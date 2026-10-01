@@ -73,7 +73,8 @@ export default class LvHomePlugin extends Plugin {
 
         this.addCommand({
             langKey: "openButler",
-            hotkey: "",
+            // 26.7 默认热键策略：Alt+H（H=Home，避开常见组合；用户可在设置-快捷键改）
+            hotkey: "Ctrl+Alt+H",
             callback: () => this.showTab(),
         });
 
