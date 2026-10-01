@@ -523,7 +523,7 @@
 - [ ] 🔴 错误与诊断入口：设置页显示插件/思源版本、前端类型、失败端点、最近扫描和恢复步骤；日志永不输出证件号、金额、token
 - [ ] 🔴 前端/内核兼容矩阵：desktop、desktop-window、browser-desktop、browser-mobile、mobile 在 3.8 LTS 与最新 beta 上验证能力探测和降级路径
 - [ ] 🟡 多窗口状态一致性：settings 与 `hub.updated` 事件带版本/时间戳，覆盖乱序、重复、丢失事件并提供手动刷新提示
-- [ ] 🟡 发布包 smoke test：解压 `package.zip` 检查 manifest、双语 i18n、图标、`LICENSE`、`MODULES.md` 和 README 链接；处理 `dist` 未包含 docs/design、prototype 导致的失链
+- [x] 🟡 发布包 smoke test：解压 `package.zip` 检查 manifest、双语 i18n、图标、`LICENSE`、`MODULES.md` 和 README 链接；处理 `dist` 未包含 docs/design、prototype 导致的失链 ✅ 2026-10-02（首轮抓到 2 真问题并修复：docs 泄漏入包已禁、LICENSE 补入；D12 落实 vite 配置）
 - [ ] 🟡 元数据一致性门禁：`package.json` repository/homepage、作者、版本、license、`plugin.json`、README 和 release tag 在 CI 中交叉校验
 - [ ] 🟡 PR CI：除 tag release 外补充 PR 的 `check + build + 包体/产物检查`，并记录 zip 体积与关键文件哈希
 - [ ] 🟡 README / MODULES / TODO 发布策略统一：明确当前 v0.1 实现边界、GitHub Release 与集市暂缓状态，避免把路线图写成已交付能力
@@ -617,6 +617,7 @@
 | 2026-10-02 | 循环B | 外部调研 flomo | 无压力捕捉印证快速备忘设计；每日回顾/八维统计参考到 v2.x 年报与统计卡；来源 flomoapp.com |
 | 2026-10-02 | 循环B | 外部调研 Notion Timeline | 起止日期范围=时间线上屏条件；travel-plan/schooling 的 timeline 视图在 v0.8 建库时补（schema 已有起止列）；来源 notion.com/help/timelines |
 | 2026-10-02 | 循环B | 外部调研 Things 3 Areas | Area→Project→To-do 层级强印证我们模块组→台账→行两层结构；组织归层级/时间归调度的分离与成员 chips+提醒中枢设计一致；来源 vanja.io/r/thingsapp |
+| 2026-10-02 | 主线 | 33.5 发布包 smoke test（首轮） | 抓到并修复：docs 泄漏入包（vite staticCopy 删 docs 行）+ LICENSE 未入包（补复制）；复检 11 必要文件全 OK/4 禁入文件全无/JSON 与 i18n 校验过 |
 | 2026-10-02 | 循环B | 外部调研 Apple 备忘录家庭共享 | 共享文件夹=家庭共用台账的思源原生路径印证（专用笔记本+思源分享即可，无需插件开发）；来源 Apple Support |
 | 2026-10-02 | 循环B | 外部调研 Notion Charts/Dashboard | 原生 chart/dashboards 印证统计卡价值；思源暂无 chart 视图→统计卡维持自绘 spark；来源 notion.com/help/charts |
 | 2026-10-02 | 循环B | 外部调研 Notion 视图 2.0 | 10 种视图与台账映射（form=快速录入原生路径候选，记 C4a 复核点）；map 思源暂无保持列表 |

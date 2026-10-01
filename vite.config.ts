@@ -82,8 +82,9 @@ export default defineConfig(buildTarget === "kernel" ? {
             targets: [
                 ...packageImageTargets,
                 { src: "./README*.md", dest: "./" },
-                { src: "./docs/*.md", dest: "./docs", rename: { stripBase: true } },
                 { src: "./asset/*", dest: "./asset", rename: { stripBase: true } },
+                // D12 发布产物范围：仅运行必需；设计文档（docs/）不入包
+                { src: "./LICENSE", dest: "./" },
                 { src: "./plugin.json", dest: "./" },
             ],
         }),
