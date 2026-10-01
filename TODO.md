@@ -456,6 +456,7 @@
 - [ ] 🟡 组件目录规范：`src/panels/<screen>/`（index.svelte + 子组件拆分原则，禁止单文件超 300 行）
 - [ ] 🟡 状态管理定案：svelte 5 runes 单例 store 三分（settings / hub / ui），边界写进 08 文档
 - [ ] 🟡 SQL 结果类型化（query 泛型封装 + 每模块手写 Row 类型，禁 any）
+- [ ] 🟡 面板 props any 清零：tab-panel 接口已具体类型化（HomeSettings/HubRuntime/ScanResult）；四屏组件的 IHomePluginLike any 字段（28 处）随 C 阶段细化逐屏类型化（循环A 第 2 项剩余）
 - [ ] 🟡 Svelte 错误边界：面板崩溃不拖垮思源主界面（顶层 error boundary + 降级 UI）
 - [ ] 🟡 加载态规范落地：何时 skeleton / 何时缓存直渲（对照 08 §4 状态矩阵逐屏标注）
 - [ ] 🟢 关键组件 props 文档注释（含用法示例）
@@ -579,7 +580,8 @@
 | 2026-10-02 | 循环A | 第 6 项 i18n 走查 | scripts/check-i18n.mjs（check:i18n script）；451 键 zh/en 全对齐 |
 | 2026-10-02 | 循环A | 第 9 项安全审计 | 移除模板遗留 console.debug（配置含成员/金额禁止打印）；保留 error 一处（契约校验提示）；console 全库仅剩必要路径 |
 | 2026-10-02 | 循环A | 第 1 项代码质量 | package.json repository/homepage 补齐（25 组元数据一致性）；抽查 5 个导出符号无死代码实锤 |
-| 2026-10-02 | 循环A | 第 5 项文档一致性 | 全仓 47 个 md 相对链接核查零失效 | media/pets/vehicles/transit/travel×4/assets-virtual 9 个 + 修复核心缺口 assets-real/health（默认启用却无 schema 的建库缺口）+ 68 枚举 i18n（总 399 键）；gzip 35.3KB；contract gate 24 schema 全过；剩余无 schema：food/address/bookmarks/snippets/parenting/schooling/social |
+| 2026-10-02 | 循环A | 第 5 项文档一致性 | 全仓 47 个 md 相对链接核查零失效 |
+| 2026-10-02 | 循环A | 第 2 项类型严格（首步） | tab-panel 核心接口具体类型化；全库 any 存量 27+28 处已盘点并记待办分批清零 | media/pets/vehicles/transit/travel×4/assets-virtual 9 个 + 修复核心缺口 assets-real/health（默认启用却无 schema 的建库缺口）+ 68 枚举 i18n（总 399 键）；gzip 35.3KB；contract gate 24 schema 全过；剩余无 schema：food/address/bookmarks/snippets/parenting/schooling/social |
 
 ---
 

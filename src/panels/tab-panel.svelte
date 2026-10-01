@@ -3,17 +3,18 @@
     import Reminders from "./screens/reminders.svelte";
     import Ledger from "./screens/ledger.svelte";
     import Members from "./screens/members.svelte";
+    import type { HomeSettings, HubRuntime, Reminder, ScanResult } from "@/types";
 
     interface IHomePluginLike {
         i18n: Record<string, string>;
         name: string;
-        settings: any;
-        runtime: any;
-        scan: any;
+        settings: HomeSettings;
+        runtime: HubRuntime;
+        scan: ScanResult | undefined;
         hubListeners: Set<() => void>;
-        refreshHub: () => Promise<any>;
+        refreshHub: () => Promise<ScanResult>;
         openSetting: () => void;
-        complete: (r: any) => Promise<unknown>;
+        complete: (r: Reminder) => Promise<unknown>;
         snooze: (id: string, days: number) => Promise<unknown>;
         mute: (id: string) => Promise<unknown>;
         unmute: (id: string) => Promise<unknown>;
