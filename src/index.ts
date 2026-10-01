@@ -232,6 +232,7 @@ export default class LvHomePlugin extends Plugin {
                 provisioned: !!ref?.docId,
                 provisional: !!ref?.provisional,
                 columns: Object.keys(ref?.columns ?? {}).length,
+                error: ref?.provisionError,
             })),
             contracts: [
                 validateSchema("members", MEMBERS_SCHEMA),

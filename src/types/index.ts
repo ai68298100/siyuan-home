@@ -101,6 +101,8 @@ export interface DbRef {
     provisional?: boolean;
     /** 字典列 key → av 列 keyID（provisioner 建列时记录；读取行的唯一稳定依据） */
     columns?: Record<string, string>;
+    /** 最近一次建库/补列失败的摘要（33.2 journal 最小版；成功后清除） */
+    provisionError?: string;
 }
 
 /** 插件设置（持久化到 data/storage/petal/siyuan-home/settings.json） */

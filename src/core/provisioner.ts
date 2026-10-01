@@ -105,11 +105,13 @@ export async function provisionModule(
     const avIdSeed = newSiYuanId();
     let avId: string | undefined;
     let provisional = false;
+    let provisionError: string | undefined;
     try {
         avId = await createAttributeView(docId, avIdSeed);
     } catch (e) {
         provisional = true;
-        console.warn(`[siyuan-home] module "${moduleId}" provisioned provisionally:`, e instanceof Error ? e.message : e);
+        provisionError = e instanceof Error ? e.message : String(e);
+        console.warn(`[siyuan-home] module "${moduleId}" provisioned provisionally:`, provisionError);
     }
     // 建列（av 可用时）；relation 列的成员库目标从 dbRefs.members 取；记录 colKey→keyID 映射
     const columnMap: Record<string, string> = {};
@@ -127,11 +129,12 @@ export async function provisionModule(
                 columnMap[col.key] = keyID;
             } catch (e) {
                 // 补列失败不阻断建库（ensureColumns 幂等补，33.2）
-                console.warn(`[siyuan-home] column "${col.key}" on "${moduleId}" deferred:`, e instanceof Error ? e.message : e);
+                provisionError = `column "${col.key}": ${e instanceof Error ? e.message : e}`;
+                console.warn(`[siyuan-home] column "${col.key}" on "${moduleId}" deferred:`, provisionError);
             }
         }
     }
-    const dbRef: DbRef = { docId, avId, notebook: notebookId, provisional, columns: columnMap };
+    const dbRef: DbRef = { docId, avId, notebook: notebookId, provisional, columns: columnMap, provisionError };
     settings.dbRefs[moduleId] = dbRef;
     return { dbRef, created: true };
 }

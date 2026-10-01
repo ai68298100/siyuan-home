@@ -161,6 +161,9 @@
                                 · {t("diag.columns")} {l.columns}
                             </p>
                         {/each}
+                        {#each diag.ledgers.filter((l: any) => l.error) as l (l.id)}
+                            <p class="lv-caption" style="color:var(--lv-danger)">{t(`module.${l.id}`)}: {l.error}</p>
+                        {/each}
                         {#if diag.errors.length > 0}
                             {#each diag.errors as e (e.moduleId)}
                                 <p class="lv-caption" style="color:var(--lv-danger)">{e.moduleId}: {e.message}</p>
