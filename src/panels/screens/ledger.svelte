@@ -1,5 +1,5 @@
 <script lang="ts">
-    import { renderLedger, addDetachedRow, setCell, newSiYuanId } from "@/core/siyuan";
+    import { renderLedger, addDetachedRow, setCell } from "@/core/siyuan";
 
     let { plugin, t }: { plugin: any; t: (k: string) => string } = $props();
 
