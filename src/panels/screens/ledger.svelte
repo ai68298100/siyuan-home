@@ -32,6 +32,7 @@
     let newExpiry = $state("");
     let newMember = $state(""); // members av itemID
     let newAmount: number | undefined = $state();
+    let newUrl = $state("");
     const memberOptions = $derived(plugin.settings.members ?? []);
     const memberAvId = $derived(plugin.settings.dbRefs.members?.avId);
     const categoryOptions = $derived<string[]>(
@@ -64,12 +65,18 @@
                 type: "relation", relation: { blockIDs: [newMember], contents: null },
             });
         }
+        // C6a 增量 4：URL 列（shopping/bookmarks/media 等 capture 常见列）
+        if (newUrl && cols.url) {
+            await setCell(ref.avId, cols.url, itemID, {
+                type: "url", url: { content: newUrl },
+            });
+        }
         if (typeof newAmount === "number" && !isNaN(newAmount) && cols.amount) {
             await setCell(ref.avId, cols.amount, itemID, {
                 type: "number", number: { content: newAmount, isNotEmpty: true },
             });
         }
-        newName = ""; newCategory = ""; newExpiry = ""; newMember = ""; newAmount = undefined;
+        newName = ""; newCategory = ""; newExpiry = ""; newMember = ""; newAmount = undefined; newUrl = "";
         await load();
         await plugin.refreshHub();
     }
@@ -105,6 +112,7 @@
     </select>
     <input class="b3-text-field" type="date" title={t("field.expiry")} bind:value={newExpiry} />
     <input class="b3-text-field" type="number" style="width:90px" placeholder={t("field.amount")} bind:value={newAmount} />
+    <input class="b3-text-field" style="min-width:140px" placeholder={t("field.url")} bind:value={newUrl} />
     <button class="b3-button b3-button--text" onclick={createRow} disabled={!ref?.avId}>＋ {t("ledger.add")}</button>
 </div>
 
