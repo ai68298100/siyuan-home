@@ -318,7 +318,7 @@
 - [ ] 🟡 RPC 入参校验：生态调用方参数 schema 校验（防脏数据入库）
 - [ ] 🟡 依赖最小化审查：每个新依赖记录必要性理由（已核：lunar-typescript/date-fns）
 - [ ] 🟡 `pnpm audit` 纳入发布前检查 + lockfile 提交
-- [ ] 🟢 dependabot/renovate 配置（依赖自动升级 PR）
+- [x] 🟢 dependabot/renovate 配置（依赖自动升级 PR） ✅ 2026-10-02（.github/dependabot.yml：npm weekly + actions monthly，major 排除）
 
 ## 20. 性能与内存
 

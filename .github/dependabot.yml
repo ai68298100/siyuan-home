@@ -1,0 +1,19 @@
+# 依赖自动升级（TODO 25）：PR 形式提交，先过 CI 再人工合并
+version: 2
+updates:
+  - package-ecosystem: "npm"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    labels:
+      - "dependencies"
+    # 只开 patch/minor 自动 PR；major 升级由维护者手动评估（lunar/date-fns 等运行时依赖变更需跑回归）
+    ignore:
+      - dependency-name: "*"
+        update-types: ["version-update:semver-major"]
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "monthly"
+    labels:
+      - "ci"
