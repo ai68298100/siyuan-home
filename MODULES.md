@@ -181,3 +181,4 @@
 | espanso/espanso（开源 14.6k★） | 文本扩展器 | 触发词→内容展开、**Forms 表单填充**（带参数位的模板）、多文件 match 组织 → `snippets` 模块印证"内容+参数位"形态；系统级注入不吸收（笔记内一键复制即可） |
 | Raindrop.io（官方桌面/移动端，闭源主程序+开源客户端 ★680+659） | 书签管理 | 集合（Collections）嵌套分类、**永久快照**（防死链）、重复/失效链接检测、高亮批注 → `bookmarks` 模块印证分类树+失效检测方向；永久快照不吸收（思源剪藏/拾遗承担） |
 | Notion 家庭 Binder 模板生态（Family Hub / Household Hub / Legacy Binder / Family HQ 等） | 家庭中枢 | 共性功能：**紧急信息卡置顶**（联系人/行动预案/医疗信息快捷访问——印证 house 模块紧急信息卡的"置顶+可打印"设计）、WiFi/保险/户号等"家庭信息中枢"页（印证 `bookmarks`+`address`+`social` 组合）、Legacy Binder 的**身后备查**维度（印证 assets-virtual 继承接管备注）、Family HQ 的移动优先多页 wiki（印证 Tab 移动端适配） |
+| TextExpander（闭源商业，2025 现状） | 文本扩展 | 缩写+填充表单（Fill-ins）、**Snippet Groups 分组共享**（家庭版思路：官方组+成员共享组）、社区模板库 → `snippets` 模块印证分组共享形态（家庭共享组=kernel broadcast 的 v2.x 场景）；订阅制云端同步不吸收（本地优先） |

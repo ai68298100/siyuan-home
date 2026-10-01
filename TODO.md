@@ -590,7 +590,8 @@
 | 2026-10-02 | 循环B | 外部调研最小轮 | actual（12k★：加密同步/快照设计印证）、seerr（12.7k★：媒体状态机印证）回填 MODULES.md 附录 |
 | 2026-10-02 | 循环B | 外部调研 espanso | 14.6k★；snippets 印证 Forms 参数位形态回填 MODULES.md |
 | 2026-10-02 | 循环B | 外部调研 Raindrop | 官方端 ★680/659；bookmarks 印证集合分类+失效检测；新增轻待办：bookmarks 加失效链接检测（进阶） |
-| 2026-10-02 | 循环B | 外部调研 Notion 家庭 Binder 生态 | 5 款模板共性（紧急卡置顶/信息中枢/Legacy 维度/移动优先）全部印证既有设计；14 组集群调研收官 | media/pets/vehicles/transit/travel×4/assets-virtual 9 个 + 修复核心缺口 assets-real/health（默认启用却无 schema 的建库缺口）+ 68 枚举 i18n（总 399 键）；gzip 35.3KB；contract gate 24 schema 全过；剩余无 schema：food/address/bookmarks/snippets/parenting/schooling/social |
+| 2026-10-02 | 循环B | 外部调研 Notion 家庭 Binder 生态 | 5 款模板共性（紧急卡置顶/信息中枢/Legacy 维度/移动优先）全部印证既有设计；14 组集群调研收官 |
+| 2026-10-02 | 循环B | 外部调研 TextExpander | 14 组最后尾巴收掉：Snippet Groups 分组共享印证 snippets 家庭共享形态（v2.x kernel broadcast 场景）；云端订阅不吸收。循环 B 常规项全部完成，后续仅按需触发 | media/pets/vehicles/transit/travel×4/assets-virtual 9 个 + 修复核心缺口 assets-real/health（默认启用却无 schema 的建库缺口）+ 68 枚举 i18n（总 399 键）；gzip 35.3KB；contract gate 24 schema 全过；剩余无 schema：food/address/bookmarks/snippets/parenting/schooling/social |
 
 ---
 
