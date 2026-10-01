@@ -36,6 +36,12 @@ pnpm run make-link   # 软链到思源工作空间 data/plugins/
 
 ## 发布
 
+- **版本策略（semver）**：
+  - **Major**（1.0→2.0）：破坏性变更（数据结构不兼容、模块移除、最低思源版本抬升）
+  - **Minor**（0.2→0.3）：新模块上线、显著新功能（用户可感知）
+  - **Patch**（0.2.1）：修复、文案、性能优化（用户无新能力）
+  - 0.x 阶段：Minor 即可能含结构调整，升级前看 CHANGELOG 的 migration notes
+- `minAppVersion` 抬升策略：仅当依赖新内核能力时才升（否则保持最大兼容面）
 - 版本号：`pnpm run update-version`（同步 package.json/plugin.json）
 - Release：打 tag → GitHub Release 附 package.zip（**集市上架暂缓**，由维护者决定时机）
 - 发布前：`docs/testing/v0.2.md` 回归脚本走查 + `check:meta` + smoke test（33.5）

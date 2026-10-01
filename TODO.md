@@ -356,8 +356,8 @@
 
 ## 23. 发布工程与维护
 
-- [ ] 🟡 semver 策略文档（破坏性=大版本/新模块=小版本/修复=patch）
-- [ ] 🟡 minAppVersion 抬升策略（依赖新内核能力时才升）
+- [x] 🟡 semver 策略文档（破坏性=大版本/新模块=小版本/修复=patch） ✅ 2026-10-02（并入 CONTRIBUTING 发布节；0.x 阶段附 migration notes 说明）
+- [x] 🟡 minAppVersion 抬升策略（依赖新内核能力时才升） ✅ 2026-10-02（并入 semver 节）
 - [ ] 🟢 release notes 半自动生成（git log → CHANGELOG 草稿）
 - [x] 🟡 zip 产物体积检查（<10MB，CI 门禁） ✅ 2026-10-02（check:meta 内置 zip 体积门禁）
 - [ ] 🟢 beta 通道：GitHub prerelease 供内测用户先行
