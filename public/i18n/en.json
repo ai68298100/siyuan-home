@@ -214,5 +214,12 @@
     "wiz.s2Hint": "Pre-selected by your household; adjust in settings anytime.",
     "wiz.noExtra": "Default modules cover your setup",
     "wiz.back": "Back",
-    "wiz.finish": "Finish & create"
+    "wiz.finish": "Finish & create",
+    "members.all": "All",
+    "mod.pending": "pending",
+    "hub.groupOverdue": "Overdue",
+    "hub.groupSoon": "Next 7 days",
+    "hub.groupLead": "Next 30 days",
+    "wiz.rerun": "Re-run onboarding",
+    "wiz.rerunHint": "Onboarding reset — open the panel to configure again"
 }

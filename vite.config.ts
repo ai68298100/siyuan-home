@@ -121,6 +121,8 @@ export default defineConfig(buildTarget === "kernel" ? {
 
             output: {
                 entryFileNames: "[name].js",
+                // 动态 chunk（如农历懒加载）强制 .js，避免 .cjs 后缀在插件加载器下的 MIME 问题
+                chunkFileNames: "chunks/[name]-[hash].js",
                 assetFileNames: (assetInfo) => assetInfo.name ?? "asset",
             },
         },

@@ -135,6 +135,12 @@
             <p>{t("about.line1")}</p>
             <p>{t("about.tagline")}</p>
             <p class="ft__on-surface">{t("about.principles")}</p>
+            <button class="b3-button b3-button--outline" style="margin-top:8px"
+                onclick={async () => {
+                    plugin.settings.onboarded = false;
+                    await import("@/core/settings").then((m) => m.saveSettings(plugin as any, plugin.settings));
+                    showMessage(t("wiz.rerunHint"), 3000, "info");
+                }}>{t("wiz.rerun")}</button>
         </div>
     {/if}
 

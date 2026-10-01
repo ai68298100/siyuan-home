@@ -69,7 +69,7 @@ export class CertsProvider implements DataProvider {
                 const v = cell(rule.field);
                 const fieldValue = v?.type === "date" ? dateFromValue(v) : textFromValue(v);
                 if (!fieldValue) continue;
-                const r = buildReminder(rule, this.moduleId, { ...rowDates, fieldValue }, {
+                const r = await buildReminder(rule, this.moduleId, { ...rowDates, fieldValue }, {
                     today,
                     leadOverride: leadFor(this.deps.settings, this.moduleId, rule),
                 });
@@ -101,7 +101,7 @@ export class MembersProvider implements DataProvider {
             if (!fieldValue) continue;
             const lunar = !!birthday?.checkbox?.checked;
             for (const rule of schema.reminders ?? []) {
-                const r = buildReminder(rule, this.moduleId, { rowId: row.itemID, title: name, fieldValue, lunar }, {
+                const r = await buildReminder(rule, this.moduleId, { rowId: row.itemID, title: name, fieldValue, lunar }, {
                     today,
                     leadOverride: leadFor(this.deps.settings, this.moduleId, rule),
                 });

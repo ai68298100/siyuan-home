@@ -22,6 +22,8 @@ export interface HubRuntime {
     schemaVersion: 1;
     /** 上次全量扫描时间（ISO） */
     scannedAt?: string;
+    /** 总览成员过滤（C2e：持久化） */
+    filterMemberId?: string;
     /** 上次扫描摘要缓存（通知与总览首屏直读，扫描失败时保留 stale 数据） */
     cache?: {
         reminders: Reminder[];

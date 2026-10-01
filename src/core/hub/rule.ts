@@ -1,6 +1,6 @@
 /**
  * 提醒规则引擎（docs/design/03 + docs/design/09 决策记录）。
- * 纯函数，无思源依赖，可单测。
+ * 纯逻辑 + 农历懒加载（lunar-lazy，bundle 整改 🔴），无思源依赖，可单测。
  *
  * 决策定案（2026-10-01，docs/design/09）：
  * - 公历 2/29 生日：平年在 2/28 提醒；
@@ -10,8 +10,8 @@
  * - 日期序列化一律用本地时区（localDateKey），禁止 toISOString（UTC 偏移会偏一天）。
  */
 import { addDays, addMonths, addYears, differenceInCalendarDays, parseISO, isValid } from "date-fns";
-import { Lunar } from "lunar-typescript";
 import type { Reminder, ReminderRuleSpec, ReminderLevel } from "@/types";
+import { nextLunarAnniversary } from "./lunar-lazy";
 
 export interface LedgerRowDates {
     /** 行块 ID */
@@ -24,7 +24,6 @@ export interface LedgerRowDates {
     cycle?: string;
     /** anniversary 的农历标记 */
     lunar?: boolean;
-    /** 行状态（DataProvider 层过滤 archived/void 后才进入本引擎） */
 }
 
 const CYCLE_MONTHS: Record<string, number> = {
@@ -49,40 +48,8 @@ function daysInMonth(year: number, month0: number): number {
     return new Date(year, month0 + 1, 0).getDate();
 }
 
-/** 农历 (年,月,日) → 公历；日不存在时向前回退（腊月三十→廿九）；完全失败返回 null */
-export function lunarToSolar(y: number, m: number, d: number): Date | null {
-    for (let day = d; day >= 1; day--) {
-        try {
-            const s = Lunar.fromYmd(y, m, day).getSolar();
-            return new Date(s.getYear(), s.getMonth() - 1, s.getDay());
-        } catch {
-            // 该日不存在（小月无三十等），继续回退
-        }
-    }
-    return null;
-}
-
-/**
- * 农历周年（决策：闰月生日平年过平月同日；生日缺失日向前回退）。
- * 从候选公历年起逐个尝试，返回第一个 >= today 的公历日期。
- */
-function nextLunarAnniversary(base: Date, today0: Date): Date | undefined {
-    const lb = Lunar.fromDate(base);
-    const lm = lb.getMonth(); // 负数 = 闰月
-    const ld = lb.getDay();
-    for (let y = today0.getFullYear() - 1; y <= today0.getFullYear() + 1; y++) {
-        // 闰月生日：先试当年同闰月，无该闰月则过平月同日
-        const candidates = lm < 0 ? [y, -lm] as const : [lm] as const;
-        for (const m of candidates) {
-            const g = lunarToSolar(y, m, ld);
-            if (g && g >= today0) return g;
-        }
-    }
-    return undefined;
-}
-
 /** 下次发生日（含今天）。 */
-export function nextOccurrence(rule: ReminderRuleSpec, row: LedgerRowDates, today: Date): Date | undefined {
+export async function nextOccurrence(rule: ReminderRuleSpec, row: LedgerRowDates, today: Date): Promise<Date | undefined> {
     const base = parseDate(row.fieldValue);
     if (!base) return undefined;
     const today0 = new Date(today.getFullYear(), today.getMonth(), today.getDate());
@@ -98,11 +65,11 @@ export function nextOccurrence(rule: ReminderRuleSpec, row: LedgerRowDates, toda
         return cand;
     }
 
-    // recurring：按周期滚动到今天及以后（O(1) 月数差；day/week 用模运算）
+    // recurring：按周期滚动到今天及以后（O(1) 月数差；day/week 用差值跳步）
     if (row.cycle === "day") {
         const diff = differenceInCalendarDays(today0, base);
         if (diff <= 0) return base;
-        return addDays(base, Math.ceil(diff / 1) * 1);
+        return addDays(base, diff);
     }
     if (row.cycle === "week") {
         const diff = differenceInCalendarDays(today0, base);
@@ -134,13 +101,13 @@ export function levelOf(daysLeft: number, leadDays: number): ReminderLevel {
  * leadOverride 合并顺序（33.3）：行级 remind_before > 用户 leadOverrides > schema 默认；
  * 行级与用户级的合并在 DataProvider 层完成，这里只收最终值。
  */
-export function buildReminder(
+export async function buildReminder(
     rule: ReminderRuleSpec,
     moduleId: string,
     row: LedgerRowDates,
     opts: { today: Date; leadOverride?: number },
-): Reminder | null {
-    const due = nextOccurrence(rule, row, opts.today);
+): Promise<Reminder | null> {
+    const due = await nextOccurrence(rule, row, opts.today);
     if (!due) return null;
     const leadDays = Math.max(0, Math.min(opts.leadOverride ?? rule.leadDays, 3650));
     const daysLeft = differenceInCalendarDays(due, opts.today);
@@ -158,11 +125,4 @@ export function buildReminder(
         daysLeft,
         level,
     };
-}
-
-/** Solar → 农历文本（供 UI 显示） */
-export function lunarLabel(iso: string): string | undefined {
-    const d = parseDate(iso);
-    if (!d) return undefined;
-    return Lunar.fromDate(d).toString();
 }

@@ -77,13 +77,13 @@
 - [ ] 🔴 C1b 导航胶囊滑动（offsetLeft 计算 + spring）
 - [ ] 🔴 C1c 删除旧 Dialog 面板与 index.scss LEGACY 段（dashboard.svelte/settings.svelte 重写为 lv-* 组件）
 - [x] 🔴 C1d 屏幕容器 `.lv-screen/.lv-anim` 接入（入场编排生效） ✅ 2026-10-02（Tab 化 + 数据接线 commit，见 34 组记录）
-- [ ] 🔴 C2a 总览：页头（问候/日期/计数滚动）+ 成员 chips 行
+- [x] 🔴 C2a 总览：页头（问候/日期/计数滚动）+ 成员 chips 行 ✅ 2026-10-02（bundle gzip 132→32KB；成员过滤持久化；三级分组；向导重跑）
 - [x] 🔴 C2b 总览：即将到期区（取 HubState 前 4 条 + 空态 + "查看全部"） ✅ 2026-10-02（Tab 化 + 数据接线 commit，见 34 组记录）
 - [ ] 🔴 C2c 总览：快速记录行（qbtn 按 enabledModules 过滤）
 - [ ] 🔴 C2d 总览：模块卡网格（启用模块 + certs/药箱统计卡）
-- [ ] 🔴 C2e 成员 chips 过滤状态持久化（作用于提醒/模块卡计数）
+- [x] 🔴 C2e 成员 chips 过滤状态持久化（作用于提醒/模块卡计数） ✅ 2026-10-02（bundle gzip 132→32KB；成员过滤持久化；三级分组；向导重跑）
 - [ ] 🔴 C3a 提醒中枢页：四组筛选（模块/成员/类型/时间）+ 显示已处理
-- [ ] 🔴 C3b 提醒中枢页：分组列表（逾期/7 天/30 天/已处理折叠）
+- [x] 🔴 C3b 提醒中枢页：分组列表（逾期/7 天/30 天/已处理折叠） ✅ 2026-10-02（bundle gzip 132→32KB；成员过滤持久化；三级分组；向导重跑）
 - [ ] 🔴 C3c 提醒中枢页：行内动作菜单（完成/续期/延后▾/定位/忽略）接线 B4
 - [ ] 🔴 C3d 筛选条件持久化
 - [ ] ⛔ 🔴 C4a 台账页外壳：模块切换下拉 + "在文档中打开"（依赖 S1 定案嵌入方式）
@@ -101,7 +101,7 @@
 - [x] 🔴 C7a 首次引导向导：三步（家庭构成→推荐模块→建库确认） ✅ 2026-10-02（Tab 化 + 数据接线 commit，见 34 组记录）
 - [x] 🔴 C7b 引导按 suggestRoles 预选逻辑（子女→育儿/上学/零花钱） ✅ 2026-10-02（Tab 化 + 数据接线 commit，见 34 组记录）
 - [ ] 🔴 C7c 引导建库批处理（provisioner 逐模块）+ 完成空态引导
-- [ ] 🔴 C7d 引导可跳过、设置页可重跑
+- [x] 🔴 C7d 引导可跳过、设置页可重跑 ✅ 2026-10-02（bundle gzip 132→32KB；成员过滤持久化；三级分组；向导重跑）
 - [ ] 🔴 C8a 设置五分区：模块/成员/提醒/生态/关于
 - [ ] 🔴 C8b 模块开关接线（启用→provisioner 建库；禁用→隐藏保留数据 + 确认框）
 - [ ] 🔴 C8c 提醒分区：leadOverrides 编辑（按 moduleId.ruleKey）+ 摘要时段 + 静默时段
@@ -319,7 +319,7 @@
 - [ ] 🟡 date-fns 按需引入核验（bundle 分析，只导入用到函数）
 - [ ] 🟢 附件缩略图懒加载（成员头像/资产照片墙）
 - [ ] 🟡 长会话内存走查（开关抽屉/弹层 50 次无增长）
-- [ ] 🔴 bundle 超预算整改：index.js gzip 132KB > 100KB 预算（05 §4.5）——lunar-typescript 全量入包；tree-shake 或动态 import 拆包（2026-10-02 实测）
+- [x] 🔴 bundle 超预算整改：index.js gzip 132KB > 100KB 预算（05 §4.5）——lunar-typescript 全量入包；动态 import 拆独立 chunk（按需加载，仅农历触发）✅ 2026-10-02 实测 gzip 132→32.4KB（-76%） ✅ 2026-10-02（bundle gzip 132→32KB；成员过滤持久化；三级分组；向导重跑）
 
 ## 21. 测试与质量工程
 
@@ -565,6 +565,7 @@
 | 2026-10-01 | 主线 | Spike 三组实验（用户启动思源后执行） | 定案 R-av-create/R2/R5；siyuan.ts 真实 av 实现；S0-S5/A2a 共 9 项勾选；R5 降级定案；实验笔记本已清理 |
 | 2026-10-01 | 主线 | B2a/B2c/B4f 提醒中枢数据链 | DataProvider(certs/members) + runScan(容错/开关收敛/计数) + runtime(snooze/mute/adhoc/缓存)；DbRef.columns 映射补齐；vitest 30/30；B2d/B3 留待接线 |
 | 2026-10-02 | 主线 | C1 Tab 化 + B2b/B3 接线 + C7 向导 + A4 | addTab 四页签面板（总览/提醒/台账/成员）；onload 建库+扫描+每日摘要；向导三步（suggestRoles 预选）；i18n 迁移（216 键双语）；GitHub 公开仓库 ai68298100/siyuan-home 推送；新增 🔴 bundle 超预算待办；发现 addTab init 闭包 self 指向 window 的坑已修 |
+| 2026-10-02 | 主线 | 🔴 bundle 整改 + C2a/e + C3b + C7d | 农历动态 import 拆 chunk（gzip 132→32.4KB，-76%，chunk 强制 .js）；总览成员 chips 过滤（持久化）+模块卡待办数；提醒页三级分组；设置页重跑引导；vitest 30/30 |
 
 ---
 

@@ -214,5 +214,12 @@
     "wiz.s2Hint": "按家庭构成预选，可随时在设置中调整。",
     "wiz.noExtra": "当前构成使用默认模块即可",
     "wiz.back": "上一步",
-    "wiz.finish": "完成并建库"
+    "wiz.finish": "完成并建库",
+    "members.all": "全部",
+    "mod.pending": "件待办",
+    "hub.groupOverdue": "已逾期",
+    "hub.groupSoon": "未来 7 天",
+    "hub.groupLead": "未来 30 天",
+    "wiz.rerun": "重新运行引导",
+    "wiz.rerunHint": "已重置引导，打开管家面板即可重新配置"
 }

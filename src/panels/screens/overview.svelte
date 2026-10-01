@@ -3,8 +3,21 @@
 
     let { plugin, t, onGoto }: { plugin: any; t: (k: string) => string; onGoto: (s: string) => void } = $props();
 
-    const reminders = $derived(plugin.scan?.reminders ?? []);
+    const allReminders = $derived(plugin.scan?.reminders ?? []);
+    const members = $derived(plugin.settings.members ?? []);
+    // C2e：成员过滤（持久化 runtime.filterMemberId；成员行 memberId 在 v0.2 由行创建顺序关联，未关联时显示全部）
+    const reminders = $derived(
+        plugin.runtime.filterMemberId
+            ? allReminders.filter((r: any) => !r.memberId || r.memberId === plugin.runtime.filterMemberId)
+            : allReminders,
+    );
     const top = $derived(reminders.slice(0, 4));
+
+    async function setMemberFilter(id: string | undefined) {
+        plugin.runtime.filterMemberId = id;
+        const { saveRuntime } = await import("@/core/hub/runtime");
+        await saveRuntime(plugin, plugin.runtime);
+    }
 
     let memoTitle = $state("");
     let memoDue = $state("");
@@ -23,6 +36,16 @@
 <div class="lv-hero">
     <div><h1>{t("dash.hello")}</h1><p>{t("dash.sub")}</p></div>
     <div class="lv-hero-count"><b class="lv-num">{reminders.length}</b><span>{t("dash.needAttention")}</span></div>
+</div>
+
+<div class="lv-members" style="margin-bottom:4px">
+    <button class="lv-chip {!plugin.runtime.filterMemberId ? 'on' : ''}" onclick={() => setMemberFilter(undefined)}>{t("members.all")}</button>
+    {#each members as m (m.id)}
+        <button class="lv-chip {plugin.runtime.filterMemberId === m.id ? 'on' : ''}" onclick={() => setMemberFilter(m.id)}>
+            <span class="lv-avatar" style="background:linear-gradient(135deg,var(--lv-accent),#9a7cff)">{m.name.slice(0, 1)}</span>{m.name}
+        </button>
+    {/each}
+    <button class="lv-chip" onclick={() => onGoto("members")}>＋</button>
 </div>
 
 <div class="lv-sec"><h2 class="lv-title-sec">{t("dash.upcoming")}</h2>
@@ -60,6 +83,7 @@
 </div>
 <div class="lv-mods">
     {#each plugin.settings.enabledModules.filter((id: string) => id !== "members") as mid (mid)}
+        {@const pending = allReminders.filter((r: any) => r.moduleId === mid).length}
         <div
             class="lv-card lv-card--hover lv-mod"
             role="button"
@@ -68,7 +92,13 @@
             onclick={() => onGoto("ledger")}
         >
             <div class="lv-mi t-blue">🗂</div><b>{t(`module.${mid}`)}</b>
-            <div class="lv-stat"><span>{t("mod.inLedger")}</span></div>
+            <div class="lv-stat">
+                {#if pending > 0}
+                    <b class="lv-num">{pending}</b><span style="color:var(--lv-warn)">{t("mod.pending")}</span>
+                {:else}
+                    <span>{t("mod.inLedger")}</span>
+                {/if}
+            </div>
         </div>
     {/each}
 </div>
