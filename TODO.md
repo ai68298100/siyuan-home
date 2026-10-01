@@ -295,6 +295,7 @@
 - [ ] 🟡 通知队列防轰炸（任务笔记管理模式：应用内通知单例队列 MAX=5 超出关最旧；B3 接线时采用）
 - [ ] 🟢 B3 出口扩展：Webhook 推送（Bark/ntfy 推手机）或与 siyuan-homepage 通知中心联动转发——不自建推送，借道既有出口（homepage 深挖印证）
 - [ ] 🟢 提醒双日期：deadline（必须完成日）与 plan（计划处理日）分离，逾期 deadline 加粗红显（Things 3 印证；总览可按 plan 提前展示）；Today 晚间分区（可选）
+- [ ] 🟢 筛选器命名视图（滴答清单智能清单印证：筛选条件组合保存为命名视图如"妈妈的证件"/"本月订阅"，一键切换；依赖 C3d 筛选持久化已实现）
 - [ ] 🟢 stock/shopping 按品类自动分区视图（Apple Reminders Grocery 印证：录入品类自动归组）；台账列视图（看板）可选项
 - [ ] 🟡 C4a 复核点：Notion form 视图=表单直写库——思源 3.8 未推出表单视图（官方调研确认），快速录入维持自建 Dialog 路线；日历视图官方已推出→提醒中枢日历形态改走原生（C4a 复核点更新）
 - [ ] 🟢 密度切换（紧凑/舒适，表格行高两档）
@@ -621,6 +622,7 @@
 | 2026-10-02 | 循环B | 外部调研 flomo | 无压力捕捉印证快速备忘设计；每日回顾/八维统计参考到 v2.x 年报与统计卡；来源 flomoapp.com |
 | 2026-10-02 | 循环B | 外部调研 Notion Timeline | 起止日期范围=时间线上屏条件；travel-plan/schooling 的 timeline 视图在 v0.8 建库时补（schema 已有起止列）；来源 notion.com/help/timelines |
 | 2026-10-02 | 循环B | 外部调研 Things 3 Areas | Area→Project→To-do 层级强印证我们模块组→台账→行两层结构；组织归层级/时间归调度的分离与成员 chips+提醒中枢设计一致；来源 vanja.io/r/thingsapp |
+| 2026-10-02 | 循环B | 外部调研 滴答清单四象限/智能清单 | 筛选器命名视图产出新待办（依赖已实现的 C3d 持久化）；来源 help.dida365/sspai |
 | 2026-10-02 | 主线 | 33.5 发布包 smoke test（首轮） | 抓到并修复：docs 泄漏入包（vite staticCopy 删 docs 行）+ LICENSE 未入包（补复制）；复检 11 必要文件全 OK/4 禁入文件全无/JSON 与 i18n 校验过 |
 | 2026-10-02 | 循环B | 外部调研 Apple 备忘录家庭共享 | 共享文件夹=家庭共用台账的思源原生路径印证（专用笔记本+思源分享即可，无需插件开发）；来源 Apple Support |
 | 2026-10-02 | 循环B | 外部调研 Notion Charts/Dashboard | 原生 chart/dashboards 印证统计卡价值；思源暂无 chart 视图→统计卡维持自绘 spark；来源 notion.com/help/charts |
