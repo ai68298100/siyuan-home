@@ -1,4 +1,5 @@
 <script lang="ts">
+    import { Dialog, Menu } from "siyuan";
     let { plugin, t }: { plugin: any; t: (k: string) => string } = $props();
 
     const all = $derived(plugin.scan?.reminders ?? []);
@@ -8,11 +9,34 @@
     );
     const levelBadge: Record<string, string> = { overdue: "red", soon: "orange", lead: "yellow" };
 
-    async function renewPrompt(r: any) {
-        const iso = window.prompt(t("act.renewPrompt"), r.dueDate);
-        if (!iso) return;
-        await plugin.renew(r, iso);
-        await plugin.refreshHub();
+    // B4b 续期：思源 Dialog 小窗（B4e 正规化，替换 window.prompt）
+    function renewDialog(r: any) {
+        const dlg = new Dialog({
+            title: `${t("act.renew")} · ${r.title}`,
+            content: `<div class="b3-dialog__content"><input class="b3-text-field fn__block" id="lv-renew-date" type="date" value="${r.dueDate}"></div>
+<div class="b3-dialog__action"><button class="b3-button b3-button--cancel" id="lv-renew-cancel">${t("cancel")}</button><button class="b3-button b3-button--text" id="lv-renew-ok">${t("save")}</button></div>`,
+            width: "380px",
+        });
+        dlg.element.querySelector("#lv-renew-cancel")?.addEventListener("click", () => dlg.destroy());
+        dlg.element.querySelector("#lv-renew-ok")?.addEventListener("click", async () => {
+            const v = (dlg.element.querySelector("#lv-renew-date") as HTMLInputElement)?.value;
+            dlg.destroy();
+            if (!v) return;
+            await plugin.renew(r, v);
+            await plugin.refreshHub();
+        });
+    }
+
+    // C3c 延后天数菜单（1/3/7/30）
+    function snoozeMenu(r: any, ev: MouseEvent) {
+        const menu = new Menu("lv-snooze");
+        for (const d of [1, 3, 7, 30]) {
+            menu.addItem({
+                label: t("act.snoozeN").replace("${n}", String(d)),
+                click: () => plugin.snooze(r.id, d).then(() => plugin.refreshHub()),
+            });
+        }
+        menu.open({ x: ev.clientX, y: ev.clientY });
     }
 </script>
 
@@ -55,9 +79,9 @@
                     <div class="lv-rem-ops">
                         <button class="b3-button b3-button--text" onclick={() => plugin.complete(r)}>{t("act.done")}</button>
                         {#if r.moduleId === "certs"}
-                            <button class="b3-button b3-button--text" onclick={() => renewPrompt(r)}>{t("act.renew")}</button>
+                            <button class="b3-button b3-button--text" onclick={() => renewDialog(r)}>{t("act.renew")}</button>
                         {/if}
-                        <button class="b3-button b3-button--text" onclick={() => plugin.snooze(r.id, 7)}>{t("act.snooze7")}</button>
+                        <button class="b3-button b3-button--text" onclick={(e) => snoozeMenu(r, e)}>{t("act.snooze")} ▾</button>
                         <button class="b3-button b3-button--text" onclick={() => plugin.mute(r.id)}>{t("act.mute")}</button>
                     </div>
                 </div>

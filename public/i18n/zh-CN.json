@@ -221,5 +221,7 @@
     "hub.groupSoon": "未来 7 天",
     "hub.groupLead": "未来 30 天",
     "wiz.rerun": "重新运行引导",
-    "wiz.rerunHint": "已重置引导，打开管家面板即可重新配置"
+    "wiz.rerunHint": "已重置引导，打开管家面板即可重新配置",
+    "act.snooze": "延后",
+    "act.snoozeN": "${n} 天后"
 }

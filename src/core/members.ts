@@ -23,6 +23,8 @@ export async function addMember(plugin: Plugin, settings: HomeSettings, member: 
         const ref = settings.dbRefs.members;
         if (ref?.avId && ref.columns) {
             const itemID = await addDetachedRow(ref.avId, member.name);
+            member.avItemId = itemID; // 回填关联键（成员过滤/下钻依赖）
+            await saveSettings(plugin, settings);
             await writeMemberCells(ref, itemID, member);
         }
     } catch (e) {

@@ -56,14 +56,21 @@ export class CertsProvider implements DataProvider {
         const schema = CERTS_SCHEMA;
         const out: Reminder[] = [];
         const { rows } = await renderLedger(ref.avId);
+        // relation 列（成员）→ 行 itemID → settings.members（avItemId 反查，成员过滤键）
+        const members = this.deps.settings.members ?? [];
         for (const row of rows) {
             const cell = (key: string) => row.cells[ref.columns![key]];
             const status = selectFromValue(cell("status"));
             if (status && status !== "valid") continue;
             const name = textFromValue(cell("name")) ?? "未命名证件";
+            const relBlockIDs: string[] | undefined = cell("member")?.relation?.blockIDs ?? undefined;
+            const member = relBlockIDs?.[0]
+                ? members.find((m) => m.avItemId === relBlockIDs[0])
+                : undefined;
             const rowDates: LedgerRowDates = {
                 rowId: row.itemID,
                 title: name,
+                memberId: member?.id,
             };
             for (const rule of schema.reminders ?? []) {
                 const v = cell(rule.field);

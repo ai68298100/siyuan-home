@@ -221,5 +221,7 @@
     "hub.groupSoon": "Next 7 days",
     "hub.groupLead": "Next 30 days",
     "wiz.rerun": "Re-run onboarding",
-    "wiz.rerunHint": "Onboarding reset — open the panel to configure again"
+    "wiz.rerunHint": "Onboarding reset — open the panel to configure again",
+    "act.snooze": "Snooze",
+    "act.snoozeN": "in ${n} days"
 }

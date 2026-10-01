@@ -25,6 +25,7 @@ export default class LvHomePlugin extends Plugin {
     settings: HomeSettings;
     runtime: HubRuntime;
     scan: ScanResult;
+    private heartbeat: number | undefined;
     /** Tab 面板刷新回调（面板挂载时注册） */
     onHubUpdate: (() => void) | null = null;
 
@@ -68,6 +69,11 @@ export default class LvHomePlugin extends Plugin {
         if (!this.settings.onboarded) {
             showMessage(this.i18n.firstRun, 6000, "info");
         }
+
+        // B2d 降级定案（kernel.js 无定时器 API）：前端心跳 30min 驱动定时扫描
+        this.heartbeat = window.setInterval(() => {
+            this.refreshHub().catch((e) => console.warn("[siyuan-home] heartbeat scan failed:", e));
+        }, 30 * 60 * 1000);
     }
 
     /** 布局就绪后：首次引导数据准备 + 建库 + 扫描（不阻塞启动） */
@@ -170,6 +176,7 @@ export default class LvHomePlugin extends Plugin {
     }
 
     onunload() {
-        // v0.2：Tab 面板由思源管理销毁；无定时器驻留
+        if (this.heartbeat) window.clearInterval(this.heartbeat);
+        this.heartbeat = undefined;
     }
 }

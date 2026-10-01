@@ -25,9 +25,13 @@
     }
     $effect(() => { void active; void plugin.scan?.scannedAt; load(); });
 
-    // capture 快速表单：name + expiry（v0.2 精简；capture 列集见 02 §4.1）
+    // capture 快速表单：name + member + expiry（v0.2 精简；capture 列集见 02 §4.1）
     let newName = $state("");
     let newExpiry = $state("");
+    let newMember = $state(""); // members av itemID
+    const memberOptions = $derived(plugin.settings.members ?? []);
+    const memberAvId = $derived(plugin.settings.dbRefs.members?.avId);
+
     async function createRow() {
         if (!ref?.avId || !newName.trim()) return;
         const itemID = await addDetachedRow(ref.avId, newName.trim());
@@ -37,8 +41,13 @@
                 type: "date", date: { content: new Date(`${newExpiry}T00:00:00`).getTime(), isNotEmpty: true, isNotTime: true },
             });
         }
+        if (newMember && cols.member && memberAvId) {
+            await setCell(ref.avId, cols.member, itemID, {
+                type: "relation", relation: { blockIDs: [newMember], contents: null },
+            });
+        }
         void newSiYuanId;
-        newName = ""; newExpiry = "";
+        newName = ""; newExpiry = ""; newMember = "";
         await load();
         await plugin.refreshHub();
     }
@@ -58,6 +67,12 @@
 
 <div class="lv-card" style="padding:14px;display:flex;gap:8px;flex-wrap:wrap;align-items:center">
     <input class="b3-text-field fn__flex-1" style="min-width:160px" placeholder={t("ledger.newName")} bind:value={newName} />
+    <select class="b3-select" bind:value={newMember}>
+        <option value="">{t("field.member")}: {t("members.all")}</option>
+        {#each memberOptions as m (m.avItemId ?? m.id)}
+            <option value={m.avItemId}>{m.name}</option>
+        {/each}
+    </select>
     <input class="b3-text-field" type="date" title={t("field.expiry")} bind:value={newExpiry} />
     <button class="b3-button b3-button--text" onclick={createRow} disabled={!ref?.avId}>＋ {t("ledger.add")}</button>
 </div>

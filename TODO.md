@@ -58,16 +58,16 @@
 - [x] 🔴 B1c 规则引擎单测：recurring 周期滚动（day/week/month/quarter/year）+ 未声明周期降级 ✅ 2026-10-01（09 决策记录 / commit 168dcae）
 - [x] 🔴 B1d 规则引擎单测：leadOverrides 覆盖与 later 降噪过滤 ✅ 2026-10-01（09 决策记录 / commit 168dcae）
 - [x] 🔴 B2a 扫描器：DataProvider 接口 + certs 实现（SQL 到期范围查询） ✅ 2026-10-01（providers/scanner/runtime 三层 + 7 单测；kernel 定时触发 B2d 另行）
-- [ ] 🔴 B2b 扫描器：三路触发整合（kernel 定时 / Tab 打开刷新 / 前端兜底心跳）
+- [x] 🔴 B2b 扫描器：三路触发整合（kernel 定时 / Tab 打开刷新 / 前端兜底心跳） ✅ 2026-10-02（B2b=Tab触发+30min心跳；B2d 定案 kernel 无定时器 API 走前端心跳；B4 续期=思源 Dialog/延后=Menu 1/3/7/30）
 - [x] 🔴 B2c HubState 缓存读写（kernel storage 优先，前端降级） ✅ 2026-10-01（providers/scanner/runtime 三层 + 7 单测；kernel 定时触发 B2d 另行）
-- [ ] 🟡 B2d kernel.js 定时任务：每日 08:00 全量扫描（可配）+ broadcast `hub.updated`
+- [x] 🟡 B2d kernel.js 定时任务：每日 08:00 全量扫描（可配）+ broadcast `hub.updated` ✅ 2026-10-02（B2b=Tab触发+30min心跳；B2d 定案 kernel 无定时器 API 走前端心跳；B4 续期=思源 Dialog/延后=Menu 1/3/7/30）
 - [ ] 🔴 B3a 通知：每日摘要一条（notifyHour，lastNotifiedDate 去重）
-- [ ] 🔴 B3b 通知：overdue 首次发现立即通知 + 静默时段（silentFrom/To）
+- [x] 🔴 B3b 通知：overdue 首次发现立即通知 + 静默时段（silentFrom/To） ✅ 2026-10-02（B2b=Tab触发+30min心跳；B2d 定案 kernel 无定时器 API 走前端心跳；B4 续期=思源 Dialog/延后=Menu 1/3/7/30）
 - [ ] 🔴 B3c 通知点击 → 打开管家 Tab 提醒页
 - [ ] 🔴 B4a 动作：完成（oneoff 归档 / recurring 写 last_done 重算 due / anniversary 记当年已办）
-- [ ] 🔴 B4b 动作：续期小窗（新到期日 + 历史追加 note）
-- [ ] 🔴 B4c 动作：延后 snooze（1/3/7/30 天，运行态持久化）
-- [ ] 🔴 B4d 动作：忽略 mute（rowId+ruleKey，可恢复）
+- [x] 🔴 B4b 动作：续期小窗（新到期日 + 历史追加 note） ✅ 2026-10-02（B2b=Tab触发+30min心跳；B2d 定案 kernel 无定时器 API 走前端心跳；B4 续期=思源 Dialog/延后=Menu 1/3/7/30）
+- [x] 🔴 B4c 动作：延后 snooze（1/3/7/30 天，运行态持久化） ✅ 2026-10-02（B2b=Tab触发+30min心跳；B2d 定案 kernel 无定时器 API 走前端心跳；B4 续期=思源 Dialog/延后=Menu 1/3/7/30）
+- [x] 🔴 B4d 动作：忽略 mute（rowId+ruleKey，可恢复） ✅ 2026-10-02（B2b=Tab触发+30min心跳；B2d 定案 kernel 无定时器 API 走前端心跳；B4 续期=思源 Dialog/延后=Menu 1/3/7/30）
 - [ ] ⛔ 🔴 B4e 动作：定位（依赖 S3 结论；降级=打开台账文档）
 - [x] 🔴 B4f 提醒中枢运行态存储 schema（snooze/mute/已办缓存 → loadData） ✅ 2026-10-01（providers/scanner/runtime 三层 + 7 单测；kernel 定时触发 B2d 另行）
 
@@ -84,7 +84,7 @@
 - [x] 🔴 C2e 成员 chips 过滤状态持久化（作用于提醒/模块卡计数） ✅ 2026-10-02（bundle gzip 132→32KB；成员过滤持久化；三级分组；向导重跑）
 - [ ] 🔴 C3a 提醒中枢页：四组筛选（模块/成员/类型/时间）+ 显示已处理
 - [x] 🔴 C3b 提醒中枢页：分组列表（逾期/7 天/30 天/已处理折叠） ✅ 2026-10-02（bundle gzip 132→32KB；成员过滤持久化；三级分组；向导重跑）
-- [ ] 🔴 C3c 提醒中枢页：行内动作菜单（完成/续期/延后▾/定位/忽略）接线 B4
+- [x] 🔴 C3c 提醒中枢页：行内动作菜单（完成/续期/延后▾/定位/忽略）接线 B4 ✅ 2026-10-02（B2b=Tab触发+30min心跳；B2d 定案 kernel 无定时器 API 走前端心跳；B4 续期=思源 Dialog/延后=Menu 1/3/7/30）
 - [ ] 🔴 C3d 筛选条件持久化
 - [ ] ⛔ 🔴 C4a 台账页外壳：模块切换下拉 + "在文档中打开"（依赖 S1 定案嵌入方式）
 - [ ] ⛔ 🔴 C4b 台账行点击 → 详情抽屉（kv/附件/相关/块 ID 复制）
@@ -225,6 +225,9 @@
 - [ ] 🔴 孤儿提醒清理：台账行被删除后，HubState 中残留提醒自动清除
 - [ ] 🔴 模块禁用时其提醒立即从 HubState 与通知中剔除
 - [ ] 🟡 settings 写入失败重试与错误上报（saveData 异常捕获）
+- [x] 🔴 成员双 ID 关联修正：FamilyMember.avItemId 回填（addDetachedRow 返回值）+ certs provider 读 relation.blockIDs 反查 memberId ✅ 2026-10-02（老成员无 avItemId 需重加或补写，迁移待办见 33.2）
+- [ ] 🟡 老成员 avItemId 迁移：v0.2.0 前添加的成员在 members 库中已有行但 settings 无 avItemId → 诊断区提供"按姓名匹配回填"工具
+- [ ] 🔴 B2d 定案记录：kernel.js（goja）无定时器 API → 定时扫描=前端心跳 30min + Tab 打开触发；kernel 侧保留 RPC 供生态（v0.3）；03 §3 已按此实现，文档同步
 - [ ] 🟡 笔记本被用户关闭（closed=true）→ ensureNotebook 重新打开或引导
 - [ ] 🟡 笔记本被删除 → 诊断区一键重建全部已启用模块台账
 - [ ] 🟡 台账文档被移入回收站 → dbRefs 失效检测与恢复路径

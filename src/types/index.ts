@@ -15,6 +15,8 @@ export interface FamilyMember {
     birthday?: string;
     /** 生日是否按农历记 */
     lunarBirthday?: boolean;
+    /** members 台账行的 itemID（addMember 建行后回填；成员过滤/下钻的关联键） */
+    avItemId?: string;
     notes?: string;
     createdAt: string;
 }
