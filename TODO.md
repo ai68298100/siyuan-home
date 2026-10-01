@@ -420,7 +420,7 @@
 - [x] 🟢 media gallery 海报墙视图 ✅ 2026-10-02（schema 层：ViewDef 扩展 gallery 类型 + media views 声明；av 建视图实现在 provisioner views 落地时）
 - [x] 🟢 food→stock 采购联动（最小版） ✅ 2026-10-02（food schema 加 ingredients 食材清单列，采购时对照 stock 采购建议；自动汇总联动留 v0.8）
 - [x] 🟢 FAQ 补"全家共用"指引 ✅ 2026-10-02（专用笔记本+思源协作=零开发家庭共用；ADR-5 隐藏优点文档化）
-- [ ] 🟢 智能归类进阶参照（firefly-iii 规则引擎：交易自动归类；v2.x 智能解析的进阶形态，概念级）
+- [x] 🟢 智能归类进阶参照 ✅ 2026-10-02（概念级文档化进 MODULES；依赖智能解析+Agent 能力先行，不排期）
 
 ## 27. 开发流程与协作
 
