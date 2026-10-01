@@ -35,10 +35,13 @@ Full accounting, password vaults, official data integrations, real-time travel i
 
 ```bash
 pnpm install
-pnpm run dev
-pnpm run build
-pnpm run check
+pnpm run dev      # dev (app + kernel watch)
+pnpm run build    # build dist/
+pnpm run check    # TypeScript + Svelte + i18n alignment
+pnpm test         # unit tests (rule engine / hub)
 ```
+
+Device regression checklist: [docs/testing/v0.2.md](./docs/testing/v0.2.md) · FAQ: [docs/FAQ.md](./docs/FAQ.md) · Privacy: [docs/privacy.md](./docs/privacy.md)
 
 Stack: `plugin-sample-vite-svelte` template (Vite 8 + Svelte 5 + pnpm, Node ≥ 24).
 
