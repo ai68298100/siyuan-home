@@ -52,7 +52,7 @@
     <button class="b3-button b3-button--text" onclick={() => onGoto("reminders")}>{t("dash.viewAll")} →</button>
 </div>
 {#if top.length === 0}
-    <div class="lv-card"><div class="lv-empty"><div class="eic">✓</div><b>{t("dash.allClear")}</b><span>{t("hub.emptyHint")}</span></div></div>
+    <div class="lv-card"><div class="lv-empty" role="status"><div class="eic">✓</div><b>{t("dash.allClear")}</b><span>{t("hub.emptyHint")}</span></div></div>
 {:else}
     <div class="lv-card lv-rems">
         {#each top as r (r.id)}
