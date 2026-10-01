@@ -6,7 +6,7 @@
     const ledgers = $derived(
         Object.entries(plugin.settings.dbRefs).filter(([id, ref]: [string, any]) => ref?.avId && id !== "members"),
     );
-    let active = $state("certs");
+    let active = $state(plugin.activeLedger ?? "certs");
     let rows: any[] = $state([]);
     let loading = $state(false);
 
@@ -56,7 +56,7 @@
 <div class="lv-hero"><h1>{t("ledger.title")}</h1><p>{t("ledger.subtitle")}</p></div>
 
 <div style="display:flex;gap:10px;align-items:center;margin:14px 0;flex-wrap:wrap">
-    <select class="b3-select" bind:value={active}>
+    <select class="b3-select" bind:value={active} onchange={() => (plugin.activeLedger = active)}>
         {#each ledgers as [id] (id)}
             <option value={id}>{t(`module.${id}`)}</option>
         {/each}

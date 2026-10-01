@@ -48,7 +48,7 @@
 - [ ] 🔴 A3d provisioner：dbRefs 失效自愈（文档被删→重建→登记刷新）
 - [x] 🔴 A4 members 数据访问层（`src/core/members.ts`）：成员 CRUD 双写（settings 引用 + members 库行） ✅ 2026-10-02（Tab 化 + 数据接线 commit，见 34 组记录）
 - [ ] 🔴 A5 certs 数据访问层（`src/modules/certs/`）：行 CRUD / 续期写回 / 按到期范围查询 / 脱敏读取
-- [ ] 🟡 A6 设置页"诊断"区数据源：台账缺失/列缺失检测接口
+- [x] 🟡 A6 设置页"诊断"区数据源：台账缺失/列缺失检测接口 ✅ 2026-10-02（qbtn 跳台账预选；诊断区=dbRefs/扫描/契约；回归脚本 docs/testing/v0.2.md；胶囊 spring）
 
 ## 3. v0.2 · 提醒中枢（阶段 B）
 
@@ -74,12 +74,12 @@
 ## 4. v0.2 · UI（阶段 C，组件契约见 docs/design/08）
 
 - [x] 🔴 C1a Tab 化外壳：`addTab` + 四页签导航（总览/提醒/台账/成员）+ 顶栏入口改造 ✅ 2026-10-02（Tab 化 + 数据接线 commit，见 34 组记录）
-- [ ] 🔴 C1b 导航胶囊滑动（offsetLeft 计算 + spring）
+- [x] 🔴 C1b 导航胶囊滑动（offsetLeft 计算 + spring） ✅ 2026-10-02（qbtn 跳台账预选；诊断区=dbRefs/扫描/契约；回归脚本 docs/testing/v0.2.md；胶囊 spring）
 - [ ] 🔴 C1c 删除旧 Dialog 面板与 index.scss LEGACY 段（dashboard.svelte/settings.svelte 重写为 lv-* 组件）
 - [x] 🔴 C1d 屏幕容器 `.lv-screen/.lv-anim` 接入（入场编排生效） ✅ 2026-10-02（Tab 化 + 数据接线 commit，见 34 组记录）
 - [x] 🔴 C2a 总览：页头（问候/日期/计数滚动）+ 成员 chips 行 ✅ 2026-10-02（bundle gzip 132→32KB；成员过滤持久化；三级分组；向导重跑）
 - [x] 🔴 C2b 总览：即将到期区（取 HubState 前 4 条 + 空态 + "查看全部"） ✅ 2026-10-02（Tab 化 + 数据接线 commit，见 34 组记录）
-- [ ] 🔴 C2c 总览：快速记录行（qbtn 按 enabledModules 过滤）
+- [x] 🔴 C2c 总览：快速记录行（qbtn 按 enabledModules 过滤） ✅ 2026-10-02（qbtn 跳台账预选；诊断区=dbRefs/扫描/契约；回归脚本 docs/testing/v0.2.md；胶囊 spring）
 - [ ] 🔴 C2d 总览：模块卡网格（启用模块 + certs/药箱统计卡）
 - [x] 🔴 C2e 成员 chips 过滤状态持久化（作用于提醒/模块卡计数） ✅ 2026-10-02（bundle gzip 132→32KB；成员过滤持久化；三级分组；向导重跑）
 - [ ] 🔴 C3a 提醒中枢页：四组筛选（模块/成员/类型/时间）+ 显示已处理
@@ -114,7 +114,7 @@
 
 ## 5. v0.2 · 收尾（阶段 D）
 
-- [ ] 🔴 D1 回归脚本 `docs/testing/v0.2.md`：引导→建库→录入→提醒→续期→禁用→数据保留→重装恢复
+- [x] 🔴 D1 回归脚本 `docs/testing/v0.2.md`：引导→建库→录入→提醒→续期→禁用→数据保留→重装恢复 ✅ 2026-10-02（qbtn 跳台账预选；诊断区=dbRefs/扫描/契约；回归脚本 docs/testing/v0.2.md；胶囊 spring）
 - [ ] 🔴 D2 性能预算实测：05 §4.5 表逐项记录（onload/扫描/首开/构建体积）
 - [ ] 🔴 D3 i18n 全量走查（无硬编码文案；zh-CN/en 同步）
 - [ ] 🔴 D4 `update-version` 0.2.0 + 构建 zip + CHANGELOG
@@ -570,6 +570,7 @@
 | 2026-10-02 | 主线 | C1 Tab 化 + B2b/B3 接线 + C7 向导 + A4 | addTab 四页签面板（总览/提醒/台账/成员）；onload 建库+扫描+每日摘要；向导三步（suggestRoles 预选）；i18n 迁移（216 键双语）；GitHub 公开仓库 ai68298100/siyuan-home 推送；新增 🔴 bundle 超预算待办；发现 addTab init 闭包 self 指向 window 的坑已修 |
 | 2026-10-02 | 主线 | 🔴 bundle 整改 + C2a/e + C3b + C7d | 农历动态 import 拆 chunk（gzip 132→32.4KB，-76%，chunk 强制 .js）；总览成员 chips 过滤（持久化）+模块卡待办数；提醒页三级分组；设置页重跑引导；vitest 30/30 |
 | 2026-10-02 | 主线 | 33.1 单实例 + 33.4 draft 事务 + 文档三件套 | hubListeners Set 多实例刷新；设置 draft 编辑事务（保存落盘）；i18n 真值收尾；FAQ/privacy/ADR 索引落地；vitest 30/30 |
+| 2026-10-02 | 主线 | C2c qbtn + C1b 胶囊 + 诊断区 + D1 回归脚本 | 快速记录行（跳台账预选）；导航胶囊 spring；设置·关于诊断（dbRefs/扫描错误/契约门禁）；回归脚本 docs/testing/v0.2.md |
 
 ---
 

@@ -140,6 +140,26 @@ export default class LvHomePlugin extends Plugin {
     }
 
     activeLedger = "certs";
+    setActiveLedger(id: string) { this.activeLedger = id; }
+
+    /** 诊断数据（33.5/A6）：台账落点状态、最近扫描、扫描错误、schema 契约 */
+    getDiagnostics() {
+        return {
+            version: "0.2.0",
+            scannedAt: this.runtime?.scannedAt,
+            errors: this.scan?.errors ?? [],
+            ledgers: Object.entries(this.settings.dbRefs).map(([id, ref]: [string, any]) => ({
+                id,
+                provisioned: !!ref?.docId,
+                provisional: !!ref?.provisional,
+                columns: Object.keys(ref?.columns ?? {}).length,
+            })),
+            contracts: [
+                validateSchema("members", MEMBERS_SCHEMA),
+                validateSchema("certs", CERTS_SCHEMA),
+            ].flat(),
+        };
+    }
 
     // ── 提醒动作（B4，转发 actions.ts）──
     complete(r: any) { return complete(this, r); }

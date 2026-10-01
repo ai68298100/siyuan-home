@@ -7,6 +7,7 @@
     interface IHomePluginLike {
         i18n: Record<string, string>;
         settings: HomeSettings;
+        getDiagnostics?: () => any;
     }
 
     let { plugin, settings }: {
@@ -148,6 +149,31 @@
                     await import("@/core/settings").then((m) => m.saveSettings(plugin as any, plugin.settings));
                     showMessage(t("wiz.rerunHint"), 3000, "info");
                 }}>{t("wiz.rerun")}</button>
+            {#if tab === "about"}
+                {@const diag = plugin.getDiagnostics?.()}
+                {#if diag}
+                    <div style="margin-top:14px;border-top:1px solid var(--b3-border-color);padding-top:10px">
+                        <p class="lv-caption">{t("diag.title")} · v{diag.version} · {t("hub.scannedAt")} {diag.scannedAt ? new Date(diag.scannedAt).toLocaleString() : "—"}</p>
+                        {#each diag.ledgers as l (l.id)}
+                            <p class="lv-caption">
+                                {t(`module.${l.id}`)}：
+                                {l.provisioned ? (l.provisional ? t("diag.provisional") : t("diag.ok")) : t("diag.missing")}
+                                · {t("diag.columns")} {l.columns}
+                            </p>
+                        {/each}
+                        {#if diag.errors.length > 0}
+                            {#each diag.errors as e (e.moduleId)}
+                                <p class="lv-caption" style="color:var(--lv-danger)">{e.moduleId}: {e.message}</p>
+                            {/each}
+                        {/if}
+                        {#if diag.contracts.length > 0}
+                            {#each diag.contracts as c (c)}
+                                <p class="lv-caption" style="color:var(--lv-danger)">{c}</p>
+                            {/each}
+                        {/if}
+                    </div>
+                {/if}
+            {/if}
         </div>
     {/if}
 

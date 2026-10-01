@@ -223,5 +223,10 @@
     "wiz.rerun": "Re-run onboarding",
     "wiz.rerunHint": "Onboarding reset — open the panel to configure again",
     "act.snooze": "Snooze",
-    "act.snoozeN": "in ${n} days"
+    "act.snoozeN": "in ${n} days",
+    "diag.title": "Diagnostics",
+    "diag.ok": "OK",
+    "diag.provisional": "provisional (AV pending)",
+    "diag.missing": "not provisioned",
+    "diag.columns": "columns"
 }

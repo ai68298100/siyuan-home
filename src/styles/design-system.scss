@@ -60,6 +60,19 @@
   .lv-mono { font-family: var(--b3-font-family-code); font-size: .86em; letter-spacing: .01em; }
 
   // ── 3. 页头与节奏 ───────────────────────────────────────
+  .lv-tabbar { display: flex; align-items: center; gap: 14px; padding: 10px 2px; margin-bottom: 8px;
+    border-bottom: 1px solid var(--lv-line); }
+  .lv-tabbar__title { font-size: 15px; font-weight: 600; }
+  .lv-tabbar__meta { display: flex; gap: 6px; align-items: center; }
+  .lv-tabs { display: flex; gap: 2px; background: var(--lv-surface-2); border: 1px solid var(--lv-line);
+    border-radius: 999px; padding: 3px; }
+  .lv-nav-pill { position: absolute; top: 3px; left: 0; height: calc(100% - 6px); border-radius: 999px;
+    background: var(--b3-theme-surface); box-shadow: var(--lv-shadow-1), inset 0 1px 0 var(--lv-inset);
+    transition: transform var(--lv-t-sheet) var(--lv-spring), width var(--lv-t-sheet) var(--lv-spring); z-index: 0; }
+  .lv-tabs__item { position: relative; z-index: 1; padding: 5px 14px; border-radius: 999px; font-size: 13px;
+    color: var(--lv-tx-2); background: none; border: none; cursor: pointer; transition: color var(--lv-t-med) var(--lv-ease);
+    &:hover { color: var(--lv-tx); } &.on { color: var(--lv-tx); font-weight: 500; } }
+  .lv-people { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 12px; }
   .lv-hero { display: flex; align-items: flex-end; gap: 16px; margin: 26px 2px 4px; flex-wrap: wrap;
     h1 { font-size: 26px; font-weight: 600; letter-spacing: -.02em; }
     p { color: var(--lv-tx-3); font-size: 13px; margin-top: 2px; }

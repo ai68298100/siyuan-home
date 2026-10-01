@@ -223,5 +223,10 @@
     "wiz.rerun": "重新运行引导",
     "wiz.rerunHint": "已重置引导，打开管家面板即可重新配置",
     "act.snooze": "延后",
-    "act.snoozeN": "${n} 天后"
+    "act.snoozeN": "${n} 天后",
+    "diag.title": "诊断",
+    "diag.ok": "正常",
+    "diag.provisional": "占位（待补建数据库）",
+    "diag.missing": "未建库",
+    "diag.columns": "列数"
 }

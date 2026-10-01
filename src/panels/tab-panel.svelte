@@ -32,6 +32,17 @@
         { id: "members", key: "tab.members" },
     ];
 
+    // C1b：滑动胶囊（offsetLeft/width + spring，与原型一致）
+    let navEl: HTMLElement;
+    let pill = $state({ x: 0, w: 0 });
+    function movePill(btn: HTMLElement | undefined) {
+        if (!btn) return;
+        pill = { x: btn.offsetLeft - 3, w: btn.offsetWidth };
+    }
+    $effect(() => {
+        movePill(navEl?.querySelector(`[data-s="${screen}"]`) as HTMLElement | undefined);
+    });
+
     // Tab 挂载即注册刷新回调（扫描完成 → 触发 rune 更新；多实例安全）
     let tick = $state(0);
     $effect(() => {
@@ -45,9 +56,10 @@
 <div class="lv-home lv-tab">
     <header class="lv-tabbar">
         <b class="lv-tabbar__title">🏠 {t("butler")}</b>
-        <nav class="lv-tabs">
+        <nav class="lv-tabs" bind:this={navEl} style="position:relative">
+            <span class="lv-nav-pill" style="transform:translateX({pill.x}px);width:{pill.w}px"></span>
             {#each screens as s (s.id)}
-                <button class="lv-tabs__item" class:on={screen === s.id} onclick={() => (screen = s.id)}>
+                <button data-s={s.id} class="lv-tabs__item" class:on={screen === s.id} onclick={() => (screen = s.id)}>
                     {t(s.key)}
                 </button>
             {/each}
