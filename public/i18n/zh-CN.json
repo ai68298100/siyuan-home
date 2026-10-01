@@ -451,5 +451,8 @@
     "field.category.opt.resident_pension": "居民养老",
     "field.category.opt.commercial_pension": "商业养老",
     "notify.overdue": "逾期 ${n} 件待处理，请打开管家面板查看",
-    "act.locate": "定位"
+    "act.locate": "定位",
+    "diag.dupCheck": "检测重复台账",
+    "diag.dupNone": "未发现重复台账",
+    "diag.dupFound": "发现 ${n} 组重复台账："
 }

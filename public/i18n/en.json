@@ -451,5 +451,8 @@
     "field.category.opt.resident_pension": "Resident pension",
     "field.category.opt.commercial_pension": "Commercial pension",
     "notify.overdue": "${n} overdue items — open Lv Home to review",
-    "act.locate": "Locate"
+    "act.locate": "Locate",
+    "diag.dupCheck": "Check duplicate ledgers",
+    "diag.dupNone": "No duplicate ledgers",
+    "diag.dupFound": "${n} duplicate ledger group(s): "
 }

@@ -179,6 +179,12 @@
                                     showMessage(t("diag.backfillDone").replace("${n}", String(res.linked.length)), 3000, "info");
                                 }}>{t("diag.backfill")}</button>
                         {/if}
+                        <button class="b3-button b3-button--outline" style="margin-top:6px"
+                            onclick={async () => {
+                                const { findDuplicateLedgers } = await import("@/core/provisioner");
+                                const dups = await findDuplicateLedgers(plugin.settings);
+                                showMessage(dups.length === 0 ? t("diag.dupNone") : t("diag.dupFound").replace("${n}", String(dups.length)) + ": " + dups.map((d) => d.hpath).join(", "), 6000, dups.length ? "error" : "info");
+                            }}>{t("diag.dupCheck")}</button>
                     </div>
                 {/if}
             {/if}

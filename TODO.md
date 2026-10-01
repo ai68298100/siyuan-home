@@ -612,7 +612,8 @@
 | 2026-10-02 | 主线 | C2d 深化 | 模块卡点击 → setActiveLedger 预选对应模块台账 |
 | 2026-10-02 | 循环A | README 导航补全（回归脚本/FAQ/privacy 链接可见化） | 新用户路径打通；英文版同步 |
 | 2026-10-02 | 循环A | FAQ 补快捷键表+参与测试指引（22 组项落地） | 快捷键策略：仅 2 命令可配，页签点击为主 |
-| 2026-10-02 | 主线 | 33.2 重复台账检测（最小版） | findDuplicateLedgers：hpath 分组检测同名台账；诊断区接入留下轮（函数已就绪+验证） | media/pets/vehicles/transit/travel×4/assets-virtual 9 个 + 修复核心缺口 assets-real/health（默认启用却无 schema 的建库缺口）+ 68 枚举 i18n（总 399 键）；gzip 35.3KB；contract gate 24 schema 全过；剩余无 schema：food/address/bookmarks/snippets/parenting/schooling/social |
+| 2026-10-02 | 主线 | 33.2 重复台账检测（最小版） | findDuplicateLedgers：hpath 分组检测同名台账；诊断区接入留下轮（函数已就绪+验证） |
+| 2026-10-02 | 主线 | 33.2 检测接入诊断区 | 按钮+结果提示（无重复/列出重复组）；合并修复动作留待实测后按需 | media/pets/vehicles/transit/travel×4/assets-virtual 9 个 + 修复核心缺口 assets-real/health（默认启用却无 schema 的建库缺口）+ 68 枚举 i18n（总 399 键）；gzip 35.3KB；contract gate 24 schema 全过；剩余无 schema：food/address/bookmarks/snippets/parenting/schooling/social |
 
 ---
 
