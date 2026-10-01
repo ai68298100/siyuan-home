@@ -75,6 +75,9 @@
 <div class="lv-quick" style="margin-bottom:4px">
     <button class="lv-qbtn" onclick={() => { plugin.setActiveLedger("certs"); onGoto("ledger"); }}><span class="qi">🪪</span>{t("module.certs")}</button>
     <button class="lv-qbtn" onclick={() => { plugin.setActiveLedger("medicine"); onGoto("ledger"); }}><span class="qi">💊</span>{t("module.medicine")}</button>
+    <button class="lv-qbtn" onclick={() => { plugin.setActiveLedger("memberships"); onGoto("ledger"); }}><span class="qi">🔁</span>{t("module.memberships")}</button>
+    <button class="lv-qbtn" onclick={() => { plugin.setActiveLedger("media"); onGoto("ledger"); }}><span class="qi">🎬</span>{t("module.media")}</button>
+    <button class="lv-qbtn" onclick={() => { plugin.setActiveLedger("favors"); onGoto("ledger"); }}><span class="qi">🧧</span>{t("module.favors")}</button>
     <button class="lv-qbtn" onclick={() => { plugin.setActiveLedger("members"); onGoto("members"); }}><span class="qi">👪</span>{t("tab.members")}</button>
 </div>
 <div class="lv-card" style="padding:14px;display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:8px">
