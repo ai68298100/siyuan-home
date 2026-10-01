@@ -44,8 +44,11 @@ UI 设计成套：`docs/design/07` 视觉设计语言（token/动效/禁止清�
 pnpm install
 pnpm run dev      # 开发（app + kernel 双目标 watch）
 pnpm run build    # 构建 dist/
-pnpm run check    # TypeScript + svelte-check
+pnpm run check    # TypeScript + Svelte + i18n 键位对齐
+pnpm test         # 单元测试（规则引擎/提醒中枢）
 ```
+
+实测回归清单见 [docs/testing/v0.2.md](./docs/testing/v0.2.md)；常见问题见 [docs/FAQ.md](./docs/FAQ.md)，隐私说明见 [docs/privacy.md](./docs/privacy.md)。
 
 技术栈：思源插件模板 `plugin-sample-vite-svelte`（Vite 8 + Svelte 5 + pnpm，Node ≥ 24）。
 
