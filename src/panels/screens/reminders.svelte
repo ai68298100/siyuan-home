@@ -88,7 +88,8 @@
                     </span>
                     <div class="lv-rem-ops">
                         <button class="b3-button b3-button--text" onclick={() => plugin.complete(r)}>{t("act.done")}</button>
-                        {#if r.moduleId === "certs"}
+                        {#if ["certs", "insurance"].includes(r.moduleId)}
+                            <!-- 续保/换证：新到期日写回台账行 expiry（26.6：insurance 续保决策的"续"动作；比价/放弃选项留 UI 细化） -->
                             <button class="b3-button b3-button--text" onclick={() => renewDialog(r)}>{t("act.renew")}</button>
                         {/if}
                         {#if r.moduleId !== "adhoc" && plugin.settings.dbRefs[r.moduleId]?.docId}
