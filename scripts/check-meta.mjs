@@ -22,6 +22,14 @@ if (plugin.disabledInPublish === false) {
     console.log("note: disabledInPublish=false —— 集市上架已启用（当前阶段应保持 true，除非你决定上架）");
 }
 
+// zip 产物体积门禁（23 组：<10MB）
+const zipPath = "package.zip";
+if (existsSync(zipPath)) {
+    const mb = readFileSync(zipPath).length / 1024 / 1024;
+    if (mb > 10) errors.push(`package.zip too large: ${mb.toFixed(2)} MB (limit 10MB)`);
+    else console.log(`package.zip OK: ${mb.toFixed(2)} MB`);
+}
+
 if (errors.length) {
     console.error("metadata errors:\n" + errors.map((e) => " - " + e).join("\n"));
     process.exit(1);

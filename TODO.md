@@ -359,7 +359,7 @@
 - [ ] 🟡 semver 策略文档（破坏性=大版本/新模块=小版本/修复=patch）
 - [ ] 🟡 minAppVersion 抬升策略（依赖新内核能力时才升）
 - [ ] 🟢 release notes 半自动生成（git log → CHANGELOG 草稿）
-- [ ] 🟡 zip 产物体积检查（<10MB，CI 门禁）
+- [x] 🟡 zip 产物体积检查（<10MB，CI 门禁） ✅ 2026-10-02（check:meta 内置 zip 体积门禁）
 - [ ] 🟢 beta 通道：GitHub prerelease 供内测用户先行
 - [x] 🟡 集市竞品监控：每月检索家庭类新插件一次，回填 MODULES.md 附录 ✅ 2026-10-02 首轮（ledger 记账不冲突；任务笔记管理证明移动端提醒可行；homepage 通知中心可参考；家庭垂直仍 0 竞品）
 - [ ] 🟢 用户反馈渠道定案（GitHub issue + ld246 帖）
@@ -635,6 +635,7 @@
 | 2026-10-02 | 循环A | 第 7 项无障碍终查（快速） | 新 UI 非按钮交互仅模块卡（已有 role/tabindex/onkeydown）；dashboard.svelte 为 LEGACY 待 C1c 删除；33.4 无障碍剩余仅剩抽屉 focus trap/aria-live |
 | 2026-10-02 | 主线 | 33.2 journal 最小版 | DbRef.provisionError 记录建库/补列失败摘要（成功清除）；诊断区红色显示；完整 journal（多步恢复）留实测后按需 |
 | 2026-10-02 | 主线 | 33.5 元数据一致性校验脚本 | scripts/check-meta.mjs（name/version 交叉+文件存在性+上架开关提示）；check:meta script |
+| 2026-10-02 | 主线 | 23 组 zip 体积门禁 | check:meta 内置（<10MB） |
 | 2026-10-02 | 主线 | C5b 成员下钻最小版 | 成员卡点击展开该成员提醒明细（徽章+逐条+完成动作）；完整跨模块时间线留 v0.5+ |
 | 2026-10-02 | 主线 | C1c（部分） | 删除废弃 dashboard.svelte（Tab 化后无引用）；settings 面板为现役保留 |
 | 2026-10-02 | 主线 | C1c 收尾（第一步完成） | LEGACY 段 7 个 dashboard 专用类删除（全局零引用验证）；settings 现役类保留；css 21.8→更精简 |
