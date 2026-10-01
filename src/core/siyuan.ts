@@ -1,25 +1,59 @@
 /**
  * 内核 API 薄封装（ADR：所有 /api 调用集中于此，便于 mock 与 Spike 修正）。
  * 前端同源走 fetchSyncPost（siyuan 包），无需令牌。
+ * 可测性（33.5/A2d）：传输函数与 av 工厂均可注入——单测用 setTransport/
+ * setAttributeViewFactory 替换，生产代码零感知。
  * 端点名以 3.8.x 为准，标注 [Spike] 的调用点在实例可用时按实测修正。
  */
-import { fetchSyncPost } from "siyuan";
-import type { ModuleSchema } from "./schema";
 
-export interface KernelError extends Error {
-    endpoint: string;
+/** fetchSyncPost 的结构化返回（避免测试环境加载 siyuan 包） */
+interface IRawResponse {
     code: number;
     msg: string;
+    data?: any;
+}
+
+type Transport = (endpoint: string, payload: object) => Promise<IRawResponse>;
+
+let transport: Transport | null = null;
+
+/** 测试注入点：替换底层传输（默认为懒加载的 fetchSyncPost） */
+export function setTransport(t: Transport | null): void {
+    transport = t;
+}
+
+async function defaultTransport(endpoint: string, payload: object): Promise<IRawResponse> {
+    // 懒加载：单测注入 transport 时不必加载 siyuan 包
+    const { fetchSyncPost } = await import("siyuan");
+    return fetchSyncPost(endpoint, payload) as unknown as Promise<IRawResponse>;
+}
+
+/** 内核调用错误：endpoint/code 可用于诊断区展示（33.5） */
+export class KernelError extends Error {
+    readonly endpoint: string;
+    readonly code: number;
+    readonly kernelMsg: string;
+
+    constructor(endpoint: string, code: number, msg: string) {
+        super(`[${endpoint}] ${msg}`);
+        this.name = "KernelError";
+        this.endpoint = endpoint;
+        this.code = code;
+        this.kernelMsg = msg;
+    }
+}
+
+export function isKernelError(e: unknown): e is KernelError {
+    return e instanceof KernelError;
 }
 
 async function post<T = any>(endpoint: string, payload: object): Promise<T> {
-    const res = await fetchSyncPost(endpoint, payload);
+    const res = await (transport ?? defaultTransport)(endpoint, payload);
+    if (!res || typeof res.code !== "number") {
+        throw new KernelError(endpoint, -1, "malformed response envelope");
+    }
     if (res.code !== 0) {
-        const err = new Error(`[${endpoint}] ${res.msg}`) as KernelError;
-        err.endpoint = endpoint;
-        err.code = res.code;
-        err.msg = res.msg;
-        throw err;
+        throw new KernelError(endpoint, res.code, res.msg ?? "unknown kernel error");
     }
     return res.data as T;
 }
@@ -63,13 +97,102 @@ export function setBlockAttrs(id: string, attrs: Record<string, string>): Promis
 }
 
 /**
- * [Spike R-av-create] 建库原语：在文档中创建一张台账数据库。
- * 候选实现（实测后定案其一，其余删除）：
- *   a) createDocWithMd 的 markdown 内联 av 块 kramdown
- *   b) /api/block/insertBlock 插入 av 块
- *   c) 内核直连端点 /api/av/*（createAttributeView / addAttributeViewColumns…）
- * 当前返回占位实现，保证 provisioner 流程可测。
+ * Spike 定案（2026-10-01，docs/testing/spike-R1R2.md 已回填结论）：
+ * - av 块形态：<div data-type="NodeAttributeView" data-av-id="X" data-av-type="table"></div>
+ * - 建库：插入 div（自造 avIdSeed）→ SQL 找块 → renderAttributeView{createIfNotExist:true}，avID = 块 ID
+ * - 加列：addAttributeViewKey{avID, keyID(自造), keyIcon:"", keyName, keyType, previousKeyID:""}
+ * - 加行：addAttributeViewBlocks{avID, srcs:[{content, isDetached:true}]}（绑定真实块 isDetached:false 静默失败——
+ *   非绑定行路径待后续 transactions 端点探索，TODO 记录）
+ * - 写值：batchSetAttributeViewBlockAttrs{avID, values:[{keyID, itemID, value}]}（rowID 已废弃，issue #15727）
+ * - 读：renderAttributeView → data.view.{columns, rows, rowCount}；行主键：getAttributeViewPrimaryKeyValues
+ * - detached 行不在 blocks 表：SQL 不可查、不可块定位 → 行定位降级为打开台账文档（B4e 定案）
  */
-export async function createAttributeView(_docId: string, _schema: ModuleSchema): Promise<string> {
-    throw new Error("[Spike R-av-create] not implemented: pending kernel probe (see docs/testing/spike-R1R2.md)");
+
+export function insertBlock(parentID: string, markdown: string): Promise<void> {
+    // 返回结构 data[0].doOperations[] 无稳定新块 ID → 调用方用 SQL 定位
+    return post("/api/block/insertBlock", { dataType: "markdown", parentID, data: markdown }).then(() => undefined);
+}
+
+/** 新思源 ID（yyyyMMddHHmmss-xxxxxxx 形态；内核对 keyID/avIdSeed 接受自造值）。crypto 随机，非加密用途但避可预测值 */
+export function newSiYuanId(): string {
+    const t = new Date();
+    const p = (n: number) => String(n).padStart(2, "0");
+    const buf = new Uint8Array(4);
+    crypto.getRandomValues(buf);
+    const rand = Array.from(buf).map((b) => (b % 36).toString(36)).join("").padEnd(7, "0").slice(0, 7);
+    return `${t.getFullYear()}${p(t.getMonth() + 1)}${p(t.getDate())}${p(t.getHours())}${p(t.getMinutes())}${p(t.getSeconds())}-${rand}`;
+}
+
+export interface AvColumnSpec {
+    keyID?: string;
+    name: string;
+    /** 思源列类型：text/date/select/mSelect/number/asset/mAsset/relation/checkbox/url/email/phone/block… */
+    type: string;
+    /** relation 列目标库 avID（R2 定案：写入接受，读取 API 不回显——schema 层自行记忆） */
+    relationTargetAvID?: string;
+}
+
+export async function addAttributeViewColumn(avID: string, col: AvColumnSpec): Promise<string> {
+    const keyID = col.keyID ?? newSiYuanId();
+    const payload: Record<string, unknown> = {
+        avID, keyID, keyIcon: "", keyName: col.name, keyType: col.type, previousKeyID: "",
+    };
+    if (col.type === "relation" && col.relationTargetAvID) {
+        payload.relation = { avID: col.relationTargetAvID, isTwoWay: false, backKeyID: "" };
+    }
+    await post("/api/av/addAttributeViewKey", payload);
+    return keyID;
+}
+
+/** 在文档内插入 av 容器 div 并触发内核建库，返回真实 avID（= av 块 ID） */
+export async function createAttributeView(docId: string, avIdSeed: string): Promise<string> {
+    const div = `<div data-type="NodeAttributeView" data-av-id="${avIdSeed}" data-av-type="table"></div>`;
+    await insertBlock(docId, div);
+    await new Promise((r) => setTimeout(r, 400)); // 块索引异步重建
+    const rows = await sql<{ id: string }>(
+        `SELECT id FROM blocks WHERE type='av' AND markdown LIKE '%${avIdSeed}%' LIMIT 1`,
+    );
+    const blockId = rows[0]?.id;
+    if (!blockId) throw new KernelError("av.createAttributeView", -3, "av block not found after insert");
+    await post("/api/av/renderAttributeView", { id: blockId, createIfNotExist: true });
+    return blockId;
+}
+
+export async function primaryRowItemIDs(avID: string, pageSize = 200): Promise<string[]> {
+    const d = await post<any>("/api/av/getAttributeViewPrimaryKeyValues", { id: avID, page: 1, pageSize });
+    return (d?.rows?.values ?? []).map((v: any) => v.id);
+}
+
+/** 加 detached 行，返回新行 itemID（加行前后行集合 diff 得出） */
+export async function addDetachedRow(avID: string, content: string): Promise<string> {
+    const before = new Set(await primaryRowItemIDs(avID));
+    await post("/api/av/addAttributeViewBlocks", {
+        avID, blockID: "", srcs: [{ blockID: "", content, isDetached: true }],
+    });
+    await new Promise((r) => setTimeout(r, 300));
+    const after = await primaryRowItemIDs(avID);
+    const added = after.find((id) => !before.has(id));
+    if (!added) throw new KernelError("av.addAttributeViewBlocks", -3, "row added but itemID not found");
+    return added;
+}
+
+/** 单元格写值（value 按列类型：{type:"text",text:{content}} / {type:"date",date:{content,isNotEmpty}} / {type:"relation",relation:{blockIDs}} …） */
+export async function setCell(avID: string, keyID: string, itemID: string, value: unknown): Promise<void> {
+    await post("/api/av/batchSetAttributeViewBlockAttrs", { avID, values: [{ keyID, itemID, value }] });
+}
+
+export interface AvRow {
+    itemID: string;
+    cells: Record<string, any>; // value.keyID → value
+}
+
+/** 读取台账（表格视图）列与行 */
+export async function renderLedger(avID: string): Promise<{ columns: any[]; rows: AvRow[]; rowCount: number }> {
+    const d = await post<any>("/api/av/renderAttributeView", { id: avID });
+    const view = d?.view ?? {};
+    const rows: AvRow[] = (view.rows ?? []).map((r: any) => ({
+        itemID: r.id,
+        cells: Object.fromEntries((r.cells ?? []).map((c: any) => [c.value?.keyID, c.value])),
+    }));
+    return { columns: view.columns ?? [], rows, rowCount: view.rowCount ?? rows.length };
 }

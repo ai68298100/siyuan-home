@@ -22,14 +22,14 @@
 
 ## 1. Spike 阶段（⛔ 全部被阻塞：等待思源实例启动）
 
-- [ ] ⛔ 🔴 S0 用户启动思源（内核 `127.0.0.1:1568`），`sy nb` 确认可达
-- [ ] ⛔ 🔴 S1 台账视图嵌入三选一实验：protyle 内嵌 av / API 渲染 / 文档跳转（`docs/testing/spike-R1R2.md` 实验一）
-- [ ] ⛔ 🔴 S1a 结论回填：`src/core/siyuan.ts#createAttributeView` 实现 + 01 ADR-4 定案
-- [ ] ⛔ 🔴 S2 关系列实验：relation 列可否编程创建并指向 members 库（实验二）
-- [ ] ⛔ 🔴 S2a 结论回填：可 → 字典列 member=relation；不可 → 降级文本列 + SQL 聚合，更新 02 §2
-- [ ] ⛔ 🟡 S3 行定位实验：openTab 定位高亮台账行（R5），结论回填 03 §5
-- [ ] ⛔ 🟡 S4 实验数据清理：临时笔记本 `siyuan-home-spike` 经确认后删除
-- [ ] ⛔ 🟡 S5 av kramdown 形态观察（手建 av 后查 blocks.markdown，为建库提供参照）
+- [x] 🔴 S0 用户启动思源（内核 `127.0.0.1:1568`），`sy nb` 确认可达 ✅ 2026-10-01 Spike 定案（docs/testing/spike-R1R2.md 结论区）
+- [x] 🔴 S1 台账视图嵌入三选一实验：protyle 内嵌 av / API 渲染 / 文档跳转（`docs/testing/spike-R1R2.md` 实验一） ✅ 2026-10-01 Spike 定案（docs/testing/spike-R1R2.md 结论区）
+- [x] 🔴 S1a 结论回填：`src/core/siyuan.ts#createAttributeView` 实现 + 01 ADR-4 定案 ✅ 2026-10-01 Spike 定案（docs/testing/spike-R1R2.md 结论区）
+- [x] 🔴 S2 关系列实验：relation 列可否编程创建并指向 members 库（实验二） ✅ 2026-10-01 Spike 定案（docs/testing/spike-R1R2.md 结论区）
+- [x] 🔴 S2a 结论回填：可 → 字典列 member=relation；不可 → 降级文本列 + SQL 聚合，更新 02 §2 ✅ 2026-10-01 Spike 定案（docs/testing/spike-R1R2.md 结论区）
+- [x] 🟡 S3 行定位实验：openTab 定位高亮台账行（R5），结论回填 03 §5 ✅ 2026-10-01 Spike 定案（docs/testing/spike-R1R2.md 结论区）
+- [x] 🟡 S4 实验数据清理：临时笔记本 `siyuan-home-spike` 经确认后删除 ✅ 2026-10-01 Spike 定案（docs/testing/spike-R1R2.md 结论区）
+- [x] 🟡 S5 av kramdown 形态观察（手建 av 后查 blocks.markdown，为建库提供参照） ✅ 2026-10-01 Spike 定案（docs/testing/spike-R1R2.md 结论区）
 - [ ] ⛔ 🟡 S6 kernel cron 实验：最小间隔、休眠/唤醒、重复扫描与前端兜底的行为记录（R3）
 - [ ] ⛔ 🟡 S7 双端冲突实验：两设备同时编辑同一行，验证提醒写回幂等、冲突提示和恢复路径（R6）
 - [ ] 🟡 S8 农历库专项：tree-shake 体积、闰月/腊月三十精度与版本升级回归（R4）
@@ -38,7 +38,7 @@
 
 - [x] 🔴 A1a schema.ts：members 成员库 schema 落地（02 §3：角色/生日/农历/尺码/忌口/状态） ✅ 2026-10-01（09 决策记录 / commit 168dcae）
 - [ ] 🔴 A1b 字段字典 i18n 键补全核对（field.* 已有 certs 部分，补 members 专属列）
-- [ ] ⛔ 🔴 A2a siyuan.ts：av 创建端点实现（等 S1）
+- [x] 🔴 A2a siyuan.ts：av 创建端点实现（等 S1） ✅ 2026-10-01 Spike 定案（docs/testing/spike-R1R2.md 结论区）
 - [ ] 🔴 A2b siyuan.ts：av 行 CRUD 封装（新增行/更新行值/删除行/按视图查询）
 - [ ] 🔴 A2c siyuan.ts：附件关联（asset 列写入文件引用）
 - [ ] 🔴 A2d siyuan.ts：错误类型统一（KernelError）+ 单元可注入 mock
@@ -474,7 +474,7 @@
 
 ### 33.2 数据、建库与迁移正确性
 
-- [ ] 🔴 `createAttributeView` 端点落地并建立真实响应 fixture；删除当前占位抛错，验收创建、补列、视图、relation 四类能力
+- [x] 🔴 `createAttributeView` 端点落地并建立真实响应 fixture；删除当前占位抛错，验收创建、补列、视图、relation 四类能力 ✅ 2026-10-01 Spike 全通（建库/加列/视图/relation）；fixture=spike 文档结论，补列循环见 provisioner
 - [ ] 🔴 建库补偿：文档创建成功而 AV/列/视图失败时写入 provisioning journal，下一次可恢复重试并清理或复用空文档；并发启用同一模块不得产生双库
 - [ ] 🔴 `dbRefs.notebook` 明确保存 ID；兼容旧的名称值、关闭/删除笔记本和重命名策略，禁止把 ID 当名称创建新笔记本
 - [ ] 🔴 台账稳定身份：查找键改用稳定 `moduleId` 标记/属性，不使用本地化标题；语言切换或文案修改不得重复建库
@@ -561,6 +561,7 @@
 | 日期 | 循环 | 动作 | 产出 |
 |---|---|---|---|
 | 2026-10-01 | 设立 | 协议建立 | 本节 |
+| 2026-10-01 | 主线 | Spike 三组实验（用户启动思源后执行） | 定案 R-av-create/R2/R5；siyuan.ts 真实 av 实现；S0-S5/A2a 共 9 项勾选；R5 降级定案；实验笔记本已清理 |
 
 ---
 

@@ -8,7 +8,7 @@ export const MODULE_GROUPS: ModuleGroupId[] = ["people", "assets", "living", "ki
 
 export const BUILT_IN_MODULES: HomeModule[] = [
     // ── 人员档案 ──
-    { id: "members",      group: "people", defaultEnabled: true,  alwaysOn: true, devStatus: "skeleton" },
+    { id: "members",      group: "people", defaultEnabled: true,  alwaysOn: true, devStatus: "ready" },
     { id: "certs",        group: "people", defaultEnabled: true,  devStatus: "planned" },
     { id: "health",       group: "people", defaultEnabled: true,  devStatus: "planned" },
     { id: "social",       group: "people", defaultEnabled: false, devStatus: "planned" },

@@ -1,58 +1,47 @@
-# Spike：R1 / R2 / R5 实验指南（v0.2 阶段 S）
+# Spike：R1 / R2 / R5 实验结论（✅ 2026-10-01 已完成回填）
 
-> 目的：在真实思源实例（3.8.x）上定案三个架构开放问题（[05 扩展设计 §6](../design/05-扩展设计.md)）。
-> 执行方式：本机内核 `http://127.0.0.1:1568`，用 `sy` 客户端（siyuan-kernel-api skill）。
-> 所有实验在临时笔记本 `siyuan-home-spike` 中进行，结论回填本文档与代码，实验笔记本经用户确认后删除。
+> 执行环境：思源 3.8.x 实例（内核 `127.0.0.1:6806`，注意 sy env 里的 1568 已过期）。
+> 实验笔记本 `siyuan-home-spike`（2 文档/8 块，全部为实验创建数据）已删除。
+> **结论已实现进 `src/core/siyuan.ts`**（transport 可注入，av 全路径真实实现）。
 
-## 准备
+---
 
-```bash
-sy="<siyuan-kernel-api skill>/scripts/sy"
-"$sy" nb            # 确认实例可达；记录现有笔记本（避免污染用户数据）
-```
+## 实验一 · R-av-create：✅ 定案（方式 b+c 组合）
 
-## 实验一 · R-av-create：编程创建数据库（av）
+**建库路径**（三步，全部验证通过）：
 
-三种候选，择一贯穿实现（`src/core/siyuan.ts#createAttributeView`）：
+1. `createDocWithMd` 写入 av 容器（**自造 av-id 可被接受**）：
+   `<div data-type="NodeAttributeView" data-av-id="<seed>" data-av-type="table"></div>`
+2. SQL 定位 av 块：`SELECT id FROM blocks WHERE type='av' AND markdown LIKE '%<seed>%'`
+3. `POST /api/av/renderAttributeView {id: <块ID>, createIfNotExist: true}` → 内核创建 av 实体（自动带"主键"block 列、"单选"select 列、表格视图）
 
-1. **直连端点**（若存在最优先）：
-   ```bash
-   "$sy" api -g attributeView          # 列出全部 av 端点与参数
-   "$sy" api -g "av" | head -40
-   ```
-   关注：createAttributeView / addAttributeViewColumn(s) / setAttributeViewColumn / addAttributeViewBlocks。
-2. **insertBlock kramdown**：`/api/block/insertBlock` 插入 av 块语法（先在思源 UI 手建一个 av，`"$sy" sql "SELECT markdown FROM blocks WHERE type='av'"` 观察其 kramdown 形态）。
-3. **createDocWithMd 内联**：同上形态能否在文档创建时内联。
+**关键事实**：**avID = av 块 ID**（非自造 seed）；`getAttributeView {id}` 用块 ID 查询。
+**加列**：`POST /api/av/addAttributeViewKey {avID, keyID(自造), keyIcon:"", keyName, keyType, previousKeyID:""}` —— text/date/select/number/relation 全部验证通过（keyIcon 与 previousKeyID 必填，空串即可）。
+**加行**：`POST /api/av/addAttributeViewBlocks {avID, srcs:[{content, isDetached:true}]}`（detached 行）✅；**`isDetached:false` 绑定真实块静默失败**（code 0 但行不出现）→ 非绑定行路径需另探索（`/api/transactions` 或 UI 组合调用），已记 TODO（A2b 附注）。
+**写值**：`POST /api/av/batchSetAttributeViewBlockAttrs {avID, values:[{keyID, itemID, value}]}` ✅ text/date 验证。**rowID 参数已废弃改 itemID**（issue #15727）。
+**读**：`renderAttributeView → data.view.{columns, rows, rowCount}`（rows[].id=行 itemID；cells[].value 按类型）；行主键列表 `getAttributeViewPrimaryKeyValues {id: avID, page, pageSize}`。
 
-记录：能否设列名/列类型/枚举值？返回什么 ID？视图（table）默认是否自动创建？
+## 实验二 · R2 关系列：✅ 可行（优于降级方案）
 
-## 实验二 · R2 关系列
+- relation 列可编程创建：`keyType:"relation"` + `relation:{avID:<目标av>, isTwoWay:false, backKeyID:""}` ✅
+- relation 值写入：`value:{type:"relation", relation:{blockIDs:[<目标行 itemID>]}}` ✅（目标= members av 的行 itemID）
+- **限制**：读取 API 不回显 relation 目标 avID（key 仅 7 个基础字段）——无碍：列的目标由插件 schema 声明（`member` → members 库），不需要读回。
+- **ADR-4/02 §2 定案**：字典列 `member` = relation 列 → members 库；跨模块成员聚合走 members 库反向查询或按 itemID join。
 
-在实验一产出的 av 上：
+## 实验三 · R5 行定位：⚠️ 降级定案
 
-```bash
-# 尝试创建 relation 列（端点与参数名按实验一发现替换）
-"$sy" <av-add-column> -d '{"avID":"...","column":{"type":"relation","name":"成员","relation":{"avID":"<成员库avID>","isTwoWay":false}}}'
-```
+- detached 行有 itemID（=行内块 ID）但**不在 blocks 表**：SQL 不可查、`openTab` 无法块定位。
+- 绑定真实块的行暂不可编程创建（见实验一）。
+- **B4e 定案**：「定位」动作降级为 `openTab({doc:{id:<台账文档ID>}})` 打开台账文档；行内高亮待非绑定行路径解锁后复核。
+- 附注：行数据若需要 SQL 全局检索，需依赖绑定真实块的行（解锁后行块可入 blocks 表）；当前 detached 模式下提醒中枢扫描走 av 读取 API（renderLedger / getAttributeViewPrimaryKeyValues），不依赖 SQL。
 
-- [ ] relation 能否编程创建并指向另一 av？
-- [ ] 已有行填 relation 值的写法？
-- 失败 → 启用降级：字典列 `member` 改 text（存成员名），成员页跨模块聚合改 SQL `LIKE`。回填 [02 §2](../design/02-数据模型与模块规格.md)。
+## 对架构的影响（已落实）
 
-## 实验三 · R5 行定位
-
-```bash
-"$sy" sql "SELECT id, f_id? FROM av_blocks WHERE av_id='<avID>'"   # 取行块 ID（表名按实际调整）
-```
-
-前端验证（在插件里临时按钮调用）：
-
-- `openTab({doc: {id: rowBlockId}})` 是否定位并高亮该行？
-- `openTab` 的 `focusName: "av"`（siyuan.d.ts:426）可否直接聚焦数据库页签？
-
-记录结论到 [03 §5 定位](../design/03-提醒中枢.md)：可用 / 降级"打开台账文档"。
-
-## 收尾
-
-- 结论回填：`siyuan.ts` 端点实现、`provisioner.ts` 若无变化确认、`05 §6` 风险表打勾、`01 ADR-4` 定案。
-- 临时笔记本删除需你确认爆炸半径后 `"$sy" removeNotebook -y`（内容全部为实验数据）。
+| 项 | 结论 |
+|---|---|
+| 01 ADR-4 | 台账嵌入方式仍有三个候选未定（前端行为），但**数据层建库/读写路径已定案并实现**；C4 台账页外壳可先走"在文档中打开" |
+| 01 ADR-1 | 行=块 修订：detached 行不产生可双链的块；"行即块可双链"作为 v0.2+ 待解锁能力（依赖非绑定行路径），文档与 UI 文案相应调整 |
+| 02 §2 | `member` 列 relation 可用；`relationTargetAvID` 由 provisioner 从 dbRefs.members 注入 |
+| 03 §5 | B4e 定位降级 |
+| 05 §6 | R1 部分（数据层）✅ / R2 ✅ / R5 ⚠️ 降级 / R-av-create ✅ |
+| siyuan.ts | 真实实现：createAttributeView / addAttributeViewColumn / addDetachedRow / setCell / renderLedger / primaryRowItemIDs（transport 可注入可测） |

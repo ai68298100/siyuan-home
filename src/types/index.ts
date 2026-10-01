@@ -27,8 +27,8 @@ export interface ModuleGroup {
     /** i18n key: group.<id> */
 }
 
-/** 模块开发状态 */
-export type DevStatus = "skeleton" | "planned";
+/** 模块开发状态（33.1 能力矩阵）：ready=有数据管理入口 / skeleton=有 schema 与壳 / planned=路线图 */
+export type DevStatus = "ready" | "skeleton" | "planned";
 
 /** 内置模块定义 */
 export interface HomeModule {
@@ -90,11 +90,12 @@ export interface HubState {
 
 // ── 设置（docs/design/01 ADR-7：只放设置与运行态）───────────
 
-/** 模块台账落点映射（provisioner 维护，幂等） */
+/** 模块台账落点映射（provisioner 维护，幂等）；provisional=等 Spike 的占位建库（C7） */
 export interface DbRef {
     docId?: string;
     avId?: string;
     notebook?: string;
+    provisional?: boolean;
 }
 
 /** 插件设置（持久化到 data/storage/petal/siyuan-home/settings.json） */
@@ -111,6 +112,8 @@ export interface HomeSettings {
     silentTo: number;
     /** moduleId → 台账文档/数据库映射 */
     dbRefs: Record<string, DbRef>;
+    /** 首次引导的家庭构成快照（C7 向导写入；真实成员在成员页维护） */
+    household?: { roles: MemberRole[]; children: number };
     /** 首次运行引导是否已完成 */
     onboarded?: boolean;
 }
