@@ -524,7 +524,7 @@
 - [ ] 🔴 前端/内核兼容矩阵：desktop、desktop-window、browser-desktop、browser-mobile、mobile 在 3.8 LTS 与最新 beta 上验证能力探测和降级路径
 - [ ] 🟡 多窗口状态一致性：settings 与 `hub.updated` 事件带版本/时间戳，覆盖乱序、重复、丢失事件并提供手动刷新提示
 - [x] 🟡 发布包 smoke test：解压 `package.zip` 检查 manifest、双语 i18n、图标、`LICENSE`、`MODULES.md` 和 README 链接；处理 `dist` 未包含 docs/design、prototype 导致的失链 ✅ 2026-10-02（首轮抓到 2 真问题并修复：docs 泄漏入包已禁、LICENSE 补入；D12 落实 vite 配置）
-- [ ] 🟡 元数据一致性门禁：`package.json` repository/homepage、作者、版本、license、`plugin.json`、README 和 release tag 在 CI 中交叉校验
+- [x] 🟡 元数据一致性门禁：`package.json` repository/homepage、作者、版本、license、`plugin.json`、README 和 release tag 在 CI 中交叉校验 ✅ 2026-10-02（scripts/check-meta.mjs + check:meta；name/version 交叉+关键文件存在性；repository 已填）
 - [ ] 🟡 PR CI：除 tag release 外补充 PR 的 `check + build + 包体/产物检查`，并记录 zip 体积与关键文件哈希
 - [ ] 🟡 README / MODULES / TODO 发布策略统一：明确当前 v0.1 实现边界、GitHub Release 与集市暂缓状态，避免把路线图写成已交付能力
 - [ ] 🟢 卸载/重装/工作区切换测试：确认台账保留、设置恢复、插件 reload 不复用旧内存，`onunload` 清理事件、计时器和 observer
@@ -634,6 +634,7 @@
 | 2026-10-02 | 主线 | 33.2 检测接入诊断区 | 按钮+结果提示（无重复/列出重复组）；合并修复动作留待实测后按需 |
 | 2026-10-02 | 循环A | 第 7 项无障碍终查（快速） | 新 UI 非按钮交互仅模块卡（已有 role/tabindex/onkeydown）；dashboard.svelte 为 LEGACY 待 C1c 删除；33.4 无障碍剩余仅剩抽屉 focus trap/aria-live |
 | 2026-10-02 | 主线 | 33.2 journal 最小版 | DbRef.provisionError 记录建库/补列失败摘要（成功清除）；诊断区红色显示；完整 journal（多步恢复）留实测后按需 |
+| 2026-10-02 | 主线 | 33.5 元数据一致性校验脚本 | scripts/check-meta.mjs（name/version 交叉+文件存在性+上架开关提示）；check:meta script |
 | 2026-10-02 | 主线 | C5b 成员下钻最小版 | 成员卡点击展开该成员提醒明细（徽章+逐条+完成动作）；完整跨模块时间线留 v0.5+ |
 | 2026-10-02 | 主线 | C1c（部分） | 删除废弃 dashboard.svelte（Tab 化后无引用）；settings 面板为现役保留 |
 | 2026-10-02 | 主线 | C1c 收尾（第一步完成） | LEGACY 段 7 个 dashboard 专用类删除（全局零引用验证）；settings 现役类保留；css 21.8→更精简 |
