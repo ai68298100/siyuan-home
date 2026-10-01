@@ -618,7 +618,8 @@
 | 2026-10-02 | 主线 | 33.2 journal 最小版 | DbRef.provisionError 记录建库/补列失败摘要（成功清除）；诊断区红色显示；完整 journal（多步恢复）留实测后按需 |
 | 2026-10-02 | 主线 | C5b 成员下钻最小版 | 成员卡点击展开该成员提醒明细（徽章+逐条+完成动作）；完整跨模块时间线留 v0.5+ |
 | 2026-10-02 | 主线 | C1c（部分） | 删除废弃 dashboard.svelte（Tab 化后无引用）；settings 面板为现役保留 |
-| 2026-10-02 | 巡检 | 健康巡检 | check 0/0、30/30、build 成功、工作区干净；大颗粒项（C1c 收尾/C6a/33.2 journal 完整版）已交接闲时队列（pending），本会话上下文余量不足以安全开拆 | media/pets/vehicles/transit/travel×4/assets-virtual 9 个 + 修复核心缺口 assets-real/health（默认启用却无 schema 的建库缺口）+ 68 枚举 i18n（总 399 键）；gzip 35.3KB；contract gate 24 schema 全过；剩余无 schema：food/address/bookmarks/snippets/parenting/schooling/social |
+| 2026-10-02 | 主线 | C1c 收尾（第一步完成） | LEGACY 段 7 个 dashboard 专用类删除（全局零引用验证）；settings 现役类保留；css 21.8→更精简 |
+| 2026-10-02 | 巡检 | 健康巡检 | check 0/0、30/30、build 成功、工作区干净；大颗粒项（C6a/33.2 journal 完整版）交接闲时队列 | media/pets/vehicles/transit/travel×4/assets-virtual 9 个 + 修复核心缺口 assets-real/health（默认启用却无 schema 的建库缺口）+ 68 枚举 i18n（总 399 键）；gzip 35.3KB；contract gate 24 schema 全过；剩余无 schema：food/address/bookmarks/snippets/parenting/schooling/social |
 
 ---
 

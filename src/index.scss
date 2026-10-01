@@ -14,28 +14,8 @@
     overflow: auto;
 }
 
-.lv-home__header {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-}
-
-.lv-home__title {
-    display: flex;
-    align-items: center;
-}
-
-.lv-home__section {
-    display: flex;
-    flex-direction: column;
-    gap: 8px;
-}
-
-.lv-home__section-title {
-    font-weight: 600;
-    font-size: 14px;
-    opacity: 0.85;
-}
+// C1c 收尾：dashboard 专用类已删（.lv-home__header/title/section/section-title/card/empty-card/grid 全零引用验证）
+// 保留：settings.svelte 现役的 .lv-home__group/__group-title 与 .lv-settings* 系列
 
 .lv-home__group {
     margin-bottom: 12px;
@@ -48,38 +28,6 @@
     letter-spacing: 0.04em;
     opacity: 0.6;
     margin: 4px 0 8px;
-}
-
-.lv-home__grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
-    gap: 8px;
-}
-
-.lv-home__card {
-    cursor: pointer;
-    padding: 8px 4px;
-
-    &:hover {
-        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.12);
-    }
-
-    .b3-card__info-title {
-        font-size: 14px;
-        font-weight: 600;
-    }
-
-    .b3-card__info-meta {
-        font-size: 12px;
-        opacity: 0.7;
-        margin-top: 4px;
-        word-break: break-all;
-    }
-}
-
-.lv-home__empty-card {
-    padding: 16px;
-    opacity: 0.75;
 }
 
 // 设置面板
