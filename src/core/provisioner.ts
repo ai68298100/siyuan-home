@@ -87,24 +87,27 @@ export async function provisionModule(
         provisional = true;
         console.warn(`[siyuan-home] module "${moduleId}" provisioned provisionally:`, e instanceof Error ? e.message : e);
     }
-    // 建列（av 可用时）；relation 列的成员库目标从 dbRefs.members 取
+    // 建列（av 可用时）；relation 列的成员库目标从 dbRefs.members 取；记录 colKey→keyID 映射
+    const columnMap: Record<string, string> = {};
     if (avId) {
         const memberAvId = moduleId === "members" ? undefined : settings.dbRefs.members?.avId;
         for (const col of schema.columns) {
+            const keyID = newSiYuanId();
             try {
                 await addAttributeViewColumn(avId, {
-                    keyID: newSiYuanId(),
+                    keyID,
                     name: opts.resolveName?.(col.key) ?? col.key,
                     type: col.type,
                     relationTargetAvID: col.type === "relation" ? memberAvId : undefined,
                 });
+                columnMap[col.key] = keyID;
             } catch (e) {
                 // 补列失败不阻断建库（ensureColumns 幂等补，33.2）
                 console.warn(`[siyuan-home] column "${col.key}" on "${moduleId}" deferred:`, e instanceof Error ? e.message : e);
             }
         }
     }
-    const dbRef: DbRef = { docId, avId, notebook: notebookId, provisional };
+    const dbRef: DbRef = { docId, avId, notebook: notebookId, provisional, columns: columnMap };
     settings.dbRefs[moduleId] = dbRef;
     return { dbRef, created: true };
 }

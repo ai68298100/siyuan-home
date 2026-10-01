@@ -1,0 +1,155 @@
+/**
+ * 提醒中枢单测：runtime 合并语义 / scanner 容错与过滤 / certs provider 读路径（mock transport）。
+ */
+import { describe, it, expect, beforeEach, afterEach } from "vitest";
+import { applyRuntime, defaultRuntime, type HubRuntime } from "@/core/hub/runtime";
+import { runScan } from "@/core/hub/scanner";
+import { CertsProvider } from "@/core/hub/providers";
+import { setTransport } from "@/core/siyuan";
+import type { DataProvider } from "@/core/hub/providers";
+import type { HomeSettings, Reminder } from "@/types";
+
+const TODAY = new Date(2026, 9, 1);
+
+const rem = (id: string, daysLeft: number, level: Reminder["level"] = "lead", moduleId = "certs"): Reminder => ({
+    id, moduleId, ruleKey: "expiry", rowId: id.split("::")[0], title: id,
+    dueDate: "2026-10-10", daysLeft, level,
+});
+
+const settings = (enabledModules?: string[]): HomeSettings => ({
+    enabledModules: enabledModules ?? ["certs", "members"],
+    members: [],
+    leadOverrides: {},
+    notifyHour: 8,
+    silentFrom: 22,
+    silentTo: 8,
+    dbRefs: {},
+});
+
+describe("runtime.applyRuntime", () => {
+    it("mute 剔除；snooze 未来隐藏、当天显示为 soon", () => {
+        const rt: HubRuntime = {
+            ...defaultRuntime(),
+            muted: { "a::certs.expiry": true },
+            snoozed: { "b::certs.expiry": "2026-10-05" },
+        };
+        const out = applyRuntime([rem("a::certs.expiry", 3), rem("b::certs.expiry", 4, "soon")], rt, TODAY);
+        expect(out.find((r) => r.id.startsWith("a::"))).toBeUndefined();
+        const b = out.find((r) => r.id.startsWith("b::"));
+        expect(b).toBeUndefined(); // snooze 到 10-05，今天 10-01 未到期 → 隐藏
+        const out2 = applyRuntime([rem("b::certs.expiry", 0)], rt, new Date(2026, 9, 5));
+        expect(out2[0]?.daysLeft).toBe(0);
+        expect(out2[0]?.level).toBe("soon");
+    });
+    it("adhoc 备忘注入并按天数排序（D1）", () => {
+        const rt: HubRuntime = {
+            ...defaultRuntime(),
+            memos: [{ id: "m1", title: "周三给老师打电话", dueDate: "2026-10-03", createdAt: "2026-10-01T00:00:00Z" }],
+        };
+        const out = applyRuntime([rem("x::certs.expiry", 9)], rt, TODAY);
+        expect(out[0].moduleId).toBe("adhoc");
+        expect(out[0].title).toBe("周三给老师打电话");
+        expect(out[0].daysLeft).toBe(2);
+        expect(out.map((r) => r.daysLeft)).toEqual([...out.map((r) => r.daysLeft)].sort((a, b) => a - b));
+    });
+});
+
+describe("scanner.runScan", () => {
+    const okProvider = (moduleId: string, list: Reminder[]): DataProvider => ({
+        moduleId, collect: async () => list,
+    });
+    const failProvider = (moduleId: string): DataProvider => ({
+        moduleId, collect: async () => { throw new Error("kernel down"); },
+    });
+
+    it("合并多 provider + 计数", async () => {
+        const res = await runScan(
+            [okProvider("certs", [rem("r1::certs.expiry", -1, "overdue"), rem("r2::certs.expiry", 3, "soon")]),
+             okProvider("members", [rem("r3::members.birthday", 20, "lead")])],
+            settings(), defaultRuntime(), TODAY,
+        );
+        expect(res.reminders).toHaveLength(3);
+        expect(res.counts).toEqual({ overdue: 1, soon: 1, lead: 1 });
+        expect(res.stale).toBe(false);
+    });
+    it("单模块失败 → stale + errors，其余照常", async () => {
+        const res = await runScan(
+            [failProvider("certs"), okProvider("members", [rem("r3::members.birthday", 20, "lead")])],
+            settings(), defaultRuntime(), TODAY,
+        );
+        expect(res.stale).toBe(true);
+        expect(res.errors[0].moduleId).toBe("certs");
+        expect(res.reminders).toHaveLength(1);
+    });
+    it("模块开关二次收敛：禁用模块的提醒剔除，adhoc 保留", async () => {
+        const res = await runScan(
+            [okProvider("certs", [rem("r1::certs.expiry", 3)]),
+             okProvider("adhoc", [{ ...rem("m1::adhoc.memo", 1, "soon"), moduleId: "adhoc" }])],
+            settings(["members"]), defaultRuntime(), TODAY,
+        );
+        expect(res.reminders.map((r) => r.moduleId)).toEqual(["adhoc"]);
+    });
+});
+
+describe("CertsProvider（mock transport，读路径）", () => {
+    afterEach(() => setTransport(null));
+
+    const AV = "av-certs-1";
+    const COLS = { name: "k-name", status: "k-status", expiry: "k-exp", due: "k-due" };
+    // render 响应：cells 不带 keyID → 走位置回退（Spike 未确认字段，回退路径必须有测试）
+    const renderPayload = {
+        code: 0, msg: "",
+        data: {
+            view: {
+                columns: Object.values(COLS).map((id, i) => ({ id, type: "text", name: `c${i}` })),
+                rowCount: 2,
+                rows: [
+                    { // 有效证件：9 天后到期
+                        id: "row-1",
+                        cells: [
+                            { value: { type: "text", text: { content: "我的护照" } } },
+                            { value: { type: "select", select: { content: "valid" } } },
+                            { value: { type: "date", date: { content: new Date(2026, 9, 10).getTime(), isNotEmpty: true } } },
+                            { value: {} },
+                        ],
+                    },
+                    { // 已过期状态行：不提醒（33.3 过滤）
+                        id: "row-2",
+                        cells: [
+                            { value: { type: "text", text: { content: "旧身份证" } } },
+                            { value: { type: "select", select: { content: "expired" } } },
+                            { value: { type: "date", date: { content: new Date(2026, 8, 1).getTime(), isNotEmpty: true } } },
+                            { value: {} },
+                        ],
+                    },
+                ],
+            },
+        },
+    };
+
+    beforeEach(() => {
+        setTransport(async (endpoint: string) => {
+            if (endpoint === "/api/av/renderAttributeView") return renderPayload;
+            if (endpoint === "/api/av/getAttributeViewPrimaryKeyValues") return { code: 0, msg: "", data: { rows: { values: [] } } };
+            throw new Error("unexpected endpoint " + endpoint);
+        });
+    });
+
+    it("读取行 → 派生 expiry 提醒；expired 行被过滤", async () => {
+        const p = new CertsProvider({
+            settings: settings(),
+            getDbRef: () => ({ avId: AV, columns: COLS }),
+        });
+        const out = await p.collect(TODAY);
+        expect(out).toHaveLength(1);
+        const r = out[0];
+        expect(r.title).toBe("我的护照");
+        expect(r.daysLeft).toBe(9);
+        expect(r.level).toBe("lead");
+        expect(r.moduleId).toBe("certs");
+    });
+    it("无 dbRef → 空数组（模块未建库时不报错）", async () => {
+        const p = new CertsProvider({ settings: settings(), getDbRef: () => undefined });
+        expect(await p.collect(TODAY)).toEqual([]);
+    });
+});

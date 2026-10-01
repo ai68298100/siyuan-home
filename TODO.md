@@ -57,9 +57,9 @@
 - [x] 🔴 B1b 规则引擎单测：anniversary 农历（腊月廿九、闰月、跨年、当天） ✅ 2026-10-01（09 决策记录 / commit 168dcae）
 - [x] 🔴 B1c 规则引擎单测：recurring 周期滚动（day/week/month/quarter/year）+ 未声明周期降级 ✅ 2026-10-01（09 决策记录 / commit 168dcae）
 - [x] 🔴 B1d 规则引擎单测：leadOverrides 覆盖与 later 降噪过滤 ✅ 2026-10-01（09 决策记录 / commit 168dcae）
-- [ ] 🔴 B2a 扫描器：DataProvider 接口 + certs 实现（SQL 到期范围查询）
+- [x] 🔴 B2a 扫描器：DataProvider 接口 + certs 实现（SQL 到期范围查询） ✅ 2026-10-01（providers/scanner/runtime 三层 + 7 单测；kernel 定时触发 B2d 另行）
 - [ ] 🔴 B2b 扫描器：三路触发整合（kernel 定时 / Tab 打开刷新 / 前端兜底心跳）
-- [ ] 🔴 B2c HubState 缓存读写（kernel storage 优先，前端降级）
+- [x] 🔴 B2c HubState 缓存读写（kernel storage 优先，前端降级） ✅ 2026-10-01（providers/scanner/runtime 三层 + 7 单测；kernel 定时触发 B2d 另行）
 - [ ] 🟡 B2d kernel.js 定时任务：每日 08:00 全量扫描（可配）+ broadcast `hub.updated`
 - [ ] 🔴 B3a 通知：每日摘要一条（notifyHour，lastNotifiedDate 去重）
 - [ ] 🔴 B3b 通知：overdue 首次发现立即通知 + 静默时段（silentFrom/To）
@@ -69,7 +69,7 @@
 - [ ] 🔴 B4c 动作：延后 snooze（1/3/7/30 天，运行态持久化）
 - [ ] 🔴 B4d 动作：忽略 mute（rowId+ruleKey，可恢复）
 - [ ] ⛔ 🔴 B4e 动作：定位（依赖 S3 结论；降级=打开台账文档）
-- [ ] 🔴 B4f 提醒中枢运行态存储 schema（snooze/mute/已办缓存 → loadData）
+- [x] 🔴 B4f 提醒中枢运行态存储 schema（snooze/mute/已办缓存 → loadData） ✅ 2026-10-01（providers/scanner/runtime 三层 + 7 单测；kernel 定时触发 B2d 另行）
 
 ## 4. v0.2 · UI（阶段 C，组件契约见 docs/design/08）
 
@@ -562,6 +562,7 @@
 |---|---|---|---|
 | 2026-10-01 | 设立 | 协议建立 | 本节 |
 | 2026-10-01 | 主线 | Spike 三组实验（用户启动思源后执行） | 定案 R-av-create/R2/R5；siyuan.ts 真实 av 实现；S0-S5/A2a 共 9 项勾选；R5 降级定案；实验笔记本已清理 |
+| 2026-10-01 | 主线 | B2a/B2c/B4f 提醒中枢数据链 | DataProvider(certs/members) + runScan(容错/开关收敛/计数) + runtime(snooze/mute/adhoc/缓存)；DbRef.columns 映射补齐；vitest 30/30；B2d/B3 留待接线 |
 
 ---
 

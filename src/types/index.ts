@@ -93,9 +93,12 @@ export interface HubState {
 /** 模块台账落点映射（provisioner 维护，幂等）；provisional=等 Spike 的占位建库（C7） */
 export interface DbRef {
     docId?: string;
+    /** av 实体 ID（Spike 定案 = av 块 ID） */
     avId?: string;
     notebook?: string;
     provisional?: boolean;
+    /** 字典列 key → av 列 keyID（provisioner 建列时记录；读取行的唯一稳定依据） */
+    columns?: Record<string, string>;
 }
 
 /** 插件设置（持久化到 data/storage/petal/siyuan-home/settings.json） */

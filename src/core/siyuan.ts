@@ -183,16 +183,22 @@ export async function setCell(avID: string, keyID: string, itemID: string, value
 
 export interface AvRow {
     itemID: string;
-    cells: Record<string, any>; // value.keyID → value
+    cells: Record<string, any>; // 列 keyID → value
 }
 
-/** 读取台账（表格视图）列与行 */
+/** 读取台账（表格视图）列与行。cells 以列 keyID 索引；value 无 keyID 时按位置回退（Spike 未确认该字段） */
 export async function renderLedger(avID: string): Promise<{ columns: any[]; rows: AvRow[]; rowCount: number }> {
     const d = await post<any>("/api/av/renderAttributeView", { id: avID });
     const view = d?.view ?? {};
-    const rows: AvRow[] = (view.rows ?? []).map((r: any) => ({
-        itemID: r.id,
-        cells: Object.fromEntries((r.cells ?? []).map((c: any) => [c.value?.keyID, c.value])),
-    }));
-    return { columns: view.columns ?? [], rows, rowCount: view.rowCount ?? rows.length };
+    const cols: any[] = view.columns ?? [];
+    const rows: AvRow[] = (view.rows ?? []).map((r: any) => {
+        const cells: Record<string, any> = {};
+        (r.cells ?? []).forEach((c: any, i: number) => {
+            const v = c.value ?? {};
+            const key = v.keyID ?? cols[i]?.id;
+            if (key) cells[key] = v;
+        });
+        return { itemID: r.id, cells };
+    });
+    return { columns: cols, rows, rowCount: view.rowCount ?? rows.length };
 }
