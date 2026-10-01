@@ -460,5 +460,7 @@
     "faq.quickCapture": "顶栏 ⚡ 按钮，或总览页快速备忘区",
     "field.battery_due": "电池更换到期",
     "field.violations": "违章记录（手动摘要）",
-    "field.ingredients": "食材清单"
+    "field.ingredients": "食材清单",
+    "ledger.rebuild": "重建台账",
+    "diag.rebuilding": "建库中…"
 }

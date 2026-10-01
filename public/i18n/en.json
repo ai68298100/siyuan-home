@@ -460,5 +460,7 @@
     "faq.quickCapture": "Top bar ⚡ button, or quick memo area on Overview",
     "field.battery_due": "Battery due",
     "field.violations": "Violations (manual)",
-    "field.ingredients": "Ingredients"
+    "field.ingredients": "Ingredients",
+    "ledger.rebuild": "Rebuild ledger",
+    "diag.rebuilding": "Provisioning…"
 }

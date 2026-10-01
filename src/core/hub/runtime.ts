@@ -45,8 +45,6 @@ export interface HubRuntime {
     lastNotifiedDate?: string;
     /** 逾期即时提醒去重：最后提示日期（B3b） */
     lastOverdueAlertDate?: string;
-    /** 逾期即时提醒去重：最后提示日期（B3b） */
-    lastOverdueAlertDate?: string;
 }
 
 export function defaultRuntime(): HubRuntime {

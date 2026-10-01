@@ -3,16 +3,29 @@
 
     let { plugin, t }: { plugin: any; t: (k: string) => string } = $props();
 
+    // 台账页模块下拉：已建库 + 已启用但未建库的模块（26.7：后者可从页面直接触发重建）
     const ledgers = $derived(
-        Object.entries(plugin.settings.dbRefs).filter(([id, ref]: [string, any]) => ref?.avId && id !== "members"),
+        plugin.settings.enabledModules
+            .filter((id: string) => id !== "members")
+            .map((id: string) => ({ id, ref: plugin.settings.dbRefs[id] })),
     );
-    // svelte-ignore state_referenced_locally
     let active = $state(plugin.activeLedger ?? "certs");
     let rows: any[] = $state([]);
     let loading = $state(false);
+    let rebuilding = $state(false);
 
     const ref = $derived(plugin.settings.dbRefs[active]);
     const schemaKeys = $derived<string[]>(ref?.columns ? Object.keys(ref.columns) : []);
+
+    async function rebuildLedger() {
+        rebuilding = true;
+        try {
+            await plugin.ensureCoreLedgers();
+            await plugin.refreshHub();
+        } finally {
+            rebuilding = false;
+        }
+    }
 
     async function load() {
         if (!ref?.avId) { rows = []; return; }
@@ -86,12 +99,18 @@
 
 <div style="display:flex;gap:10px;align-items:center;margin:14px 0;flex-wrap:wrap">
     <select class="b3-select" bind:value={active} onchange={() => (plugin.activeLedger = active)}>
-        {#each ledgers as [id] (id)}
-            <option value={id}>{t(`module.${id}`)}</option>
+        {#each ledgers as l (l.id)}
+            <option value={l.id}>{t(`module.${l.id}`)}{l.ref?.avId ? "" : `（${t("diag.missing")}）`}</option>
         {/each}
     </select>
     <span class="fn__flex-1"></span>
-    <button class="b3-button b3-button--outline" onclick={() => plugin.showTabDocs(ref?.docId)}>{t("ledger.openDoc")} ↗</button>
+    {#if rebuilding}
+        <span class="lv-caption">{t("diag.rebuilding")}</span>
+    {:else if !ref?.avId}
+        <button class="b3-button" onclick={rebuildLedger}>{t("ledger.rebuild")}</button>
+    {:else}
+        <button class="b3-button b3-button--outline" onclick={() => plugin.showTabDocs(ref?.docId)}>{t("ledger.openDoc")} ↗</button>
+    {/if}
 </div>
 
 <div class="lv-card" style="padding:14px;display:flex;gap:8px;flex-wrap:wrap;align-items:center">
