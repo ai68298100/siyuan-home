@@ -458,5 +458,6 @@
     "faq.shortcuts": "Shortcuts & entries",
     "faq.topbarOrCommand": "Top bar 🏠 button, or command palette (hotkey customizable in SiYuan settings)",
     "faq.quickCapture": "Top bar ⚡ button, or quick memo area on Overview",
-    "field.battery_due": "Battery due"
+    "field.battery_due": "Battery due",
+    "field.violations": "Violations (manual)"
 }

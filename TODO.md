@@ -414,7 +414,7 @@
 
 - [ ] 🟢 assets-real QR 标签打印/扫码定位（Sortly 印证；标签页生成 QR→贴物→扫码直达台账行）
 - [x] 🟡 vehicles 电池更换周期字段+提醒 ✅ 2026-10-02（schema 加 battery_due 列 + battery 提醒 30 天；周期推算由用户按实际记录下次更换日）
-- [ ] 🟡 vehicles 违章手动记录字段（12123 功能面：日期/地点/行为/罚款/扣分/处理状态）
+- [x] 🟡 vehicles 违章手动记录字段 ✅ 2026-10-02（violations text 列：日期/地点/行为/罚款摘要，换行分隔；子表化留 v0.8 深化）
 - [ ] 🟢 insurance 续保决策提醒（contracts 自动续约有同款语义：到期前 N 天提示"续/比价/放弃"决策而非仅提醒）
 - [ ] 🟢 snippets 参数位模板（espanso Forms/TextExpander 印证：{{占位}} 展开时弹填充；如地址模板填收件人）
 - [ ] 🟢 media gallery 海报墙视图（seerr 印证：封面卡片墙；schema media 补 gallery 视图定义）

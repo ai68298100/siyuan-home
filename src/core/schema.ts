@@ -451,6 +451,8 @@ export const VEHICLES_SCHEMA: ModuleSchema = {
         { key: "inspection_due", type: "date", labelKey: "field.inspection_due" },
         // 电池更换（grocy 印证：铅酸 1.5-2 年/锂 5-8 年——用户按实际记录下次更换日）
         { key: "battery_due", type: "date", labelKey: "field.battery_due" },
+        // 违章手动记录（12123 功能面：日期/地点/行为/罚款 摘要，多条例以换行分隔；官方数据不做对接）
+        { key: "violations", type: "text", labelKey: "field.violations" },
     ],
     capture: ["name", "plate", "expiry", "inspection_due"],
     reminders: [
