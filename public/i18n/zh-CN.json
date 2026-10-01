@@ -228,5 +228,7 @@
     "diag.ok": "正常",
     "diag.provisional": "占位（待补建数据库）",
     "diag.missing": "未建库",
-    "diag.columns": "列数"
+    "diag.columns": "列数",
+    "diag.backfill": "回填成员关联",
+    "diag.backfillDone": "已回填 ${n} 位成员的台账关联"
 }

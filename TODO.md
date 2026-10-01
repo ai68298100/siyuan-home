@@ -226,7 +226,7 @@
 - [ ] 🔴 模块禁用时其提醒立即从 HubState 与通知中剔除
 - [ ] 🟡 settings 写入失败重试与错误上报（saveData 异常捕获）
 - [x] 🔴 成员双 ID 关联修正：FamilyMember.avItemId 回填（addDetachedRow 返回值）+ certs provider 读 relation.blockIDs 反查 memberId ✅ 2026-10-02（老成员无 avItemId 需重加或补写，迁移待办见 33.2）
-- [ ] 🟡 老成员 avItemId 迁移：v0.2.0 前添加的成员在 members 库中已有行但 settings 无 avItemId → 诊断区提供"按姓名匹配回填"工具
+- [x] 🟡 老成员 avItemId 迁移：v0.2.0 前添加的成员在 members 库中已有行但 settings 无 avItemId → 诊断区提供"按姓名匹配回填"工具 ✅ 2026-10-02（诊断区一键按姓名回填）
 - [ ] 🔴 B2d 定案记录：kernel.js（goja）无定时器 API → 定时扫描=前端心跳 30min + Tab 打开触发；kernel 侧保留 RPC 供生态（v0.3）；03 §3 已按此实现，文档同步
 - [ ] 🟡 笔记本被用户关闭（closed=true）→ ensureNotebook 重新打开或引导
 - [ ] 🟡 笔记本被删除 → 诊断区一键重建全部已启用模块台账
@@ -571,6 +571,7 @@
 | 2026-10-02 | 主线 | 🔴 bundle 整改 + C2a/e + C3b + C7d | 农历动态 import 拆 chunk（gzip 132→32.4KB，-76%，chunk 强制 .js）；总览成员 chips 过滤（持久化）+模块卡待办数；提醒页三级分组；设置页重跑引导；vitest 30/30 |
 | 2026-10-02 | 主线 | 33.1 单实例 + 33.4 draft 事务 + 文档三件套 | hubListeners Set 多实例刷新；设置 draft 编辑事务（保存落盘）；i18n 真值收尾；FAQ/privacy/ADR 索引落地；vitest 30/30 |
 | 2026-10-02 | 主线 | C2c qbtn + C1b 胶囊 + 诊断区 + D1 回归脚本 | 快速记录行（跳台账预选）；导航胶囊 spring；设置·关于诊断（dbRefs/扫描错误/契约门禁）；回归脚本 docs/testing/v0.2.md |
+| 2026-10-02 | 主线 | avItemId 迁移工具 | 诊断区一键按姓名匹配 members 库行回填 avItemId（backfillMemberLinks）；vitest 30/30 |
 
 ---
 

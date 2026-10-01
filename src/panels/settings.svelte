@@ -171,6 +171,14 @@
                                 <p class="lv-caption" style="color:var(--lv-danger)">{c}</p>
                             {/each}
                         {/if}
+                        {#if (plugin.settings.members ?? []).some((m: any) => !m.avItemId)}
+                            <button class="b3-button b3-button--outline" style="margin-top:6px"
+                                onclick={async () => {
+                                    const { backfillMemberLinks } = await import("@/core/members");
+                                    const res = await backfillMemberLinks(plugin as any, plugin.settings);
+                                    showMessage(t("diag.backfillDone").replace("${n}", String(res.linked.length)), 3000, "info");
+                                }}>{t("diag.backfill")}</button>
+                        {/if}
                     </div>
                 {/if}
             {/if}

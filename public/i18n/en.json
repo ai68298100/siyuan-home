@@ -228,5 +228,7 @@
     "diag.ok": "OK",
     "diag.provisional": "provisional (AV pending)",
     "diag.missing": "not provisioned",
-    "diag.columns": "columns"
+    "diag.columns": "columns",
+    "diag.backfill": "Backfill member links",
+    "diag.backfillDone": "Linked ${n} members to ledger rows"
 }

@@ -48,6 +48,38 @@ export async function removeMember(plugin: Plugin, settings: HomeSettings, id: s
     await saveSettings(plugin, settings);
 }
 
+/**
+ * 老成员关联回填（诊断区工具）：按姓名主键匹配 members 库行，回填 avItemId。
+ * 仅处理缺 avItemId 的成员；同名多行取第一行并在结果中报告。
+ */
+export async function backfillMemberLinks(
+    plugin: Plugin,
+    settings: HomeSettings,
+): Promise<{ linked: string[]; unmatched: string[] }> {
+    const ref = settings.dbRefs.members;
+    const linked: string[] = [];
+    const unmatched: string[] = [];
+    if (!ref?.avId || !ref.columns?.name) return { linked, unmatched };
+    const { renderLedger } = await import("./siyuan");
+    const { rows } = await renderLedger(ref.avId);
+    const nameKey = ref.columns.name;
+    const pending = settings.members.filter((m) => !m.avItemId);
+    for (const m of pending) {
+        const hit = rows.find((r) => {
+            const v = r.cells[nameKey];
+            return (v?.text?.content ?? v?.block?.content ?? "").trim() === m.name.trim();
+        });
+        if (hit) {
+            m.avItemId = hit.itemID;
+            linked.push(m.name);
+        } else {
+            unmatched.push(m.name);
+        }
+    }
+    if (linked.length > 0) await saveSettings(plugin, settings);
+    return { linked, unmatched };
+}
+
 /** 编辑成员（设置侧为准；av 侧行值尽力同步） */
 export async function updateMember(plugin: Plugin, settings: HomeSettings, member: FamilyMember): Promise<void> {
     settings.members = settings.members.map((m) => (m.id === member.id ? member : m));
