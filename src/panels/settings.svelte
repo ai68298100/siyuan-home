@@ -149,6 +149,11 @@
                     await import("@/core/settings").then((m) => m.saveSettings(plugin as any, plugin.settings));
                     showMessage(t("wiz.rerunHint"), 3000, "info");
                 }}>{t("wiz.rerun")}</button>
+            <div style="margin-top:10px;border-top:1px solid var(--b3-border-color);padding-top:8px">
+                <p class="lv-caption">⌨ {t("faq.shortcuts")}</p>
+                <p class="lv-caption">· {t("openButler")}：{t("faq.topbarOrCommand")}</p>
+                <p class="lv-caption">· {t("faq.quickCapture")}：{t("faq.topbarBolt")}</p>
+            </div>
             {#if tab === "about"}
                 {@const diag = plugin.getDiagnostics?.()}
                 {#if diag}
