@@ -51,7 +51,9 @@
     <div class="lv-people">
         {#each members as m (m.id)}
             <div class="lv-card lv-mod">
-        <div class="head" style="display:flex;gap:10px;align-items:center;cursor:pointer" onclick={() => toggleExpand(m.id)}>
+        <div class="head" style="display:flex;gap:10px;align-items:center;cursor:pointer" role="button" tabindex="0"
+            onkeydown={(e: KeyboardEvent) => e.key === "Enter" && toggleExpand(m.id)}
+            onclick={() => toggleExpand(m.id)}>
             <span class="lv-avatar lg" style="background:linear-gradient(135deg,var(--lv-accent),var(--lv-accent-2))">{m.name.slice(0, 1)}</span>
             <div><b>{m.name}</b><div class="lv-caption">{t(`role.${m.role}`)}{m.lunarBirthday ? " 🌙" : ""} {m.birthday ?? ""}</div></div>
             <span style="flex:1"></span>
