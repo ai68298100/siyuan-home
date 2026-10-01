@@ -23,9 +23,7 @@
         plugin.setActiveLedger("certs");
         onGoto?.("ledger");
     }
-    async function finish() {
-        await finishAndCapture();
-    }
+    // 完成=建库+直达证件快速录入（C7 CTA）
     function skip() { plugin.finishOnboarding({ roles: ["self"], children: 0 }, []); }
 </script>
 
