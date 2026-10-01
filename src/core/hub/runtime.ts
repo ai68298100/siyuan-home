@@ -24,6 +24,8 @@ export interface HubRuntime {
     scannedAt?: string;
     /** 总览成员过滤（C2e：持久化） */
     filterMemberId?: string;
+    /** 提醒中枢筛选（C3d：持久化） */
+    hubFilter?: string;
     /** 上次扫描摘要缓存（通知与总览首屏直读，扫描失败时保留 stale 数据） */
     cache?: {
         reminders: Reminder[];

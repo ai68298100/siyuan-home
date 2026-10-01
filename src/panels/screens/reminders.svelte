@@ -3,7 +3,8 @@
     let { plugin, t }: { plugin: any; t: (k: string) => string } = $props();
 
     const all = $derived(plugin.scan?.reminders ?? []);
-    // C3d：筛选持久化（runtime.hubFilter）
+    // C3d：筛选持久化（runtime.hubFilter）——初始快照为设计意图
+    // svelte-ignore state_referenced_locally
     let filter = $state(plugin.runtime.hubFilter ?? "all");
     async function setFilter(v: string) {
         filter = v;
