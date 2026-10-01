@@ -214,7 +214,7 @@
 - [ ] 🟢 车辆旅行国际集群：Drivvo/Fuelio/TripIt/Wanderlog/PackPoint/Polarsteps
 - [x] 🟢 效率小件集群（部分）：espanso 已查（14.6k★：触发词展开+Forms 表单参数位印证 snippets 形态；系统级注入不吸收）；Raindrop/TextExpander 留待下轮
 - [ ] 🟢 国际家庭管理集群：Cozi/FamilyWall/Maple/OurHome/Sweepy/Tody/Homechart（gh）
-- [x] 🟢 记账补充：Actual 已查（12k★，本地优先+加密同步架构印证；信封预算不吸收）；MoneyWiz 留待下轮
+- [x] 🟢 记账补充：Actual（12k★，架构印证）+ firefly-iii（24.8k★，循环交易/规则引擎印证 memberships 语义；复式记账与预算不吸收）均已查；MoneyWiz 闭源跳过
 - [ ] 🟢 调研结论回填 MODULES.md 附录 + 影响新模块/字段时更新 schema
 
 ## 15. 数据完整性与边界场景
@@ -625,6 +625,7 @@
 | 2026-10-02 | 循环B | 外部调研 Things 3 Areas | Area→Project→To-do 层级强印证我们模块组→台账→行两层结构；组织归层级/时间归调度的分离与成员 chips+提醒中枢设计一致；来源 vanja.io/r/thingsapp |
 | 2026-10-02 | 循环B | 外部调研 滴答清单四象限/智能清单 | 筛选器命名视图产出新待办（依赖已实现的 C3d 持久化）；来源 help.dida365/sspai |
 | 2026-10-02 | 循环B | 外部调研 Notion relation/rollup | 成员卡统计 rollup 原生路径确认产出待办（C5b 数据层简化）；来源 notion.com/help/relations-and-rollups |
+| 2026-10-02 | 循环B | 闲时队列任务执行（第二轮 prompt 到达） | 任务1-4（i18n/Tab化/接线/引导）核对为已完成（prompt 快照滞后约20提交）；增量=firefly-iii 调研（24.8k★）回填；巡检全绿；金钱提醒：循环交易印证 memberships recurring |
 | 2026-10-02 | 主线 | 33.5 发布包 smoke test（首轮） | 抓到并修复：docs 泄漏入包（vite staticCopy 删 docs 行）+ LICENSE 未入包（补复制）；复检 11 必要文件全 OK/4 禁入文件全无/JSON 与 i18n 校验过 |
 | 2026-10-02 | 循环B | 外部调研 Apple 备忘录家庭共享 | 共享文件夹=家庭共用台账的思源原生路径印证（专用笔记本+思源分享即可，无需插件开发）；来源 Apple Support |
 | 2026-10-02 | 循环B | 外部调研 Notion Charts/Dashboard | 原生 chart/dashboards 印证统计卡价值；思源暂无 chart 视图→统计卡维持自绘 spark；来源 notion.com/help/charts |
