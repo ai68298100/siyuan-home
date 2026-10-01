@@ -576,7 +576,8 @@
 | 2026-10-02 | 主线 | 8 模块 schema 批量生产（v0.4/v0.5/v0.6 主体） | shopping/contracts/exams/allowance/favors/stock/chores/house schema + 66 枚举 i18n（总 329 键）；契约门禁 13 schema 全过；gzip 34.2KB；schema 驱动模块达 13/31；devStatus 已随 schema 批量晋升（31 模块 skeleton，ready 待各模块 UI 完成逐个晋升） |
 | 2026-10-02 | 主线 | 🏁 31/31 schema 全覆盖 | 最后 7 个轻模块（food/address/bookmarks/snippets/parenting/schooling/social）；i18n 451 键；gzip 35.9KB；契约门禁 31 schema 全过；31 模块全部 schema 驱动——v0.3~v0.8 全版本 schema 层提前完成 |
 | 2026-10-02 | 循环A | 兜底循环 A 启动：devStatus 批量晋升 + 面板点击文案分级（ready/skeleton/planned 三态已实现） | modules.ts 31 项 skeleton；vitest 30/30 |
-| 2026-10-02 | 循环A | 第 6 项 i18n 走查 | scripts/check-i18n.mjs（check:i18n script）；451 键 zh/en 全对齐 | media/pets/vehicles/transit/travel×4/assets-virtual 9 个 + 修复核心缺口 assets-real/health（默认启用却无 schema 的建库缺口）+ 68 枚举 i18n（总 399 键）；gzip 35.3KB；contract gate 24 schema 全过；剩余无 schema：food/address/bookmarks/snippets/parenting/schooling/social |
+| 2026-10-02 | 循环A | 第 6 项 i18n 走查 | scripts/check-i18n.mjs（check:i18n script）；451 键 zh/en 全对齐 |
+| 2026-10-02 | 循环A | 第 9 项安全审计 | 移除模板遗留 console.debug（配置含成员/金额禁止打印）；保留 error 一处（契约校验提示）；console 全库仅剩必要路径 | media/pets/vehicles/transit/travel×4/assets-virtual 9 个 + 修复核心缺口 assets-real/health（默认启用却无 schema 的建库缺口）+ 68 枚举 i18n（总 399 键）；gzip 35.3KB；contract gate 24 schema 全过；剩余无 schema：food/address/bookmarks/snippets/parenting/schooling/social |
 
 ---
 
