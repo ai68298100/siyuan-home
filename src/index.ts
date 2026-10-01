@@ -26,8 +26,8 @@ export default class LvHomePlugin extends Plugin {
     runtime: HubRuntime;
     scan: ScanResult;
     private heartbeat: number | undefined;
-    /** Tab 面板刷新回调（面板挂载时注册） */
-    onHubUpdate: (() => void) | null = null;
+    /** Tab 面板刷新回调（支持多实例，33.1：所有打开的管家面板同步刷新） */
+    hubListeners = new Set<() => void>();
 
     async onload() {
         const self = this;
@@ -117,7 +117,7 @@ export default class LvHomePlugin extends Plugin {
             showMessage(text, 6000, "info");
         }
         await saveRuntime(this, this.runtime);
-        this.onHubUpdate?.();
+        this.hubListeners.forEach((fn) => fn());
         return scan;
     }
 

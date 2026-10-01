@@ -10,7 +10,7 @@
         settings: any;
         runtime: any;
         scan: any;
-        onHubUpdate: (() => void) | null;
+        hubListeners: Set<() => void>;
         refreshHub: () => Promise<any>;
         openSetting: () => void;
         complete: (r: any) => Promise<unknown>;
@@ -32,16 +32,13 @@
         { id: "members", key: "tab.members" },
     ];
 
-    // Tab 挂载即注册刷新回调（扫描完成 → 触发 rune 更新）
+    // Tab 挂载即注册刷新回调（扫描完成 → 触发 rune 更新；多实例安全）
     let tick = $state(0);
     $effect(() => {
-        plugin.onHubUpdate = () => { tick += 1; };
-        return () => { plugin.onHubUpdate = null; };
-    });
-    // 打开时刷新一次扫描（B2b：Tab 打开触发）
-    $effect(() => {
-        void tick;
+        const listener = () => { tick += 1; };
+        (plugin.hubListeners as Set<() => void>).add(listener);
         void plugin.refreshHub();
+        return () => { (plugin.hubListeners as Set<() => void>).delete(listener); };
     });
 </script>
 

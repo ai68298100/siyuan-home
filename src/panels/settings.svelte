@@ -18,49 +18,56 @@
 
     let tab: "modules" | "members" | "about" = $state("modules");
     let saving = $state(false);
+    // 33.4 编辑事务：draft 副本，保存才落盘（取消/关闭不污染 settings）。
+    // 此处捕获初始快照是设计意图，抑制 svelte 的 locally-referenced 提示。
+    // svelte-ignore state_referenced_locally
+    let draftEnabled: string[] = $state([...settings.enabledModules]);
+    // svelte-ignore state_referenced_locally
+    let draftMembers: any[] = $state(settings.members.map((m: any) => ({ ...m })));
 
     const ROLES: MemberRole[] = ["self", "spouse", "partner", "child", "elder", "kin", "other"];
-    const enabledIds = $derived(new Set(settings.enabledModules));
+    const enabledIds = $derived(new Set(draftEnabled));
 
     function toggleModule(id: string, alwaysOn?: boolean) {
         if (alwaysOn) return;
         if (enabledIds.has(id)) {
-            settings.enabledModules = settings.enabledModules.filter((x) => x !== id);
+            draftEnabled = draftEnabled.filter((x) => x !== id);
         } else {
-            settings.enabledModules = [...settings.enabledModules, id];
+            draftEnabled = [...draftEnabled, id];
             const mod = modulesByGroup("kids").find((m) => m.id === id);
             if (mod?.suggestRoles?.length) {
-                const has = settings.members.some((m) => mod.suggestRoles!.includes(m.role));
+                const has = draftMembers.some((m) => mod.suggestRoles!.includes(m.role));
                 if (!has) showMessage(t("members.suggestOn"), 3200, "info");
             }
         }
     }
 
     function enableAll() {
-        settings.enabledModules = MODULE_GROUPS.flatMap((g) => modulesByGroup(g).map((m) => m.id));
+        draftEnabled = MODULE_GROUPS.flatMap((g) => modulesByGroup(g).map((m) => m.id));
     }
 
     function coreOnly() {
-        settings.enabledModules = MODULE_GROUPS.flatMap((g) => modulesByGroup(g))
+        draftEnabled = MODULE_GROUPS.flatMap((g) => modulesByGroup(g))
             .filter((m) => m.defaultEnabled || m.alwaysOn)
             .map((m) => m.id);
     }
 
     function addMember() {
-        settings.members = [...settings.members, newMember(" ", "other")];
+        draftMembers = [...draftMembers, newMember(" ", "other")];
     }
 
     function removeMember(id: string) {
         confirm(t("delete"), t("delete") + "?", () => {
-            settings.members = settings.members.filter((m) => m.id !== id);
+            draftMembers = draftMembers.filter((m) => m.id !== id);
         });
     }
 
     async function save() {
         saving = true;
         try {
-            settings.members = settings.members.map((m) => ({ ...m, name: m.name.trim() || "?" }));
-            await saveSettings(plugin as any, settings);
+            plugin.settings.enabledModules = [...draftEnabled];
+            plugin.settings.members = draftMembers.map((m) => ({ ...m, name: m.name.trim() || "?" }));
+            await saveSettings(plugin as any, plugin.settings);
             showMessage(t("saved"), 2000, "info");
         } finally {
             saving = false;
@@ -109,20 +116,20 @@
         {/each}
     {:else if tab === "members"}
         <div class="lv-settings__hint">{t("settings.membersHint")}</div>
-        {#if settings.members.length === 0}
+        {#if draftMembers.length === 0}
             <div class="lv-settings__hint ft__on-surface">{t("members.empty")}</div>
         {/if}
-        {#each settings.members as m, i (m.id)}
+        {#each draftMembers as m, i (m.id)}
             <div class="fn__flex lv-settings__row lv-settings__member">
-                <input class="b3-text-field fn__size200" placeholder={t("members.name")} bind:value={settings.members[i].name} />
-                <select class="b3-select" bind:value={settings.members[i].role}>
+                <input class="b3-text-field fn__size200" placeholder={t("members.name")} bind:value={draftMembers[i].name} />
+                <select class="b3-select" bind:value={draftMembers[i].role}>
                     {#each ROLES as r (r)}
                         <option value={r}>{t(`role.${r}`)}</option>
                     {/each}
                 </select>
-                <input class="b3-text-field" type="date" bind:value={settings.members[i].birthday} title={t("members.birthday")} />
+                <input class="b3-text-field" type="date" bind:value={draftMembers[i].birthday} title={t("members.birthday")} />
                 <label class="fn__flex">
-                    <input type="checkbox" class="b3-switch" bind:checked={settings.members[i].lunarBirthday} />
+                    <input type="checkbox" class="b3-switch" bind:checked={draftMembers[i].lunarBirthday} />
                     <span>{t("members.lunar")}</span>
                 </label>
                 <span class="fn__flex-1"></span>

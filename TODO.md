@@ -338,12 +338,12 @@
 ## 22. 文档与用户支持
 
 - [ ] 🟡 用户手册 docs/guide/（每模块一页，含截图，上架前完成核心五模块）
-- [ ] 🟡 FAQ（数据存哪里/是否上传/如何备份/多设备）
-- [ ] 🟡 隐私声明 docs/privacy.md（README 与集市描述引用）
+- [x] 🟡 FAQ（数据存哪里/是否上传/如何备份/多设备） ✅ 2026-10-02
+- [x] 🟡 隐私声明 docs/privacy.md（README 与集市描述引用） ✅ 2026-10-02
 - [ ] 🟡 生态 RPC API 文档 docs/api.md（方法/签名/since 版本，05 §2 的落地文档）
 - [ ] 🟡 README 中英双语截图与演示 GIF（替换纯文字介绍）
 - [ ] 🟢 60 秒快速上手视频脚本（B 站/小红书发布素材）
-- [ ] 🟢 ADR 索引页 docs/design/00-index.md（七条 ADR + 后续增补的导航）
+- [x] 🟢 ADR 索引页 docs/design/00-index.md（七条 ADR + 后续增补的导航） ✅ 2026-10-02
 - [ ] 🟢 每版本 migration notes（用户可见的升级说明）
 - [ ] 🟢 键盘快捷键完整表（配合 17 组速查表）
 
@@ -569,6 +569,7 @@
 | 2026-10-01 | 主线 | B2a/B2c/B4f 提醒中枢数据链 | DataProvider(certs/members) + runScan(容错/开关收敛/计数) + runtime(snooze/mute/adhoc/缓存)；DbRef.columns 映射补齐；vitest 30/30；B2d/B3 留待接线 |
 | 2026-10-02 | 主线 | C1 Tab 化 + B2b/B3 接线 + C7 向导 + A4 | addTab 四页签面板（总览/提醒/台账/成员）；onload 建库+扫描+每日摘要；向导三步（suggestRoles 预选）；i18n 迁移（216 键双语）；GitHub 公开仓库 ai68298100/siyuan-home 推送；新增 🔴 bundle 超预算待办；发现 addTab init 闭包 self 指向 window 的坑已修 |
 | 2026-10-02 | 主线 | 🔴 bundle 整改 + C2a/e + C3b + C7d | 农历动态 import 拆 chunk（gzip 132→32.4KB，-76%，chunk 强制 .js）；总览成员 chips 过滤（持久化）+模块卡待办数；提醒页三级分组；设置页重跑引导；vitest 30/30 |
+| 2026-10-02 | 主线 | 33.1 单实例 + 33.4 draft 事务 + 文档三件套 | hubListeners Set 多实例刷新；设置 draft 编辑事务（保存落盘）；i18n 真值收尾；FAQ/privacy/ADR 索引落地；vitest 30/30 |
 
 ---
 
