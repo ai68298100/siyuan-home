@@ -48,7 +48,7 @@
 - [ ] 🔴 A3d provisioner：dbRefs 失效自愈（文档被删→重建→登记刷新）
 - [x] 🔴 A4 members 数据访问层（`src/core/members.ts`）：成员 CRUD 双写（settings 引用 + members 库行） ✅ 2026-10-02（Tab 化 + 数据接线 commit，见 34 组记录）
 - [ ] 🔴 A5 certs 数据访问层（`src/modules/certs/`）：行 CRUD / 续期写回 / 按到期范围查询 / 脱敏读取
-- [x] 🟡 A6 设置页"诊断"区数据源：台账缺失/列缺失检测接口 ✅ 2026-10-02（qbtn 跳台账预选；诊断区=dbRefs/扫描/契约；回归脚本 docs/testing/v0.2.md；胶囊 spring）
+- [x] 🟡 A6 设置页"诊断"区数据源：台账缺失/列缺失检测接口 ✅ 2026-10-02（qbtn 跳台账预选；诊断区=dbRefs/扫描/契约；回归脚本 docs/testing/v0.2.md；胶囊 spring；check 零警告）
 
 ## 3. v0.2 · 提醒中枢（阶段 B）
 
