@@ -28,6 +28,21 @@ export default class LvHomePlugin extends Plugin {
     runtime: HubRuntime;
     scan: ScanResult;
     private heartbeat: number | undefined;
+    /** moduleId → schema 目录（UI 按需读取列定义/枚举；与 ensureCoreLedgers 同源） */
+    schemaCatalog: Record<string, any> = {
+        members: MEMBERS_SCHEMA, certs: CERTS_SCHEMA,
+        "assets-real": ASSETS_REAL_SCHEMA, health: HEALTH_SCHEMA,
+        medicine: MEDICINE_SCHEMA, memberships: MEMBERSHIPS_SCHEMA, insurance: INSURANCE_SCHEMA,
+        shopping: SHOPPING_SCHEMA, contracts: CONTRACTS_SCHEMA, exams: EXAMS_SCHEMA,
+        allowance: ALLOWANCE_SCHEMA, favors: FAVORS_SCHEMA, stock: STOCK_SCHEMA,
+        chores: CHORES_SCHEMA, house: HOUSE_SCHEMA,
+        media: MEDIA_SCHEMA, pets: PETS_SCHEMA, vehicles: VEHICLES_SCHEMA, transit: TRANSIT_SCHEMA,
+        "travel-plan": TRAVEL_PLAN_SCHEMA, "travel-booking": TRAVEL_BOOKING_SCHEMA,
+        "travel-packing": TRAVEL_PACKING_SCHEMA, "travel-log": TRAVEL_LOG_SCHEMA,
+        "assets-virtual": ASSETS_VIRTUAL_SCHEMA,
+        food: FOOD_SCHEMA, address: ADDRESS_SCHEMA, bookmarks: BOOKMARKS_SCHEMA, snippets: SNIPPETS_SCHEMA,
+        parenting: PARENTING_SCHEMA, schooling: SCHOOLING_SCHEMA, social: SOCIAL_SCHEMA,
+    };
     /** Tab 面板刷新回调（支持多实例，33.1：所有打开的管家面板同步刷新） */
     hubListeners = new Set<() => void>();
 

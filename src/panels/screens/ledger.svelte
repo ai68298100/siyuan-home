@@ -26,17 +26,26 @@
     }
     $effect(() => { void active; void plugin.scan?.scannedAt; load(); });
 
-    // capture 快速表单：name + member + expiry（v0.2 精简；capture 列集见 02 §4.1）
+    // capture 快速表单：name + category + member + expiry（capture 列集驱动，枚举从 schema 读）
     let newName = $state("");
+    let newCategory = $state("");
     let newExpiry = $state("");
     let newMember = $state(""); // members av itemID
     const memberOptions = $derived(plugin.settings.members ?? []);
     const memberAvId = $derived(plugin.settings.dbRefs.members?.avId);
+    const categoryOptions = $derived<string[]>(
+        (plugin.schemaCatalog?.[active]?.columns ?? []).find((c: any) => c.key === "category")?.options ?? [],
+    );
 
     async function createRow() {
         if (!ref?.avId || !newName.trim()) return;
         const itemID = await addDetachedRow(ref.avId, newName.trim());
         const cols = ref.columns ?? {};
+        if (newCategory && cols.category) {
+            await setCell(ref.avId, cols.category, itemID, {
+                type: "select", select: { content: newCategory },
+            });
+        }
         if (newExpiry && cols.expiry) {
             await setCell(ref.avId, cols.expiry, itemID, {
                 type: "date", date: { content: new Date(`${newExpiry}T00:00:00`).getTime(), isNotEmpty: true, isNotTime: true },
@@ -48,7 +57,7 @@
             });
         }
         void newSiYuanId;
-        newName = ""; newExpiry = ""; newMember = "";
+        newName = ""; newCategory = ""; newExpiry = ""; newMember = "";
         await load();
         await plugin.refreshHub();
     }
@@ -68,6 +77,14 @@
 
 <div class="lv-card" style="padding:14px;display:flex;gap:8px;flex-wrap:wrap;align-items:center">
     <input class="b3-text-field fn__flex-1" style="min-width:160px" placeholder={t("ledger.newName")} bind:value={newName} />
+    {#if categoryOptions.length > 0}
+        <select class="b3-select" bind:value={newCategory}>
+            <option value="">{t("field.category")}</option>
+            {#each categoryOptions as opt (opt)}
+                <option value={opt}>{t(`field.category.opt.${opt}`) !== `field.category.opt.${opt}` ? t(`field.category.opt.${opt}`) : opt}</option>
+            {/each}
+        </select>
+    {/if}
     <select class="b3-select" bind:value={newMember}>
         <option value="">{t("field.member")}: {t("members.all")}</option>
         {#each memberOptions as m (m.avItemId ?? m.id)}
