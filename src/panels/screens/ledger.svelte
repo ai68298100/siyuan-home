@@ -9,6 +9,8 @@
             .filter((id: string) => id !== "members")
             .map((id: string) => ({ id, ref: plugin.settings.dbRefs[id] })),
     );
+    // 初始快照为设计意图（activeLedger 由模块卡/快速记录预选）
+    // svelte-ignore state_referenced_locally
     let active = $state(plugin.activeLedger ?? "certs");
     let rows: any[] = $state([]);
     let loading = $state(false);
