@@ -352,7 +352,7 @@
 - [ ] 🟢 60 秒快速上手视频脚本（B 站/小红书发布素材）
 - [x] 🟢 ADR 索引页 docs/design/00-index.md（七条 ADR + 后续增补的导航） ✅ 2026-10-02
 - [ ] 🟢 每版本 migration notes（用户可见的升级说明）
-- [ ] 🟢 键盘快捷键完整表（配合 17 组速查表）
+- [x] 🟢 键盘快捷键完整表（配合 17 组速查表） ✅ 2026-10-02（FAQ 快捷键条目：2 命令+页签+自定义说明）
 
 ## 23. 发布工程与维护
 
@@ -610,7 +610,8 @@
 | 2026-10-02 | 主线 | B3b 逾期即时提醒 | 每日首次扫描 overdue>0 且非静默 → error 级提示；lastOverdueAlertDate 去重 |
 | 2026-10-02 | 主线 | B4e 定位动作（R5 降级实施） | 提醒行加定位按钮 → 打开该模块台账文档；行内高亮待非 detached 行路径解锁 |
 | 2026-10-02 | 主线 | C2d 深化 | 模块卡点击 → setActiveLedger 预选对应模块台账 |
-| 2026-10-02 | 循环A | README 导航补全（回归脚本/FAQ/privacy 链接可见化） | 新用户路径打通；英文版同步 | media/pets/vehicles/transit/travel×4/assets-virtual 9 个 + 修复核心缺口 assets-real/health（默认启用却无 schema 的建库缺口）+ 68 枚举 i18n（总 399 键）；gzip 35.3KB；contract gate 24 schema 全过；剩余无 schema：food/address/bookmarks/snippets/parenting/schooling/social |
+| 2026-10-02 | 循环A | README 导航补全（回归脚本/FAQ/privacy 链接可见化） | 新用户路径打通；英文版同步 |
+| 2026-10-02 | 循环A | FAQ 补快捷键表+参与测试指引（22 组项落地） | 快捷键策略：仅 2 命令可配，页签点击为主 | media/pets/vehicles/transit/travel×4/assets-virtual 9 个 + 修复核心缺口 assets-real/health（默认启用却无 schema 的建库缺口）+ 68 枚举 i18n（总 399 键）；gzip 35.3KB；contract gate 24 schema 全过；剩余无 schema：food/address/bookmarks/snippets/parenting/schooling/social |
 
 ---
 
