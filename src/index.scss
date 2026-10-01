@@ -15,13 +15,13 @@
 }
 
 // C1c 收尾：dashboard 专用类已删（.lv-home__header/title/section/section-title/card/empty-card/grid 全零引用验证）
-// 保留：settings.svelte 现役的 .lv-home__group/__group-title 与 .lv-settings* 系列
+// settings.svelte 现役类已统一 lv-settings 命名空间（下方定义）
 
-.lv-home__group {
+.lv-settings__group {
     margin-bottom: 12px;
 }
 
-.lv-home__group-title {
+.lv-settings__group-title {
     font-size: 12px;
     font-weight: 600;
     text-transform: uppercase;
@@ -30,9 +30,17 @@
     margin: 4px 0 8px;
 }
 
-// 设置面板
+// 设置面板（现役：settings.svelte；类名已统一 lv-settings 命名空间）
 .lv-settings {
     min-height: 480px;
+}
+.lv-settings__group {
+    margin-bottom: 12px;
+}
+.lv-settings__group-title {
+    font-weight: 600;
+    font-size: 14px;
+    opacity: 0.85;
 }
 
 .lv-settings__hint {

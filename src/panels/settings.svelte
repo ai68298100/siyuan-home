@@ -86,8 +86,8 @@
     {#if tab === "modules"}
         <div class="lv-settings__hint">{t("settings.modulesHint")}</div>
         {#each MODULE_GROUPS as gid (gid)}
-            <div class="lv-home__group">
-                <div class="lv-home__group-title">{t(`group.${gid}`)}</div>
+            <div class="lv-settings__group">
+                <div class="lv-settings__group-title">{t(`group.${gid}`)}</div>
                 {#each modulesByGroup(gid) as mod (mod.id)}
                     <div class="fn__flex lv-settings__row">
                         <input
