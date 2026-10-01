@@ -291,6 +291,7 @@
 - [ ] 🟡 时间表述本地化（「3 天后 / 下周三」+ 悬浮完整日期）
 - [ ] 🟡 空工作区首启体验（无笔记本时引导先建笔记本）
 - [ ] 🟢 bookmarks 失效链接检测（周期 HEAD 检查+标记失效——Raindrop 印证，进阶）
+- [ ] 🟢 快速录入日期智能解析（TickTick 印证：录"10月15日换证"自动填 due；中文日期 NLP，进阶）
 - [ ] 🟢 密度切换（紧凑/舒适，表格行高两档）
 
 ## 18. kernel.js 与基础设施
@@ -592,7 +593,8 @@
 | 2026-10-02 | 循环B | 外部调研 Raindrop | 官方端 ★680/659；bookmarks 印证集合分类+失效检测；新增轻待办：bookmarks 加失效链接检测（进阶） |
 | 2026-10-02 | 循环B | 外部调研 Notion 家庭 Binder 生态 | 5 款模板共性（紧急卡置顶/信息中枢/Legacy 维度/移动优先）全部印证既有设计；14 组集群调研收官 |
 | 2026-10-02 | 循环B | 外部调研 TextExpander | 14 组最后尾巴收掉：Snippet Groups 分组共享印证 snippets 家庭共享形态（v2.x kernel broadcast 场景）；云端订阅不吸收。循环 B 常规项全部完成，后续仅按需触发 |
-| 2026-10-02 | 循环B | 外部调研 Obsidian Tasks | 循环任务完成→自动生成下一次（印证 chores 语义）；内嵌 query 块按日期分组（印证台账嵌入视图方向）；来源 obsidian-tasks-plugin 官方文档 | media/pets/vehicles/transit/travel×4/assets-virtual 9 个 + 修复核心缺口 assets-real/health（默认启用却无 schema 的建库缺口）+ 68 枚举 i18n（总 399 键）；gzip 35.3KB；contract gate 24 schema 全过；剩余无 schema：food/address/bookmarks/snippets/parenting/schooling/social |
+| 2026-10-02 | 循环B | 外部调研 Obsidian Tasks | 循环任务完成→自动生成下一次（印证 chores 语义）；内嵌 query 块按日期分组（印证台账嵌入视图方向）；来源 obsidian-tasks-plugin 官方文档 |
+| 2026-10-02 | 循环B | 外部调研 TickTick/滴答清单 | 智能日期解析产出新待办（快速录入 NLP 日期）；位置提醒/四象限/习惯打卡不吸收 | media/pets/vehicles/transit/travel×4/assets-virtual 9 个 + 修复核心缺口 assets-real/health（默认启用却无 schema 的建库缺口）+ 68 枚举 i18n（总 399 键）；gzip 35.3KB；contract gate 24 schema 全过；剩余无 schema：food/address/bookmarks/snippets/parenting/schooling/social |
 
 ---
 

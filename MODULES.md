@@ -183,3 +183,4 @@
 | Notion 家庭 Binder 模板生态（Family Hub / Household Hub / Legacy Binder / Family HQ 等） | 家庭中枢 | 共性功能：**紧急信息卡置顶**（联系人/行动预案/医疗信息快捷访问——印证 house 模块紧急信息卡的"置顶+可打印"设计）、WiFi/保险/户号等"家庭信息中枢"页（印证 `bookmarks`+`address`+`social` 组合）、Legacy Binder 的**身后备查**维度（印证 assets-virtual 继承接管备注）、Family HQ 的移动优先多页 wiki（印证 Tab 移动端适配） |
 | TextExpander（闭源商业，2025 现状） | 文本扩展 | 缩写+填充表单（Fill-ins）、**Snippet Groups 分组共享**（家庭版思路：官方组+成员共享组）、社区模板库 → `snippets` 模块印证分组共享形态（家庭共享组=kernel broadcast 的 v2.x 场景）；订阅制云端同步不吸收（本地优先） |
 | Obsidian Tasks 插件（社区标杆，vault 级任务） | 任务管理 | **循环任务完成时自动生成下一次发生**（🔁 规则内嵌任务文本）、内嵌 query 块按日期分组/过滤/排序、done-date 记录 → `chores`/`stock` 的周期语义印证（完成→自动排下一次，与我们的 last_done+due 推算同构）；内嵌 query 块形态印证台账"任意文档嵌入视图"方向 |
+| TickTick/滴答清单（跨平台任务标杆） | 任务+习惯 | 周期/重复提醒、**文本智能解析时间**（录入时自动识别"明天下午3点"）、位置提醒、四象限、习惯打卡 → 提醒中枢印证"快速录入时智能解析日期"（v0.3 增强：录"10月15日换证"自动填 due）；位置提醒/四象限/习惯打卡不吸收（打卡归小驴打卡插件） |
