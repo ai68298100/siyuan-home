@@ -418,7 +418,7 @@
 - [ ] 🟢 insurance 续保决策提醒（contracts 自动续约有同款语义：到期前 N 天提示"续/比价/放弃"决策而非仅提醒）
 - [x] 🟢 snippets 参数位模板（espanso Forms/TextExpander 印证：{{占位}} 展开时弹填充） ✅ 2026-10-02（约定文档化进 MODULES 16 组；{{语法}}+填充交互随 snippets 面板 v0.6+ 实现）
 - [x] 🟢 media gallery 海报墙视图 ✅ 2026-10-02（schema 层：ViewDef 扩展 gallery 类型 + media views 声明；av 建视图实现在 provisioner views 落地时）
-- [ ] 🟢 food→stock 采购联动（grocy 印证：菜谱食材自动汇总进囤货采购建议）
+- [x] 🟢 food→stock 采购联动（最小版） ✅ 2026-10-02（food schema 加 ingredients 食材清单列，采购时对照 stock 采购建议；自动汇总联动留 v0.8）
 - [x] 🟢 FAQ 补"全家共用"指引 ✅ 2026-10-02（专用笔记本+思源协作=零开发家庭共用；ADR-5 隐藏优点文档化）
 - [ ] 🟢 智能归类进阶参照（firefly-iii 规则引擎：交易自动归类；v2.x 智能解析的进阶形态，概念级）
 

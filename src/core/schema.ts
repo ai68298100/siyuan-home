@@ -340,6 +340,8 @@ export const FOOD_SCHEMA: ModuleSchema = {
         { key: "rating", type: "number", labelKey: "field.rating" },
         ...d("date", "url", "note"),
         { key: "dislike_safe", type: "checkbox", labelKey: "field.dislike_safe" },
+        // grocy 印证（26.6）：食材摘要（换行分隔）——采购时可对照 stock 采购建议手动补货；自动联动留 v0.8
+        { key: "ingredients", type: "text", labelKey: "field.ingredients" },
     ],
     capture: ["name", "category", "rating", "date"],
 };
