@@ -47,7 +47,7 @@
         {#each members as m (m.id)}
             <div class="lv-card lv-mod">
                 <div class="head" style="display:flex;gap:10px;align-items:center">
-                    <span class="lv-avatar lg" style="background:linear-gradient(135deg,var(--lv-accent),#9a7cff)">{m.name.slice(0, 1)}</span>
+                    <span class="lv-avatar lg" style="background:linear-gradient(135deg,var(--lv-accent),var(--lv-accent-2))">{m.name.slice(0, 1)}</span>
                     <div><b>{m.name}</b><div class="lv-caption">{t(`role.${m.role}`)}{m.lunarBirthday ? " 🌙" : ""} {m.birthday ?? ""}</div></div>
                     <span style="flex:1"></span>
                     <button class="b3-button b3-button--text" onclick={() => removeMember(plugin, plugin.settings, m.id).then(() => plugin.refreshHub())}>{t("delete")}</button>

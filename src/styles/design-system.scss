@@ -15,6 +15,8 @@
   --lv-t-fast: 120ms; --lv-t-med: 180ms; --lv-t-slow: 240ms; --lv-t-sheet: 320ms;
 
   --lv-accent: var(--b3-theme-primary);
+  // 品牌渐变第二色（产品标/头像渐变专用）——全库唯一允许的字面色值（07 §6 豁免）
+  --lv-accent-2: #9a7cff;
   --lv-accent-soft: color-mix(in srgb, var(--b3-theme-primary) 14%, transparent);
   --lv-accent-line: color-mix(in srgb, var(--b3-theme-primary) 32%, transparent);
   --lv-surface-2: var(--b3-theme-surface-light);

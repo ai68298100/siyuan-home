@@ -42,7 +42,7 @@
     <button class="lv-chip {!plugin.runtime.filterMemberId ? 'on' : ''}" onclick={() => setMemberFilter(undefined)}>{t("members.all")}</button>
     {#each members as m (m.id)}
         <button class="lv-chip {plugin.runtime.filterMemberId === m.id ? 'on' : ''}" onclick={() => setMemberFilter(m.id)}>
-            <span class="lv-avatar" style="background:linear-gradient(135deg,var(--lv-accent),#9a7cff)">{m.name.slice(0, 1)}</span>{m.name}
+            <span class="lv-avatar" style="background:linear-gradient(135deg,var(--lv-accent),var(--lv-accent-2))">{m.name.slice(0, 1)}</span>{m.name}
         </button>
     {/each}
     <button class="lv-chip" onclick={() => onGoto("members")}>＋</button>

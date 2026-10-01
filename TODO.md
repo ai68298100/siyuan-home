@@ -581,7 +581,8 @@
 | 2026-10-02 | 循环A | 第 9 项安全审计 | 移除模板遗留 console.debug（配置含成员/金额禁止打印）；保留 error 一处（契约校验提示）；console 全库仅剩必要路径 |
 | 2026-10-02 | 循环A | 第 1 项代码质量 | package.json repository/homepage 补齐（25 组元数据一致性）；抽查 5 个导出符号无死代码实锤 |
 | 2026-10-02 | 循环A | 第 5 项文档一致性 | 全仓 47 个 md 相对链接核查零失效 |
-| 2026-10-02 | 循环A | 第 2 项类型严格（首步） | tab-panel 核心接口具体类型化；全库 any 存量 27+28 处已盘点并记待办分批清零 | media/pets/vehicles/transit/travel×4/assets-virtual 9 个 + 修复核心缺口 assets-real/health（默认启用却无 schema 的建库缺口）+ 68 枚举 i18n（总 399 键）；gzip 35.3KB；contract gate 24 schema 全过；剩余无 schema：food/address/bookmarks/snippets/parenting/schooling/social |
+| 2026-10-02 | 循环A | 第 2 项类型严格（首步） | tab-panel 核心接口具体类型化；全库 any 存量 27+28 处已盘点并记待办分批清零 |
+| 2026-10-02 | 循环A | 第 4 项设计一致性（色值走查） | svelte/ts 硬编码色值仅 2 处（品牌渐变第二色）→ token 化 --lv-accent-2 集中于设计系统；无其他违规 | media/pets/vehicles/transit/travel×4/assets-virtual 9 个 + 修复核心缺口 assets-real/health（默认启用却无 schema 的建库缺口）+ 68 枚举 i18n（总 399 键）；gzip 35.3KB；contract gate 24 schema 全过；剩余无 schema：food/address/bookmarks/snippets/parenting/schooling/social |
 
 ---
 
