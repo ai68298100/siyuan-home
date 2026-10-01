@@ -454,5 +454,8 @@
     "act.locate": "定位",
     "diag.dupCheck": "检测重复台账",
     "diag.dupNone": "未发现重复台账",
-    "diag.dupFound": "发现 ${n} 组重复台账："
+    "diag.dupFound": "发现 ${n} 组重复台账：",
+    "faq.shortcuts": "快捷键与入口",
+    "faq.topbarOrCommand": "顶栏 🏠 按钮，或命令面板搜索（快捷键可在思源设置-快捷键中自定义）",
+    "faq.quickCapture": "顶栏 ⚡ 按钮，或总览页快速备忘区"
 }

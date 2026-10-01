@@ -454,5 +454,8 @@
     "act.locate": "Locate",
     "diag.dupCheck": "Check duplicate ledgers",
     "diag.dupNone": "No duplicate ledgers",
-    "diag.dupFound": "${n} duplicate ledger group(s): "
+    "diag.dupFound": "${n} duplicate ledger group(s): ",
+    "faq.shortcuts": "Shortcuts & entries",
+    "faq.topbarOrCommand": "Top bar 🏠 button, or command palette (hotkey customizable in SiYuan settings)",
+    "faq.quickCapture": "Top bar ⚡ button, or quick memo area on Overview"
 }
