@@ -13,6 +13,30 @@ import {
     createAttributeView, addAttributeViewColumn,
 } from "./siyuan";
 
+export interface DuplicateFinding {
+    hpath: string;
+    docIds: string[];
+}
+
+/** 33.2 重复检测：同一笔记本内同名台账文档（hpath 相同出现 >1 次） */
+export async function findDuplicateLedgers(settings: HomeSettings): Promise<DuplicateFinding[]> {
+    const notebookId = settings.dbRefs.members?.notebook ?? settings.dbRefs.certs?.notebook;
+    if (!notebookId) return [];
+    const rows = await sql<{ hpath: string; cnt: number }>(
+        `SELECT hpath, COUNT(id) AS cnt FROM blocks
+         WHERE type='d' AND box='${notebookId.replace(/'/g, "''")}' AND hpath LIKE '${DOC_TITLE_PREFIX}%'
+         GROUP BY hpath HAVING cnt > 1`,
+    );
+    const out: DuplicateFinding[] = [];
+    for (const r of rows) {
+        const ids = await sql<{ id: string }>(
+            `SELECT id FROM blocks WHERE type='d' AND box='${notebookId}' AND hpath='${r.hpath.replace(/'/g, "''")}'`,
+        );
+        out.push({ hpath: r.hpath, docIds: ids.map((x) => x.id) });
+    }
+    return out;
+}
+
 export const DEFAULT_NOTEBOOK_NAME = "🏠 小驴管家";
 const DOC_TITLE_PREFIX = "台账 · ";
 
