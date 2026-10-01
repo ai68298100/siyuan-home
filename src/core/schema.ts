@@ -195,6 +195,106 @@ export const INSURANCE_SCHEMA: ModuleSchema = {
     ],
 };
 
+// ── v0.4/v0.6 批量 schema（02 §4.3 紧凑规格落地）─────────────────
+
+export const SHOPPING_SCHEMA: ModuleSchema = {
+    columns: [
+        ...d("name", "member"),
+        { ...FIELD_DICT.category, options: ["daily", "digital", "apparel", "food_sh", "other_sh"] },
+        ...d("date", "amount", "url", "note"),
+        { key: "channel", type: "text", labelKey: "field.channel" },
+        { key: "tracking_no", type: "text", labelKey: "field.tracking_no" },
+        { key: "pickup_code", type: "text", labelKey: "field.pickup_code" },
+    ],
+    capture: ["name", "amount", "date", "channel"],
+};
+
+export const CONTRACTS_SCHEMA: ModuleSchema = {
+    columns: [
+        ...d("name", "member"),
+        { ...FIELD_DICT.category, options: ["rent", "renovation", "purchase", "labor", "property_ct", "other_ct"] },
+        { ...FIELD_DICT.status, options: ["ct_active", "ct_expired", "terminated"] },
+        ...d("date", "expiry", "remind_before", "attachments", "note"),
+        { key: "party", type: "text", labelKey: "field.party" },
+        { key: "deposit", type: "number", labelKey: "field.deposit" },
+    ],
+    capture: ["name", "category", "expiry", "attachments"],
+    reminders: [{ key: "expiry", field: "expiry", kind: "oneoff", leadDays: 30 }],
+};
+
+export const EXAMS_SCHEMA: ModuleSchema = {
+    columns: [
+        ...d("name", "member"),
+        { ...FIELD_DICT.category, options: ["vocational", "title", "language", "academic", "other_ex"] },
+        { ...FIELD_DICT.status, options: ["preparing", "passed", "ex_expired"] },
+        ...d("expiry", "attachments", "note"),
+        { key: "issuer", type: "text", labelKey: "field.issuer" },
+        { key: "exam_date", type: "date", labelKey: "field.exam_date" },
+    ],
+    capture: ["name", "member", "exam_date", "expiry"],
+    reminders: [{ key: "expiry", field: "expiry", kind: "oneoff", leadDays: 60 }],
+};
+
+export const ALLOWANCE_SCHEMA: ModuleSchema = {
+    columns: [
+        ...d("name", "member"),
+        { ...FIELD_DICT.category, options: ["lucky", "allowance_al", "reward", "interest_al"] },
+        { key: "direction", type: "select", labelKey: "field.direction", options: ["in", "out"] },
+        ...d("amount", "date", "note"),
+        { key: "source", type: "text", labelKey: "field.source" },
+    ],
+    capture: ["name", "category", "amount", "direction", "date"],
+    views: [{ key: "by_member", type: "table", groupBy: "member" }],
+};
+
+export const FAVORS_SCHEMA: ModuleSchema = {
+    columns: [
+        ...d("name"),
+        { ...FIELD_DICT.category, options: ["wedding", "full_moon", "housewarming", "graduation", "birthday_fv", "other_fv"] },
+        { key: "direction", type: "select", labelKey: "field.direction", options: ["in", "out"] },
+        { key: "person", type: "text", labelKey: "field.person" },
+        ...d("amount", "date", "note"),
+    ],
+    capture: ["name", "direction", "person", "amount", "date"],
+    views: [{ key: "by_person", type: "table", groupBy: "person" }],
+};
+
+export const STOCK_SCHEMA: ModuleSchema = {
+    columns: [
+        ...d("name", "member"),
+        { ...FIELD_DICT.category, options: ["food_st", "daily_chem", "paper", "medical_st", "other_st"] },
+        ...d("expiry", "location", "note"),
+        { key: "qty", type: "number", labelKey: "field.qty" },
+        { key: "low_stock_at", type: "number", labelKey: "field.low_stock_at" },
+    ],
+    capture: ["name", "qty", "low_stock_at", "expiry"],
+    reminders: [{ key: "expiry", field: "expiry", kind: "oneoff", leadDays: 30 }],
+};
+
+export const CHORES_SCHEMA: ModuleSchema = {
+    columns: [
+        ...d("name", "member"),
+        { ...FIELD_DICT.category, options: ["housework", "maintenance", "care", "other_ch"] },
+        ...d("cycle", "due", "note"),
+        { key: "last_done", type: "date", labelKey: "field.last_done" },
+    ],
+    capture: ["name", "member", "cycle", "due"],
+    // v0.2：due 作为一次性提醒；周期写回（中枢重算）见 03 §5 recurring 完整版
+    reminders: [{ key: "due", field: "due", kind: "oneoff", leadDays: 7 }],
+};
+
+export const HOUSE_SCHEMA: ModuleSchema = {
+    columns: [
+        ...d("name", "member"),
+        { ...FIELD_DICT.category, options: ["payment", "maintenance_h", "anniversary", "emergency"] },
+        ...d("cycle", "note"),
+        { key: "pay_day", type: "date", labelKey: "field.pay_day" },
+        { key: "lunar", type: "checkbox", labelKey: "field.lunar" },
+    ],
+    capture: ["name", "category", "pay_day", "cycle"],
+    reminders: [{ key: "pay_day", field: "pay_day", kind: "anniversary", leadDays: 7, lunarField: "lunar" }],
+};
+
 // ── schema 契约校验（33.2 门禁）─────────────────────────────
 
 /** 契约：capture/views/reminders 引用的列必须都在 columns 中；违规时开发期抛错。 */

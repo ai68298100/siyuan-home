@@ -136,8 +136,8 @@
 
 - [ ] 🟡 assets-real schema + 保修/借出/处置状态机
 - [ ] 🟡 assets-virtual schema（平台/账号名/密码位置索引/继承备注）
-- [ ] 🟡 shopping schema（订单号/快递单号/取件码/渠道）
-- [ ] 🟡 contracts schema（起止/到期提醒/押金/对方联系方式）
+- [x] 🟡 shopping schema（订单号/快递单号/取件码/渠道） ✅ 2026-10-02（schema+枚举 i18n+通用提醒派生；UI 细化随模块启用迭代）
+- [x] 🟡 contracts schema（起止/到期提醒/押金/对方联系方式） ✅ 2026-10-02（schema+枚举 i18n+通用提醒派生；UI 细化随模块启用迭代）
 - [ ] 🟡 购物→实物资产一键建档联动
 - [ ] 🟡 资产估值汇总统计卡（总览）
 - [ ] 🟡 会员年费折算视图（月均统计）
@@ -146,20 +146,20 @@
 
 - [ ] 🟡 parenting schema + 国家免疫规划程序表内置模板（0-6 岁 22 剂）
 - [ ] 🟡 schooling schema（学段推算当前年级/升学节点/学费/课外班课时）
-- [ ] 🟡 exams schema（证书效期/复审周期/考试节点）
-- [ ] 🟡 allowance schema（压岁钱/零花钱多账户/发放周期）
+- [x] 🟡 exams schema（证书效期/复审周期/考试节点） ✅ 2026-10-02（schema+枚举 i18n+通用提醒派生；UI 细化随模块启用迭代）
+- [x] 🟡 allowance schema（压岁钱/零花钱多账户/发放周期） ✅ 2026-10-02（schema+枚举 i18n+通用提醒派生；UI 细化随模块启用迭代）
 - [ ] 🟡 疫苗排期视图（应种/已种/逾期）
 - [ ] 🟡 打卡联动：recordValue RPC（身高体重落成长记录）
 - [ ] 🟡 升学节点倒计时进提醒中枢
 
 ## 9. v0.6 生活包（🟡）
 
-- [ ] 🟡 favors schema（收送双向/事件类型/按人净额视图）
-- [ ] 🟡 stock schema（低库存+效期双提醒）
+- [x] 🟡 favors schema（收送双向/事件类型/按人净额视图） ✅ 2026-10-02（schema+枚举 i18n+通用提醒派生；UI 细化随模块启用迭代）
+- [x] 🟡 stock schema（低库存+效期双提醒） ✅ 2026-10-02（schema+枚举 i18n+通用提醒派生；UI 细化随模块启用迭代）
 - [ ] 🟡 food schema（菜谱/忌口联动/餐厅）
 - [ ] 🟡 address / bookmarks / snippets schema（轻台账三件）
-- [ ] 🟡 chores schema（周期任务 → 提醒中枢 recurring）
-- [ ] 🟡 house schema（维护周期/缴费日/农历纪念日/忌日）
+- [x] 🟡 chores schema（周期任务 → 提醒中枢 recurring） ✅ 2026-10-02（schema+枚举 i18n+通用提醒派生；UI 细化随模块启用迭代）
+- [x] 🟡 house schema（维护周期/缴费日/农历纪念日/忌日） ✅ 2026-10-02（schema+枚举 i18n+通用提醒派生；UI 细化随模块启用迭代）
 - [ ] 🟡 应急物资清单模板文档（应急管理部基础版）+ 半年巡检提醒
 - [ ] 🟡 快切注入：网址/常用语 RPC 消费端联调
 
@@ -573,6 +573,7 @@
 | 2026-10-02 | 主线 | C2c qbtn + C1b 胶囊 + 诊断区 + D1 回归脚本 | 快速记录行（跳台账预选）；导航胶囊 spring；设置·关于诊断（dbRefs/扫描错误/契约门禁）；回归脚本 docs/testing/v0.2.md |
 | 2026-10-02 | 主线 | avItemId 迁移工具 | 诊断区一键按姓名匹配 members 库行回填 avItemId（backfillMemberLinks）；vitest 30/30 |
 | 2026-10-02 | 主线 | v0.3 三模块 schema 生产 | medicine/memberships/insurance schema + SchemaLedgerProvider 通用提醒派生 + ensureCoreLedgers 按启用建库 + 54 枚举 i18n；验证"新模块=数据"扩展设计；gzip 33.4KB |
+| 2026-10-02 | 主线 | 8 模块 schema 批量生产（v0.4/v0.5/v0.6 主体） | shopping/contracts/exams/allowance/favors/stock/chores/house schema + 66 枚举 i18n（总 329 键）；契约门禁 13 schema 全过；gzip 34.2KB；schema 驱动模块达 13/31；devStatus 批量晋升待统一执行 |
 
 ---
 

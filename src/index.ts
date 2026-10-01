@@ -12,7 +12,7 @@ import { CertsProvider, MembersProvider, SchemaLedgerProvider } from "@/core/hub
 import { dailyDigest, markNotified } from "@/core/hub/notify";
 import { complete, snooze, mute, unmute, renew, addMemo } from "@/core/hub/actions";
 import { provisionModule } from "@/core/provisioner";
-import { CERTS_SCHEMA, MEMBERS_SCHEMA, MEDICINE_SCHEMA, MEMBERSHIPS_SCHEMA, INSURANCE_SCHEMA, validateSchema } from "@/core/schema";
+import { CERTS_SCHEMA, MEMBERS_SCHEMA, MEDICINE_SCHEMA, MEMBERSHIPS_SCHEMA, INSURANCE_SCHEMA, SHOPPING_SCHEMA, CONTRACTS_SCHEMA, EXAMS_SCHEMA, ALLOWANCE_SCHEMA, FAVORS_SCHEMA, STOCK_SCHEMA, CHORES_SCHEMA, HOUSE_SCHEMA, validateSchema } from "@/core/schema";
 import type { HomeSettings } from "@/types";
 
 const TAB_TYPE = "hub-tab";
@@ -61,10 +61,14 @@ export default class LvHomePlugin extends Plugin {
         });
 
         // schema 契约门禁（33.2）：开发期发现违规立即暴露
-        for (const [id, schema] of [
+        const allSchemas: [string, any][] = [
             ["members", MEMBERS_SCHEMA], ["certs", CERTS_SCHEMA],
             ["medicine", MEDICINE_SCHEMA], ["memberships", MEMBERSHIPS_SCHEMA], ["insurance", INSURANCE_SCHEMA],
-        ] as const) {
+            ["shopping", SHOPPING_SCHEMA], ["contracts", CONTRACTS_SCHEMA], ["exams", EXAMS_SCHEMA],
+            ["allowance", ALLOWANCE_SCHEMA], ["favors", FAVORS_SCHEMA], ["stock", STOCK_SCHEMA],
+            ["chores", CHORES_SCHEMA], ["house", HOUSE_SCHEMA],
+        ];
+        for (const [id, schema] of allSchemas) {
             const errors = validateSchema(id, schema);
             if (errors.length) console.error("[siyuan-home] schema contract violations:", errors);
         }
@@ -99,6 +103,14 @@ export default class LvHomePlugin extends Plugin {
             ["medicine", MEDICINE_SCHEMA, this.i18n["module.medicine"]],
             ["memberships", MEMBERSHIPS_SCHEMA, this.i18n["module.memberships"]],
             ["insurance", INSURANCE_SCHEMA, this.i18n["module.insurance"]],
+            ["shopping", SHOPPING_SCHEMA, this.i18n["module.shopping"]],
+            ["contracts", CONTRACTS_SCHEMA, this.i18n["module.contracts"]],
+            ["exams", EXAMS_SCHEMA, this.i18n["module.exams"]],
+            ["allowance", ALLOWANCE_SCHEMA, this.i18n["module.allowance"]],
+            ["favors", FAVORS_SCHEMA, this.i18n["module.favors"]],
+            ["stock", STOCK_SCHEMA, this.i18n["module.stock"]],
+            ["chores", CHORES_SCHEMA, this.i18n["module.chores"]],
+            ["house", HOUSE_SCHEMA, this.i18n["module.house"]],
         ];
         for (const [id, schema, title] of plans) {
             if (!enabled.has(id)) continue;
@@ -116,6 +128,11 @@ export default class LvHomePlugin extends Plugin {
             new SchemaLedgerProvider("medicine", MEDICINE_SCHEMA, deps),
             new SchemaLedgerProvider("memberships", MEMBERSHIPS_SCHEMA, deps),
             new SchemaLedgerProvider("insurance", INSURANCE_SCHEMA, deps),
+            new SchemaLedgerProvider("contracts", CONTRACTS_SCHEMA, deps),
+            new SchemaLedgerProvider("exams", EXAMS_SCHEMA, deps),
+            new SchemaLedgerProvider("stock", STOCK_SCHEMA, deps),
+            new SchemaLedgerProvider("chores", CHORES_SCHEMA, deps),
+            new SchemaLedgerProvider("house", HOUSE_SCHEMA, deps),
         ];
         const scan = await runScan(providers, this.settings, this.runtime);
         this.scan = scan;
