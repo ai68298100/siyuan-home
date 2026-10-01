@@ -16,7 +16,7 @@
     "check:i18n": "node scripts/check-i18n.mjs",
     "dev:app": "cross-env NODE_ENV=development VITE_SOURCEMAP=inline VITE_BUILD_TARGET=app vite build --watch",
     "dev:kernel": "cross-env NODE_ENV=development VITE_SOURCEMAP=inline VITE_BUILD_TARGET=kernel vite build --watch",
-    "check": "run-s check:types check:svelte",
+    "check": "run-s check:types check:svelte check:i18n",
     "check:types": "tsc --noEmit -p tsconfig.json && tsc --noEmit -p tsconfig.node.json",
     "check:svelte": "svelte-check --tsconfig ./tsconfig.json",
     "clean": "node ./scripts/clean.js",
