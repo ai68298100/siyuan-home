@@ -294,6 +294,7 @@
 - [ ] 🟢 快速录入日期智能解析（TickTick 印证：录"10月15日换证"自动填 due；中文日期 NLP，进阶）
 - [ ] 🟢 提醒双日期：deadline（必须完成日）与 plan（计划处理日）分离，逾期 deadline 加粗红显（Things 3 印证；总览可按 plan 提前展示）；Today 晚间分区（可选）
 - [ ] 🟢 stock/shopping 按品类自动分区视图（Apple Reminders Grocery 印证：录入品类自动归组）；台账列视图（看板）可选项
+- [ ] 🟡 C4a 复核点：Notion form 视图=表单直写库——思源原生是否有等价物（数据库表单/模板录入），若有则快速录入可走原生路径（来源 Notion 视图 2.0 调研）
 - [ ] 🟢 密度切换（紧凑/舒适，表格行高两档）
 
 ## 18. kernel.js 与基础设施
@@ -598,7 +599,8 @@
 | 2026-10-02 | 循环B | 外部调研 Obsidian Tasks | 循环任务完成→自动生成下一次（印证 chores 语义）；内嵌 query 块按日期分组（印证台账嵌入视图方向）；来源 obsidian-tasks-plugin 官方文档 |
 | 2026-10-02 | 循环B | 外部调研 TickTick/滴答清单 | 智能日期解析产出新待办（快速录入 NLP 日期）；位置提醒/四象限/习惯打卡不吸收 |
 | 2026-10-02 | 循环B | 外部调研 Things 3 | 双日期分离（deadline/plan）产出新待办；This Evening 晚间分区记可选；来源 culturedcode 官方支持文档 |
-| 2026-10-02 | 循环B | 外部调研 Apple Reminders | Grocery 按品类自动分区产出待办（stock 分组视图）；列视图记可选项；来源 Apple Support | media/pets/vehicles/transit/travel×4/assets-virtual 9 个 + 修复核心缺口 assets-real/health（默认启用却无 schema 的建库缺口）+ 68 枚举 i18n（总 399 键）；gzip 35.3KB；contract gate 24 schema 全过；剩余无 schema：food/address/bookmarks/snippets/parenting/schooling/social |
+| 2026-10-02 | 循环B | 外部调研 Apple Reminders | Grocery 按品类自动分区产出待办（stock 分组视图）；列视图记可选项；来源 Apple Support |
+| 2026-10-02 | 循环B | 外部调研 Notion 视图 2.0 | 10 种视图与台账映射（form=快速录入原生路径候选，记 C4a 复核点）；map 思源暂无保持列表 | media/pets/vehicles/transit/travel×4/assets-virtual 9 个 + 修复核心缺口 assets-real/health（默认启用却无 schema 的建库缺口）+ 68 枚举 i18n（总 399 键）；gzip 35.3KB；contract gate 24 schema 全过；剩余无 schema：food/address/bookmarks/snippets/parenting/schooling/social |
 
 ---
 
