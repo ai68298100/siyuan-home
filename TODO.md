@@ -616,6 +616,7 @@
 | 2026-10-02 | 循环B | 外部调研 Notion Calendar | 日期属性数据库直接上日历+Date 属性提醒——印证提醒中枢日历视图形态（v0.3+ 候选）；菜单栏理念印证状态栏角标；来源 notion.com/help |
 | 2026-10-02 | 循环B | 外部调研 flomo | 无压力捕捉印证快速备忘设计；每日回顾/八维统计参考到 v2.x 年报与统计卡；来源 flomoapp.com |
 | 2026-10-02 | 循环B | 外部调研 Notion Timeline | 起止日期范围=时间线上屏条件；travel-plan/schooling 的 timeline 视图在 v0.8 建库时补（schema 已有起止列）；来源 notion.com/help/timelines |
+| 2026-10-02 | 循环B | 外部调研 Things 3 Areas | Area→Project→To-do 层级强印证我们模块组→台账→行两层结构；组织归层级/时间归调度的分离与成员 chips+提醒中枢设计一致；来源 vanja.io/r/thingsapp |
 | 2026-10-02 | 循环B | 外部调研 Apple 备忘录家庭共享 | 共享文件夹=家庭共用台账的思源原生路径印证（专用笔记本+思源分享即可，无需插件开发）；来源 Apple Support |
 | 2026-10-02 | 循环B | 外部调研 Notion Charts/Dashboard | 原生 chart/dashboards 印证统计卡价值；思源暂无 chart 视图→统计卡维持自绘 spark；来源 notion.com/help/charts |
 | 2026-10-02 | 循环B | 外部调研 Notion 视图 2.0 | 10 种视图与台账映射（form=快速录入原生路径候选，记 C4a 复核点）；map 思源暂无保持列表 |
