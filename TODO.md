@@ -359,7 +359,7 @@
 - [ ] 🟢 release notes 半自动生成（git log → CHANGELOG 草稿）
 - [ ] 🟡 zip 产物体积检查（<10MB，CI 门禁）
 - [ ] 🟢 beta 通道：GitHub prerelease 供内测用户先行
-- [ ] 🟡 集市竞品监控：每月检索家庭类新插件一次，回填 MODULES.md 附录
+- [x] 🟡 集市竞品监控：每月检索家庭类新插件一次，回填 MODULES.md 附录 ✅ 2026-10-02 首轮（ledger 记账不冲突；任务笔记管理证明移动端提醒可行；homepage 通知中心可参考；家庭垂直仍 0 竞品）
 - [ ] 🟢 用户反馈渠道定案（GitHub issue + ld246 帖）
 - [ ] 🟢 弃用提示机制（字段/模块弃用时面板内一次性通知）
 
@@ -600,7 +600,8 @@
 | 2026-10-02 | 循环B | 外部调研 TickTick/滴答清单 | 智能日期解析产出新待办（快速录入 NLP 日期）；位置提醒/四象限/习惯打卡不吸收 |
 | 2026-10-02 | 循环B | 外部调研 Things 3 | 双日期分离（deadline/plan）产出新待办；This Evening 晚间分区记可选；来源 culturedcode 官方支持文档 |
 | 2026-10-02 | 循环B | 外部调研 Apple Reminders | Grocery 按品类自动分区产出待办（stock 分组视图）；列视图记可选项；来源 Apple Support |
-| 2026-10-02 | 循环B | 外部调研 Notion 视图 2.0 | 10 种视图与台账映射（form=快速录入原生路径候选，记 C4a 复核点）；map 思源暂无保持列表 | media/pets/vehicles/transit/travel×4/assets-virtual 9 个 + 修复核心缺口 assets-real/health（默认启用却无 schema 的建库缺口）+ 68 枚举 i18n（总 399 键）；gzip 35.3KB；contract gate 24 schema 全过；剩余无 schema：food/address/bookmarks/snippets/parenting/schooling/social |
+| 2026-10-02 | 循环B | 外部调研 Notion 视图 2.0 | 10 种视图与台账映射（form=快速录入原生路径候选，记 C4a 复核点）；map 思源暂无保持列表 |
+| 2026-10-02 | 循环B | 集市监控首轮（23 组） | 3 插件扫描：无家庭垂直竞品；任务笔记管理的移动端后台提醒印证 B3 可行性；23 组转为周期性持续 | media/pets/vehicles/transit/travel×4/assets-virtual 9 个 + 修复核心缺口 assets-real/health（默认启用却无 schema 的建库缺口）+ 68 枚举 i18n（总 399 键）；gzip 35.3KB；contract gate 24 schema 全过；剩余无 schema：food/address/bookmarks/snippets/parenting/schooling/social |
 
 ---
 
