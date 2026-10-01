@@ -46,7 +46,7 @@
 - [ ] 🔴 A3b provisioner：ensureColumns 版本升级补列（不删不改旧列）
 - [ ] 🔴 A3c provisioner：默认视图创建（certs 的 by_member / expiring）
 - [ ] 🔴 A3d provisioner：dbRefs 失效自愈（文档被删→重建→登记刷新）
-- [ ] 🔴 A4 members 数据访问层（`src/core/members.ts`）：成员 CRUD 双写（settings 引用 + members 库行）
+- [x] 🔴 A4 members 数据访问层（`src/core/members.ts`）：成员 CRUD 双写（settings 引用 + members 库行） ✅ 2026-10-02（Tab 化 + 数据接线 commit，见 34 组记录）
 - [ ] 🔴 A5 certs 数据访问层（`src/modules/certs/`）：行 CRUD / 续期写回 / 按到期范围查询 / 脱敏读取
 - [ ] 🟡 A6 设置页"诊断"区数据源：台账缺失/列缺失检测接口
 
@@ -73,12 +73,12 @@
 
 ## 4. v0.2 · UI（阶段 C，组件契约见 docs/design/08）
 
-- [ ] 🔴 C1a Tab 化外壳：`addTab` + 四页签导航（总览/提醒/台账/成员）+ 顶栏入口改造
+- [x] 🔴 C1a Tab 化外壳：`addTab` + 四页签导航（总览/提醒/台账/成员）+ 顶栏入口改造 ✅ 2026-10-02（Tab 化 + 数据接线 commit，见 34 组记录）
 - [ ] 🔴 C1b 导航胶囊滑动（offsetLeft 计算 + spring）
 - [ ] 🔴 C1c 删除旧 Dialog 面板与 index.scss LEGACY 段（dashboard.svelte/settings.svelte 重写为 lv-* 组件）
-- [ ] 🔴 C1d 屏幕容器 `.lv-screen/.lv-anim` 接入（入场编排生效）
+- [x] 🔴 C1d 屏幕容器 `.lv-screen/.lv-anim` 接入（入场编排生效） ✅ 2026-10-02（Tab 化 + 数据接线 commit，见 34 组记录）
 - [ ] 🔴 C2a 总览：页头（问候/日期/计数滚动）+ 成员 chips 行
-- [ ] 🔴 C2b 总览：即将到期区（取 HubState 前 4 条 + 空态 + "查看全部"）
+- [x] 🔴 C2b 总览：即将到期区（取 HubState 前 4 条 + 空态 + "查看全部"） ✅ 2026-10-02（Tab 化 + 数据接线 commit，见 34 组记录）
 - [ ] 🔴 C2c 总览：快速记录行（qbtn 按 enabledModules 过滤）
 - [ ] 🔴 C2d 总览：模块卡网格（启用模块 + certs/药箱统计卡）
 - [ ] 🔴 C2e 成员 chips 过滤状态持久化（作用于提醒/模块卡计数）
@@ -98,8 +98,8 @@
 - [ ] 🔴 C6c 块菜单入口：选中文字 → 存为常用语/网址/地址（预填）
 - [ ] 🔴 C6d 斜杠命令 `/lv`（快速记录/打开台账）
 - [ ] 🔴 C6e 命令面板：打开管家面板 / 快速记录（快捷键可配置）
-- [ ] 🔴 C7a 首次引导向导：三步（家庭构成→推荐模块→建库确认）
-- [ ] 🔴 C7b 引导按 suggestRoles 预选逻辑（子女→育儿/上学/零花钱）
+- [x] 🔴 C7a 首次引导向导：三步（家庭构成→推荐模块→建库确认） ✅ 2026-10-02（Tab 化 + 数据接线 commit，见 34 组记录）
+- [x] 🔴 C7b 引导按 suggestRoles 预选逻辑（子女→育儿/上学/零花钱） ✅ 2026-10-02（Tab 化 + 数据接线 commit，见 34 组记录）
 - [ ] 🔴 C7c 引导建库批处理（provisioner 逐模块）+ 完成空态引导
 - [ ] 🔴 C7d 引导可跳过、设置页可重跑
 - [ ] 🔴 C8a 设置五分区：模块/成员/提醒/生态/关于
@@ -319,6 +319,7 @@
 - [ ] 🟡 date-fns 按需引入核验（bundle 分析，只导入用到函数）
 - [ ] 🟢 附件缩略图懒加载（成员头像/资产照片墙）
 - [ ] 🟡 长会话内存走查（开关抽屉/弹层 50 次无增长）
+- [ ] 🔴 bundle 超预算整改：index.js gzip 132KB > 100KB 预算（05 §4.5）——lunar-typescript 全量入包；tree-shake 或动态 import 拆包（2026-10-02 实测）
 
 ## 21. 测试与质量工程
 
@@ -503,7 +504,7 @@
 - [ ] 🟡 响应式矩阵：320/375/768/1024、desktop-window、browser、mobile 全部走查；Dialog 使用视口上限、成员行窄屏堆叠、触摸目标至少 44px、安全区可用
 - [ ] 🟡 无悬停操作：提醒/表格动作在键盘 focus-within、触摸和移动端均可见；不能只依赖 hover 后显示操作按钮
 - [ ] 🟡 主题与样式隔离：`.b3-tab-bar` 等旧样式全部挂 `.lv-home` 作用域，清理硬编码颜色并补 color-mix fallback、对比度和 high-contrast 验收
-- [ ] 🟡 文案国际化真值：关于页、版本、错误、ARIA、农历说明和诊断文案全部进入 zh-CN/en；禁止 `settings.svelte` 继续硬编码中文
+- [x] 🟡 文案国际化真值：关于页、版本、错误、ARIA、农历说明和诊断文案全部进入 zh-CN/en；禁止 `settings.svelte` 继续硬编码中文 ✅ 2026-10-02（Tab 化 + 数据接线 commit，见 34 组记录）
 
 ### 33.5 平台、发布与支持
 
@@ -563,6 +564,7 @@
 | 2026-10-01 | 设立 | 协议建立 | 本节 |
 | 2026-10-01 | 主线 | Spike 三组实验（用户启动思源后执行） | 定案 R-av-create/R2/R5；siyuan.ts 真实 av 实现；S0-S5/A2a 共 9 项勾选；R5 降级定案；实验笔记本已清理 |
 | 2026-10-01 | 主线 | B2a/B2c/B4f 提醒中枢数据链 | DataProvider(certs/members) + runScan(容错/开关收敛/计数) + runtime(snooze/mute/adhoc/缓存)；DbRef.columns 映射补齐；vitest 30/30；B2d/B3 留待接线 |
+| 2026-10-02 | 主线 | C1 Tab 化 + B2b/B3 接线 + C7 向导 + A4 | addTab 四页签面板（总览/提醒/台账/成员）；onload 建库+扫描+每日摘要；向导三步（suggestRoles 预选）；i18n 迁移（216 键双语）；GitHub 公开仓库 ai68298100/siyuan-home 推送；新增 🔴 bundle 超预算待办；发现 addTab init 闭包 self 指向 window 的坑已修 |
 
 ---
 

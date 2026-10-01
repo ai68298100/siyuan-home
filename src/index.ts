@@ -1,11 +1,21 @@
-import { Plugin, showMessage } from "siyuan";
+import { Plugin, showMessage, openTab } from "siyuan";
+import { mount, unmount } from "svelte";
 import "./index.scss";
 
-import Dashboard from "@/panels/dashboard.svelte";
+import TabPanel from "@/panels/tab-panel.svelte";
 import HomeSettingsPanel from "@/panels/settings.svelte";
 import { svelteDialog } from "@/libs/dialog";
 import { loadSettings, saveSettings } from "@/core/settings";
+import { loadRuntime, saveRuntime, type HubRuntime } from "@/core/hub/runtime";
+import { runScan, type ScanResult } from "@/core/hub/scanner";
+import { CertsProvider, MembersProvider } from "@/core/hub/providers";
+import { dailyDigest, markNotified } from "@/core/hub/notify";
+import { complete, snooze, mute, unmute, renew, addMemo } from "@/core/hub/actions";
+import { provisionModule } from "@/core/provisioner";
+import { CERTS_SCHEMA, MEMBERS_SCHEMA, validateSchema } from "@/core/schema";
 import type { HomeSettings } from "@/types";
+
+const TAB_TYPE = "hub-tab";
 
 /**
  * 小驴管家（Lv Home）
@@ -13,54 +23,153 @@ import type { HomeSettings } from "@/types";
  */
 export default class LvHomePlugin extends Plugin {
     settings: HomeSettings;
+    runtime: HubRuntime;
+    scan: ScanResult;
+    /** Tab 面板刷新回调（面板挂载时注册） */
+    onHubUpdate: (() => void) | null = null;
 
     async onload() {
+        const self = this;
         this.settings = await loadSettings(this);
+        this.runtime = await loadRuntime(this);
+
+        // Tab 面板：init 时挂载 Svelte，destroy 时卸载（同一 Tab 可多次打开）
+        const unmounts = new WeakMap<Element, () => void>();
+        this.addTab({
+            type: TAB_TYPE,
+            init(this: { element: HTMLElement }) {
+                const um = mount(TabPanel, { target: this.element, props: { plugin: self } });
+                unmounts.set(this.element, um as () => void);
+            },
+            destroy(this: { element: HTMLElement }) {
+                const um = unmounts.get(this.element);
+                if (um) unmount(um as any);
+            },
+        });
 
         this.addTopBar({
             icon: "iconEmoji",
             title: this.i18n.butler,
-            callback: () => this.showDashboard(),
+            callback: () => this.showTab(),
         });
 
         this.addCommand({
             langKey: "openButler",
             hotkey: "",
-            callback: () => this.showDashboard(),
+            callback: () => this.showTab(),
         });
+
+        // schema 契约门禁（33.2）：开发期发现违规立即暴露
+        for (const [id, schema] of [["members", MEMBERS_SCHEMA], ["certs", CERTS_SCHEMA]] as const) {
+            const errors = validateSchema(id, schema);
+            if (errors.length) console.error("[siyuan-home] schema contract violations:", errors);
+        }
 
         if (!this.settings.onboarded) {
             showMessage(this.i18n.firstRun, 6000, "info");
-            this.settings.onboarded = true;
-            await saveSettings(this, this.settings);
         }
     }
 
-    showDashboard() {
-        svelteDialog({
-            title: `${this.i18n.butler} · ${this.i18n["dashboard.title"]}`,
-            component: Dashboard,
-            props: {
-                plugin: this,
-                settings: this.settings,
+    /** 布局就绪后：首次引导数据准备 + 建库 + 扫描（不阻塞启动） */
+    async onLayoutReady() {
+        try {
+            await this.ensureCoreLedgers();
+            await this.refreshHub();
+        } catch (e) {
+            console.warn("[siyuan-home] initial provision/scan deferred:", e instanceof Error ? e.message : e);
+        }
+    }
+
+    /** members 先建（relation 目标），certs 随后；幂等 */
+    async ensureCoreLedgers(): Promise<void> {
+        const resolveName = (key: string) => this.i18n[`field.${key}`] ?? key;
+        await provisionModule(this.settings, "members", MEMBERS_SCHEMA, this.i18n["module.members"], { resolveName });
+        await provisionModule(this.settings, "certs", CERTS_SCHEMA, this.i18n["module.certs"], { resolveName });
+        await saveSettings(this, this.settings);
+    }
+
+    /** 扫描 → 运行态合并 → 缓存 → 每日摘要 → 通知面板 */
+    async refreshHub(): Promise<ScanResult> {
+        const providers = [
+            new CertsProvider({ settings: this.settings, getDbRef: (id) => this.settings.dbRefs[id] }),
+            new MembersProvider({ settings: this.settings, getDbRef: (id) => this.settings.dbRefs[id] }),
+        ];
+        const scan = await runScan(providers, this.settings, this.runtime);
+        this.scan = scan;
+        this.runtime.cache = {
+            reminders: scan.reminders,
+            counts: scan.counts,
+            errors: scan.errors,
+        };
+        this.runtime.scannedAt = scan.scannedAt;
+        const digest = dailyDigest(scan, this.settings, this.runtime);
+        if (digest.shouldNotify) {
+            markNotified(this.runtime);
+            const text = this.i18n["notify.digest"]
+                .replace("${overdue}", String(digest.overdue))
+                .replace("${soon}", String(digest.soon));
+            showMessage(text, 6000, "info");
+        }
+        await saveRuntime(this, this.runtime);
+        this.onHubUpdate?.();
+        return scan;
+    }
+
+    showTab() {
+        openTab({
+            app: this.app,
+            custom: {
+                id: `${this.name}${TAB_TYPE}`,
+                title: this.i18n.butler,
+                icon: "iconHome",
             },
-            width: "760px",
         });
+    }
+
+    /** 打开台账文档（R5 降级定位） */
+    showTabDocs(docId?: string) {
+        const docId0 = docId ?? this.settings.dbRefs[this.activeLedger]?.docId;
+        if (!docId0) return;
+        openTab({ app: this.app, doc: { id: docId0 } });
+    }
+
+    activeLedger = "certs";
+
+    // ── 提醒动作（B4，转发 actions.ts）──
+    complete(r: any) { return complete(this, r); }
+    snooze(id: string, days: number) { return snooze(this, id, days); }
+    mute(id: string) { return mute(this, id); }
+    unmute(id: string) { return unmute(this, id); }
+    renew(r: any, iso: string) { return renew(this, r, iso, this.settings.dbRefs[r.moduleId] ?? {}); }
+    addMemo(title: string, due: string) { return addMemo(this, title, due); }
+    async finishOnboarding(household: { roles: string[]; children: number }, moduleIds: string[]) {
+        this.settings.household = household as any;
+        this.settings.enabledModules = Array.from(new Set([...this.settings.enabledModules, ...moduleIds]));
+        this.settings.onboarded = true;
+        await this.ensureCoreLedgers();
+        await saveSettings(this, this.settings);
+        await this.refreshHub();
+    }
+
+    /** Tab 面板挂载入口（tab callback 由框架调 addTab 注册的 destroy 之外回调） */
+    mountPanel(element: HTMLElement) {
+        const unmount = mount(TabPanel, {
+            target: element,
+            props: { plugin: this },
+        });
+        return unmount;
     }
 
     openSetting() {
         svelteDialog({
             title: this.i18n.settingsTitle,
             component: HomeSettingsPanel,
-            props: {
-                plugin: this,
-                settings: this.settings,
-            },
+            props: { plugin: this, settings: this.settings },
             width: "860px",
         });
     }
 
     onunload() {
-        // v0.1 无常驻资源
+        // v0.2：Tab 面板由思源管理销毁；无定时器驻留
     }
 }

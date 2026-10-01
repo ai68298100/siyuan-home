@@ -132,9 +132,9 @@
         <button class="b3-button b3-button--outline" onclick={addMember}>＋ {t("add")}</button>
     {:else}
         <div class="lv-settings__about">
-            <p>🏠 小驴管家 (Lv Home) v0.1.0</p>
-            <p>家庭与生活管家：成员档案 · 资产 · 育儿上学 · 病历社保 · 影音书库 · 出行旅行</p>
-            <p class="ft__on-surface">台账进数据库 · 效期进统一提醒中枢 · 长内容进文档</p>
+            <p>{t("about.line1")}</p>
+            <p>{t("about.tagline")}</p>
+            <p class="ft__on-surface">{t("about.principles")}</p>
         </div>
     {/if}
 
