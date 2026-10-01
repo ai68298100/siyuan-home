@@ -1,5 +1,5 @@
 <script lang="ts">
-    let { plugin, t }: { plugin: any; t: (k: string) => string } = $props();
+    let { plugin, t, onGoto }: { plugin: any; t: (k: string) => string; onGoto?: (s: string) => void } = $props();
 
     let step = $state(1);
     const roleOptions = ["spouse", "partner", "child", "elder", "kin"];
@@ -16,9 +16,15 @@
         if (!picked.includes("child")) children = 0;
     }
 
-    async function finish() {
+    // C7 向导 CTA：完成后直达证件快速录入（预选 certs）
+    async function finishAndCapture() {
         const roles = ["self", ...picked];
         await plugin.finishOnboarding({ roles, children }, recommended);
+        plugin.setActiveLedger("certs");
+        onGoto?.("ledger");
+    }
+    async function finish() {
+        await finishAndCapture();
     }
     function skip() { plugin.finishOnboarding({ roles: ["self"], children: 0 }, []); }
 </script>
@@ -56,7 +62,7 @@
         </div>
         <div style="display:flex;justify-content:space-between">
             <button class="b3-button b3-button--outline" onclick={() => (step = 1)}>← {t("wiz.back")}</button>
-            <button class="b3-button b3-button--text" onclick={finish}>✓ {t("wiz.finish")}</button>
+            <button class="b3-button b3-button--text" title={t("wiz.finishCta")} onclick={finishAndCapture}>✓ {t("wiz.finishAndCapture")}</button>
         </div>
     {/if}
 </div>

@@ -30,7 +30,7 @@
 </script>
 
 {#if !plugin.settings.onboarded}
-    <Onboarding {plugin} {t} />
+    <Onboarding {plugin} {t} onGoto={onGoto} />
 {/if}
 
 <div class="lv-hero">

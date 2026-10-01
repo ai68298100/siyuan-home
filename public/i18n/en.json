@@ -462,5 +462,7 @@
     "field.violations": "Violations (manual)",
     "field.ingredients": "Ingredients",
     "ledger.rebuild": "Rebuild ledger",
-    "diag.rebuilding": "Provisioning…"
+    "diag.rebuilding": "Provisioning…",
+    "wiz.finishAndCapture": "Finish & add first cert",
+    "wiz.finishCta": "Provision, then jump to cert quick-entry"
 }

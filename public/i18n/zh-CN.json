@@ -462,5 +462,7 @@
     "field.violations": "违章记录（手动摘要）",
     "field.ingredients": "食材清单",
     "ledger.rebuild": "重建台账",
-    "diag.rebuilding": "建库中…"
+    "diag.rebuilding": "建库中…",
+    "wiz.finishAndCapture": "完成并录第一条证件",
+    "wiz.finishCta": "建库后直达证件快速录入"
 }
