@@ -183,6 +183,18 @@ export default class LvHomePlugin extends Plugin {
                 .replace("${soon}", String(digest.soon));
             showMessage(text, 6000, "info");
         }
+        // B3b：逾期事项每日首次发现立即提示（静默判断同摘要）
+        const { localDateKey } = await import("@/core/hub/rule");
+        const today = localDateKey(new Date());
+        const inSilent = (() => {
+            const h = new Date().getHours();
+            const [from, to] = [this.settings.silentFrom ?? 22, this.settings.silentTo ?? 8];
+            return from > to ? h >= from || h < to : h >= from && h < to;
+        })();
+        if (scan.counts.overdue > 0 && !inSilent && this.runtime.lastOverdueAlertDate !== today) {
+            this.runtime.lastOverdueAlertDate = today;
+            showMessage(this.i18n["notify.overdue"].replace("${n}", String(scan.counts.overdue)), 6000, "error");
+        }
         await saveRuntime(this, this.runtime);
         this.hubListeners.forEach((fn) => fn());
         return scan;

@@ -43,6 +43,8 @@ export interface HubRuntime {
     memos: AdhocMemo[];
     /** 每日摘要去重：最后通知日期 */
     lastNotifiedDate?: string;
+    /** 逾期即时提醒去重：最后提示日期（B3b） */
+    lastOverdueAlertDate?: string;
 }
 
 export function defaultRuntime(): HubRuntime {
