@@ -299,6 +299,11 @@ export const STOCK_SCHEMA: ModuleSchema = {
         { key: "low_stock_at", type: "number", labelKey: "field.low_stock_at" },
     ],
     capture: ["name", "qty", "low_stock_at", "expiry"],
+    // 品类分区（Apple Reminders Grocery 印证，26.6）：囤货按品类自动归组
+    views: [
+        { key: "by_category", type: "table", groupBy: "category" },
+        { key: "expiring", type: "table", sortBy: { key: "expiry", asc: true } },
+    ],
     reminders: [{ key: "expiry", field: "expiry", kind: "oneoff", leadDays: 30 }],
 };
 
