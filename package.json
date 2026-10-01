@@ -13,6 +13,7 @@
   },
   "scripts": {
     "dev": "run-p dev:app dev:kernel",
+    "check:i18n": "node scripts/check-i18n.mjs",
     "dev:app": "cross-env NODE_ENV=development VITE_SOURCEMAP=inline VITE_BUILD_TARGET=app vite build --watch",
     "dev:kernel": "cross-env NODE_ENV=development VITE_SOURCEMAP=inline VITE_BUILD_TARGET=kernel vite build --watch",
     "check": "run-s check:types check:svelte",
