@@ -623,6 +623,7 @@
 | 2026-10-02 | 主线 | 33.4 微补 | 总览空状态卡 role=status（读屏播报空态切换） |
 | 2026-10-02 | 主线 | C6a 增量 | ledger 快速表单加分类下拉（schemaCatalog 目录挂载，枚举 schema 驱动）；capture 全列集动态渲染留后续 |
 | 2026-10-02 | 主线 | C6a 增量 2 | 快速表单加金额字段（number 列写入；购物/会员/人情模块通用） |
+| 2026-10-02 | 主线 | C6a 增量 3 | 快速建行自动写默认状态（schema status 枚举首值，certs=valid/medicine=inuse） |
 | 2026-10-02 | 主线 | 22 组快捷键速查表 | 设置·关于区落地；策略=仅 2 命令可配避免冲突 |
 | 2026-10-02 | 主线 | C1c 真正收尾 | settings 面板类名统一 lv-settings 命名空间（脱离 LEGACY 段）；index.scss 仅剩 settings 现役类 |
 | 2026-10-02 | 循环B | 外部调研 Notion Calendar | 日期属性数据库直接上日历+Date 属性提醒——印证提醒中枢日历视图形态（v0.3+ 候选）；菜单栏理念印证状态栏角标；来源 notion.com/help |

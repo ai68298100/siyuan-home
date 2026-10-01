@@ -47,6 +47,13 @@
                 type: "select", select: { content: newCategory },
             });
         }
+        // C6a 增量 3：自动写入默认状态（schema status 枚举第一个值，如 certs=valid / medicine=inuse）
+        const statusCol = (plugin.schemaCatalog?.[active]?.columns ?? []).find((c: any) => c.key === "status");
+        if (statusCol?.options?.length && cols.status) {
+            await setCell(ref.avId, cols.status, itemID, {
+                type: "select", select: { content: statusCol.options[0] },
+            });
+        }
         if (newExpiry && cols.expiry) {
             await setCell(ref.avId, cols.expiry, itemID, {
                 type: "date", date: { content: new Date(`${newExpiry}T00:00:00`).getTime(), isNotEmpty: true, isNotTime: true },
