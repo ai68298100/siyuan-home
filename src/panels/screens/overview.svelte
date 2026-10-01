@@ -91,7 +91,7 @@
 </div>
 <div class="lv-mods">
     {#each plugin.settings.enabledModules.filter((id: string) => id !== "members") as mid (mid)}
-        {@const pending = allReminders.filter((r: any) => r.moduleId === mid).length}
+        {@const pending = reminders.filter((r: any) => r.moduleId === mid).length}
         <div
             class="lv-card lv-card--hover lv-mod"
             role="button"
