@@ -326,7 +326,92 @@ export const HOUSE_SCHEMA: ModuleSchema = {
     reminders: [{ key: "pay_day", field: "pay_day", kind: "anniversary", leadDays: 7, lunarField: "lunar" }],
 };
 
-// ── v0.7/v0.8 批量 schema ────────────────────────────────────
+// ── 最后一批轻模块（31/31 全覆盖）────────────────────────────
+
+export const FOOD_SCHEMA: ModuleSchema = {
+    columns: [
+        ...d("name", "member"),
+        { ...FIELD_DICT.category, options: ["home_cook", "restaurant", "takeout"] },
+        { key: "rating", type: "number", labelKey: "field.rating" },
+        ...d("date", "url", "note"),
+        { key: "dislike_safe", type: "checkbox", labelKey: "field.dislike_safe" },
+    ],
+    capture: ["name", "category", "rating", "date"],
+};
+
+export const ADDRESS_SCHEMA: ModuleSchema = {
+    columns: [
+        ...d("name", "member"),
+        { ...FIELD_DICT.category, options: ["home", "shipping", "id_addr", "org"] },
+        { key: "address_full", type: "text", labelKey: "field.address_full" },
+        ...d("url", "note"),
+    ],
+    capture: ["name", "category", "address_full"],
+};
+
+export const BOOKMARKS_SCHEMA: ModuleSchema = {
+    columns: [
+        ...d("name"),
+        { ...FIELD_DICT.category, options: ["gov", "payment_bm", "shopping_bm", "learning", "work", "other_bm"] },
+        ...d("url", "note"),
+        { key: "account_note", type: "text", labelKey: "field.account_name" },
+    ],
+    capture: ["name", "category", "url"],
+};
+
+export const SNIPPETS_SCHEMA: ModuleSchema = {
+    columns: [
+        ...d("name"),
+        { ...FIELD_DICT.category, options: ["greeting", "address_sn", "intro", "reply", "other_sn"] },
+        { key: "content", type: "text", labelKey: "field.content" },
+        ...d("tags"),
+    ],
+    capture: ["name", "content"],
+};
+
+export const PARENTING_SCHEMA: ModuleSchema = {
+    columns: [
+        ...d("name", "member"),
+        { ...FIELD_DICT.category, options: ["vaccine_p", "growth", "feeding", "milestone"] },
+        ...d("date", "attachments", "note"),
+        { key: "vaccine_name", type: "text", labelKey: "field.vaccine_name" },
+        { key: "dose_no", type: "number", labelKey: "field.dose_no" },
+        { key: "metric_value", type: "number", labelKey: "field.metric_value" },
+    ],
+    capture: ["name", "member", "category", "date"],
+    reminders: [{ key: "next_visit", field: "due", kind: "oneoff", leadDays: 7 }],
+};
+
+export const SCHOOLING_SCHEMA: ModuleSchema = {
+    columns: [
+        ...d("name", "member"),
+        { ...FIELD_DICT.category, options: ["kindergarten", "primary", "junior", "senior", "college", "grad_school", "extracurricular"] },
+        { ...FIELD_DICT.status, options: ["applying", "enrolled", "graduated"] },
+        { key: "school", type: "text", labelKey: "field.school" },
+        { key: "grade", type: "text", labelKey: "field.grade" },
+        { key: "teacher", type: "text", labelKey: "field.teacher" },
+        ...d("amount", "due", "note"),
+        { key: "enroll_year", type: "number", labelKey: "field.enroll_year" },
+    ],
+    capture: ["name", "school", "category", "amount", "due"],
+    reminders: [
+        { key: "tuition", field: "due", kind: "oneoff", leadDays: 14 },
+    ],
+};
+
+export const SOCIAL_SCHEMA: ModuleSchema = {
+    columns: [
+        ...d("name", "member"),
+        { ...FIELD_DICT.category, options: ["shebao", "gongjijin", "yibao", "resident_pension", "commercial_pension"] },
+        ...d("note"),
+        { key: "account_no", type: "text", labelKey: "field.account_no" },
+        { key: "retire_check", type: "checkbox", labelKey: "field.retire_check" },
+        { key: "retire_age", type: "number", labelKey: "field.retire_age" },
+        { key: "balance_snapshot", type: "number", labelKey: "field.balance_snapshot" },
+        { key: "snapshot_date", type: "date", labelKey: "field.snapshot_date" },
+    ],
+    capture: ["name", "member", "category", "account_no"],
+};
 
 export const MEDIA_SCHEMA: ModuleSchema = {
     columns: [

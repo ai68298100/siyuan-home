@@ -574,7 +574,7 @@
 | 2026-10-02 | 主线 | avItemId 迁移工具 | 诊断区一键按姓名匹配 members 库行回填 avItemId（backfillMemberLinks）；vitest 30/30 |
 | 2026-10-02 | 主线 | v0.3 三模块 schema 生产 | medicine/memberships/insurance schema + SchemaLedgerProvider 通用提醒派生 + ensureCoreLedgers 按启用建库 + 54 枚举 i18n；验证"新模块=数据"扩展设计；gzip 33.4KB |
 | 2026-10-02 | 主线 | 8 模块 schema 批量生产（v0.4/v0.5/v0.6 主体） | shopping/contracts/exams/allowance/favors/stock/chores/house schema + 66 枚举 i18n（总 329 键）；契约门禁 13 schema 全过；gzip 34.2KB；schema 驱动模块达 13/31；devStatus 批量晋升待统一执行 |
-| 2026-10-02 | 主线 | v0.7/v0.8 + 核心补全：24/31 schema | media/pets/vehicles/transit/travel×4/assets-virtual 9 个 + 修复核心缺口 assets-real/health（默认启用却无 schema 的建库缺口）+ 68 枚举 i18n（总 399 键）；gzip 35.3KB；contract gate 24 schema 全过；剩余无 schema：food/address/bookmarks/snippets/parenting/schooling/social |
+| 2026-10-02 | 主线 | 🏁 31/31 schema 全覆盖 | 最后 7 个轻模块（food/address/bookmarks/snippets/parenting/schooling/social）；i18n 451 键；gzip 35.9KB；契约门禁 31 schema 全过；31 模块全部 schema 驱动——v0.3~v0.8 全版本 schema 层提前完成 | media/pets/vehicles/transit/travel×4/assets-virtual 9 个 + 修复核心缺口 assets-real/health（默认启用却无 schema 的建库缺口）+ 68 枚举 i18n（总 399 键）；gzip 35.3KB；contract gate 24 schema 全过；剩余无 schema：food/address/bookmarks/snippets/parenting/schooling/social |
 
 ---
 

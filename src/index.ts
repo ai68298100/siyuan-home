@@ -12,7 +12,7 @@ import { CertsProvider, MembersProvider, SchemaLedgerProvider } from "@/core/hub
 import { dailyDigest, markNotified } from "@/core/hub/notify";
 import { complete, snooze, mute, unmute, renew, addMemo } from "@/core/hub/actions";
 import { provisionModule } from "@/core/provisioner";
-import { CERTS_SCHEMA, MEMBERS_SCHEMA, MEDICINE_SCHEMA, MEMBERSHIPS_SCHEMA, INSURANCE_SCHEMA, SHOPPING_SCHEMA, CONTRACTS_SCHEMA, EXAMS_SCHEMA, ALLOWANCE_SCHEMA, FAVORS_SCHEMA, STOCK_SCHEMA, CHORES_SCHEMA, HOUSE_SCHEMA, MEDIA_SCHEMA, PETS_SCHEMA, VEHICLES_SCHEMA, TRANSIT_SCHEMA, TRAVEL_PLAN_SCHEMA, TRAVEL_BOOKING_SCHEMA, TRAVEL_PACKING_SCHEMA, TRAVEL_LOG_SCHEMA, ASSETS_VIRTUAL_SCHEMA, ASSETS_REAL_SCHEMA, HEALTH_SCHEMA, validateSchema } from "@/core/schema";
+import { CERTS_SCHEMA, MEMBERS_SCHEMA, MEDICINE_SCHEMA, MEMBERSHIPS_SCHEMA, INSURANCE_SCHEMA, SHOPPING_SCHEMA, CONTRACTS_SCHEMA, EXAMS_SCHEMA, ALLOWANCE_SCHEMA, FAVORS_SCHEMA, STOCK_SCHEMA, CHORES_SCHEMA, HOUSE_SCHEMA, MEDIA_SCHEMA, PETS_SCHEMA, VEHICLES_SCHEMA, TRANSIT_SCHEMA, TRAVEL_PLAN_SCHEMA, TRAVEL_BOOKING_SCHEMA, TRAVEL_PACKING_SCHEMA, TRAVEL_LOG_SCHEMA, ASSETS_VIRTUAL_SCHEMA, ASSETS_REAL_SCHEMA, HEALTH_SCHEMA, FOOD_SCHEMA, ADDRESS_SCHEMA, BOOKMARKS_SCHEMA, SNIPPETS_SCHEMA, PARENTING_SCHEMA, SCHOOLING_SCHEMA, SOCIAL_SCHEMA, validateSchema } from "@/core/schema";
 import type { HomeSettings } from "@/types";
 
 const TAB_TYPE = "hub-tab";
@@ -72,6 +72,9 @@ export default class LvHomePlugin extends Plugin {
             ["travel-plan", TRAVEL_PLAN_SCHEMA], ["travel-booking", TRAVEL_BOOKING_SCHEMA],
             ["travel-packing", TRAVEL_PACKING_SCHEMA], ["travel-log", TRAVEL_LOG_SCHEMA],
             ["assets-virtual", ASSETS_VIRTUAL_SCHEMA],
+            ["food", FOOD_SCHEMA], ["address", ADDRESS_SCHEMA], ["bookmarks", BOOKMARKS_SCHEMA],
+            ["snippets", SNIPPETS_SCHEMA], ["parenting", PARENTING_SCHEMA], ["schooling", SCHOOLING_SCHEMA],
+            ["social", SOCIAL_SCHEMA],
         ];
         for (const [id, schema] of allSchemas) {
             const errors = validateSchema(id, schema);
@@ -127,6 +130,13 @@ export default class LvHomePlugin extends Plugin {
             ["travel-packing", TRAVEL_PACKING_SCHEMA, this.i18n["module.travel-packing"]],
             ["travel-log", TRAVEL_LOG_SCHEMA, this.i18n["module.travel-log"]],
             ["assets-virtual", ASSETS_VIRTUAL_SCHEMA, this.i18n["module.assets-virtual"]],
+            ["food", FOOD_SCHEMA, this.i18n["module.food"]],
+            ["address", ADDRESS_SCHEMA, this.i18n["module.address"]],
+            ["bookmarks", BOOKMARKS_SCHEMA, this.i18n["module.bookmarks"]],
+            ["snippets", SNIPPETS_SCHEMA, this.i18n["module.snippets"]],
+            ["parenting", PARENTING_SCHEMA, this.i18n["module.parenting"]],
+            ["schooling", SCHOOLING_SCHEMA, this.i18n["module.schooling"]],
+            ["social", SOCIAL_SCHEMA, this.i18n["module.social"]],
         ];
         for (const [id, schema, title] of plans) {
             if (!enabled.has(id)) continue;
