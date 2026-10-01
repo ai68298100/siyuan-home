@@ -8,11 +8,11 @@ import { svelteDialog } from "@/libs/dialog";
 import { loadSettings, saveSettings } from "@/core/settings";
 import { loadRuntime, saveRuntime, type HubRuntime } from "@/core/hub/runtime";
 import { runScan, type ScanResult } from "@/core/hub/scanner";
-import { CertsProvider, MembersProvider } from "@/core/hub/providers";
+import { CertsProvider, MembersProvider, SchemaLedgerProvider } from "@/core/hub/providers";
 import { dailyDigest, markNotified } from "@/core/hub/notify";
 import { complete, snooze, mute, unmute, renew, addMemo } from "@/core/hub/actions";
 import { provisionModule } from "@/core/provisioner";
-import { CERTS_SCHEMA, MEMBERS_SCHEMA, validateSchema } from "@/core/schema";
+import { CERTS_SCHEMA, MEMBERS_SCHEMA, MEDICINE_SCHEMA, MEMBERSHIPS_SCHEMA, INSURANCE_SCHEMA, validateSchema } from "@/core/schema";
 import type { HomeSettings } from "@/types";
 
 const TAB_TYPE = "hub-tab";
@@ -61,7 +61,10 @@ export default class LvHomePlugin extends Plugin {
         });
 
         // schema 契约门禁（33.2）：开发期发现违规立即暴露
-        for (const [id, schema] of [["members", MEMBERS_SCHEMA], ["certs", CERTS_SCHEMA]] as const) {
+        for (const [id, schema] of [
+            ["members", MEMBERS_SCHEMA], ["certs", CERTS_SCHEMA],
+            ["medicine", MEDICINE_SCHEMA], ["memberships", MEMBERSHIPS_SCHEMA], ["insurance", INSURANCE_SCHEMA],
+        ] as const) {
             const errors = validateSchema(id, schema);
             if (errors.length) console.error("[siyuan-home] schema contract violations:", errors);
         }
@@ -86,19 +89,33 @@ export default class LvHomePlugin extends Plugin {
         }
     }
 
-    /** members 先建（relation 目标），certs 随后；幂等 */
+    /** members 先建（relation 目标），其余按需；幂等。启用模块才建库（P4） */
     async ensureCoreLedgers(): Promise<void> {
         const resolveName = (key: string) => this.i18n[`field.${key}`] ?? key;
-        await provisionModule(this.settings, "members", MEMBERS_SCHEMA, this.i18n["module.members"], { resolveName });
-        await provisionModule(this.settings, "certs", CERTS_SCHEMA, this.i18n["module.certs"], { resolveName });
+        const enabled = new Set(this.settings.enabledModules);
+        const plans: [string, any, string][] = [
+            ["members", MEMBERS_SCHEMA, this.i18n["module.members"]],
+            ["certs", CERTS_SCHEMA, this.i18n["module.certs"]],
+            ["medicine", MEDICINE_SCHEMA, this.i18n["module.medicine"]],
+            ["memberships", MEMBERSHIPS_SCHEMA, this.i18n["module.memberships"]],
+            ["insurance", INSURANCE_SCHEMA, this.i18n["module.insurance"]],
+        ];
+        for (const [id, schema, title] of plans) {
+            if (!enabled.has(id)) continue;
+            await provisionModule(this.settings, id, schema, title, { resolveName });
+        }
         await saveSettings(this, this.settings);
     }
 
     /** 扫描 → 运行态合并 → 缓存 → 每日摘要 → 通知面板 */
     async refreshHub(): Promise<ScanResult> {
+        const deps = { settings: this.settings, getDbRef: (id: string) => this.settings.dbRefs[id] };
         const providers = [
-            new CertsProvider({ settings: this.settings, getDbRef: (id) => this.settings.dbRefs[id] }),
-            new MembersProvider({ settings: this.settings, getDbRef: (id) => this.settings.dbRefs[id] }),
+            new CertsProvider(deps),
+            new MembersProvider(deps),
+            new SchemaLedgerProvider("medicine", MEDICINE_SCHEMA, deps),
+            new SchemaLedgerProvider("memberships", MEMBERSHIPS_SCHEMA, deps),
+            new SchemaLedgerProvider("insurance", INSURANCE_SCHEMA, deps),
         ];
         const scan = await runScan(providers, this.settings, this.runtime);
         this.scan = scan;

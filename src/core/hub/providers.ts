@@ -5,7 +5,7 @@
 import type { Reminder, ReminderRuleSpec } from "@/types";
 import { buildReminder, localDateKey, type LedgerRowDates } from "./rule";
 import { renderLedger } from "../siyuan";
-import { CERTS_SCHEMA, MEMBERS_SCHEMA } from "../schema";
+import { CERTS_SCHEMA, MEMBERS_SCHEMA, type ModuleSchema } from "../schema";
 import type { DbRef, HomeSettings } from "@/types";
 
 export interface DataProvider {
@@ -80,6 +80,48 @@ export class CertsProvider implements DataProvider {
                     today,
                     leadOverride: leadFor(this.deps.settings, this.moduleId, rule),
                 });
+                if (r) out.push(r);
+            }
+        }
+        return out;
+    }
+}
+
+/** 通用 schema 驱动 provider（05 §1"新模块=数据"）：按 schema.reminders 逐列派生，relation 成员反查同 certs */
+export class SchemaLedgerProvider implements DataProvider {
+    readonly moduleId: string;
+    constructor(
+        moduleId: string,
+        private schema: ModuleSchema,
+        private deps: ProviderDeps,
+    ) {
+        this.moduleId = moduleId;
+    }
+
+    async collect(today: Date): Promise<Reminder[]> {
+        const ref = this.deps.getDbRef(this.moduleId);
+        if (!ref?.avId || !ref.columns) return [];
+        const out: Reminder[] = [];
+        const { rows } = await renderLedger(ref.avId);
+        const members = this.deps.settings.members ?? [];
+        // 通用终态过滤：状态命中即跳过（字典 status 枚举的非活跃值）
+        const skip = new Set(["archived", "void", "expired", "renewed", "refunded", "discarded", "surrendered", "ins_expired", "med_expired", "m_expired"]);
+        for (const row of rows) {
+            const cell = (key: string) => row.cells[ref.columns![key]];
+            if (skip.has(selectFromValue(cell("status")) ?? "")) continue;
+            const name = textFromValue(cell("name")) ?? this.moduleId;
+            const rel: string[] | undefined = cell("member")?.relation?.blockIDs ?? undefined;
+            const member = rel?.[0] ? members.find((m) => m.avItemId === rel[0]) : undefined;
+            for (const rule of this.schema.reminders ?? []) {
+                const v = cell(rule.field);
+                const fieldValue = v?.type === "date" ? dateFromValue(v) : textFromValue(v);
+                if (!fieldValue) continue;
+                const cycleKey = rule.cycleField ?? "cycle";
+                const r = await buildReminder(rule, this.moduleId, {
+                    rowId: row.itemID, title: name, memberId: member?.id, fieldValue,
+                    cycle: rule.kind === "recurring" ? (selectFromValue(cell(cycleKey)) ?? textFromValue(cell(cycleKey))) : undefined,
+                    lunar: !!cell(rule.lunarField ?? "lunar")?.checkbox?.checked,
+                }, { today, leadOverride: leadFor(this.deps.settings, this.moduleId, rule) });
                 if (r) out.push(r);
             }
         }

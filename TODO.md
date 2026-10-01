@@ -123,9 +123,9 @@
 
 ## 6. v0.3 提醒中枢扩展（🟡）
 
-- [ ] 🟡 medicine schema + 建库 + 提醒接入（效期+低库存双规则）
-- [ ] 🟡 memberships schema（计费周期/试用期/自动续费/储值余额）
-- [ ] 🟡 insurance schema（缴费日+保障到期双提醒）
+- [x] 🟡 medicine schema + 建库 + 提醒接入（效期+低库存双规则） ✅ 2026-10-02（SchemaLedgerProvider 通用派生，schema 驱动建库+提醒；低库存双规则留 v0.3 后段）
+- [x] 🟡 memberships schema（计费周期/试用期/自动续费/储值余额） ✅ 2026-10-02（SchemaLedgerProvider 通用派生，schema 驱动建库+提醒；低库存双规则留 v0.3 后段）
+- [x] 🟡 insurance schema（缴费日+保障到期双提醒） ✅ 2026-10-02（SchemaLedgerProvider 通用派生，schema 驱动建库+提醒；低库存双规则留 v0.3 后段）
 - [ ] 🟡 提醒中枢规则清单 UI 完善（按模块列出 rules）
 - [ ] 🟡 生态 RPC server 首批：home.capabilities / getSnippets / getBookmarks
 - [ ] 🟡 生态开关接线（设置·生态 → rpc 权限）
@@ -572,6 +572,7 @@
 | 2026-10-02 | 主线 | 33.1 单实例 + 33.4 draft 事务 + 文档三件套 | hubListeners Set 多实例刷新；设置 draft 编辑事务（保存落盘）；i18n 真值收尾；FAQ/privacy/ADR 索引落地；vitest 30/30 |
 | 2026-10-02 | 主线 | C2c qbtn + C1b 胶囊 + 诊断区 + D1 回归脚本 | 快速记录行（跳台账预选）；导航胶囊 spring；设置·关于诊断（dbRefs/扫描错误/契约门禁）；回归脚本 docs/testing/v0.2.md |
 | 2026-10-02 | 主线 | avItemId 迁移工具 | 诊断区一键按姓名匹配 members 库行回填 avItemId（backfillMemberLinks）；vitest 30/30 |
+| 2026-10-02 | 主线 | v0.3 三模块 schema 生产 | medicine/memberships/insurance schema + SchemaLedgerProvider 通用提醒派生 + ensureCoreLedgers 按启用建库 + 54 枚举 i18n；验证"新模块=数据"扩展设计；gzip 33.4KB |
 
 ---
 

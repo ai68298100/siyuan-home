@@ -137,6 +137,64 @@ export const MEMBERS_SCHEMA: ModuleSchema = {
     ],
 };
 
+// ── v0.3 模块 schema（02 §4.3，SchemaLedgerProvider 通用派生）──────────
+
+export const MEDICINE_SCHEMA: ModuleSchema = {
+    columns: [
+        ...d("name", "member"),
+        { ...FIELD_DICT.category, options: ["rx", "otc", "external", "device", "supplement"] },
+        { ...FIELD_DICT.status, options: ["inuse", "standby", "med_expired", "discarded"] },
+        ...d("expiry", "remind_before"),
+        { key: "stock_qty", type: "number", labelKey: "field.stock_qty" },
+        { key: "low_stock_at", type: "number", labelKey: "field.low_stock_at" },
+        ...d("location", "note"),
+    ],
+    capture: ["name", "category", "expiry", "stock_qty", "location"],
+    views: [{ key: "expiring", type: "table", sortBy: { key: "expiry", asc: true } }],
+    reminders: [{ key: "expiry", field: "expiry", kind: "oneoff", leadDays: 30 }],
+};
+
+export const MEMBERSHIPS_SCHEMA: ModuleSchema = {
+    columns: [
+        ...d("name", "member"),
+        { ...FIELD_DICT.category, options: ["member_card", "prepaid", "subscription", "coupon", "points"] },
+        { ...FIELD_DICT.status, options: ["active", "m_expired", "refunded"] },
+        ...d("expiry", "cycle", "amount", "note"),
+        { key: "next_pay", type: "date", labelKey: "field.next_pay" },
+        { key: "trial_end", type: "date", labelKey: "field.trial_end" },
+        { key: "auto_renew", type: "checkbox", labelKey: "field.auto_renew" },
+        { key: "credentials_note", type: "text", labelKey: "field.credentials_note" },
+    ],
+    capture: ["name", "category", "amount", "cycle", "next_pay"],
+    views: [{ key: "renewing", type: "table", sortBy: { key: "next_pay", asc: true } }],
+    reminders: [
+        { key: "next_pay", field: "next_pay", kind: "recurring", leadDays: 14, cycleField: "cycle" },
+        { key: "trial_end", field: "trial_end", kind: "oneoff", leadDays: 3 },
+        { key: "expiry", field: "expiry", kind: "oneoff", leadDays: 14 },
+    ],
+};
+
+export const INSURANCE_SCHEMA: ModuleSchema = {
+    columns: [
+        ...d("name", "member"),
+        { ...FIELD_DICT.category, options: ["health", "critical", "accident", "life", "vehicle", "property", "other_ins"] },
+        { ...FIELD_DICT.status, options: ["in_force", "paying", "ins_expired", "surrendered"] },
+        { key: "insurer", type: "text", labelKey: "field.insurer" },
+        { key: "policy_no", type: "text", labelKey: "field.policy_no" },
+        { key: "premium", type: "number", labelKey: "field.premium" },
+        { key: "pay_cycle", type: "select", labelKey: "field.cycle", options: ["month", "quarter", "year"] },
+        { key: "next_pay", type: "date", labelKey: "field.next_pay" },
+        { key: "coverage", type: "number", labelKey: "field.coverage" },
+        ...d("expiry", "attachments", "note"),
+    ],
+    capture: ["name", "category", "insurer", "premium", "next_pay"],
+    views: [{ key: "paying", type: "table", groupBy: "member" }],
+    reminders: [
+        { key: "next_pay", field: "next_pay", kind: "recurring", leadDays: 30, cycleField: "pay_cycle" },
+        { key: "expiry", field: "expiry", kind: "oneoff", leadDays: 30 },
+    ],
+};
+
 // ── schema 契约校验（33.2 门禁）─────────────────────────────
 
 /** 契约：capture/views/reminders 引用的列必须都在 columns 中；违规时开发期抛错。 */
