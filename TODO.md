@@ -407,7 +407,7 @@
 - [ ] 🔴 eslint + prettier 配置统一（沿用模板或补齐，写入 CONTRIBUTING）
 - [ ] 🟡 pre-commit hook：staged 文件快速 lint（提交前秒级反馈）
 - [ ] 🟡 分支模型：main + feature/*；单人项目也走 PR 自检（触发 CI）
-- [ ] 🟡 PR 自查清单（check 通过/截图对比/TODO.md 勾选同步）
+- [x] 🟡 PR 自查清单（check 通过/截图对比/TODO.md 勾选同步） ✅ 2026-10-02（.github/PULL_REQUEST_TEMPLATE.md 落盘）
 - [ ] 🟡 每次合并后同步勾选 TODO.md（流程约定，防止清单腐化）
 - [ ] 🟢 代码内 TODO/FIXME 注释规范 + 每版本清扫一次
 - [ ] 🟢 多机开发同步约定（pull --rebase、禁 force push main）
@@ -636,6 +636,7 @@
 | 2026-10-02 | 主线 | 33.2 journal 最小版 | DbRef.provisionError 记录建库/补列失败摘要（成功清除）；诊断区红色显示；完整 journal（多步恢复）留实测后按需 |
 | 2026-10-02 | 主线 | 33.5 元数据一致性校验脚本 | scripts/check-meta.mjs（name/version 交叉+文件存在性+上架开关提示）；check:meta script |
 | 2026-10-02 | 主线 | 23 组 zip 体积门禁 | check:meta 内置（<10MB） |
+| 2026-10-02 | 主线 | 25 组 issue/PR 模板落盘 .github/ | bug/feature 模板 + PR 自查清单 |
 | 2026-10-02 | 主线 | C5b 成员下钻最小版 | 成员卡点击展开该成员提醒明细（徽章+逐条+完成动作）；完整跨模块时间线留 v0.5+ |
 | 2026-10-02 | 主线 | C1c（部分） | 删除废弃 dashboard.svelte（Tab 化后无引用）；settings 面板为现役保留 |
 | 2026-10-02 | 主线 | C1c 收尾（第一步完成） | LEGACY 段 7 个 dashboard 专用类删除（全局零引用验证）；settings 现役类保留；css 21.8→更精简 |
