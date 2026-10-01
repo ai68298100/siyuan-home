@@ -26,11 +26,12 @@
     }
     $effect(() => { void active; void plugin.scan?.scannedAt; load(); });
 
-    // capture 快速表单：name + category + member + expiry（capture 列集驱动，枚举从 schema 读）
+    // capture 快速表单：name + category + member + expiry + amount（capture 列集驱动，枚举从 schema 读）
     let newName = $state("");
     let newCategory = $state("");
     let newExpiry = $state("");
     let newMember = $state(""); // members av itemID
+    let newAmount: number | undefined = $state();
     const memberOptions = $derived(plugin.settings.members ?? []);
     const memberAvId = $derived(plugin.settings.dbRefs.members?.avId);
     const categoryOptions = $derived<string[]>(
@@ -56,8 +57,12 @@
                 type: "relation", relation: { blockIDs: [newMember], contents: null },
             });
         }
-        void newSiYuanId;
-        newName = ""; newCategory = ""; newExpiry = ""; newMember = "";
+        if (typeof newAmount === "number" && !isNaN(newAmount) && cols.amount) {
+            await setCell(ref.avId, cols.amount, itemID, {
+                type: "number", number: { content: newAmount, isNotEmpty: true },
+            });
+        }
+        newName = ""; newCategory = ""; newExpiry = ""; newMember = ""; newAmount = undefined;
         await load();
         await plugin.refreshHub();
     }
@@ -92,6 +97,7 @@
         {/each}
     </select>
     <input class="b3-text-field" type="date" title={t("field.expiry")} bind:value={newExpiry} />
+    <input class="b3-text-field" type="number" style="width:90px" placeholder={t("field.amount")} bind:value={newAmount} />
     <button class="b3-button b3-button--text" onclick={createRow} disabled={!ref?.avId}>＋ {t("ledger.add")}</button>
 </div>
 
