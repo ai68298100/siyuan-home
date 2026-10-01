@@ -382,7 +382,7 @@
 - [ ] 🟡 social preview 图 + about topics（siyuan / siyuan-plugin / family / reminder）
 - [ ] 🟡 `.gitignore` 终审（dist/node_modules/本地环境/测试空间路径不入库）
 - [ ] 🟢 `assets/` 展示资产目录（截图与 GIF 源文件归档）
-- [ ] 🟡 CONTRIBUTING.md（开发环境/流程/规范摘要）
+- [x] 🟡 CONTRIBUTING.md（开发环境/流程/规范摘要） ✅ 2026-10-02（含约定 8 条：事实源/i18n/内核 API 收口/数据边界/隐私红线等）
 - [ ] 🟡 issue 与 PR 模板落盘 `.github/`（21 组模板的落地项）
 - [ ] 🟢 GitHub Projects 看板或 milestone（v0.2/v0.3；以 TODO.md 为唯一事实源，Projects 仅展示）
 - [ ] 🟡 Releases 流程演练：tag → GitHub Release 附 zip（不发集市）
