@@ -68,7 +68,7 @@
 - [x] 🔴 B4b 动作：续期小窗（新到期日 + 历史追加 note） ✅ 2026-10-02（B2b=Tab触发+30min心跳；B2d 定案 kernel 无定时器 API 走前端心跳；B4 续期=思源 Dialog/延后=Menu 1/3/7/30）
 - [x] 🔴 B4c 动作：延后 snooze（1/3/7/30 天，运行态持久化） ✅ 2026-10-02（B2b=Tab触发+30min心跳；B2d 定案 kernel 无定时器 API 走前端心跳；B4 续期=思源 Dialog/延后=Menu 1/3/7/30）
 - [x] 🔴 B4d 动作：忽略 mute（rowId+ruleKey，可恢复） ✅ 2026-10-02（B2b=Tab触发+30min心跳；B2d 定案 kernel 无定时器 API 走前端心跳；B4 续期=思源 Dialog/延后=Menu 1/3/7/30）
-- [ ] ⛔ 🔴 B4e 动作：定位（依赖 S3 结论；降级=打开台账文档）
+- [x] 🔴 B4e 动作：定位（依赖 S3 结论；降级=打开台账文档） ✅ 2026-10-02（R5 降级定案实施：提醒行定位按钮→openTab 台账文档）
 - [x] 🔴 B4f 提醒中枢运行态存储 schema（snooze/mute/已办缓存 → loadData） ✅ 2026-10-01（providers/scanner/runtime 三层 + 7 单测；kernel 定时触发 B2d 另行）
 
 ## 4. v0.2 · UI（阶段 C，组件契约见 docs/design/08）
@@ -607,7 +607,8 @@
 | 2026-10-02 | 循环B | 任务笔记管理源码深挖 | NotificationDialog 队列模式（MAX=5）产出通知防轰炸待办；移动端后台教程在其知乎文章（B3 接线时参照） |
 | 2026-10-02 | 循环B | siyuan-homepage 深挖（循环B 本阶段收尾） | 通知中心 Webhook 出口产出 B3 扩展待办（Bark/ntfy 或联动转发）；循环 B 进入休眠，触发条件=新竞品信号或实测反馈 |
 | 2026-10-02 | 主线 | C3d 筛选持久化 | runtime.hubFilter；健康巡检全绿 |
-| 2026-10-02 | 主线 | B3b 逾期即时提醒 | 每日首次扫描 overdue>0 且非静默 → error 级提示；lastOverdueAlertDate 去重 | media/pets/vehicles/transit/travel×4/assets-virtual 9 个 + 修复核心缺口 assets-real/health（默认启用却无 schema 的建库缺口）+ 68 枚举 i18n（总 399 键）；gzip 35.3KB；contract gate 24 schema 全过；剩余无 schema：food/address/bookmarks/snippets/parenting/schooling/social |
+| 2026-10-02 | 主线 | B3b 逾期即时提醒 | 每日首次扫描 overdue>0 且非静默 → error 级提示；lastOverdueAlertDate 去重 |
+| 2026-10-02 | 主线 | B4e 定位动作（R5 降级实施） | 提醒行加定位按钮 → 打开该模块台账文档；行内高亮待非 detached 行路径解锁 | media/pets/vehicles/transit/travel×4/assets-virtual 9 个 + 修复核心缺口 assets-real/health（默认启用却无 schema 的建库缺口）+ 68 枚举 i18n（总 399 键）；gzip 35.3KB；contract gate 24 schema 全过；剩余无 schema：food/address/bookmarks/snippets/parenting/schooling/social |
 
 ---
 

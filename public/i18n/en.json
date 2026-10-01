@@ -450,5 +450,6 @@
     "field.category.opt.yibao": "Medical ins.",
     "field.category.opt.resident_pension": "Resident pension",
     "field.category.opt.commercial_pension": "Commercial pension",
-    "notify.overdue": "${n} overdue items — open Lv Home to review"
+    "notify.overdue": "${n} overdue items — open Lv Home to review",
+    "act.locate": "Locate"
 }

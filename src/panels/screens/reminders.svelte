@@ -89,6 +89,9 @@
                         {#if r.moduleId === "certs"}
                             <button class="b3-button b3-button--text" onclick={() => renewDialog(r)}>{t("act.renew")}</button>
                         {/if}
+                        {#if r.moduleId !== "adhoc" && plugin.settings.dbRefs[r.moduleId]?.docId}
+                            <button class="b3-button b3-button--text" title={t("act.locate")} onclick={() => plugin.showTabDocs(plugin.settings.dbRefs[r.moduleId].docId)}>{t("act.locate")}</button>
+                        {/if}
                         <button class="b3-button b3-button--text" onclick={(e) => snoozeMenu(r, e)}>{t("act.snooze")} ▾</button>
                         <button class="b3-button b3-button--text" onclick={() => plugin.mute(r.id)}>{t("act.mute")}</button>
                     </div>
