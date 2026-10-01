@@ -144,7 +144,7 @@
 
 ## 8. v0.5 教育包（🟡）
 
-- [ ] 🟡 parenting schema + 国家免疫规划程序表内置模板（0-6 岁 22 剂）
+- [x] 🟡 parenting schema + 国家免疫规划程序表内置模板（0-6 岁 22 剂） ✅ 2026-10-02（src/core/immunization.ts：22 剂程序表+doseDate 月龄推算/月末收敛；排期视图接线留 v0.5 后段）
 - [ ] 🟡 schooling schema（学段推算当前年级/升学节点/学费/课外班课时）
 - [x] 🟡 exams schema（证书效期/复审周期/考试节点） ✅ 2026-10-02（schema+枚举 i18n+通用提醒派生；UI 细化随模块启用迭代）
 - [x] 🟡 allowance schema（压岁钱/零花钱多账户/发放周期） ✅ 2026-10-02（schema+枚举 i18n+通用提醒派生；UI 细化随模块启用迭代）
@@ -584,7 +584,8 @@
 | 2026-10-02 | 循环A | 第 2 项类型严格（首步） | tab-panel 核心接口具体类型化；全库 any 存量 27+28 处已盘点并记待办分批清零 |
 | 2026-10-02 | 循环A | 第 4 项设计一致性（色值走查） | svelte/ts 硬编码色值仅 2 处（品牌渐变第二色）→ token 化 --lv-accent-2 集中于设计系统；无其他违规 |
 | 2026-10-02 | 循环A | 第 3 项（部分：check 链）+ 第 7 项（盘点） | check:i18n 纳入 pnpm check；a11y 盘点：buttons 全量可键盘达、aria-label/role/tabindex 已有基础，剩余=抽屉 focus trap 与 aria-live（记 33.4 剩余） |
-| 2026-10-02 | 循环A | 第 8 项性能 + 循环终局 | gzip 35.9KB 实测达标（预算 100KB）；9 项走查完成 7 项，剩余 2 项（无障碍补齐/any 清零）已归属 33.4 与 C 阶段；循环 A 关闭，后续触发条件=实测反馈或新模块生产 | media/pets/vehicles/transit/travel×4/assets-virtual 9 个 + 修复核心缺口 assets-real/health（默认启用却无 schema 的建库缺口）+ 68 枚举 i18n（总 399 键）；gzip 35.3KB；contract gate 24 schema 全过；剩余无 schema：food/address/bookmarks/snippets/parenting/schooling/social |
+| 2026-10-02 | 循环A | 第 8 项性能 + 循环终局 | gzip 35.9KB 实测达标（预算 100KB）；9 项走查完成 7 项，剩余 2 项（无障碍补齐/any 清零）已归属 33.4 与 C 阶段；循环 A 关闭，后续触发条件=实测反馈或新模块生产 |
+| 2026-10-02 | 循环B | v0.5 疫苗程序表种子数据 | immunization.ts（22 剂+推算函数）；政策公开数据，无版权问题 | media/pets/vehicles/transit/travel×4/assets-virtual 9 个 + 修复核心缺口 assets-real/health（默认启用却无 schema 的建库缺口）+ 68 枚举 i18n（总 399 键）；gzip 35.3KB；contract gate 24 schema 全过；剩余无 schema：food/address/bookmarks/snippets/parenting/schooling/social |
 
 ---
 
