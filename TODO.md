@@ -85,7 +85,7 @@
 - [ ] 🔴 C3a 提醒中枢页：四组筛选（模块/成员/类型/时间）+ 显示已处理
 - [x] 🔴 C3b 提醒中枢页：分组列表（逾期/7 天/30 天/已处理折叠） ✅ 2026-10-02（bundle gzip 132→32KB；成员过滤持久化；三级分组；向导重跑）
 - [x] 🔴 C3c 提醒中枢页：行内动作菜单（完成/续期/延后▾/定位/忽略）接线 B4 ✅ 2026-10-02（B2b=Tab触发+30min心跳；B2d 定案 kernel 无定时器 API 走前端心跳；B4 续期=思源 Dialog/延后=Menu 1/3/7/30）
-- [ ] 🔴 C3d 筛选条件持久化
+- [x] 🔴 C3d 筛选条件持久化 ✅ 2026-10-02（runtime.hubFilter）
 - [ ] ⛔ 🔴 C4a 台账页外壳：模块切换下拉 + "在文档中打开"（依赖 S1 定案嵌入方式）
 - [ ] ⛔ 🔴 C4b 台账行点击 → 详情抽屉（kv/附件/相关/块 ID 复制）
 - [ ] 🔴 C4c 台账"新建"：capture 列集快速表单（抽屉内或弹层）
@@ -605,7 +605,8 @@
 | 2026-10-02 | 循环B | 外部调研 Notion 视图 2.0 | 10 种视图与台账映射（form=快速录入原生路径候选，记 C4a 复核点）；map 思源暂无保持列表 |
 | 2026-10-02 | 循环B | 集市监控首轮（23 组） | 3 插件扫描：无家庭垂直竞品；任务笔记管理的移动端后台提醒印证 B3 可行性；23 组转为周期性持续 |
 | 2026-10-02 | 循环B | 任务笔记管理源码深挖 | NotificationDialog 队列模式（MAX=5）产出通知防轰炸待办；移动端后台教程在其知乎文章（B3 接线时参照） |
-| 2026-10-02 | 循环B | siyuan-homepage 深挖（循环B 本阶段收尾） | 通知中心 Webhook 出口产出 B3 扩展待办（Bark/ntfy 或联动转发）；循环 B 进入休眠，触发条件=新竞品信号或实测反馈 | media/pets/vehicles/transit/travel×4/assets-virtual 9 个 + 修复核心缺口 assets-real/health（默认启用却无 schema 的建库缺口）+ 68 枚举 i18n（总 399 键）；gzip 35.3KB；contract gate 24 schema 全过；剩余无 schema：food/address/bookmarks/snippets/parenting/schooling/social |
+| 2026-10-02 | 循环B | siyuan-homepage 深挖（循环B 本阶段收尾） | 通知中心 Webhook 出口产出 B3 扩展待办（Bark/ntfy 或联动转发）；循环 B 进入休眠，触发条件=新竞品信号或实测反馈 |
+| 2026-10-02 | 主线 | C3d 筛选持久化 | runtime.hubFilter；健康巡检全绿 | media/pets/vehicles/transit/travel×4/assets-virtual 9 个 + 修复核心缺口 assets-real/health（默认启用却无 schema 的建库缺口）+ 68 枚举 i18n（总 399 键）；gzip 35.3KB；contract gate 24 schema 全过；剩余无 schema：food/address/bookmarks/snippets/parenting/schooling/social |
 
 ---
 

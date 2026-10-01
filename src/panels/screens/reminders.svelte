@@ -3,7 +3,14 @@
     let { plugin, t }: { plugin: any; t: (k: string) => string } = $props();
 
     const all = $derived(plugin.scan?.reminders ?? []);
-    let filter = $state("all");
+    // C3d：筛选持久化（runtime.hubFilter）
+    let filter = $state(plugin.runtime.hubFilter ?? "all");
+    async function setFilter(v: string) {
+        filter = v;
+        plugin.runtime.hubFilter = v;
+        const { saveRuntime } = await import("@/core/hub/runtime");
+        await saveRuntime(plugin, plugin.runtime);
+    }
     const filtered = $derived(
         filter === "all" ? all : filter === "handled" ? [] : all.filter((r: any) => r.level === filter),
     );
@@ -43,7 +50,7 @@
 <div class="lv-hero"><h1>{t("hub.title")}</h1><p>{t("hub.subtitle")}</p></div>
 
 <div class="filters" style="display:flex;gap:8px;margin:16px 0">
-    <select class="b3-select" bind:value={filter}>
+    <select class="b3-select" value={filter} onchange={(e) => setFilter((e.target as HTMLSelectElement).value)}>
         <option value="all">{t("hub.filterAll")}</option>
         <option value="overdue">{t("hub.filterOverdue")}</option>
         <option value="soon">{t("hub.filterSoon")}</option>
