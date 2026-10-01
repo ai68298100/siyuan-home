@@ -1,0 +1,1091 @@
+<!doctype html>
+<html lang="zh-CN" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>小驴管家 Lv Home · UI 原型 v2（质感与灵动）</title>
+<style>
+/* ============================================================
+   小驴管家 · 视觉设计语言 v1.1（docs/design/07）
+   主题词：沉静的精密仪表台
+   v2 增量：环境辉光 / 胶片颗粒 / 内侧高光 / 模块色砖 /
+   入场交错编排 / 导航胶囊滑动 / 状态点呼吸 / 弹簧曲线 / 动效降级
+   ============================================================ */
+:root{
+  --lv-r-1:6px; --lv-r-2:10px; --lv-r-3:14px; --lv-r-4:18px;
+  --lv-ease:cubic-bezier(.2,0,0,1);
+  --lv-spring:cubic-bezier(.32,.72,0,1);
+  --lv-t-fast:120ms; --lv-t-med:180ms; --lv-t-slow:240ms;
+  --lv-t-sheet:320ms;
+}
+[data-theme="dark"]{
+  --lv-bg:#0d0f12; --lv-surface:#15181d; --lv-surface-2:#1b1f26;
+  --lv-line:rgba(255,255,255,.075); --lv-line-strong:rgba(255,255,255,.13);
+  --lv-tx:#e9ebee; --lv-tx-2:#a3a8b3; --lv-tx-3:#6d737f;
+  --lv-accent:#7c9bff; --lv-accent-soft:rgba(124,155,255,.14); --lv-accent-line:rgba(124,155,255,.32);
+  --lv-danger:#f2716f; --lv-danger-soft:rgba(242,113,111,.10);
+  --lv-warn:#f0a35a;  --lv-warn-soft:rgba(240,163,90,.11);
+  --lv-amber:#e3c163; --lv-amber-soft:rgba(227,193,99,.10);
+  --lv-ok:#5cc48f;    --lv-ok-soft:rgba(92,196,143,.10);
+  --lv-shadow-1:0 1px 2px rgba(0,0,0,.28);
+  --lv-shadow-2:0 8px 28px rgba(0,0,0,.36), 0 2px 8px rgba(0,0,0,.24);
+  --lv-shadow-3:0 24px 64px rgba(0,0,0,.46), 0 6px 16px rgba(0,0,0,.30);
+  --lv-mask:rgba(8,10,13,.62);
+  --lv-inset:rgba(255,255,255,.045);          /* 内侧上缘高光 */
+  --lv-aura:rgba(124,155,255,.075);           /* 环境辉光 */
+  --lv-noise:.028;                            /* 胶片颗粒强度 */
+  color-scheme:dark;
+}
+[data-theme="light"]{
+  --lv-bg:#f5f6f8; --lv-surface:#ffffff; --lv-surface-2:#f1f3f6;
+  --lv-line:rgba(15,23,42,.08); --lv-line-strong:rgba(15,23,42,.15);
+  --lv-tx:#1c2126; --lv-tx-2:#5b6472; --lv-tx-3:#959daa;
+  --lv-accent:#3f66e0; --lv-accent-soft:rgba(63,102,224,.10); --lv-accent-line:rgba(63,102,224,.30);
+  --lv-danger:#d9484b; --lv-danger-soft:rgba(217,72,75,.08);
+  --lv-warn:#c47717;  --lv-warn-soft:rgba(196,119,23,.09);
+  --lv-amber:#a2821d; --lv-amber-soft:rgba(162,130,29,.09);
+  --lv-ok:#1f9d64;    --lv-ok-soft:rgba(31,157,100,.09);
+  --lv-shadow-1:0 1px 2px rgba(16,24,40,.06);
+  --lv-shadow-2:0 8px 24px rgba(16,24,40,.10), 0 2px 6px rgba(16,24,40,.06);
+  --lv-shadow-3:0 24px 56px rgba(16,24,40,.16), 0 6px 14px rgba(16,24,40,.08);
+  --lv-mask:rgba(15,23,42,.32);
+  --lv-inset:rgba(255,255,255,.7);
+  --lv-aura:rgba(63,102,224,.05);
+  --lv-noise:.04;
+  color-scheme:light;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%}
+body{
+  background:var(--lv-bg); color:var(--lv-tx);
+  font:14px/1.65 -apple-system,"SF Pro Text","Segoe UI Variable","Segoe UI","PingFang SC","Microsoft YaHei UI","Microsoft YaHei",sans-serif;
+  -webkit-font-smoothing:antialiased; text-rendering:optimizeLegibility;
+  transition:background var(--lv-t-slow) var(--lv-ease), color var(--lv-t-slow) var(--lv-ease);
+}
+/* 材质层：环境辉光 + 胶片颗粒（非交互、低于感知阈值的修饰） */
+body::before{
+  content:"";position:fixed;inset:0;pointer-events:none;z-index:1;opacity:var(--lv-noise);
+  background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='140'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='140' height='140' filter='url(%23n)'/%3E%3C/svg%3E");
+}
+body::after{
+  content:"";position:fixed;top:-220px;left:50%;transform:translateX(-50%);
+  width:960px;height:620px;border-radius:50%;pointer-events:none;z-index:0;
+  background:radial-gradient(closest-side,var(--lv-aura),transparent 72%);
+}
+::selection{background:var(--lv-accent-soft)}
+:focus-visible{outline:2px solid var(--lv-accent);outline-offset:2px;border-radius:6px}
+.num{font-variant-numeric:tabular-nums;font-feature-settings:"tnum"}
+.mono{font-family:ui-monospace,"SF Mono","Cascadia Code",Consolas,monospace;font-size:.86em;letter-spacing:.01em}
+svg{display:block}
+button{font:inherit;color:inherit;background:none;border:none;cursor:pointer}
+input,select{font:inherit}
+
+/* ── 应用外壳 ─────────────────────────────────────────── */
+.app{max-width:1160px;margin:0 auto;padding:0 28px 80px;position:relative;z-index:2}
+.topbar{
+  position:sticky;top:0;z-index:50;display:flex;align-items:center;gap:20px;
+  padding:14px 4px;margin-bottom:8px;
+  background:color-mix(in srgb, var(--lv-bg) 78%, transparent);
+  backdrop-filter:blur(16px) saturate(1.4);-webkit-backdrop-filter:blur(16px) saturate(1.4);
+  border-bottom:1px solid transparent;transition:border var(--lv-t-med) var(--lv-ease), box-shadow var(--lv-t-med) var(--lv-ease);
+}
+.topbar.scrolled{border-bottom-color:var(--lv-line);box-shadow:0 8px 24px rgba(0,0,0,.14)}
+.brand{display:flex;align-items:center;gap:10px;flex:none}
+.brand-mark{
+  width:26px;height:26px;border-radius:8px;display:grid;place-items:center;color:#fff;position:relative;
+  background:linear-gradient(135deg,var(--lv-accent),#9a7cff);
+  box-shadow:0 2px 10px var(--lv-accent-soft), inset 0 1px 0 rgba(255,255,255,.35);
+  transition:transform var(--lv-t-med) var(--lv-spring);
+}
+.brand:hover .brand-mark{transform:rotate(-6deg) scale(1.05)}
+.brand b{font-size:15px;font-weight:600;letter-spacing:.01em}
+.brand .tag{color:var(--lv-tx-3);font-size:11px;margin-top:2px}
+/* 分段导航 + 滑动胶囊（共享布局过渡） */
+.nav{display:flex;gap:2px;background:var(--lv-surface-2);border:1px solid var(--lv-line);
+  border-radius:999px;padding:3px;position:relative;overflow-x:auto;scrollbar-width:none}
+.nav::-webkit-scrollbar{display:none}
+.nav-pill{position:absolute;top:3px;left:0;height:calc(100% - 6px);border-radius:999px;
+  background:var(--lv-surface);box-shadow:var(--lv-shadow-1), inset 0 1px 0 var(--lv-inset);
+  transition:transform var(--lv-t-sheet) var(--lv-spring), width var(--lv-t-sheet) var(--lv-spring);z-index:0}
+.nav button{position:relative;z-index:1;padding:6px 14px;border-radius:999px;color:var(--lv-tx-2);font-size:13px;
+  background:none;transition:color var(--lv-t-med) var(--lv-ease);white-space:nowrap}
+.nav button:hover{color:var(--lv-tx)}
+.nav button.on{color:var(--lv-tx);font-weight:500}
+.nav .dot{position:absolute;top:2px;right:-2px;width:7px;height:7px;border-radius:50%;
+  background:var(--lv-danger);box-shadow:0 0 0 3px var(--lv-danger-soft)}
+.top-actions{margin-left:auto;display:flex;align-items:center;gap:8px}
+.iconbtn{width:32px;height:32px;border-radius:9px;display:grid;place-items:center;color:var(--lv-tx-2);
+  border:1px solid transparent;transition:all var(--lv-t-med) var(--lv-ease)}
+.iconbtn:hover{background:var(--lv-surface-2);color:var(--lv-tx);border-color:var(--lv-line)}
+.iconbtn:active{transform:scale(.94)}
+.hub-status{display:flex;align-items:center;gap:7px;color:var(--lv-tx-3);font-size:12px;margin-right:6px}
+.pulse{width:7px;height:7px;border-radius:50%;background:var(--lv-ok);position:relative;flex:none}
+/* 状态点呼吸：全产品唯一常驻动效，极缓、低幅 */
+.pulse::after{content:"";position:absolute;inset:-3px;border-radius:50%;border:1px solid var(--lv-ok);
+  opacity:.5;animation:breath 3.4s var(--lv-ease) infinite}
+@keyframes breath{0%,100%{transform:scale(.8);opacity:.55}55%{transform:scale(1.5);opacity:0}}
+
+/* ── 屏幕切换 + 入场交错编排 ──────────────────────────── */
+.screen{display:none}
+.screen.on{display:block}
+@keyframes rise{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}
+.screen.on > *{animation:rise var(--lv-t-slow) var(--lv-ease) backwards}
+.screen.on > *:nth-child(1){animation-delay:0ms}
+.screen.on > *:nth-child(2){animation-delay:30ms}
+.screen.on > *:nth-child(3){animation-delay:60ms}
+.screen.on > *:nth-child(4){animation-delay:75ms}
+.screen.on > *:nth-child(5){animation-delay:90ms}
+.screen.on > *:nth-child(6){animation-delay:105ms}
+.screen.on > *:nth-child(7){animation-delay:120ms}
+.screen.on > *:nth-child(8){animation-delay:135ms}
+.screen.on .mod{animation:rise var(--lv-t-slow) var(--lv-ease) backwards}
+.screen.on .mod:nth-child(2){animation-delay:40ms}
+.screen.on .mod:nth-child(3){animation-delay:80ms}
+.screen.on .mod:nth-child(4){animation-delay:120ms}
+.screen.on .mod:nth-child(5){animation-delay:160ms}
+.screen.on .mod:nth-child(6){animation-delay:200ms}
+.screen.on .mod:nth-child(7){animation-delay:240ms}
+
+/* ── 通用元件 ─────────────────────────────────────────── */
+.sec-title{display:flex;align-items:baseline;gap:10px;margin:26px 2px 12px}
+.sec-title h2{font-size:12.5px;font-weight:600;letter-spacing:.05em;color:var(--lv-tx-2)}
+.sec-title .sub{font-size:12px;color:var(--lv-tx-3)}
+.sec-title .link{margin-left:auto;font-size:12.5px;color:var(--lv-accent);text-decoration:none;
+  transition:opacity var(--lv-t-fast)}
+.sec-title .link:hover{opacity:.75}
+.card{
+  background:var(--lv-surface);border:1px solid var(--lv-line);border-radius:var(--lv-r-3);
+  box-shadow:var(--lv-shadow-1), inset 0 1px 0 var(--lv-inset);
+}
+.btn{display:inline-flex;align-items:center;gap:6px;padding:7px 14px;border-radius:var(--lv-r-2);
+  border:1px solid var(--lv-line-strong);background:var(--lv-surface);font-size:13px;color:var(--lv-tx);
+  box-shadow:inset 0 1px 0 var(--lv-inset);transition:all var(--lv-t-fast) var(--lv-ease)}
+.btn:hover{border-color:var(--lv-accent-line);color:var(--lv-accent)}
+.btn:active{transform:translateY(1px)}
+.btn.primary{background:var(--lv-accent);border-color:transparent;color:#fff;font-weight:500;
+  box-shadow:0 2px 10px var(--lv-accent-soft), inset 0 1px 0 rgba(255,255,255,.28)}
+.btn.primary:hover{filter:brightness(1.07)}
+.btn.ghost{border-color:transparent;box-shadow:none;color:var(--lv-tx-2);padding:6px 10px}
+.btn.ghost:hover{background:var(--lv-surface-2);color:var(--lv-tx)}
+.chip{display:inline-flex;align-items:center;gap:6px;padding:5px 12px;border-radius:999px;font-size:12.5px;
+  color:var(--lv-tx-2);border:1px solid var(--lv-line);background:var(--lv-surface);
+  transition:all var(--lv-t-fast) var(--lv-ease);cursor:pointer}
+.chip:hover{border-color:var(--lv-line-strong);color:var(--lv-tx);transform:translateY(-1px)}
+.chip.on{background:var(--lv-accent-soft);border-color:var(--lv-accent-line);color:var(--lv-accent);font-weight:500}
+.ava{width:18px;height:18px;border-radius:50%;display:inline-grid;place-items:center;font-size:10px;color:#fff;
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.35)}
+.badge{display:inline-flex;align-items:center;gap:5px;font-size:11.5px;padding:2px 9px;border-radius:999px;font-weight:500}
+.badge.red{background:var(--lv-danger-soft);color:var(--lv-danger)}
+.badge.orange{background:var(--lv-warn-soft);color:var(--lv-warn)}
+.badge.yellow{background:var(--lv-amber-soft);color:var(--lv-amber)}
+.badge.green{background:var(--lv-ok-soft);color:var(--lv-ok)}
+.badge.gray{background:var(--lv-surface-2);color:var(--lv-tx-3)}
+
+/* ── 总览 ─────────────────────────────────────────────── */
+.hero{display:flex;align-items:flex-end;gap:16px;margin:26px 2px 4px;flex-wrap:wrap}
+.hero h1{font-size:26px;font-weight:600;letter-spacing:-.02em}
+.hero p{color:var(--lv-tx-3);font-size:13px;margin-top:2px}
+.hero .count{margin-left:auto;display:flex;align-items:baseline;gap:8px}
+.hero .count b{font-size:32px;font-weight:600;letter-spacing:-.03em}
+.hero .count span{color:var(--lv-tx-3);font-size:12.5px}
+.members{display:flex;gap:8px;flex-wrap:wrap;margin:14px 0 4px}
+.reminders{display:flex;flex-direction:column;margin-top:4px;overflow:hidden;border-radius:var(--lv-r-3)}
+.rem{
+  display:flex;align-items:center;gap:14px;padding:13px 18px 13px 14px;position:relative;
+  border-bottom:1px solid var(--lv-line);transition:background var(--lv-t-fast) var(--lv-ease)}
+.rem:last-child{border-bottom:none}
+.rem::before{content:"";position:absolute;left:0;top:10px;bottom:10px;width:3px;border-radius:3px;
+  background:var(--lv-line);transition:box-shadow var(--lv-t-med) var(--lv-ease)}
+.rem.overdue::before{background:var(--lv-danger)} .rem.overdue{background:var(--lv-danger-soft)}
+.rem.soon::before{background:var(--lv-warn)} .rem.lead::before{background:var(--lv-amber)}
+.rem:hover{background:var(--lv-surface-2)}
+.rem:hover::before{box-shadow:0 0 8px 1px currentColor}
+.rem.overdue:hover::before{color:var(--lv-danger)}
+.rem.soon:hover::before{color:var(--lv-warn)}
+.rem.lead:hover::before{color:var(--lv-amber)}
+.rem .ic{width:34px;height:34px;border-radius:10px;display:grid;place-items:center;flex:none;font-size:15px;
+  background:var(--lv-surface-2);border:1px solid var(--lv-line);
+  box-shadow:inset 0 1px 0 var(--lv-inset)}
+.rem .t{min-width:0}
+.rem .t b{font-weight:500;font-size:13.5px;display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.rem .t span{font-size:12px;color:var(--lv-tx-3)}
+.rem .when{margin-left:auto;text-align:right;flex:none}
+.rem .when b{font-size:13px;font-weight:600;display:block}
+.rem .when span{font-size:11.5px;color:var(--lv-tx-3)}
+.rem .ops{display:flex;gap:4px;flex:none;opacity:0;transform:translateX(6px);transition:all var(--lv-t-med) var(--lv-ease)}
+.rem:hover .ops{opacity:1;transform:none}
+.quick{display:flex;gap:8px;flex-wrap:wrap}
+.qbtn{display:inline-flex;align-items:center;gap:8px;padding:9px 16px;border-radius:var(--lv-r-2);
+  background:var(--lv-surface);border:1px solid var(--lv-line);font-size:13px;color:var(--lv-tx-2);
+  box-shadow:inset 0 1px 0 var(--lv-inset);transition:all var(--lv-t-fast) var(--lv-ease)}
+.qbtn:hover{color:var(--lv-tx);border-color:var(--lv-accent-line);transform:translateY(-2px);box-shadow:var(--lv-shadow-2), inset 0 1px 0 var(--lv-inset)}
+.qbtn:active{transform:none}
+.qbtn .qi{width:22px;height:22px;border-radius:7px;display:grid;place-items:center;font-size:12px;
+  background:var(--lv-surface-2);box-shadow:inset 0 -1px 2px rgba(0,0,0,.14), inset 0 1px 0 var(--lv-inset)}
+/* 模块色砖：领域色调（12% alpha 底 + 25% 描边），为扫描性服务 */
+.mi{width:34px;height:34px;border-radius:10px;display:grid;place-items:center;font-size:16px;
+  transition:transform var(--lv-t-med) var(--lv-spring)}
+.t-blue  {background:rgba(124,155,255,.13);border:1px solid rgba(124,155,255,.26)}
+.t-green {background:rgba(92,196,143,.12); border:1px solid rgba(92,196,143,.26)}
+.t-cyan  {background:rgba(94,196,214,.12); border:1px solid rgba(94,196,214,.26)}
+.t-purple{background:rgba(154,124,255,.12);border:1px solid rgba(154,124,255,.26)}
+.t-rose  {background:rgba(240,124,170,.12);border:1px solid rgba(240,124,170,.26)}
+.t-amber {background:rgba(227,193,99,.13); border:1px solid rgba(227,193,99,.26)}
+.mods{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:10px}
+.mod{padding:16px;display:flex;flex-direction:column;gap:10px;cursor:pointer;
+  transition:transform var(--lv-t-med) var(--lv-ease), box-shadow var(--lv-t-med) var(--lv-ease), border var(--lv-t-med) var(--lv-ease)}
+.mod:hover{transform:translateY(-2px);box-shadow:var(--lv-shadow-2), inset 0 1px 0 var(--lv-inset);border-color:var(--lv-line-strong)}
+.mod:hover .mi{transform:scale(1.08) rotate(-4deg)}
+.mod b{font-size:13.5px;font-weight:500}
+.mod .stat{display:flex;align-items:baseline;gap:6px}
+.mod .stat b{font-size:18px;font-weight:600;letter-spacing:-.01em}
+.mod .stat span{font-size:11.5px;color:var(--lv-tx-3)}
+.mod .stat .up{margin-left:auto}
+/* 趋势条：入场生长 + hover 二次强调 */
+.spark{display:flex;align-items:flex-end;gap:3px;height:20px;margin-left:auto}
+.spark i{width:4px;border-radius:2px;background:var(--lv-accent-soft);transform-origin:bottom;
+  transform:scaleY(0);transition:transform 520ms var(--lv-spring)}
+.screen.on .spark i{transform:scaleY(1)}
+.spark i:nth-child(1){transition-delay:150ms}.spark i:nth-child(2){transition-delay:220ms}
+.spark i:nth-child(3){transition-delay:290ms}.spark i:nth-child(4){transition-delay:360ms}
+.spark i:nth-child(5){transition-delay:430ms}
+.spark i.hi{background:var(--lv-accent)}
+.mod:hover .spark i.hi{box-shadow:0 0 6px var(--lv-accent-line)}
+
+/* ── 提醒中枢 ─────────────────────────────────────────── */
+.filters{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin:18px 0 14px}
+.select{appearance:none;-webkit-appearance:none;padding:7px 30px 7px 12px;border-radius:var(--lv-r-2);
+  border:1px solid var(--lv-line);background:var(--lv-surface) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'%3E%3Cpath d='M1 1l4 4 4-4' stroke='%23888f9c' fill='none' stroke-width='1.5' stroke-linecap='round'/%3E%3C/svg%3E") no-repeat right 11px center;
+  color:var(--lv-tx-2);font-size:12.5px;cursor:pointer;
+  transition:border var(--lv-t-fast) var(--lv-ease), color var(--lv-t-fast) var(--lv-ease)}
+.select:hover{border-color:var(--lv-line-strong);color:var(--lv-tx)}
+.group-label{display:flex;align-items:center;gap:10px;margin:22px 2px 8px;font-size:12px;color:var(--lv-tx-3);font-weight:500}
+.group-label::after{content:"";flex:1;height:1px;background:var(--lv-line)}
+
+/* ── 台账 ─────────────────────────────────────────────── */
+.ledger-head{display:flex;align-items:center;gap:12px;margin:18px 0 12px;flex-wrap:wrap}
+.ledger-head h1{font-size:17px;font-weight:600}
+.table-wrap{overflow:hidden}
+table{width:100%;border-collapse:collapse;font-size:13px}
+thead th{position:sticky;top:0;background:var(--lv-surface);text-align:left;font-size:11.5px;font-weight:500;
+  color:var(--lv-tx-3);padding:10px 16px;border-bottom:1px solid var(--lv-line);white-space:nowrap;letter-spacing:.03em}
+tbody td{padding:11px 16px;border-bottom:1px solid var(--lv-line);white-space:nowrap}
+tbody tr{cursor:pointer;transition:background var(--lv-t-fast) var(--lv-ease)}
+tbody tr:hover{background:var(--lv-surface-2)}
+tbody tr.sel{background:var(--lv-accent-soft);box-shadow:inset 2px 0 0 var(--lv-accent)}
+.cell-sub{display:block;font-size:11.5px;color:var(--lv-tx-3);margin-top:1px}
+.sev{width:8px;height:8px;border-radius:50%}
+.sev.red{background:var(--lv-danger);box-shadow:0 0 0 3px var(--lv-danger-soft)}
+.sev.orange{background:var(--lv-warn);box-shadow:0 0 0 3px var(--lv-warn-soft)}
+.sev.green{background:var(--lv-ok);box-shadow:0 0 0 3px var(--lv-ok-soft)}
+.sev.gray{background:var(--lv-tx-3)}
+
+/* ── 抽屉（弹簧曲线入场）──────────────────────────────── */
+.mask{position:fixed;inset:0;background:var(--lv-mask);opacity:0;pointer-events:none;
+  transition:opacity var(--lv-t-slow) var(--lv-ease);backdrop-filter:blur(3px);z-index:90}
+.mask.open{opacity:1;pointer-events:auto}
+.drawer{position:fixed;top:0;right:0;bottom:0;width:440px;max-width:94vw;z-index:100;
+  background:var(--lv-surface);border-left:1px solid var(--lv-line);box-shadow:var(--lv-shadow-3);
+  transform:translateX(36px);opacity:0;pointer-events:none;
+  transition:transform var(--lv-t-sheet) var(--lv-spring),opacity var(--lv-t-slow) var(--lv-ease);
+  display:flex;flex-direction:column}
+.drawer.open{transform:none;opacity:1;pointer-events:auto}
+.drawer-head{display:flex;align-items:center;gap:10px;padding:18px 22px;border-bottom:1px solid var(--lv-line)}
+.drawer-head h3{font-size:15px;font-weight:600}
+.drawer-body{padding:20px 22px;overflow:auto;flex:1;display:flex;flex-direction:column;gap:20px;
+  scrollbar-width:thin;scrollbar-color:var(--lv-line-strong) transparent}
+.drawer-body::-webkit-scrollbar{width:8px}
+.drawer-body::-webkit-scrollbar-thumb{background:var(--lv-line-strong);border-radius:8px;border:2px solid var(--lv-surface)}
+.drawer.open .drawer-body > *{animation:rise var(--lv-t-slow) var(--lv-ease) backwards}
+.drawer.open .drawer-body > *:nth-child(2){animation-delay:50ms}
+.drawer.open .drawer-body > *:nth-child(3){animation-delay:100ms}
+.drawer.open .drawer-body > *:nth-child(4){animation-delay:150ms}
+.kv{display:grid;grid-template-columns:88px 1fr;gap:8px 14px;font-size:13px}
+.kv dt{color:var(--lv-tx-3)}
+.kv dd{color:var(--lv-tx)}
+.files{display:flex;flex-wrap:wrap;gap:8px}
+.file{display:inline-flex;align-items:center;gap:7px;padding:7px 12px;border-radius:var(--lv-r-2);
+  border:1px solid var(--lv-line);background:var(--lv-surface-2);font-size:12.5px;color:var(--lv-tx-2);
+  transition:all var(--lv-t-fast) var(--lv-ease)}
+.file:hover{color:var(--lv-accent);border-color:var(--lv-accent-line);transform:translateY(-1px)}
+.drawer-foot{display:flex;gap:8px;padding:16px 22px;border-top:1px solid var(--lv-line)}
+
+/* ── 成员 ─────────────────────────────────────────────── */
+.people{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:12px}
+.person{padding:18px;display:flex;flex-direction:column;gap:12px;cursor:pointer;
+  transition:transform var(--lv-t-med) var(--lv-ease), box-shadow var(--lv-t-med) var(--lv-ease), border var(--lv-t-med) var(--lv-ease)}
+.person:hover{transform:translateY(-2px);box-shadow:var(--lv-shadow-2), inset 0 1px 0 var(--lv-inset);border-color:var(--lv-line-strong)}
+.person .head{display:flex;align-items:center;gap:12px}
+.person .pava{width:40px;height:40px;border-radius:12px;display:grid;place-items:center;font-size:16px;color:#fff;
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.35), 0 2px 8px rgba(0,0,0,.16)}
+.person b{font-size:14px;font-weight:600;display:block}
+.person .role{font-size:11.5px;color:var(--lv-tx-3)}
+.person .stats{display:flex;gap:14px;border-top:1px solid var(--lv-line);padding-top:12px}
+.person .stats div span{display:block;font-size:11px;color:var(--lv-tx-3)}
+.person .stats div b{font-size:14px;font-weight:600}
+.person .alert{font-size:12px;color:var(--lv-warn);display:flex;align-items:center;gap:6px}
+/* 细进度条：疫苗程序等长期进度（灵动感：入场生长） */
+.meter{height:3px;border-radius:3px;background:var(--lv-surface-2);overflow:hidden}
+.meter i{display:block;height:100%;border-radius:3px;background:linear-gradient(90deg,var(--lv-accent),#9a7cff);
+  transform-origin:left;transform:scaleX(0);transition:transform 700ms var(--lv-spring) 200ms}
+.screen.on .meter i{transform:scaleX(1)}
+.meter-cap{display:flex;justify-content:space-between;font-size:11px;color:var(--lv-tx-3);margin-top:5px}
+
+/* ── 设置 ─────────────────────────────────────────────── */
+.settings{display:grid;grid-template-columns:190px 1fr;gap:22px;margin-top:18px}
+.set-nav{display:flex;flex-direction:column;gap:2px;align-self:start;position:sticky;top:80px}
+.set-nav button{text-align:left;padding:9px 14px;border-radius:var(--lv-r-2);font-size:13px;color:var(--lv-tx-2);
+  transition:all var(--lv-t-fast) var(--lv-ease)}
+.set-nav button:hover{background:var(--lv-surface-2);color:var(--lv-tx)}
+.set-nav button.on{background:var(--lv-accent-soft);color:var(--lv-accent);font-weight:500}
+.set-pane{display:flex;flex-direction:column;gap:14px}
+.set-card{padding:18px 20px}
+.set-card h3{font-size:13.5px;font-weight:600;margin-bottom:4px}
+.set-card .hint{font-size:12px;color:var(--lv-tx-3);margin-bottom:14px}
+.togglerow{display:flex;align-items:center;gap:12px;padding:10px 0;border-bottom:1px solid var(--lv-line)}
+.togglerow:last-child{border-bottom:none}
+.togglerow .tt{flex:1}
+.togglerow .tt b{font-size:13px;font-weight:500;display:block}
+.togglerow .tt span{font-size:12px;color:var(--lv-tx-3)}
+.sw{position:relative;width:34px;height:20px;border-radius:999px;background:var(--lv-surface-2);
+  border:1px solid var(--lv-line-strong);transition:all var(--lv-t-med) var(--lv-ease);flex:none}
+.sw::after{content:"";position:absolute;top:2px;left:2px;width:14px;height:14px;border-radius:50%;
+  background:var(--lv-tx-3);transition:all var(--lv-t-med) var(--lv-spring)}
+.sw:hover{border-color:var(--lv-accent-line)}
+.sw.on{background:var(--lv-accent);border-color:transparent}
+.sw.on::after{left:16px;background:#fff}
+
+/* ── 引导（品牌时刻：双层 aura 缓浮）──────────────────── */
+.aura{position:relative;overflow:hidden;border-radius:var(--lv-r-4);border:1px solid var(--lv-line);
+  background:var(--lv-surface);padding:56px 48px;margin-top:34px;
+  box-shadow:inset 0 1px 0 var(--lv-inset)}
+.aura::before,.aura::after{content:"";position:absolute;border-radius:50%;pointer-events:none}
+.aura::before{top:-160px;left:50%;transform:translateX(-60%);width:560px;height:360px;
+  background:radial-gradient(closest-side,var(--lv-accent-soft),transparent 70%);
+  animation:drift 11s ease-in-out infinite alternate}
+.aura::after{top:-100px;left:20%;width:380px;height:280px;opacity:.6;
+  background:radial-gradient(closest-side,rgba(154,124,255,.12),transparent 70%);
+  animation:drift 13s ease-in-out infinite alternate-reverse}
+@keyframes drift{from{transform:translate(-8px,4px)}to{transform:translate(10px,-8px)}}
+.wiz{max-width:560px;margin:0 auto;position:relative}
+.wiz .step{font-size:12px;color:var(--lv-accent);font-weight:600;letter-spacing:.08em}
+.wiz h1{font-size:22px;font-weight:600;margin:8px 0 6px;letter-spacing:-.01em}
+.wiz p{color:var(--lv-tx-3);font-size:13.5px;margin-bottom:24px}
+.roles{display:flex;flex-wrap:wrap;gap:9px;margin-bottom:28px}
+.rolechip{display:inline-flex;align-items:center;gap:8px;padding:9px 16px;border-radius:999px;
+  border:1px solid var(--lv-line-strong);font-size:13.5px;cursor:pointer;
+  transition:all var(--lv-t-med) var(--lv-spring)}
+.rolechip:hover{border-color:var(--lv-accent-line);transform:translateY(-1px)}
+.rolechip.on{background:var(--lv-accent-soft);border-color:var(--lv-accent);color:var(--lv-accent)}
+.wiz-foot{display:flex;align-items:center;gap:10px}
+.wiz-foot .skip{margin-left:auto}
+
+/* ── 弹层：快速录入 ───────────────────────────────────── */
+.modal{position:fixed;inset:0;display:grid;place-items:center;z-index:110;pointer-events:none}
+.modal .sheet{width:480px;max-width:92vw;background:var(--lv-surface);border:1px solid var(--lv-line-strong);
+  border-radius:var(--lv-r-4);box-shadow:var(--lv-shadow-3), inset 0 1px 0 var(--lv-inset);
+  opacity:0;transform:translateY(16px) scale(.97);
+  transition:transform var(--lv-t-sheet) var(--lv-spring),opacity var(--lv-t-slow) var(--lv-ease)}
+.modal.open{pointer-events:auto}
+.modal.open .sheet{opacity:1;transform:none}
+.sheet-head{display:flex;align-items:center;gap:10px;padding:16px 22px;border-bottom:1px solid var(--lv-line)}
+.sheet-body{padding:20px 22px;display:flex;flex-direction:column;gap:14px}
+.frow{display:grid;grid-template-columns:76px 1fr;gap:12px;align-items:center}
+.frow label{font-size:12.5px;color:var(--lv-tx-3)}
+.frow input[type=text],.frow input[type=number]{width:100%;padding:8px 12px;border-radius:var(--lv-r-2);
+  border:1px solid var(--lv-line);background:var(--lv-surface-2);color:var(--lv-tx);
+  box-shadow:inset 0 1px 2px rgba(0,0,0,.08);transition:border var(--lv-t-fast) var(--lv-ease)}
+.frow input:focus{outline:none;border-color:var(--lv-accent-line)}
+.sheet-foot{display:flex;gap:8px;justify-content:flex-end;padding:14px 22px;border-top:1px solid var(--lv-line)}
+
+/* ── 空态 ─────────────────────────────────────────────── */
+.empty{padding:48px 24px;text-align:center;display:flex;flex-direction:column;align-items:center;gap:10px}
+.empty .eic{width:52px;height:52px;border-radius:16px;display:grid;place-items:center;font-size:22px;
+  background:var(--lv-surface-2);border:1px solid var(--lv-line);
+  box-shadow:inset 0 1px 0 var(--lv-inset), 0 0 24px var(--lv-accent-soft)}
+.empty b{font-size:14px;font-weight:500}
+.empty span{font-size:12.5px;color:var(--lv-tx-3);max-width:300px}
+
+/* ── 组件库（活体样式指南，与 07/08 文档同步）──────────── */
+.sg-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:14px;margin-top:16px}
+.sg-cell{padding:18px}
+.sg-cell>b{display:block;font-size:12px;color:var(--lv-tx-2);letter-spacing:.05em;margin-bottom:14px}
+.sg-row{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+.sg-swatches{display:flex;gap:10px;flex-wrap:wrap}
+.sg-sw{text-align:center}
+.sg-sw i{display:block;width:44px;height:44px;border-radius:12px;border:1px solid var(--lv-line)}
+.sg-sw span{display:block;font-size:10.5px;color:var(--lv-tx-3);margin-top:5px}
+.sg-type>div{margin-bottom:6px;display:flex;align-items:baseline;gap:10px}
+.sg-type small{width:88px;flex:none;font-size:10.5px;color:var(--lv-tx-3)}
+.sg-note{margin-top:14px;font-size:12px;color:var(--lv-tx-3);border-top:1px solid var(--lv-line);padding-top:12px}
+
+/* ── 动效降级 ─────────────────────────────────────────── */
+@media (prefers-reduced-motion:reduce){
+  *,*::before,*::after{animation:none!important;transition:none!important}
+}
+@media (max-width:760px){
+  .app{padding:0 16px 60px}
+  .settings{grid-template-columns:1fr}
+  .set-nav{flex-direction:row;overflow-x:auto;position:static}
+  .hub-status{display:none}
+  .rem .ops{display:none}
+  .hero h1{font-size:21px}
+}
+</style>
+</head>
+<body>
+<div class="app">
+
+  <!-- 顶栏 -->
+  <header class="topbar" id="topbar">
+    <div class="brand">
+      <div class="brand-mark">
+        <svg width="14" height="14" viewBox="0 0 16 16" fill="none"><path d="M3 6.5a5 5 0 0 1 10 0V9a4 4 0 0 1-4 4H7a4 4 0 0 1-4-4V6.5Z" stroke="#fff" stroke-width="1.6"/><circle cx="6" cy="7.6" r="1" fill="#fff"/><circle cx="10" cy="7.6" r="1" fill="#fff"/></svg>
+      </div>
+      <div><b>小驴管家</b><div class="tag mono">Lv Home · 原型 v2</div></div>
+    </div>
+    <nav class="nav" id="nav">
+      <span class="nav-pill" id="pill"></span>
+      <button data-s="overview" class="on">总览</button>
+      <button data-s="reminders">提醒<span class="dot"></span></button>
+      <button data-s="ledger">台账</button>
+      <button data-s="members">成员</button>
+      <button data-s="onboarding">引导</button>
+      <button data-s="settings">设置</button>
+      <button data-s="styleguide">组件库</button>
+    </nav>
+    <div class="top-actions">
+      <div class="hub-status"><span class="pulse"></span><span>提醒中枢 · 今日已扫描 <span class="mono">08:00</span></span></div>
+      <button class="iconbtn" title="快速记录" onclick="openModal()">⚡</button>
+      <button class="iconbtn" title="切换主题" onclick="toggleTheme()">◐</button>
+    </div>
+  </header>
+
+  <!-- ═══ 总览 ═══ -->
+  <section class="screen on" id="s-overview">
+    <div class="hero">
+      <div>
+        <h1>早安，小飞驴家</h1>
+        <p>10 月 1 日 周四 · 一切都在轨道上</p>
+      </div>
+      <div class="count"><b class="num" id="heroCount">4</b><span>件事需要留意</span></div>
+    </div>
+
+    <div class="members">
+      <button class="chip on">全部</button>
+      <button class="chip"><span class="ava" style="background:linear-gradient(135deg,#5b7ff0,#7c9bff)">我</span>我</button>
+      <button class="chip"><span class="ava" style="background:linear-gradient(135deg,#c76fb4,#e08cc9)">雷</span>老婆</button>
+      <button class="chip"><span class="ava" style="background:linear-gradient(135deg,#58b98c,#7fd3a8)">仔</span>儿子</button>
+      <button class="chip"><span class="ava" style="background:linear-gradient(135deg,#c99044,#e0b06a)">妈</span>妈妈</button>
+      <button class="chip">＋</button>
+    </div>
+
+    <div class="sec-title">
+      <h2>即将到期</h2><span class="sub">未来 30 天</span>
+      <a class="link" href="#" onclick="go('reminders');return false">提醒中枢 →</a>
+    </div>
+    <div class="card reminders">
+      <div class="rem overdue">
+        <div class="ic">🪪</div>
+        <div class="t"><b>妈妈的身份证</b><span>证件 · 身份证 · 存放 玄关抽屉 A</span></div>
+        <div class="when"><b class="num" style="color:var(--lv-danger)">已逾期 2 天</b><span class="num">到期 09-29</span></div>
+        <div class="ops"><button class="btn ghost">续期…</button><button class="btn ghost">延后</button></div>
+      </div>
+      <div class="rem soon">
+        <div class="ic">💉</div>
+        <div class="t"><b>儿子 · 百白破第 4 剂</b><span>育儿 · 疫苗 · 社区接种点</span></div>
+        <div class="when"><b class="num" style="color:var(--lv-warn)">3 天后</b><span class="num">10-04</span></div>
+        <div class="ops"><button class="btn ghost">完成</button><button class="btn ghost">延后</button></div>
+      </div>
+      <div class="rem lead">
+        <div class="ic">📺</div>
+        <div class="t"><b>视频会员自动续费</b><span>订阅 · 月付 ¥25 · 连续包月</span></div>
+        <div class="when"><b class="num" style="color:var(--lv-amber)">12 天后</b><span class="num">10-13</span></div>
+        <div class="ops"><button class="btn ghost">续期…</button><button class="btn ghost">延后</button></div>
+      </div>
+      <div class="rem lead">
+        <div class="ic">🛡️</div>
+        <div class="t"><b>全车保险续保</b><span>保单 · 车险 · 人保</span></div>
+        <div class="when"><b class="num" style="color:var(--lv-amber)">25 天后</b><span class="num">10-26</span></div>
+        <div class="ops"><button class="btn ghost">续期…</button><button class="btn ghost">延后</button></div>
+      </div>
+    </div>
+
+    <div class="sec-title"><h2>快速记录</h2><span class="sub">不用打开台账</span></div>
+    <div class="quick">
+      <button class="qbtn" onclick="openModal()"><span class="qi">🛒</span>购物</button>
+      <button class="qbtn" onclick="openModal()"><span class="qi">💊</span>药品 / 囤货</button>
+      <button class="qbtn" onclick="openModal()"><span class="qi">🎬</span>看过 / 读完</button>
+      <button class="qbtn" onclick="openModal()"><span class="qi">🧧</span>人情往来</button>
+      <button class="qbtn" onclick="openModal()"><span class="qi">✏️</span>更多…</button>
+    </div>
+
+    <div class="sec-title"><h2>我的模块</h2><span class="sub">已启用 7 / 31</span><a class="link" href="#" onclick="go('settings');return false">在设置中启用 →</a></div>
+    <div class="mods">
+      <div class="card mod" onclick="go('ledger')">
+        <div class="mi t-blue">🪪</div><b>证件管理</b>
+        <div class="stat"><b class="num">12</b><span>条 · <span style="color:var(--lv-danger)">1</span> 待办</span><span class="up badge red">1 ⚠</span></div>
+      </div>
+      <div class="card mod" onclick="go('ledger')">
+        <div class="mi t-green">💊</div><b>家庭药箱</b>
+        <div class="stat"><b class="num">9</b><span>种 · 余量 2 低</span><span class="up badge orange">2 ⚠</span></div>
+      </div>
+      <div class="card mod" onclick="go('ledger')">
+        <div class="mi t-cyan">📦</div><b>实物资产</b>
+        <div class="stat"><b class="num">34</b><span>件 · 估值 ¥86k</span>
+          <span class="spark"><i style="height:40%"></i><i style="height:55%"></i><i style="height:45%"></i><i style="height:70%"></i><i class="hi" style="height:95%"></i></span>
+        </div>
+      </div>
+      <div class="card mod" onclick="go('ledger')">
+        <div class="mi t-purple">🔁</div><b>会员与订阅</b>
+        <div class="stat"><b class="num">¥86</b><span>月均 · 8 项</span>
+          <span class="spark"><i style="height:30%"></i><i style="height:35%"></i><i style="height:50%"></i><i style="height:52%"></i><i class="hi" style="height:60%"></i></span>
+        </div>
+      </div>
+      <div class="card mod" onclick="go('ledger')">
+        <div class="mi t-rose">🧧</div><b>礼尚往来</b>
+        <div class="stat"><b class="num">+1,200</b><span>本年净收 · 26 笔</span><span class="up badge green">顺差</span></div>
+      </div>
+      <div class="card mod" onclick="go('ledger')">
+        <div class="mi t-amber">🧒</div><b>上学管理</b>
+        <div class="stat"><b class="num">中班</b><span>阳光幼儿园 · 学费 11 月缴</span></div>
+      </div>
+      <div class="card mod" onclick="go('ledger')">
+        <div class="mi t-blue">🎬</div><b>影音书库</b>
+        <div class="stat"><b class="num">156</b><span>部 · 在看 6 · 在读 2</span></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ═══ 提醒中枢 ═══ -->
+  <section class="screen" id="s-reminders">
+    <div class="hero"><h1>提醒中枢</h1><p>所有日期敏感事项，从台账自动派生</p></div>
+    <div class="filters">
+      <select class="select"><option>全部模块</option><option>证件</option><option>疫苗</option><option>订阅</option><option>保单</option></select>
+      <select class="select"><option>全部成员</option><option>我</option><option>老婆</option><option>儿子</option><option>妈妈</option></select>
+      <select class="select"><option>未来 30 天</option><option>未来 7 天</option><option>已逾期</option><option>全部</option></select>
+      <label class="chip" style="margin-left:auto;cursor:pointer"><input type="checkbox" style="accent-color:var(--lv-accent)">显示已处理</label>
+    </div>
+
+    <div class="group-label">已逾期 · 1</div>
+    <div class="card reminders">
+      <div class="rem overdue">
+        <div class="ic">🪪</div>
+        <div class="t"><b>妈妈的身份证</b><span>证件 / 身份证 · 到期日 2026-09-29</span></div>
+        <div class="when"><b class="num" style="color:var(--lv-danger)">-2 天</b></div>
+        <div class="ops"><button class="btn ghost">续期…</button><button class="btn ghost">延后 ▾</button><button class="btn ghost">定位</button></div>
+      </div>
+    </div>
+
+    <div class="group-label">未来 7 天 · 1</div>
+    <div class="card reminders">
+      <div class="rem soon">
+        <div class="ic">💉</div>
+        <div class="t"><b>儿子 · 百白破第 4 剂</b><span>疫苗 / 程序表 · 2026-10-04</span></div>
+        <div class="when"><b class="num" style="color:var(--lv-warn)">3 天</b></div>
+        <div class="ops"><button class="btn ghost">完成</button><button class="btn ghost">延后 ▾</button><button class="btn ghost">定位</button></div>
+      </div>
+    </div>
+
+    <div class="group-label">未来 30 天 · 2</div>
+    <div class="card reminders">
+      <div class="rem lead">
+        <div class="ic">📺</div>
+        <div class="t"><b>视频会员自动续费</b><span>订阅 · 连续包月 · ¥25/月</span></div>
+        <div class="when"><b class="num">12 天</b></div>
+        <div class="ops"><button class="btn ghost">续期…</button><button class="btn ghost">延后 ▾</button><button class="btn ghost">定位</button></div>
+      </div>
+      <div class="rem lead">
+        <div class="ic">🛡️</div>
+        <div class="t"><b>全车保险续保</b><span>保单 · 车险 · 缴费周期 年</span></div>
+        <div class="when"><b class="num">25 天</b></div>
+        <div class="ops"><button class="btn ghost">续期…</button><button class="btn ghost">延后 ▾</button><button class="btn ghost">定位</button></div>
+      </div>
+    </div>
+
+    <div class="group-label">已忽略 / 已处理</div>
+    <div class="card">
+      <div class="empty">
+        <div class="eic">✓</div><b>干净</b>
+        <span>延后与已处理的提醒会归档在这里，可随时恢复。</span>
+      </div>
+    </div>
+  </section>
+
+  <!-- ═══ 台账 ═══ -->
+  <section class="screen" id="s-ledger">
+    <div class="ledger-head">
+      <h1>证件管理</h1>
+      <select class="select"><option>🪪 证件管理</option><option>💊 家庭药箱</option><option>📦 实物资产</option></select>
+      <span class="badge gray">嵌入思源原生数据库视图</span>
+      <span style="flex:1"></span>
+      <button class="btn ghost">📄 模板</button>
+      <button class="btn">在文档中打开 ↗</button>
+      <button class="btn primary" onclick="openModal()">＋ 新建</button>
+    </div>
+    <div class="card table-wrap">
+      <table>
+        <thead><tr>
+          <th style="width:26px"></th><th>名称</th><th>成员</th><th>类型</th>
+          <th>签发日</th><th>到期日</th><th>提前提醒</th><th>状态</th>
+        </tr></thead>
+        <tbody>
+          <tr class="sel" onclick="openDrawer(this)">
+            <td><span class="sev red"></span></td>
+            <td>妈妈的身份证<span class="cell-sub">存放 玄关抽屉 A</span></td>
+            <td>妈妈</td><td>身份证</td>
+            <td class="num">2016-10-01</td><td class="num" style="color:var(--lv-danger)">2026-09-29</td>
+            <td class="num">90 天</td><td><span class="badge red">已逾期</span></td>
+          </tr>
+          <tr onclick="openDrawer(this)">
+            <td><span class="sev orange"></span></td>
+            <td>老婆的驾驶证<span class="cell-sub">C1 · 6 年一换</span></td>
+            <td>老婆</td><td>驾驶证</td>
+            <td class="num">2020-11-30</td><td class="num" style="color:var(--lv-warn)">2026-11-30</td>
+            <td class="num">90 天</td><td><span class="badge orange">即将到期</span></td>
+          </tr>
+          <tr onclick="openDrawer(this)">
+            <td><span class="sev green"></span></td>
+            <td>我的护照<span class="cell-sub">因私 · 剩余有效期充足</span></td>
+            <td>我</td><td>护照</td>
+            <td class="num">2019-05-11</td><td class="num">2029-05-10</td>
+            <td class="num">365 天</td><td><span class="badge green">有效</span></td>
+          </tr>
+          <tr onclick="openDrawer(this)">
+            <td><span class="sev gray"></span></td>
+            <td>儿子的出生证明<span class="cell-sub">长期有效</span></td>
+            <td>儿子</td><td>出生证明</td>
+            <td class="num">2021-03-14</td><td class="num">—</td>
+            <td class="num">—</td><td><span class="badge gray">长期</span></td>
+          </tr>
+          <tr onclick="openDrawer(this)">
+            <td><span class="sev green"></span></td>
+            <td>港澳通行证<span class="cell-sub">签注 2027-03 另计</span></td>
+            <td>我</td><td>通行证</td>
+            <td class="num">2017-03-02</td><td class="num">2027-03-02</td>
+            <td class="num">90 天</td><td><span class="badge green">有效</span></td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+    <p style="margin-top:10px;font-size:12px;color:var(--lv-tx-3)">
+      行即块：每行可复制块引用，在日记中双链（如「妈妈的身份证」）；筛选、排序、分组为思源原生能力。
+    </p>
+  </section>
+
+  <!-- ═══ 成员 ═══ -->
+  <section class="screen" id="s-members">
+    <div class="hero"><h1>成员</h1><p>所有台账按成员组织 · 点击查看跨模块档案</p></div>
+    <div class="people" style="margin-top:16px">
+      <div class="card person">
+        <div class="head"><span class="pava" style="background:linear-gradient(135deg,#5b7ff0,#7c9bff)">我</span>
+          <div><b>我</b><span class="role">self · 生日 07-12 农历 🌙</span></div></div>
+        <div class="stats">
+          <div><b class="num">5</b><span>证件</span></div>
+          <div><b class="num">2</b><span>保单</span></div>
+          <div><b class="num">3</b><span>病历</span></div>
+        </div>
+        <div class="alert">◦ 药箱：布洛芬余量 1</div>
+      </div>
+      <div class="card person">
+        <div class="head"><span class="pava" style="background:linear-gradient(135deg,#c76fb4,#e08cc9)">雷</span>
+          <div><b>老婆</b><span class="role">spouse · 生日 02-29</span></div></div>
+        <div class="stats">
+          <div><b class="num">4</b><span>证件</span></div>
+          <div><b class="num">1</b><span>保单</span></div>
+          <div><b class="num">1</b><span>病历</span></div>
+        </div>
+        <div class="alert">⚠ 驾驶证 11-30 到期</div>
+      </div>
+      <div class="card person">
+        <div class="head"><span class="pava" style="background:linear-gradient(135deg,#58b98c,#7fd3a8)">仔</span>
+          <div><b>儿子</b><span class="role">child · 生日 03-14 · 中班</span></div></div>
+        <div class="stats">
+          <div><b class="num">2</b><span>证件</span></div>
+          <div><b class="num">14/22</b><span>疫苗</span></div>
+          <div><b class="num">¥3,600</b><span>压岁钱</span></div>
+        </div>
+        <div>
+          <div class="meter"><i style="width:64%"></i></div>
+          <div class="meter-cap"><span>免疫规划程序</span><span class="num">14 / 22 剂</span></div>
+        </div>
+        <div class="alert">⚠ 百白破第 4 剂 10-04</div>
+      </div>
+      <div class="card person">
+        <div class="head"><span class="pava" style="background:linear-gradient(135deg,#c99044,#e0b06a)">妈</span>
+          <div><b>妈妈</b><span class="role">elder · 生日 09-25 农历 🌙</span></div></div>
+        <div class="stats">
+          <div><b class="num">3</b><span>证件</span></div>
+          <div><b class="num">2</b><span>病历</span></div>
+          <div><b class="num">3.2 年</b><span>退休倒计时</span></div>
+        </div>
+        <div class="alert">⚠ 身份证已逾期（09-29）</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ═══ 引导 ═══ -->
+  <section class="screen" id="s-onboarding">
+    <div class="aura"><div class="wiz">
+      <div class="step">STEP 1 / 3</div>
+      <h1>先认识一下家里都有谁</h1>
+      <p>成员是所有模块的组织维度。之后随时可以在设置中增减，生日支持农历。</p>
+      <div class="roles">
+        <button class="rolechip on">🙋 我</button>
+        <button class="rolechip on">👫 配偶</button>
+        <button class="rolechip on">🧒 子女 ×1</button>
+        <button class="rolechip">👴 老人</button>
+        <button class="rolechip">👨‍👩‍👧 其他亲属</button>
+        <button class="rolechip">🐾 宠物</button>
+      </div>
+      <div class="wiz-foot">
+        <button class="btn ghost skip">跳过引导</button>
+        <span style="flex:1"></span>
+        <button class="btn">上一步</button>
+        <button class="btn primary" onclick="go('settings')">下一步 · 选择模块 →</button>
+      </div>
+    </div></div>
+  </section>
+
+  <!-- ═══ 设置 ═══ -->
+  <section class="screen" id="s-settings">
+    <div class="hero"><h1>设置</h1><p>模块按需开启 · 未启用的模块不建库、不出现在面板</p></div>
+    <div class="settings">
+      <nav class="set-nav">
+        <button class="on">🧩 模块</button>
+        <button>👪 成员</button>
+        <button>⏰ 提醒</button>
+        <button>🔗 生态</button>
+        <button>ℹ️ 关于</button>
+      </nav>
+      <div class="set-pane">
+        <div class="card set-card">
+          <h3>人员档案</h3>
+          <div class="hint">家庭成员始终开启；证件建议优先录入，提醒中枢立即生效。</div>
+          <div class="togglerow"><div class="tt"><b>证件管理</b><span>效期规则化提醒 · 扫描件 · 存放位置</span></div><span class="badge gray">核心</span><button class="sw on" onclick="this.classList.toggle('on')" aria-label="开关"></button></div>
+          <div class="togglerow"><div class="tt"><b>病历与健康</b><span>就诊 · 处方 · 报告 · 疫苗 · 过敏史</span></div><span class="badge gray">核心</span><button class="sw on" onclick="this.classList.toggle('on')" aria-label="开关"></button></div>
+          <div class="togglerow"><div class="tt"><b>社保医保</b><span>账户档案 · 退休倒计时</span></div><button class="sw" onclick="this.classList.toggle('on')" aria-label="开关"></button></div>
+          <div class="togglerow"><div class="tt"><b>考证管理</b><span>证书效期 · 考试节点 · 继续教育</span></div><button class="sw" onclick="this.classList.toggle('on')" aria-label="开关"></button></div>
+        </div>
+        <div class="card set-card">
+          <h3>资产购物</h3>
+          <div class="togglerow"><div class="tt"><b>实物资产</b><span>家具 · 家电 · 数码 · 玩具 · 保修跟踪</span></div><span class="badge gray">核心</span><button class="sw on" onclick="this.classList.toggle('on')" aria-label="开关"></button></div>
+          <div class="togglerow"><div class="tt"><b>虚拟资产</b><span>账号 · 域名 · 密码位置索引（不存密码）</span></div><button class="sw" onclick="this.classList.toggle('on')" aria-label="开关"></button></div>
+          <div class="togglerow"><div class="tt"><b>会员与订阅</b><span>续费 · 试用期 · 储值余额</span></div><span class="badge gray">核心</span><button class="sw on" onclick="this.classList.toggle('on')" aria-label="开关"></button></div>
+          <div class="togglerow"><div class="tt"><b>合同与文件</b><span>租房 · 装修 · 劳动合同到期</span></div><button class="sw" onclick="this.classList.toggle('on')" aria-label="开关"></button></div>
+        </div>
+        <div class="card set-card">
+          <h3>育儿上学 <span class="badge yellow" style="margin-left:6px">建议存在「子女」成员</span></h3>
+          <div class="togglerow"><div class="tt"><b>育儿管理</b><span>疫苗程序表 · 成长曲线 · 里程碑</span></div><button class="sw" onclick="this.classList.toggle('on')" aria-label="开关"></button></div>
+          <div class="togglerow"><div class="tt"><b>上学管理</b><span>幼儿园 → 大学 · 升学节点 · 学费</span></div><button class="sw" onclick="this.classList.toggle('on')" aria-label="开关"></button></div>
+          <div class="togglerow"><div class="tt"><b>零花钱与压岁钱</b><span>多账户 · 发放周期 · 用途标签</span></div><button class="sw" onclick="this.classList.toggle('on')" aria-label="开关"></button></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ═══ 组件库（活体样式指南）═══ -->
+  <section class="screen" id="s-styleguide">
+    <div class="hero"><h1>组件库</h1><p>全部组件与状态 · 与 docs/design/07、08 同步，C 阶段实现以此为准</p></div>
+
+    <div class="sg-grid">
+      <div class="card sg-cell">
+        <b>颜色 TOKEN</b>
+        <div class="sg-swatches">
+          <div class="sg-sw"><i style="background:var(--lv-accent)"></i><span>accent</span></div>
+          <div class="sg-sw"><i style="background:var(--lv-accent-soft)"></i><span>accent-soft</span></div>
+          <div class="sg-sw"><i style="background:var(--lv-danger)"></i><span>danger</span></div>
+          <div class="sg-sw"><i style="background:var(--lv-warn)"></i><span>warn</span></div>
+          <div class="sg-sw"><i style="background:var(--lv-amber)"></i><span>amber</span></div>
+          <div class="sg-sw"><i style="background:var(--lv-ok)"></i><span>ok</span></div>
+          <div class="sg-sw"><i style="background:var(--lv-surface-2)"></i><span>surface-2</span></div>
+          <div class="sg-sw"><i style="background:var(--lv-line-strong)"></i><span>line-strong</span></div>
+          <div class="sg-sw"><i style="background:linear-gradient(135deg,var(--lv-accent),#9a7cff)"></i><span>brand</span></div>
+        </div>
+        <div class="sg-note">实现规则：全部由 b3 变量派生（color-mix），跟随思源主题；禁止硬编码色值。</div>
+      </div>
+
+      <div class="card sg-cell">
+        <b>排版</b>
+        <div class="sg-type">
+          <div><small>页标题 26</small><span style="font-size:26px;font-weight:600;letter-spacing:-.02em">早安，小飞驴家</span></div>
+          <div><small>区块标题</small><span style="font-size:12.5px;font-weight:600;letter-spacing:.05em;color:var(--lv-tx-2)">即将到期</span></div>
+          <div><small>正文 13.5</small><span>妈妈身份证存放于玄关抽屉 A。</span></div>
+          <div><small>次要 / 辅助</small><span style="color:var(--lv-tx-2)">次要文字</span><span style="color:var(--lv-tx-3)">辅助说明</span></div>
+          <div><small>.num</small><span class="num" style="font-weight:600">1,234.56 · 09-29</span></div>
+          <div><small>.mono</small><span class="mono">20261001140532-ab12cd3</span></div>
+        </div>
+        <div class="sg-note">三级文字层次（tx / tx-2 / tx-3）之外不允许第四种颜色；数字一律 tabular-nums。</div>
+      </div>
+
+      <div class="card sg-cell">
+        <b>按钮</b>
+        <div class="sg-row" style="margin-bottom:10px">
+          <button class="btn primary">主要操作</button>
+          <button class="btn">次要操作</button>
+          <button class="btn ghost">幽灵按钮</button>
+        </div>
+        <div class="sg-row">
+          <button class="btn sm">小按钮</button>
+          <button class="btn" disabled>禁用态</button>
+          <button class="iconbtn" title="icon">⚡</button>
+          <button class="iconbtn" title="icon">◐</button>
+        </div>
+        <div class="sg-note">主按钮每视图 ≤1 个；与思源原生 UI 并列处可用 b3-button。</div>
+      </div>
+
+      <div class="card sg-cell">
+        <b>chips 与徽章</b>
+        <div class="sg-row" style="margin-bottom:10px">
+          <button class="chip">默认</button>
+          <button class="chip on">选中</button>
+          <button class="chip"><span class="ava" style="background:linear-gradient(135deg,#5b7ff0,#7c9bff)">我</span>成员过滤</button>
+          <button class="chip">＋</button>
+        </div>
+        <div class="sg-row">
+          <span class="badge red">已逾期</span><span class="badge orange">即将到期</span>
+          <span class="badge yellow">建议成员</span><span class="badge green">有效</span><span class="badge gray">核心</span>
+        </div>
+        <div class="sg-note">chips = 过滤/切换；徽章 = 状态/属性标注，不承载点击。</div>
+      </div>
+
+      <div class="card sg-cell">
+        <b>表单原语</b>
+        <div class="frow" style="margin-bottom:10px"><label>文本</label><input type="text" placeholder=" placeholder"></div>
+        <div class="frow" style="margin-bottom:10px"><label>下拉</label><select class="select" style="width:100%"><option>证件管理</option></select></div>
+        <div class="frow" style="margin-bottom:10px"><label>开关</label>
+          <button class="sw on" onclick="this.classList.toggle('on')"></button>
+          <button class="sw" onclick="this.classList.toggle('on')"></button>
+          <label style="display:flex;gap:6px;align-items:center;font-size:12.5px;cursor:pointer">
+            <input type="checkbox" style="accent-color:var(--lv-accent)" checked>复选</label>
+        </div>
+        <div class="sg-note">b3 原生类（b3-text-field/b3-select/b3-switch）可互换使用，token 一致。</div>
+      </div>
+
+      <div class="card sg-cell">
+        <b>状态点 · 进度</b>
+        <div class="sg-row" style="margin-bottom:12px">
+          <span class="sev red"></span><span class="sev orange"></span>
+          <span class="sev green"></span><span class="sev gray"></span>
+          <span class="pulse" style="margin-left:8px"></span><span style="font-size:12px;color:var(--lv-tx-3)">呼吸态（唯一常驻动效）</span>
+        </div>
+        <div class="meter"><i style="width:64%"></i></div>
+        <div class="meter-cap"><span>免疫规划程序</span><span class="num">14 / 22 剂</span></div>
+        <div class="sg-note">色点带 3px 光晕；细进度条用于长期进度（疫苗/退休/年计划）。</div>
+      </div>
+
+      <div class="card sg-cell" style="grid-column:1/-1;padding:0;overflow:hidden">
+        <b style="padding:18px 18px 0">提醒行（四级色轨 · hover 浮现操作 · 色轨 hover 泛光）</b>
+        <div class="reminders" style="margin:12px 0 0;border-radius:0">
+          <div class="rem overdue">
+            <div class="ic">🪪</div>
+            <div class="t"><b>妈妈的身份证</b><span>证件 · 身份证</span></div>
+            <div class="when"><b class="num" style="color:var(--lv-danger)">已逾期 2 天</b><span class="num">09-29</span></div>
+            <div class="ops"><button class="btn ghost">续期…</button><button class="btn ghost">延后</button></div>
+          </div>
+          <div class="rem soon">
+            <div class="ic">💉</div>
+            <div class="t"><b>儿子 · 百白破第 4 剂</b><span>疫苗</span></div>
+            <div class="when"><b class="num" style="color:var(--lv-warn)">3 天后</b><span class="num">10-04</span></div>
+            <div class="ops"><button class="btn ghost">完成</button><button class="btn ghost">延后</button></div>
+          </div>
+          <div class="rem lead">
+            <div class="ic">📺</div>
+            <div class="t"><b>视频会员自动续费</b><span>订阅</span></div>
+            <div class="when"><b class="num" style="color:var(--lv-amber)">12 天后</b><span class="num">10-13</span></div>
+            <div class="ops"><button class="btn ghost">续期…</button><button class="btn ghost">延后</button></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="card sg-cell">
+        <b>模块卡（领域色砖 + 趋势条）</b>
+        <div class="mods" style="grid-template-columns:1fr 1fr">
+          <div class="card mod"><div class="mi t-blue">🪪</div><b>证件管理</b>
+            <div class="stat"><b class="num">12</b><span>条 · 1 待办</span></div></div>
+          <div class="card mod"><div class="mi t-cyan">📦</div><b>实物资产</b>
+            <div class="stat"><b class="num">34</b><span>件 · ¥86k</span>
+              <span class="spark"><i style="height:40%"></i><i style="height:55%"></i><i style="height:45%"></i><i style="height:70%"></i><i class="hi" style="height:95%"></i></span></div></div>
+        </div>
+        <div class="sg-note">色砖六色：t-blue / t-green / t-cyan / t-purple / t-rose / t-amber（12% 底 + 26% 描边）。</div>
+      </div>
+
+      <div class="card sg-cell">
+        <b>表格 / 附件 / 明细</b>
+        <table style="margin:-6px 0 10px">
+          <thead><tr><th>名称</th><th>到期</th><th>状态</th></tr></thead>
+          <tbody>
+            <tr class="sel"><td>妈妈的身份证</td><td class="num">2026-09-29</td><td><span class="badge red">已逾期</span></td></tr>
+            <tr><td>我的护照</td><td class="num">2029-05-10</td><td><span class="badge green">有效</span></td></tr>
+          </tbody>
+        </table>
+        <div class="files" style="margin-bottom:10px">
+          <button class="file">🖼 正页.jpg</button><button class="file">📄 攻略 ↗</button>
+        </div>
+        <dl class="kv"><dt>存放位置</dt><dd>玄关抽屉 A</dd><dt>块 ID</dt><dd class="mono">20261001-ab12cd3</dd></dl>
+      </div>
+
+      <div class="card sg-cell">
+        <b>空态 · 骨架 · 弹层</b>
+        <div class="empty" style="padding:20px 8px">
+          <div class="eic">✓</div><b>干净</b><span>延后与已处理的提醒会归档在这里。</span>
+        </div>
+        <div style="display:flex;gap:10px;align-items:center;margin-bottom:12px">
+          <div class="lv-skel" style="width:120px;height:14px"></div>
+          <div class="lv-skel" style="width:64px;height:14px"></div>
+        </div>
+        <div class="sg-row">
+          <button class="btn" onclick="openDrawer(document.querySelector('#s-ledger tbody tr'))">打开抽屉示例</button>
+          <button class="btn primary" onclick="openModal()">打开快速录入</button>
+        </div>
+        <div class="sg-note">蒙层 z-90 / 抽屉 z-100 / 弹层 z-110；Toast 用思源 showMessage，不自建。</div>
+      </div>
+    </div>
+
+    <p class="sg-note" style="margin:16px 2px 0">
+      入场交错编排作用于 <span class="mono">.lv-anim.lv-screen</span> 容器（30-75ms 阶梯）；全部动效在
+      <span class="mono">prefers-reduced-motion</span> 下整体降级。完整契约见
+      <span class="mono">docs/design/08-UI组件库与实现规范.md</span>；实现样式表
+      <span class="mono">src/styles/design-system.scss</span> 已按本文档落地。
+    </p>
+  </section>
+</div>
+
+<!-- 抽屉：详情 -->
+<div class="mask" id="mask" onclick="closeDrawer()"></div>
+<aside class="drawer" id="drawer" aria-label="条目详情">
+  <div class="drawer-head">
+    <h3>妈妈的身份证</h3>
+    <span class="badge red">已逾期</span>
+    <span style="flex:1"></span>
+    <button class="iconbtn" onclick="closeDrawer()">✕</button>
+  </div>
+  <div class="drawer-body">
+    <dl class="kv">
+      <dt>成员</dt><dd>妈妈</dd>
+      <dt>类型</dt><dd>身份证 · 居民身份证</dd>
+      <dt>证件号</dt><dd class="mono">****1234 <span style="color:var(--lv-tx-3)">（脱敏，点击查看）</span></dd>
+      <dt>签发日</dt><dd class="num">2016-10-01</dd>
+      <dt>到期日</dt><dd class="num" style="color:var(--lv-danger)">2026-09-29 · 逾期 2 天</dd>
+      <dt>提前提醒</dt><dd class="num">90 天</dd>
+      <dt>存放位置</dt><dd>玄关抽屉 A</dd>
+      <dt>规则</dt><dd>长期（换新后生效）</dd>
+    </dl>
+    <div>
+      <div style="font-size:12px;color:var(--lv-tx-3);margin-bottom:8px">附件</div>
+      <div class="files">
+        <button class="file">🖼 身份证正页.jpg</button>
+        <button class="file">🖼 国徽面.jpg</button>
+      </div>
+    </div>
+    <div>
+      <div style="font-size:12px;color:var(--lv-tx-3);margin-bottom:8px">相关</div>
+      <div class="files"><button class="file">📄 换证办理攻略 ↗</button><button class="file">📍 户籍大厅（地址库）</button></div>
+    </div>
+    <div style="font-size:11.5px;color:var(--lv-tx-3)" class="mono">块 ID：20261001140532-ab12cd3 · 可复制双链</div>
+  </div>
+  <div class="drawer-foot">
+    <button class="btn primary">续期…</button>
+    <button class="btn">延后 ▾</button>
+    <button class="btn">编辑</button>
+    <span style="flex:1"></span>
+    <button class="btn ghost">归档</button>
+  </div>
+</aside>
+
+<!-- 弹层：快速录入 -->
+<div class="modal" id="modal">
+  <div class="sheet" onclick="event.stopPropagation()">
+    <div class="sheet-head">
+      <b style="font-size:14px">⚡ 快速记录</b>
+      <select class="select" style="margin-left:auto"><option>🛒 购物</option><option>💊 药品 / 囤货</option><option>🎬 影音</option><option>🧧 人情</option></select>
+      <button class="iconbtn" onclick="closeModal()">✕</button>
+    </div>
+    <div class="sheet-body">
+      <div class="frow"><label>名称</label><input type="text" placeholder="种草的空气炸锅"></div>
+      <div class="frow"><label>金额</label><input type="number" placeholder="299" style="width:120px"></div>
+      <div class="frow"><label>成员</label>
+        <div style="display:flex;gap:6px">
+          <button class="chip on">我</button><button class="chip">老婆</button><button class="chip">全家</button>
+        </div>
+      </div>
+      <div class="frow"><label>日期</label><input type="text" value="今天" style="width:120px"></div>
+      <div class="frow"><label></label><label style="display:flex;gap:6px;align-items:center;cursor:pointer">
+        <input type="checkbox" style="accent-color:var(--lv-accent)" checked>保存后顺手建档为实物资产</label></div>
+    </div>
+    <div class="sheet-foot">
+      <button class="btn ghost" onclick="closeModal()">取消</button>
+      <button class="btn" onclick="closeModal()">保存</button>
+      <button class="btn primary" onclick="closeModal()">保存并查看</button>
+    </div>
+  </div>
+</div>
+
+<script>
+const $=s=>document.querySelector(s), $$=s=>[...document.querySelectorAll(s)];
+
+/* 屏幕切换 + 导航胶囊滑动 */
+function go(name){
+  $$('.screen').forEach(x=>x.classList.remove('on'));
+  $('#s-'+name).classList.add('on');
+  const btn=$$('#nav button').find(b=>b.dataset.s===name);
+  $$('#nav button').forEach(b=>b.classList.toggle('on',b===btn));
+  movePill(btn);
+  window.scrollTo({top:0,behavior:'instant'});
+}
+const nav=$('#nav'), pill=$('#pill');
+function movePill(btn){
+  if(!btn)return;
+  pill.style.width=btn.offsetWidth+'px';
+  pill.style.transform=`translateX(${btn.offsetLeft-3}px)`;
+}
+nav.addEventListener('click',e=>{const b=e.target.closest('button');if(b)go(b.dataset.s)});
+window.addEventListener('resize',()=>movePill($('#nav button.on')));
+requestAnimationFrame(()=>movePill($('#nav button.on')));
+
+/* 顶栏滚动投影 */
+window.addEventListener('scroll',()=>{
+  $('#topbar').classList.toggle('scrolled',window.scrollY>6);
+},{passive:true});
+
+/* chips / 角色 chips 可切换 */
+$$('.chip,.rolechip').forEach(el=>el.addEventListener('click',()=>{
+  if(el.querySelector('input'))return;
+  el.classList.toggle('on');
+}));
+
+/* 主题切换 */
+function toggleTheme(){
+  const h=document.documentElement;
+  h.dataset.theme=h.dataset.theme==='dark'?'light':'dark';
+}
+
+/* 抽屉 */
+function openDrawer(tr){
+  $$('#s-ledger tbody tr').forEach(r=>r.classList.remove('sel'));
+  tr.classList.add('sel');
+  $('#mask').classList.add('open');$('#drawer').classList.add('open');
+}
+function closeDrawer(){$('#mask').classList.remove('open');$('#drawer').classList.remove('open')}
+
+/* 快速录入 */
+function openModal(){$('#modal').classList.add('open');$('#mask').classList.add('open')}
+function closeModal(){$('#modal').classList.remove('open');if(!$('#drawer').classList.contains('open'))$('#mask').classList.remove('open')}
+document.addEventListener('keydown',e=>{if(e.key==='Escape'){closeModal();closeDrawer()}});
+
+/* 主数字滚动（总览「需要留意」计数） */
+(() => {
+  const el=document.getElementById('heroCount');
+  if(!el)return;
+  const target=+el.textContent||0; const t0=performance.now(), dur=560;
+  el.textContent='0';
+  function tick(t){
+    const p=Math.min((t-t0)/dur,1), e=1-Math.pow(1-p,3);
+    el.textContent=Math.round(target*e);
+    if(p<1)requestAnimationFrame(tick);
+  }
+  requestAnimationFrame(tick);
+})();
+</script>
+</body>
+</html>

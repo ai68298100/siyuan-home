@@ -1,0 +1,532 @@
+# 小驴管家（Lv Home）· 项目待办总清单
+
+> 标记：🔴 当前版本必须 · 🟡 下一版本 · 🟢 远期/可选 · ⛔ 被阻塞（注明被什么阻塞）· ⏸ 暂缓（集市上架，触发条件另定）
+> **发布策略（2026-10-01 定）**：开发到一定程度后公开 GitHub 仓库与 Release；**集市上架整体暂缓**（见第 26 组）。
+> 阶段定义见 `docs/design/06-v0.2开发任务拆解.md`；版本路线见 `MODULES.md §6`。
+> 完成一项勾一项；每个版本的验收线见对应小节的"出口条件"。
+
+---
+
+## 0. 工程基建
+
+- [ ] 🔴 `git init` 并建立首个提交（当前项目无版本控制）
+- [ ] 🟡 创建 GitHub 仓库 `ai68298100/siyuan-home`（仓库名必须等于插件 name，main 分支）——**触发条件：v0.2 纵向切片完成且回归全绿，公开前审查（第 25 组）通过**
+- [ ] 🟡 推送骨架 + 设计文档（README/MODULES/docs/design/prototype）——同上触发条件
+- [ ] 🟡 配置 GitHub Actions：PR 时跑 `pnpm run check + build`（模板自带 workflow 改造）
+- [ ] 🟢 分支保护：main 禁直推
+- [ ] 🟢 `plugin.json` 的 `author`/`url` 从占位 lvdaoguan 改为 ai68298100
+- [ ] 🔴 替换 `icon.png`（160×160，≤64KiB，禁止 SVG）
+- [ ] 🟡 制作 `preview.png`（1024×768，≤512KiB，集市展示图）
+- [ ] ⏸ 上架时移除 `plugin.json` 的 `disabledInPublish: true`
+- [ ] 🟢 LICENSE 确认（MIT，作者名更新）
+
+## 1. Spike 阶段（⛔ 全部被阻塞：等待思源实例启动）
+
+- [ ] ⛔ 🔴 S0 用户启动思源（内核 `127.0.0.1:1568`），`sy nb` 确认可达
+- [ ] ⛔ 🔴 S1 台账视图嵌入三选一实验：protyle 内嵌 av / API 渲染 / 文档跳转（`docs/testing/spike-R1R2.md` 实验一）
+- [ ] ⛔ 🔴 S1a 结论回填：`src/core/siyuan.ts#createAttributeView` 实现 + 01 ADR-4 定案
+- [ ] ⛔ 🔴 S2 关系列实验：relation 列可否编程创建并指向 members 库（实验二）
+- [ ] ⛔ 🔴 S2a 结论回填：可 → 字典列 member=relation；不可 → 降级文本列 + SQL 聚合，更新 02 §2
+- [ ] ⛔ 🟡 S3 行定位实验：openTab 定位高亮台账行（R5），结论回填 03 §5
+- [ ] ⛔ 🟡 S4 实验数据清理：临时笔记本 `siyuan-home-spike` 经确认后删除
+- [ ] ⛔ 🟡 S5 av kramdown 形态观察（手建 av 后查 blocks.markdown，为建库提供参照）
+- [ ] ⛔ 🟡 S6 kernel cron 实验：最小间隔、休眠/唤醒、重复扫描与前端兜底的行为记录（R3）
+- [ ] ⛔ 🟡 S7 双端冲突实验：两设备同时编辑同一行，验证提醒写回幂等、冲突提示和恢复路径（R6）
+- [ ] 🟡 S8 农历库专项：tree-shake 体积、闰月/腊月三十精度与版本升级回归（R4）
+
+## 2. v0.2 · 数据层（阶段 A）
+
+- [ ] 🔴 A1a schema.ts：members 成员库 schema 落地（02 §3：角色/生日/农历/尺码/忌口/状态）
+- [ ] 🔴 A1b 字段字典 i18n 键补全核对（field.* 已有 certs 部分，补 members 专属列）
+- [ ] ⛔ 🔴 A2a siyuan.ts：av 创建端点实现（等 S1）
+- [ ] 🔴 A2b siyuan.ts：av 行 CRUD 封装（新增行/更新行值/删除行/按视图查询）
+- [ ] 🔴 A2c siyuan.ts：附件关联（asset 列写入文件引用）
+- [ ] 🔴 A2d siyuan.ts：错误类型统一（KernelError）+ 单元可注入 mock
+- [ ] 🔴 A3a provisioner：幂等建库全流程打通（依赖 A2a）
+- [ ] 🔴 A3b provisioner：ensureColumns 版本升级补列（不删不改旧列）
+- [ ] 🔴 A3c provisioner：默认视图创建（certs 的 by_member / expiring）
+- [ ] 🔴 A3d provisioner：dbRefs 失效自愈（文档被删→重建→登记刷新）
+- [ ] 🔴 A4 members 数据访问层（`src/core/members.ts`）：成员 CRUD 双写（settings 引用 + members 库行）
+- [ ] 🔴 A5 certs 数据访问层（`src/modules/certs/`）：行 CRUD / 续期写回 / 按到期范围查询 / 脱敏读取
+- [ ] 🟡 A6 设置页"诊断"区数据源：台账缺失/列缺失检测接口
+
+## 3. v0.2 · 提醒中枢（阶段 B）
+
+- [ ] 🔴 B0 vitest 接入（devDependencies + `pnpm test` script）
+- [ ] 🔴 B1a 规则引擎单测：oneoff 边界（今天到期/昨天/闰年 2-29）
+- [ ] 🔴 B1b 规则引擎单测：anniversary 农历（腊月廿九、闰月、跨年、当天）
+- [ ] 🔴 B1c 规则引擎单测：recurring 周期滚动（day/week/month/quarter/year）+ 未声明周期降级
+- [ ] 🔴 B1d 规则引擎单测：leadOverrides 覆盖与 later 降噪过滤
+- [ ] 🔴 B2a 扫描器：DataProvider 接口 + certs 实现（SQL 到期范围查询）
+- [ ] 🔴 B2b 扫描器：三路触发整合（kernel 定时 / Tab 打开刷新 / 前端兜底心跳）
+- [ ] 🔴 B2c HubState 缓存读写（kernel storage 优先，前端降级）
+- [ ] 🟡 B2d kernel.js 定时任务：每日 08:00 全量扫描（可配）+ broadcast `hub.updated`
+- [ ] 🔴 B3a 通知：每日摘要一条（notifyHour，lastNotifiedDate 去重）
+- [ ] 🔴 B3b 通知：overdue 首次发现立即通知 + 静默时段（silentFrom/To）
+- [ ] 🔴 B3c 通知点击 → 打开管家 Tab 提醒页
+- [ ] 🔴 B4a 动作：完成（oneoff 归档 / recurring 写 last_done 重算 due / anniversary 记当年已办）
+- [ ] 🔴 B4b 动作：续期小窗（新到期日 + 历史追加 note）
+- [ ] 🔴 B4c 动作：延后 snooze（1/3/7/30 天，运行态持久化）
+- [ ] 🔴 B4d 动作：忽略 mute（rowId+ruleKey，可恢复）
+- [ ] ⛔ 🔴 B4e 动作：定位（依赖 S3 结论；降级=打开台账文档）
+- [ ] 🔴 B4f 提醒中枢运行态存储 schema（snooze/mute/已办缓存 → loadData）
+
+## 4. v0.2 · UI（阶段 C，组件契约见 docs/design/08）
+
+- [ ] 🔴 C1a Tab 化外壳：`addTab` + 四页签导航（总览/提醒/台账/成员）+ 顶栏入口改造
+- [ ] 🔴 C1b 导航胶囊滑动（offsetLeft 计算 + spring）
+- [ ] 🔴 C1c 删除旧 Dialog 面板与 index.scss LEGACY 段（dashboard.svelte/settings.svelte 重写为 lv-* 组件）
+- [ ] 🔴 C1d 屏幕容器 `.lv-screen/.lv-anim` 接入（入场编排生效）
+- [ ] 🔴 C2a 总览：页头（问候/日期/计数滚动）+ 成员 chips 行
+- [ ] 🔴 C2b 总览：即将到期区（取 HubState 前 4 条 + 空态 + "查看全部"）
+- [ ] 🔴 C2c 总览：快速记录行（qbtn 按 enabledModules 过滤）
+- [ ] 🔴 C2d 总览：模块卡网格（启用模块 + certs/药箱统计卡）
+- [ ] 🔴 C2e 成员 chips 过滤状态持久化（作用于提醒/模块卡计数）
+- [ ] 🔴 C3a 提醒中枢页：四组筛选（模块/成员/类型/时间）+ 显示已处理
+- [ ] 🔴 C3b 提醒中枢页：分组列表（逾期/7 天/30 天/已处理折叠）
+- [ ] 🔴 C3c 提醒中枢页：行内动作菜单（完成/续期/延后▾/定位/忽略）接线 B4
+- [ ] 🔴 C3d 筛选条件持久化
+- [ ] ⛔ 🔴 C4a 台账页外壳：模块切换下拉 + "在文档中打开"（依赖 S1 定案嵌入方式）
+- [ ] ⛔ 🔴 C4b 台账行点击 → 详情抽屉（kv/附件/相关/块 ID 复制）
+- [ ] 🔴 C4c 台账"新建"：capture 列集快速表单（抽屉内或弹层）
+- [ ] 🔴 C5a 成员页：成员卡网格（统计三格 + alert 行 + 农历标记）
+- [ ] 🔴 C5b 成员页：单成员下钻（跨模块时间线 v0.2 = certs + 提醒）
+- [ ] 🔴 C5c 成员编辑对话框（增删改/角色/生日/农历）
+- [ ] 🔴 C5d 长期进度条接入（疫苗程序占位，数据 v0.5 接通）
+- [ ] 🔴 C6a 快速录入弹层：capture 驱动表单 + 模块选择（记住上次）
+- [ ] 🔴 C6b 快速录入保存链路（写台账行 + toast + "保存并查看"）
+- [ ] 🔴 C6c 块菜单入口：选中文字 → 存为常用语/网址/地址（预填）
+- [ ] 🔴 C6d 斜杠命令 `/lv`（快速记录/打开台账）
+- [ ] 🔴 C6e 命令面板：打开管家面板 / 快速记录（快捷键可配置）
+- [ ] 🔴 C7a 首次引导向导：三步（家庭构成→推荐模块→建库确认）
+- [ ] 🔴 C7b 引导按 suggestRoles 预选逻辑（子女→育儿/上学/零花钱）
+- [ ] 🔴 C7c 引导建库批处理（provisioner 逐模块）+ 完成空态引导
+- [ ] 🔴 C7d 引导可跳过、设置页可重跑
+- [ ] 🔴 C8a 设置五分区：模块/成员/提醒/生态/关于
+- [ ] 🔴 C8b 模块开关接线（启用→provisioner 建库；禁用→隐藏保留数据 + 确认框）
+- [ ] 🔴 C8c 提醒分区：leadOverrides 编辑（按 moduleId.ruleKey）+ 摘要时段 + 静默时段
+- [ ] 🟡 C8d 生态分区占位（开关 UI，v0.3 接线）
+- [ ] 🔴 C8e 关于分区：版本/仓库链接/诊断入口
+- [ ] 🟡 C8f 面板隐藏金额开关（隐私，07 §4）
+- [ ] 🟡 C9a 移动端走查：760 断点/触摸目标/抽屉全宽
+- [ ] 🟡 C9b 空态文案全量走查（每屏"下一步动作"型）
+- [ ] 🟡 C9c 与原型组件库屏像素比对走查（间距 ±2px）
+
+## 5. v0.2 · 收尾（阶段 D）
+
+- [ ] 🔴 D1 回归脚本 `docs/testing/v0.2.md`：引导→建库→录入→提醒→续期→禁用→数据保留→重装恢复
+- [ ] 🔴 D2 性能预算实测：05 §4.5 表逐项记录（onload/扫描/首开/构建体积）
+- [ ] 🔴 D3 i18n 全量走查（无硬编码文案；zh-CN/en 同步）
+- [ ] 🔴 D4 `update-version` 0.2.0 + 构建 zip + CHANGELOG
+- [ ] 🟡 D5 发布前安全扫描（mimosa security_scan）
+- [ ] 🟡 D6 内测：装入 `D:\小飞驴的SIYUAN` 工作空间实跑一周
+
+## 6. v0.3 提醒中枢扩展（🟡）
+
+- [ ] 🟡 medicine schema + 建库 + 提醒接入（效期+低库存双规则）
+- [ ] 🟡 memberships schema（计费周期/试用期/自动续费/储值余额）
+- [ ] 🟡 insurance schema（缴费日+保障到期双提醒）
+- [ ] 🟡 提醒中枢规则清单 UI 完善（按模块列出 rules）
+- [ ] 🟡 生态 RPC server 首批：home.capabilities / getSnippets / getBookmarks
+- [ ] 🟡 生态开关接线（设置·生态 → rpc 权限）
+- [ ] 🟡 多端同步信号：台账变更 broadcast → 他端"刷新"角标
+- [ ] 🟡 移动端提醒降级实测（角标+开面板刷新）
+
+## 7. v0.4 资产购物（🟡）
+
+- [ ] 🟡 assets-real schema + 保修/借出/处置状态机
+- [ ] 🟡 assets-virtual schema（平台/账号名/密码位置索引/继承备注）
+- [ ] 🟡 shopping schema（订单号/快递单号/取件码/渠道）
+- [ ] 🟡 contracts schema（起止/到期提醒/押金/对方联系方式）
+- [ ] 🟡 购物→实物资产一键建档联动
+- [ ] 🟡 资产估值汇总统计卡（总览）
+- [ ] 🟡 会员年费折算视图（月均统计）
+
+## 8. v0.5 教育包（🟡）
+
+- [ ] 🟡 parenting schema + 国家免疫规划程序表内置模板（0-6 岁 22 剂）
+- [ ] 🟡 schooling schema（学段推算当前年级/升学节点/学费/课外班课时）
+- [ ] 🟡 exams schema（证书效期/复审周期/考试节点）
+- [ ] 🟡 allowance schema（压岁钱/零花钱多账户/发放周期）
+- [ ] 🟡 疫苗排期视图（应种/已种/逾期）
+- [ ] 🟡 打卡联动：recordValue RPC（身高体重落成长记录）
+- [ ] 🟡 升学节点倒计时进提醒中枢
+
+## 9. v0.6 生活包（🟡）
+
+- [ ] 🟡 favors schema（收送双向/事件类型/按人净额视图）
+- [ ] 🟡 stock schema（低库存+效期双提醒）
+- [ ] 🟡 food schema（菜谱/忌口联动/餐厅）
+- [ ] 🟡 address / bookmarks / snippets schema（轻台账三件）
+- [ ] 🟡 chores schema（周期任务 → 提醒中枢 recurring）
+- [ ] 🟡 house schema（维护周期/缴费日/农历纪念日/忌日）
+- [ ] 🟡 应急物资清单模板文档（应急管理部基础版）+ 半年巡检提醒
+- [ ] 🟡 快切注入：网址/常用语 RPC 消费端联调
+
+## 10. v0.7 影音书库 + 健康深化（🟢→🟡）
+
+- [ ] 🟢 media schema（六类媒体/状态机/评分/进度/来源链接）
+- [ ] 🟢 收藏夹/在看/年度统计三视图
+- [ ] 🟡 health 深化：复诊提醒/报告归档视图/过敏史联动 food
+- [ ] 🟡 social 退休倒计时（出生年月+政策参数+按成员卡片展示）
+- [ ] 🟢 pets schema（疫苗/驱虫周期）
+
+## 11. v0.8 出行包（🟢）
+
+- [ ] 🟢 vehicles schema（保养里程/年检/保险/电池更换/加油充电台账）
+- [ ] 🟢 transit schema（ETC/交通卡年审）
+- [ ] 🟢 travel-plan / booking / packing / log 四模块 schema
+- [ ] 🟢 行前清单证件自查（引用 certs 库：护照 6 个月规则/儿童证件）
+- [ ] 🟢 行李清单模板库（城市游/海岛/露营/自驾/研学）
+
+## 12. v1.0 GitHub 正式发布（公开仓库的 1.0 版本）
+
+- [ ] 🟡 公开发布条件自检：🔴 项全部完成、回归脚本全绿、内测反馈（31 组）处理完毕
+- [ ] 🟡 生态联动打磨：四插件互测（快切/打卡/人脉/拾遗）
+- [ ] 🟡 多设备同步冲突测试（两台设备实跑同一工作区）
+- [ ] 🟡 31 模块全开性能回归（05 §4.5 预算复核）
+- [ ] 🟡 隐私终审：脱敏显示/无密码确认/导出脱敏提示/通知脱敏
+- [ ] 🟡 `v1.0.0` tag + GitHub Release（附 package.zip；siyuan-plugin-release skill 调整为只发 Release 不推集市）
+- [ ] 🟡 README 双语终稿（截图/GIF/功能表/隐私声明链接）
+- [ ] 🟡 migration notes 汇总（0.x → 1.0 用户升级说明）
+- [ ] 🟢 公告帖：ld246 / 少数派（是否随 1.0 公开同步发布，另定）
+- [ ] 🟢 1.0 后维护节奏：每两周 issue 清扫 + 月度小版本
+- [ ] 🟢 ROADMAP.md（从 TODO.md 提炼用户视角的路线图）
+
+## 13. 生态与远期（🟢）
+
+- [ ] 🟢 人脉联动：home.linkContact（成员↔联系人双向引用 + 缺失降级快照）
+- [ ] 🟢 拾遗联动：home.archiveRef（剪藏归档为台账行附件/关联文档）
+- [ ] 🟢 打卡联动：家务/备考台账任务一键转打卡习惯
+- [ ] 🟢 模板包导入导出（schema+模板+视图 JSON 打包，"新生儿包/露营包"）
+- [ ] 🟢 CSV/JSON 导出一键入口（脱敏提示，05 §4）
+- [ ] 🟢 家庭年报生成器（年度提醒处理率/人情净额/媒体统计）
+- [ ] 🟢 用户自定义台账模块（自定义字段集建库，复用建库器与提醒中枢）
+- [ ] 🟢 家庭成员间状态共享（kernel broadcast 多端，家务完成同步）
+- [ ] 🟢 i18n 扩展：zh-TW / ja
+- [ ] 🟢 无障碍专项审查（键盘全可达/对比度/读屏标签）
+- [ ] 🟢 发布快照数据（savePublishData，3.8.4+）探索
+
+## 14. 调研补齐（🟢 可选，前次因并发限制中断于 16 款/9 轮）
+
+- [ ] 🟢 书影音国际产品集群：Goodreads/StoryGraph/Letterboxd/Trakt/Komga（gh 可查 gotson/komga）
+- [ ] 🟢 健康用药集群：Medisafe/MyTherapy/Apple 健康/CareZone 兴衰
+- [ ] 🟢 车辆旅行国际集群：Drivvo/Fuelio/TripIt/Wanderlog/PackPoint/Polarsteps
+- [ ] 🟢 效率小件集群：Raindrop/espanso（gh）/TextExpander/家庭 binder
+- [ ] 🟢 国际家庭管理集群：Cozi/FamilyWall/Maple/OurHome/Sweepy/Tody/Homechart（gh）
+- [ ] 🟢 记账补充：YNAB/Actual（gh actualbudget/actual）/MoneyWiz
+- [ ] 🟢 调研结论回填 MODULES.md 附录 + 影响新模块/字段时更新 schema
+
+## 15. 数据完整性与边界场景
+
+- [ ] 🔴 引用完整性：成员删除后行上的成员引用悬空 → 显示「未指定成员」+ 批量改派入口
+- [ ] 🔴 provisioner 只增列不改枚举：用户自改的 select 选项不被覆盖（ensureColumns 约束）
+- [ ] 🔴 settings.json 损坏容错：解析失败 → 备份坏文件 + 回退默认值 + 警告 toast
+- [ ] 🔴 孤儿提醒清理：台账行被删除后，HubState 中残留提醒自动清除
+- [ ] 🔴 模块禁用时其提醒立即从 HubState 与通知中剔除
+- [ ] 🟡 settings 写入失败重试与错误上报（saveData 异常捕获）
+- [ ] 🟡 笔记本被用户关闭（closed=true）→ ensureNotebook 重新打开或引导
+- [ ] 🟡 笔记本被删除 → 诊断区一键重建全部已启用模块台账
+- [ ] 🟡 台账文档被移入回收站 → dbRefs 失效检测与恢复路径
+- [ ] 🟡 提醒列表 >200 条虚拟滚动（防长列表卡顿）
+- [ ] 🟡 系统休眠错过定时扫描 → 唤醒/开面板补扫
+- [ ] 🟡 农历闰月生日规则定案（闰月生日在平年如何处理）+ 单测
+- [ ] 🟡 系统时间回拨/跨天瞬间的扫描容错（due 计算幂等）
+- [ ] 🟢 金额显示层：小数/千分位/多币种符号（仅显示，不做汇率）
+- [ ] 🟢 多端同时编辑同一行：写回操作幂等性验证
+- [ ] 🟢 跨时区说明：due 以内核本地时区计算（文档 + 测试用例）
+
+## 16. 模块功能深化（按模块细化，v0.3+ 逐版吸收进 schema）
+
+- [ ] 🟡 certs：换证历史链（旧证→新证 relation + 历史视图）
+- [ ] 🟡 certs：复印件/电子版存放位置字段
+- [ ] 🟡 assets：估值快照（手动记录 + 时间线，非自动估值）
+- [ ] 🟡 assets：位置变更历史（物品搬家记录）
+- [ ] 🟢 assets：CSV 批量导入（列映射向导）
+- [ ] 🟡 shopping：退货/退款记录字段与状态
+- [ ] 🟢 shopping：同商品价格历史（复购比价参考）
+- [ ] 🟡 shopping：购入联动 stock（囤货品自动加库存）
+- [ ] 🟡 memberships：家庭共享账号（主卡人/成员位标注）
+- [ ] 🟢 memberships：取消自动续费指引链接字段
+- [ ] 🟡 contracts：自动续约条款标记 → 到期提醒升级为「续约决策提醒」
+- [ ] 🟢 contracts：押金退还记录
+- [ ] 🟡 health：体检年度计划模板（recurring）
+- [ ] 🟡 health：处方药 → 药箱联动（新建药箱行或扣减提示）
+- [ ] 🟡 insurance：理赔记录状态机（报案/材料/到账）
+- [ ] 🟡 social：缴费基数年度调整提醒
+- [ ] 🟡 schooling：作业/考试日程（recurring）+ 家长会记录文档模板
+- [ ] 🟢 schooling：转学/插班历史
+- [ ] 🟡 parenting：疫苗批号与接种点字段（接种追溯）
+- [ ] 🟡 parenting：生长曲线图（身高体重 WHO 百分位 SVG 渲染）
+- [ ] 🟡 parenting：辅食新食材 3 天观察期 → 联动 health 过敏史
+- [ ] 🟡 allowance：孩子愿望清单（目标金额 + 存钱进度条）
+- [ ] 🟢 allowance：利息/收益流水
+- [ ] 🟡 favors：年度人情报告（收送 TOP / 净额走势）
+- [ ] 🟡 favors：回礼提醒（事件后 N 天）
+- [ ] 🟢 media：追更提醒（剧更新日手动登记 → 提醒中枢）
+- [ ] 🟢 media：图书借出记录（借出状态复用 assets 模式）
+- [ ] 🟢 travel：行前证件检查结果存档（检查时间/结论）
+- [ ] 🟡 house：水电煤抄表流水（表读数记录）
+- [ ] 🟡 house：保修期联动 contracts（保修内报修免费标记）
+- [ ] 🟡 stock：采购建议清单（低于阈值项自动汇总视图）
+
+## 17. UI / 交互增强
+
+- [ ] 🟡 全局台账搜索框（标题/备注 contains，与成员过滤叠加）
+- [ ] 🟡 排序与视图偏好记忆（提醒页/台账页各自持久化）
+- [ ] 🟡 提醒/台账行批量操作（多选 → 批量归档/延后/忽略）
+- [ ] 🟡 成员卡右键/长按菜单（编辑/归档/查看档案）
+- [ ] 🟢 成员网格拖拽排序
+- [ ] 🟡 头像上传（asset 文件选择器 → 成员库 avatar 列）
+- [ ] 🟡 单条记录复制为脱敏文本（分享场景）
+- [ ] 🟡 紧急信息卡打印样式（@media print，家庭紧急信息卡可打印）
+- [ ] 🟢 快捷键速查表（设置·关于区）
+- [ ] 🟢 成员下钻面包屑返回
+- [ ] 🔴 删除行走思源块删除（保留撤销窗口），禁止绕过 UI 直接删
+- [ ] 🟡 统计卡点击下钻（模块卡 → 预筛选的台账/提醒视图）
+- [ ] 🟢 提醒行就地展开摘要（不离开列表）
+- [ ] 🟡 时间表述本地化（「3 天后 / 下周三」+ 悬浮完整日期）
+- [ ] 🟡 空工作区首启体验（无笔记本时引导先建笔记本）
+- [ ] 🟢 密度切换（紧凑/舒适，表格行高两档）
+
+## 18. kernel.js 与基础设施
+
+- [ ] 🔴 前端监听 `kernel-plugin-state-change` 之后才初始化 RPC 客户端（模板硬性约定）
+- [ ] 🔴 kernel 不可用时的降级链路：RPC 失败 → 前端兜底扫描（静默）
+- [ ] 🟡 storage watcher：他端 settings 变更 → 本端设置热重载
+- [ ] 🟡 onDataChanged 防抖 → 增量扫描触发
+- [ ] 🟢 kernel 私有 HTTP 路由规划（/plugin/private/siyuan-home/...，为外部工具预留）
+- [ ] 🔴 onunload 清理审计：eventBus 解绑/定时器销毁/observer 断开（内存泄漏清单）
+- [ ] 🟡 卸载向导：uninstall 时询问保留或清理（默认保留台账文档）
+- [ ] 🟡 工作区切换/插件重载的 onload 幂等验证
+
+## 19. 安全加固
+
+- [ ] 🔴 面板渲染用户内容统一转义（标题/备注防 XSS——台账内容来自用户输入）
+- [ ] 🔴 日志审计：永不输出 token / 证件号 / 金额到 console
+- [ ] 🟡 附件处理边界：仅展示图片/PDF 预览，不执行未知类型
+- [ ] 🟡 RPC 入参校验：生态调用方参数 schema 校验（防脏数据入库）
+- [ ] 🟡 依赖最小化审查：每个新依赖记录必要性理由（已核：lunar-typescript/date-fns）
+- [ ] 🟡 `pnpm audit` 纳入发布前检查 + lockfile 提交
+- [ ] 🟢 dependabot/renovate 配置（依赖自动升级 PR）
+
+## 20. 性能与内存
+
+- [ ] 🟡 列表性能预算：1000 行表格滚动 60fps（虚拟滚动兜底）
+- [ ] 🟡 扫描去抖合并（Tab 快速切换不重复全量扫描）
+- [ ] 🟢 成员色/图标映射缓存（避免每帧重算）
+- [ ] 🟡 bundle 体积守门：CI 检查 index.js gzip < 100KB（超限即失败）
+- [ ] 🟡 date-fns 按需引入核验（bundle 分析，只导入用到函数）
+- [ ] 🟢 附件缩略图懒加载（成员头像/资产照片墙）
+- [ ] 🟡 长会话内存走查（开关抽屉/弹层 50 次无增长）
+
+## 21. 测试与质量工程
+
+- [ ] 🟡 i18n 键位对齐检查脚本（zh-CN/en key 集合 diff，纳入 CI）
+- [ ] 🟡 schema 黄金文件测试（certs schema 序列化快照防意外变更）
+- [ ] 🟡 provisioner mock 单测：新建/补登记/重建三分支（A3 已列，此处补测试文件规划）
+- [ ] 🟡 settings 迁移测试：v0.1 旧结构 → v0.2 读取兼容（reminderAdvanceDays 遗留字段）
+- [ ] 🟢 core/ 目录覆盖率目标 ≥70%（vitest coverage）
+- [ ] 🟡 兼容性矩阵：思源 3.8.0 LTS / 最新 beta 各跑一轮回归脚本
+- [ ] 🟢 issue 模板（bug：环境信息+复现步骤；feature：场景+竞品参照）
+- [ ] 🟢 回归脚本模板化（docs/testing/ 每版本一份，含截图占位）
+
+## 22. 文档与用户支持
+
+- [ ] 🟡 用户手册 docs/guide/（每模块一页，含截图，上架前完成核心五模块）
+- [ ] 🟡 FAQ（数据存哪里/是否上传/如何备份/多设备）
+- [ ] 🟡 隐私声明 docs/privacy.md（README 与集市描述引用）
+- [ ] 🟡 生态 RPC API 文档 docs/api.md（方法/签名/since 版本，05 §2 的落地文档）
+- [ ] 🟡 README 中英双语截图与演示 GIF（替换纯文字介绍）
+- [ ] 🟢 60 秒快速上手视频脚本（B 站/小红书发布素材）
+- [ ] 🟢 ADR 索引页 docs/design/00-index.md（七条 ADR + 后续增补的导航）
+- [ ] 🟢 每版本 migration notes（用户可见的升级说明）
+- [ ] 🟢 键盘快捷键完整表（配合 17 组速查表）
+
+## 23. 发布工程与维护
+
+- [ ] 🟡 semver 策略文档（破坏性=大版本/新模块=小版本/修复=patch）
+- [ ] 🟡 minAppVersion 抬升策略（依赖新内核能力时才升）
+- [ ] 🟢 release notes 半自动生成（git log → CHANGELOG 草稿）
+- [ ] 🟡 zip 产物体积检查（<10MB，CI 门禁）
+- [ ] 🟢 beta 通道：GitHub prerelease 供内测用户先行
+- [ ] 🟡 集市竞品监控：每月检索家庭类新插件一次，回填 MODULES.md 附录
+- [ ] 🟢 用户反馈渠道定案（GitHub issue + ld246 帖）
+- [ ] 🟢 弃用提示机制（字段/模块弃用时面板内一次性通知）
+
+## 24. 设置与数据管理
+
+- [ ] 🟡 插件设置导出/导入（JSON 文件，跨设备/重装迁移辅助）
+- [ ] 🟡 恢复出厂：清空 settings 保留台账数据（双重确认）
+- [ ] 🟡 示例数据一键生成/一键清除（新用户体验与截图制作）
+- [ ] 🟢 数据体积概览（各模块行数/附件数量统计面板）
+- [ ] 🟢 迁移指南：Sortly/钱迹等 CSV → 本插件字段映射文档
+- [ ] 🟢 备份指引：结合思源备份机制的台账备份建议（写入 FAQ）
+
+## 25. GitHub 公开化准备（🟡 触发条件：v0.2 纵向切片完成且回归全绿）
+
+- [ ] 🟡 仓库公开前隐私审查：历史提交/文档/示例中无真实姓名、证件号、家庭数据
+- [ ] 🟡 示例数据生成器：虚拟家庭（"小飞驴一家"）一键生成，专供截图与演示（配合 24 组示例数据项）
+- [ ] 🟡 README 双语终稿 + badges（CI 状态/版本/license）
+- [ ] 🟡 social preview 图 + about topics（siyuan / siyuan-plugin / family / reminder）
+- [ ] 🟡 `.gitignore` 终审（dist/node_modules/本地环境/测试空间路径不入库）
+- [ ] 🟢 `assets/` 展示资产目录（截图与 GIF 源文件归档）
+- [ ] 🟡 CONTRIBUTING.md（开发环境/流程/规范摘要）
+- [ ] 🟡 issue 与 PR 模板落盘 `.github/`（21 组模板的落地项）
+- [ ] 🟢 GitHub Projects 看板或 milestone（v0.2/v0.3；以 TODO.md 为唯一事实源，Projects 仅展示）
+- [ ] 🟡 Releases 流程演练：tag → GitHub Release 附 zip（不发集市）
+- [ ] 🟡 0.x 预发布约定写入 README（0.x 阶段数据结构可能变，升级需看 migration notes）
+- [ ] 🟢 公开仓库首次 announcement 计划（发帖与否另定）
+- [ ] 🟡 代码目录终审：无实验残留、无注释掉的死代码、无调试入口
+- [ ] 🟢 git 历史敏感信息扫描（早期提交复查）
+
+## 26. 集市上架（⏸ 整体暂缓：触发条件由你另行决定，以下全部挂起）
+
+- [ ] ⏸ `disabledInPublish: true` 移除 + `minAppVersion` 复核
+- [ ] ⏸ fork `siyuan-note/bazaar` + `plugins.txt` 一行 PR（一次 PR 只做一件事）
+- [ ] ⏸ PR Check 校验修复（审核意见在原 PR 修改，不开新 PR）
+- [ ] ⏸ 集市 keywords/描述优化（plugin.json）
+- [ ] ⏸ 上架前终审：兼容矩阵（21 组）+ 安全扫描（mimosa）+ 隐私走查
+- [ ] ⏸ 审核反馈处理
+- [ ] ⏸ 上架后发布流水线常态化（每版本 release → 索引更新验证）
+
+## 27. 开发流程与协作
+
+- [ ] 🔴 conventional commits 规范（feat/fix/docs/refactor/test/chore，git-commit skill 已支持）
+- [ ] 🔴 eslint + prettier 配置统一（沿用模板或补齐，写入 CONTRIBUTING）
+- [ ] 🟡 pre-commit hook：staged 文件快速 lint（提交前秒级反馈）
+- [ ] 🟡 分支模型：main + feature/*；单人项目也走 PR 自检（触发 CI）
+- [ ] 🟡 PR 自查清单（check 通过/截图对比/TODO.md 勾选同步）
+- [ ] 🟡 每次合并后同步勾选 TODO.md（流程约定，防止清单腐化）
+- [ ] 🟢 代码内 TODO/FIXME 注释规范 + 每版本清扫一次
+- [ ] 🟢 多机开发同步约定（pull --rebase、禁 force push main）
+- [ ] 🟢 devlog 开发日志（GitHub Discussions，记录关键决策）
+
+## 28. 思源平台适配与增强
+
+- [ ] 🟡 状态栏入口：`addStatusBar`「今日到期 N」角标，点击直达提醒页
+- [ ] 🟡 Dock 面板评估：提醒中枢常驻侧栏（04 交互设计的遗留决策项）
+- [ ] 🟡 多前端实测矩阵：desktop / desktop-window / browser-desktop / mobile 各一轮
+- [ ] 🟡 第三方主题兼容走查（dark+/sunflower 等：color-mix 派生 token 在非官方主题下的表现）
+- [ ] 🟡 思源设置内字号缩放适配（相对单位检查，禁固定 px 的正文字号）
+- [ ] 🟡 高分屏/DPI 走查（发丝线、图标砖、光晕在不同缩放下）
+- [ ] 🟢 面包屑按钮：`addBreadcrumbButton`，打开台账文档时显示「在管家面板打开」
+- [ ] 🟢 AI Agent 能力注册：`addAgentCapability`「查询家庭到期/快速记录」（3.8.x 新能力）
+- [ ] 🟢 与常见插件共存抽测（面板类名/事件总线/dock 冲突）
+- [ ] 🟢 `siyuan://` 深链处理（通知点击在移动端的落地路径）
+- [ ] 🟢 `addFloatLayer` 探索：块内快速记录浮层
+- [ ] 🟢 台账行块拖入日记验证（思源原生块拖拽，文档化用法）
+- [ ] 🟢 打印/导出 PDF 时管家界面的降级样式
+- [ ] 🟢 `bootAppearances` 启动画面（远期彩蛋）
+
+## 29. 提醒中枢深化
+
+- [ ] 🟡 同成员同日多提醒合并展示（"儿子的 3 件事"折叠卡）
+- [ ] 🟡 每周预告摘要（周日推送下周 7 天清单）
+- [ ] 🟡 处理历史视图 + 月度完成率统计（到期处理率 = 质感的延伸）
+- [ ] 🟡 「快速备忘」开放决策：是否允许独立于台账的一次性提醒（如"周三给老师打电话"）——与 P2 原则的边界，需定案后更新 03 文档
+- [ ] 🟢 续期历史时间线（一个证件的历次换证/续保记录沉淀）
+- [ ] 🟢 默认提前量自适应（按用户实际处理时长学习）
+- [ ] 🟢 通知一键静音（今日免打扰快捷开关，顶栏）
+
+## 30. 国际化细节
+
+- [ ] 🟡 日期 locale 格式（zh `YYYY-MM-DD` / en 规范定案）
+- [ ] 🟡 农历显示的 en 方案设计决策（"腊月廿三"英文呈现方式）
+- [ ] 🟡 币种符号与千分位 locale 化（¥/￥/，分隔）
+- [ ] 🟡 英文复数处理（1 item / N items，i18n 键设计）
+- [ ] 🟢 双语言截图资产（README 与未来集市用）
+- [ ] 🟢 zh-TW 翻译启动（用词对照表：软体/资料/档案…）
+- [ ] 🟢 文案语气规范成文（按钮用动词开头、空态友好不卖萌、错误不说教）
+
+## 31. 体验研究与反馈
+
+- [ ] 🟡 内测计划：3-5 位真实用户（家人/朋友），两周使用 + 结构化访谈
+- [ ] 🟡 内测反馈表模板（按模块打分 + 高频场景 + 弃用模块原因）
+- [ ] 🟢 面板内「反馈」入口（跳转 GitHub issue）
+- [ ] 🟢 访谈提纲：哪些模块真实被用/哪些被关掉/提醒是否及时
+- [ ] 🟢 迭代优先级决策流程：内测数据 → TODO.md 重排（而非拍脑袋）
+
+## 32. Svelte / 前端工程规范
+
+- [ ] 🟡 组件目录规范：`src/panels/<screen>/`（index.svelte + 子组件拆分原则，禁止单文件超 300 行）
+- [ ] 🟡 状态管理定案：svelte 5 runes 单例 store 三分（settings / hub / ui），边界写进 08 文档
+- [ ] 🟡 SQL 结果类型化（query 泛型封装 + 每模块手写 Row 类型，禁 any）
+- [ ] 🟡 Svelte 错误边界：面板崩溃不拖垮思源主界面（顶层 error boundary + 降级 UI）
+- [ ] 🟡 加载态规范落地：何时 skeleton / 何时缓存直渲（对照 08 §4 状态矩阵逐屏标注）
+- [ ] 🟢 关键组件 props 文档注释（含用法示例）
+- [ ] 🟢 视觉回归抽查流程：改 token 后过一遍原型「组件库」屏截图比对
+
+---
+
+## 33. 2026-10-01 仓库审计补充（现状差距与新增验收线）
+
+> 本组来自对当前源码、原型、构建产物和文档的交叉审计。`pnpm run check` 与 `pnpm run build` 已通过，但当前可运行范围仍是 v0.1 的 Dialog、设置、成员引用和模块注册骨架；以下项目用于把“能编译”推进到“可交付、可恢复、可验证”。
+
+### 33.1 产品闭环与状态诚实
+
+- [ ] 🔴 现状能力矩阵：为每个模块声明 `ready/skeleton/planned`，并让默认启用项必须具备 schema、provider、空态和可执行入口；禁止“已启用但点击只弹规划中”
+- [ ] 🔴 `loadSettings` 回归：用户显式关闭 `defaultEnabled` 模块后重启仍保持关闭；新增模块只在版本化迁移时补入默认值
+- [ ] 🔴 首次引导状态迁移：向导完成或用户明确跳过后才写 `onboarded=true`；v0.1 已安装用户能看到一次迁移提示并可重跑
+- [ ] 🔴 模块启停事务：启用时显示建库进度、失败原因和重试；禁用只隐藏并保留数据，状态与 `dbRefs` 原子写入
+- [ ] 🟡 管家面板单实例：顶栏、命令和通知点击复用同一 Tab/Dialog，避免重复打开多个面板和过期状态
+- [ ] 🟡 设计契约引用矩阵：`docs/design/08`、`design-system.scss` 中的组件必须有实际页面引用或明确标为未实现，防止“样式已写但用户看不到”
+
+### 33.2 数据、建库与迁移正确性
+
+- [ ] 🔴 `createAttributeView` 端点落地并建立真实响应 fixture；删除当前占位抛错，验收创建、补列、视图、relation 四类能力
+- [ ] 🔴 建库补偿：文档创建成功而 AV/列/视图失败时写入 provisioning journal，下一次可恢复重试并清理或复用空文档；并发启用同一模块不得产生双库
+- [ ] 🔴 `dbRefs.notebook` 明确保存 ID；兼容旧的名称值、关闭/删除笔记本和重命名策略，禁止把 ID 当名称创建新笔记本
+- [ ] 🔴 台账稳定身份：查找键改用稳定 `moduleId` 标记/属性，不使用本地化标题；语言切换或文案修改不得重复建库
+- [ ] 🔴 schema 契约门禁：所有 `capture`、`views`、`reminders.field` 必须存在于 `columns`；补齐 certs 的 `due` 列或删除无效 endorsement 规则，并统一 `date/issue_date`、`issuance_rule` 命名
+- [ ] 🔴 relation 元数据：`member` 列声明目标 members 库及缺失降级策略；v0.1 `settings.members` → members 数据库的一次性迁移可重试、去重且保留引用
+- [ ] 🟡 目标笔记本配置落地：`HomeSettings` 增加 notebook ID/名称的迁移字段，设置页支持选择、关闭、删除后的恢复策略
+- [ ] 🟡 设置 schema 版本与迁移链：校验小时范围、提前量、成员字段和未知字段；坏文件先备份，再回退默认并给出可恢复提示
+- [ ] 🟡 去重修复工具：诊断区能发现重复模块文档/AV、孤儿 `dbRefs`、重复成员 ID，预览后安全合并并在迁移前自动备份
+
+### 33.3 提醒规则与运行态
+
+- [ ] 🔴 提醒字段语义契约：规则实际读取 `ReminderRuleSpec.field/cycleField/lunarField`，实现行级 `remind_before`、`leadOverrides`、`last_done` 优先级，校验并 clamp 无效提前量，明确 `later` 折叠/过滤语义，并过滤 archived/void 行
+- [ ] 🔴 日期序列化使用思源内核本地日期，不用 `toISOString().slice(0, 10)`；覆盖 UTC+8、夏令时、跨天和系统时间回拨矩阵
+- [ ] 🔴 农历边界策略定案并测试：闰月映射、无闰月年份、腊月廿九、正月初一、2 月 29 日周年（2/28、3/1 或跳过）及单条异常隔离
+- [ ] 🔴 recurring 算法与语义：明确逾期周期是否展示 overdue；月末 31 日不漂移；长期历史日期采用 O(1) 跳步，不能按天 `while` 扫描
+- [ ] 🔴 HubState 协议版本化：增加 `schemaVersion`、每成员/模块统计、扫描错误、snooze/mute/handled TTL 和旧缓存迁移；单模块失败不得把全局显示成“暂无事项”
+- [ ] 🟡 运行态清理：行删除、模块禁用、卸载和跨设备冲突时清理提醒缓存，限制 `snooze/mute/handled` 无限增长，通知去重按本地日历计算，并提供脱敏诊断导出
+
+### 33.4 UI、交互与可访问性
+
+- [ ] 🔴 设置编辑事务：使用 draft 副本；取消/关闭回滚未保存改动，dirty 状态触发离开确认，保存失败保留输入并支持重试
+- [ ] 🔴 成员编辑校验：首个成员可快速设为“自己”，名称必填、角色/日期合法；删除说明“仅移除引用/保留台账”并提供批量改派
+- [ ] 🔴 提醒区真实接线：移除静态空态，接入 HubState 的 loading/empty/error/stale/retry 状态和“下一步”操作
+- [ ] 🔴 无障碍走查：模块卡/成员 chip/表格行改为语义按钮或补齐 Enter+Space；补 label、heading、tablist/tabpanel、`aria-selected`、`aria-live`、可见焦点和读屏文案
+- [ ] 🔴 弹层行为契约：Dialog/抽屉支持初始焦点、focus trap、Esc、关闭后恢复焦点、`aria-modal`、滚动锁和未保存变更保护
+- [ ] 🟡 响应式矩阵：320/375/768/1024、desktop-window、browser、mobile 全部走查；Dialog 使用视口上限、成员行窄屏堆叠、触摸目标至少 44px、安全区可用
+- [ ] 🟡 无悬停操作：提醒/表格动作在键盘 focus-within、触摸和移动端均可见；不能只依赖 hover 后显示操作按钮
+- [ ] 🟡 主题与样式隔离：`.b3-tab-bar` 等旧样式全部挂 `.lv-home` 作用域，清理硬编码颜色并补 color-mix fallback、对比度和 high-contrast 验收
+- [ ] 🟡 文案国际化真值：关于页、版本、错误、ARIA、农历说明和诊断文案全部进入 zh-CN/en；禁止 `settings.svelte` 继续硬编码中文
+
+### 33.5 平台、发布与支持
+
+- [ ] 🔴 SQL/输入安全专项：所有动态查询统一参数化或严格 ID 校验；对话框 placeholder/defaultText、标题、备注、附件名称统一 textContent/HTML sanitization
+- [ ] 🔴 错误与诊断入口：设置页显示插件/思源版本、前端类型、失败端点、最近扫描和恢复步骤；日志永不输出证件号、金额、token
+- [ ] 🔴 前端/内核兼容矩阵：desktop、desktop-window、browser-desktop、browser-mobile、mobile 在 3.8 LTS 与最新 beta 上验证能力探测和降级路径
+- [ ] 🟡 多窗口状态一致性：settings 与 `hub.updated` 事件带版本/时间戳，覆盖乱序、重复、丢失事件并提供手动刷新提示
+- [ ] 🟡 发布包 smoke test：解压 `package.zip` 检查 manifest、双语 i18n、图标、`LICENSE`、`MODULES.md` 和 README 链接；处理 `dist` 未包含 docs/design、prototype 导致的失链
+- [ ] 🟡 元数据一致性门禁：`package.json` repository/homepage、作者、版本、license、`plugin.json`、README 和 release tag 在 CI 中交叉校验
+- [ ] 🟡 PR CI：除 tag release 外补充 PR 的 `check + build + 包体/产物检查`，并记录 zip 体积与关键文件哈希
+- [ ] 🟡 README / MODULES / TODO 发布策略统一：明确当前 v0.1 实现边界、GitHub Release 与集市暂缓状态，避免把路线图写成已交付能力
+- [ ] 🟢 卸载/重装/工作区切换测试：确认台账保留、设置恢复、插件 reload 不复用旧内存，`onunload` 清理事件、计时器和 observer
+
+---
+
+
+## 关键路径速览
+
+```
+S0(启动思源) → S1/S2 → A2a/A3 → A5 → B2 → C1 → C2-C7 → D
+                ⛔目前唯一阻塞点：思源实例未运行
+快速可先行（不依赖 Spike）：
+  0 工程基建(git init/icon) · B0/B1 单测 · C6c-d 块菜单与斜杠 · C7 向导骨架 · C8 设置壳 · 27 开发流程规范
+```
+
+> 统计：待办 34 组共 **390 项**（🔴 110 · 🟡 179 · 🟢 94，部分项含双重标记；⛔ 阻塞 14 项、⏸ 暂缓 8 项）。⛔ 项全部指向同一根因：**思源实例未启动**。

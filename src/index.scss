@@ -1,0 +1,132 @@
+// 小驴管家（Lv Home）样式入口
+// ① 设计系统（docs/design/07 §3、08）—— C1-C8 全部 UI 的实现基座
+@use "./styles/design-system";
+
+// ② v0.1 面板遗留样式（LEGACY）：dashboard/settings 两块 svelte 仍引用；
+//    C1 Tab 化改造时整体删除，替换为 design-system 中的 .lv-* 组件。
+.lv-home {
+    padding: 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    height: 100%;
+    box-sizing: border-box;
+    overflow: auto;
+}
+
+.lv-home__header {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.lv-home__title {
+    display: flex;
+    align-items: center;
+}
+
+.lv-home__section {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.lv-home__section-title {
+    font-weight: 600;
+    font-size: 14px;
+    opacity: 0.85;
+}
+
+.lv-home__group {
+    margin-bottom: 12px;
+}
+
+.lv-home__group-title {
+    font-size: 12px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    opacity: 0.6;
+    margin: 4px 0 8px;
+}
+
+.lv-home__grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+    gap: 8px;
+}
+
+.lv-home__card {
+    cursor: pointer;
+    padding: 8px 4px;
+
+    &:hover {
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.12);
+    }
+
+    .b3-card__info-title {
+        font-size: 14px;
+        font-weight: 600;
+    }
+
+    .b3-card__info-meta {
+        font-size: 12px;
+        opacity: 0.7;
+        margin-top: 4px;
+        word-break: break-all;
+    }
+}
+
+.lv-home__empty-card {
+    padding: 16px;
+    opacity: 0.75;
+}
+
+// 设置面板
+.lv-settings {
+    min-height: 480px;
+}
+
+.lv-settings__hint {
+    font-size: 13px;
+    opacity: 0.75;
+    margin-bottom: 4px;
+}
+
+.lv-settings__row {
+    align-items: flex-start;
+    gap: 12px;
+    padding: 6px 0;
+    border-bottom: 1px solid var(--b3-border-color);
+
+    .b3-card__info-meta {
+        font-size: 12px;
+        opacity: 0.7;
+    }
+
+    .b3-chip--small {
+        margin-left: 6px;
+        transform: scale(0.85);
+    }
+}
+
+.lv-settings__member {
+    align-items: center;
+}
+
+.lv-settings__footer {
+    gap: 8px;
+    margin-top: 8px;
+    align-items: center;
+}
+
+.b3-tab-bar {
+    gap: 4px;
+    border-bottom: 1px solid var(--b3-border-color);
+    padding-bottom: 8px;
+}
+
+.lv-settings__about {
+    line-height: 1.8;
+    font-size: 13px;
+}
