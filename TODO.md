@@ -578,7 +578,8 @@
 | 2026-10-02 | 循环A | 兜底循环 A 启动：devStatus 批量晋升 + 面板点击文案分级（ready/skeleton/planned 三态已实现） | modules.ts 31 项 skeleton；vitest 30/30 |
 | 2026-10-02 | 循环A | 第 6 项 i18n 走查 | scripts/check-i18n.mjs（check:i18n script）；451 键 zh/en 全对齐 |
 | 2026-10-02 | 循环A | 第 9 项安全审计 | 移除模板遗留 console.debug（配置含成员/金额禁止打印）；保留 error 一处（契约校验提示）；console 全库仅剩必要路径 |
-| 2026-10-02 | 循环A | 第 1 项代码质量 | package.json repository/homepage 补齐（25 组元数据一致性）；抽查 5 个导出符号无死代码实锤 | media/pets/vehicles/transit/travel×4/assets-virtual 9 个 + 修复核心缺口 assets-real/health（默认启用却无 schema 的建库缺口）+ 68 枚举 i18n（总 399 键）；gzip 35.3KB；contract gate 24 schema 全过；剩余无 schema：food/address/bookmarks/snippets/parenting/schooling/social |
+| 2026-10-02 | 循环A | 第 1 项代码质量 | package.json repository/homepage 补齐（25 组元数据一致性）；抽查 5 个导出符号无死代码实锤 |
+| 2026-10-02 | 循环A | 第 5 项文档一致性 | 全仓 47 个 md 相对链接核查零失效 | media/pets/vehicles/transit/travel×4/assets-virtual 9 个 + 修复核心缺口 assets-real/health（默认启用却无 schema 的建库缺口）+ 68 枚举 i18n（总 399 键）；gzip 35.3KB；contract gate 24 schema 全过；剩余无 schema：food/address/bookmarks/snippets/parenting/schooling/social |
 
 ---
 
