@@ -293,6 +293,7 @@
 - [ ] 🟢 bookmarks 失效链接检测（周期 HEAD 检查+标记失效——Raindrop 印证，进阶）
 - [ ] 🟢 快速录入日期智能解析（TickTick 印证：录"10月15日换证"自动填 due；中文日期 NLP，进阶）
 - [ ] 🟡 通知队列防轰炸（任务笔记管理模式：应用内通知单例队列 MAX=5 超出关最旧；B3 接线时采用）
+- [ ] 🟢 B3 出口扩展：Webhook 推送（Bark/ntfy 推手机）或与 siyuan-homepage 通知中心联动转发——不自建推送，借道既有出口（homepage 深挖印证）
 - [ ] 🟢 提醒双日期：deadline（必须完成日）与 plan（计划处理日）分离，逾期 deadline 加粗红显（Things 3 印证；总览可按 plan 提前展示）；Today 晚间分区（可选）
 - [ ] 🟢 stock/shopping 按品类自动分区视图（Apple Reminders Grocery 印证：录入品类自动归组）；台账列视图（看板）可选项
 - [ ] 🟡 C4a 复核点：Notion form 视图=表单直写库——思源原生是否有等价物（数据库表单/模板录入），若有则快速录入可走原生路径（来源 Notion 视图 2.0 调研）
@@ -603,7 +604,8 @@
 | 2026-10-02 | 循环B | 外部调研 Apple Reminders | Grocery 按品类自动分区产出待办（stock 分组视图）；列视图记可选项；来源 Apple Support |
 | 2026-10-02 | 循环B | 外部调研 Notion 视图 2.0 | 10 种视图与台账映射（form=快速录入原生路径候选，记 C4a 复核点）；map 思源暂无保持列表 |
 | 2026-10-02 | 循环B | 集市监控首轮（23 组） | 3 插件扫描：无家庭垂直竞品；任务笔记管理的移动端后台提醒印证 B3 可行性；23 组转为周期性持续 |
-| 2026-10-02 | 循环B | 任务笔记管理源码深挖 | NotificationDialog 队列模式（MAX=5）产出通知防轰炸待办；移动端后台教程在其知乎文章（B3 接线时参照） | media/pets/vehicles/transit/travel×4/assets-virtual 9 个 + 修复核心缺口 assets-real/health（默认启用却无 schema 的建库缺口）+ 68 枚举 i18n（总 399 键）；gzip 35.3KB；contract gate 24 schema 全过；剩余无 schema：food/address/bookmarks/snippets/parenting/schooling/social |
+| 2026-10-02 | 循环B | 任务笔记管理源码深挖 | NotificationDialog 队列模式（MAX=5）产出通知防轰炸待办；移动端后台教程在其知乎文章（B3 接线时参照） |
+| 2026-10-02 | 循环B | siyuan-homepage 深挖（循环B 本阶段收尾） | 通知中心 Webhook 出口产出 B3 扩展待办（Bark/ntfy 或联动转发）；循环 B 进入休眠，触发条件=新竞品信号或实测反馈 | media/pets/vehicles/transit/travel×4/assets-virtual 9 个 + 修复核心缺口 assets-real/health（默认启用却无 schema 的建库缺口）+ 68 枚举 i18n（总 399 键）；gzip 35.3KB；contract gate 24 schema 全过；剩余无 schema：food/address/bookmarks/snippets/parenting/schooling/social |
 
 ---
 
