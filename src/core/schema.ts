@@ -449,11 +449,14 @@ export const VEHICLES_SCHEMA: ModuleSchema = {
         ...d("expiry", "note"),
         { key: "mileage", type: "number", labelKey: "field.mileage" },
         { key: "inspection_due", type: "date", labelKey: "field.inspection_due" },
+        // 电池更换（grocy 印证：铅酸 1.5-2 年/锂 5-8 年——用户按实际记录下次更换日）
+        { key: "battery_due", type: "date", labelKey: "field.battery_due" },
     ],
     capture: ["name", "plate", "expiry", "inspection_due"],
     reminders: [
         { key: "expiry", field: "expiry", kind: "oneoff", leadDays: 30 },
         { key: "inspection", field: "inspection_due", kind: "oneoff", leadDays: 30 },
+        { key: "battery", field: "battery_due", kind: "oneoff", leadDays: 30 },
     ],
 };
 
