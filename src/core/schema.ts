@@ -29,7 +29,7 @@ export interface ColumnDef {
 export interface ViewDef {
     key: string;
     /** i18n 键：view.<module>.<key> */
-    type: "table";
+    type: "table" | "gallery";
     /** 按 key 过滤/分组的声明式描述（provisioner 建视图用） */
     groupBy?: string;
     sortBy?: { key: string; asc: boolean };
@@ -423,7 +423,11 @@ export const MEDIA_SCHEMA: ModuleSchema = {
         ...d("url", "date", "note"),
     ],
     capture: ["name", "category", "status", "rating"],
-    views: [{ key: "consuming", type: "table", groupBy: "category" }],
+    // 海报墙（seerr 印证，26.6）：画廊视图以封面卡片呈现；思源 gallery 视图类型原生支持
+    views: [
+        { key: "wall", type: "gallery" },
+        { key: "consuming", type: "table", groupBy: "status" },
+    ],
 };
 
 export const PETS_SCHEMA: ModuleSchema = {
