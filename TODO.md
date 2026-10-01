@@ -358,7 +358,7 @@
 
 - [x] 🟡 semver 策略文档（破坏性=大版本/新模块=小版本/修复=patch） ✅ 2026-10-02（并入 CONTRIBUTING 发布节；0.x 阶段附 migration notes 说明）
 - [x] 🟡 minAppVersion 抬升策略（依赖新内核能力时才升） ✅ 2026-10-02（并入 semver 节）
-- [ ] 🟢 release notes 半自动生成（git log → CHANGELOG 草稿）
+- [x] 🟢 release notes 半自动生成（git log → CHANGELOG 草稿） ✅ 2026-10-02（scripts/release-notes.mjs：Conventional Commits 按类型分组）
 - [x] 🟡 zip 产物体积检查（<10MB，CI 门禁） ✅ 2026-10-02（check:meta 内置 zip 体积门禁）
 - [ ] 🟢 beta 通道：GitHub prerelease 供内测用户先行
 - [x] 🟡 集市竞品监控：每月检索家庭类新插件一次，回填 MODULES.md 附录 ✅ 2026-10-02 首轮（ledger 记账不冲突；任务笔记管理证明移动端提醒可行；homepage 通知中心可参考；家庭垂直仍 0 竞品）
@@ -614,6 +614,7 @@
 | 2026-10-02 | 主线 | 22 组快捷键速查表 | 设置·关于区落地；策略=仅 2 命令可配避免冲突 |
 | 2026-10-02 | 主线 | C1c 真正收尾 | settings 面板类名统一 lv-settings 命名空间（脱离 LEGACY 段）；index.scss 仅剩 settings 现役类 |
 | 2026-10-02 | 循环B | 外部调研 Notion Calendar | 日期属性数据库直接上日历+Date 属性提醒——印证提醒中枢日历视图形态（v0.3+ 候选）；菜单栏理念印证状态栏角标；来源 notion.com/help |
+| 2026-10-02 | 主线 | 23 组 release notes 生成器 | scripts/release-notes.mjs（git log 分组草稿） |
 | 2026-10-02 | 循环B | 外部调研 flomo | 无压力捕捉印证快速备忘设计；每日回顾/八维统计参考到 v2.x 年报与统计卡；来源 flomoapp.com |
 | 2026-10-02 | 循环B | 外部调研 Notion Timeline | 起止日期范围=时间线上屏条件；travel-plan/schooling 的 timeline 视图在 v0.8 建库时补（schema 已有起止列）；来源 notion.com/help/timelines |
 | 2026-10-02 | 循环B | 外部调研 Things 3 Areas | Area→Project→To-do 层级强印证我们模块组→台账→行两层结构；组织归层级/时间归调度的分离与成员 chips+提醒中枢设计一致；来源 vanja.io/r/thingsapp |
