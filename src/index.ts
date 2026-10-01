@@ -16,6 +16,8 @@ import { CERTS_SCHEMA, MEMBERS_SCHEMA, MEDICINE_SCHEMA, MEMBERSHIPS_SCHEMA, INSU
 import type { HomeSettings } from "@/types";
 
 const TAB_TYPE = "hub-tab";
+/** 版本显示（诊断/关于）；发布时与 package.json/plugin.json 同步（update-version script 覆盖 dist 元数据） */
+const PLUGIN_VERSION = "0.2.0";
 
 /**
  * 小驴管家（Lv Home）
@@ -224,7 +226,7 @@ export default class LvHomePlugin extends Plugin {
     /** 诊断数据（33.5/A6）：台账落点状态、最近扫描、扫描错误、schema 契约 */
     getDiagnostics() {
         return {
-            version: "0.2.0",
+            version: PLUGIN_VERSION,
             scannedAt: this.runtime?.scannedAt,
             errors: this.scan?.errors ?? [],
             ledgers: Object.entries(this.settings.dbRefs).map(([id, ref]: [string, any]) => ({
