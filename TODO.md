@@ -643,6 +643,7 @@
 | 2026-10-02 | 循环B | 外部调研 Notion 数据库自动化 | 循环触发器（Every frequency，2025 新）印证提醒中枢 recurring 语义且我们更彻底（推算 due 而非仅跑自动化）；来源 notion.com/help/database-automations |
 | 2026-10-02 | 循环B | 外部调研 Google Tasks | 到期自动同步日历印证台账日历呈现（原生路线再确认）；Gmail 侧栏捕捉=顶栏⚡同位设计；来源 Google Workspace |
 | 2026-10-02 | 循环B | 外部调研 Todoist | Quick Add 输入即解析+Filter Queries+Assist 自然语言生成查询——智能解析与命名视图两待办的规格参照再强化；来源 todoist.com/help |
+| 2026-10-02 | 循环B | 外部调研 Any.do Family | 协作智能杂货清单印证品类分区；任务内聊天/@提及/指派=v2.x kernel broadcast 交互设计参照；来源 support.any.do |
 | 2026-10-02 | 主线 | 22 组快捷键速查表 | 设置·关于区落地；策略=仅 2 命令可配避免冲突 |
 | 2026-10-02 | 主线 | C1c 真正收尾 | settings 面板类名统一 lv-settings 命名空间（脱离 LEGACY 段）；index.scss 仅剩 settings 现役类 |
 | 2026-10-02 | 循环B | 外部调研 Notion Calendar | 日期属性数据库直接上日历+Date 属性提醒——印证提醒中枢日历视图形态（v0.3+ 候选）；菜单栏理念印证状态栏角标；来源 notion.com/help |
