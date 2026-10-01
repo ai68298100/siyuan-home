@@ -44,6 +44,7 @@ pnpm run make-link   # 软链到思源工作空间 data/plugins/
 - `minAppVersion` 抬升策略：仅当依赖新内核能力时才升（否则保持最大兼容面）
 - 版本号：`pnpm run update-version`（同步 package.json/plugin.json）
 - Release：打 tag → GitHub Release 附 package.zip（**集市上架暂缓**，由维护者决定时机）
+- **Beta 通道**：内测版本打 `vX.Y.Z-beta.N` 标签发 **GitHub prerelease**（勾选 "Set as a pre-release"）——内测用户手动下载安装；beta 不进 CHANGELOG 正式段，只在 prerelease notes 说明改动
 - 发布前：`docs/testing/v0.2.md` 回归脚本走查 + `check:meta` + smoke test（33.5）
 
 ## 问题反馈

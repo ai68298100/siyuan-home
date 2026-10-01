@@ -362,7 +362,7 @@
 - [x] 🟡 minAppVersion 抬升策略（依赖新内核能力时才升） ✅ 2026-10-02（并入 semver 节）
 - [x] 🟢 release notes 半自动生成（git log → CHANGELOG 草稿） ✅ 2026-10-02（scripts/release-notes.mjs：Conventional Commits 按类型分组）
 - [x] 🟡 zip 产物体积检查（<10MB，CI 门禁） ✅ 2026-10-02（check:meta 内置 zip 体积门禁）
-- [ ] 🟢 beta 通道：GitHub prerelease 供内测用户先行
+- [x] 🟢 beta 通道：GitHub prerelease 供内测用户先行 ✅ 2026-10-02（CONTRIBUTING 发布节：vX.Y.Z-beta.N 标签+prerelease 勾选+不进正式 CHANGELOG）
 - [x] 🟡 集市竞品监控：每月检索家庭类新插件一次，回填 MODULES.md 附录 ✅ 2026-10-02 首轮（ledger 记账不冲突；任务笔记管理证明移动端提醒可行；homepage 通知中心可参考；家庭垂直仍 0 竞品）
 - [ ] 🟢 用户反馈渠道定案（GitHub issue + ld246 帖）
 - [ ] 🟢 弃用提示机制（字段/模块弃用时面板内一次性通知）
