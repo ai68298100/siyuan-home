@@ -25,6 +25,8 @@
 <div class="b3-dialog__action"><button class="b3-button b3-button--cancel" id="lv-renew-cancel">${t("cancel")}</button><button class="b3-button b3-button--text" id="lv-renew-ok">${t("save")}</button></div>`,
             width: "380px",
         });
+        // 33.4 弹层契约：初始焦点落在日期输入
+        (dlg.element.querySelector("#lv-renew-date") as HTMLInputElement)?.focus();
         dlg.element.querySelector("#lv-renew-cancel")?.addEventListener("click", () => dlg.destroy());
         dlg.element.querySelector("#lv-renew-ok")?.addEventListener("click", async () => {
             const v = (dlg.element.querySelector("#lv-renew-date") as HTMLInputElement)?.value;
