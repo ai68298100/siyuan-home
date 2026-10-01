@@ -6,6 +6,7 @@
     const ledgers = $derived(
         Object.entries(plugin.settings.dbRefs).filter(([id, ref]: [string, any]) => ref?.avId && id !== "members"),
     );
+    // svelte-ignore state_referenced_locally
     let active = $state(plugin.activeLedger ?? "certs");
     let rows: any[] = $state([]);
     let loading = $state(false);
