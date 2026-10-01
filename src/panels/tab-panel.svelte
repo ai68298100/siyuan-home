@@ -3,7 +3,9 @@
     import Reminders from "./screens/reminders.svelte";
     import Ledger from "./screens/ledger.svelte";
     import Members from "./screens/members.svelte";
-    import type { HomeSettings, HubRuntime, Reminder, ScanResult } from "@/types";
+    import type { HomeSettings, Reminder } from "@/types";
+    import type { HubRuntime } from "@/core/hub/runtime";
+    import type { ScanResult } from "@/core/hub/scanner";
 
     interface IHomePluginLike {
         i18n: Record<string, string>;
