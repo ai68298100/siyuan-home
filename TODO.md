@@ -212,7 +212,7 @@
 - [ ] 🟢 书影音国际产品集群：Goodreads/StoryGraph/Letterboxd/Trakt/Komga（gh 可查 gotson/komga）
 - [ ] 🟢 健康用药集群：Medisafe/MyTherapy/Apple 健康/CareZone 兴衰
 - [ ] 🟢 车辆旅行国际集群：Drivvo/Fuelio/TripIt/Wanderlog/PackPoint/Polarsteps
-- [ ] 🟢 效率小件集群：Raindrop/espanso（gh）/TextExpander/家庭 binder
+- [x] 🟢 效率小件集群（部分）：espanso 已查（14.6k★：触发词展开+Forms 表单参数位印证 snippets 形态；系统级注入不吸收）；Raindrop/TextExpander 留待下轮
 - [ ] 🟢 国际家庭管理集群：Cozi/FamilyWall/Maple/OurHome/Sweepy/Tody/Homechart（gh）
 - [x] 🟢 记账补充：Actual 已查（12k★，本地优先+加密同步架构印证；信封预算不吸收）；MoneyWiz 留待下轮
 - [ ] 🟢 调研结论回填 MODULES.md 附录 + 影响新模块/字段时更新 schema
@@ -586,7 +586,8 @@
 | 2026-10-02 | 循环A | 第 3 项（部分：check 链）+ 第 7 项（盘点） | check:i18n 纳入 pnpm check；a11y 盘点：buttons 全量可键盘达、aria-label/role/tabindex 已有基础，剩余=抽屉 focus trap 与 aria-live（记 33.4 剩余） |
 | 2026-10-02 | 循环A | 第 8 项性能 + 循环终局 | gzip 35.9KB 实测达标（预算 100KB）；9 项走查完成 7 项，剩余 2 项（无障碍补齐/any 清零）已归属 33.4 与 C 阶段；循环 A 关闭，后续触发条件=实测反馈或新模块生产 |
 | 2026-10-02 | 循环B | v0.5 疫苗程序表种子数据 | immunization.ts（22 剂+推算函数）；政策公开数据，无版权问题 |
-| 2026-10-02 | 循环B | 外部调研最小轮 | actual（12k★：加密同步/快照设计印证）、seerr（12.7k★：媒体状态机印证）回填 MODULES.md 附录 | media/pets/vehicles/transit/travel×4/assets-virtual 9 个 + 修复核心缺口 assets-real/health（默认启用却无 schema 的建库缺口）+ 68 枚举 i18n（总 399 键）；gzip 35.3KB；contract gate 24 schema 全过；剩余无 schema：food/address/bookmarks/snippets/parenting/schooling/social |
+| 2026-10-02 | 循环B | 外部调研最小轮 | actual（12k★：加密同步/快照设计印证）、seerr（12.7k★：媒体状态机印证）回填 MODULES.md 附录 |
+| 2026-10-02 | 循环B | 外部调研 espanso | 14.6k★；snippets 印证 Forms 参数位形态回填 MODULES.md | media/pets/vehicles/transit/travel×4/assets-virtual 9 个 + 修复核心缺口 assets-real/health（默认启用却无 schema 的建库缺口）+ 68 枚举 i18n（总 399 键）；gzip 35.3KB；contract gate 24 schema 全过；剩余无 schema：food/address/bookmarks/snippets/parenting/schooling/social |
 
 ---
 
