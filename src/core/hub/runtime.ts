@@ -45,6 +45,8 @@ export interface HubRuntime {
     lastNotifiedDate?: string;
     /** 逾期即时提醒去重：最后提示日期（B3b） */
     lastOverdueAlertDate?: string;
+    /** 逾期即时提醒去重：最后提示日期（B3b） */
+    lastOverdueAlertDate?: string;
 }
 
 export function defaultRuntime(): HubRuntime {
@@ -62,12 +64,19 @@ export async function saveRuntime(plugin: Plugin, rt: HubRuntime): Promise<void>
     await plugin.saveData(RUNTIME_NAME, rt);
 }
 
-/** 派生提醒 → 呈现列表：合并 snooze/mute，追加 adhoc 备忘 */
+/** 派生提醒 → 呈现列表：合并 snooze/mute，追加 adhoc 备忘（过期 30 天以上的备忘自动清理，33.3） */
 export function applyRuntime(
     derived: Reminder[],
     rt: HubRuntime,
     today: Date,
 ): Reminder[] {
+    // 备忘自动清理：过期超过 30 天的直接移除（保存时机由调用方负责）
+    const cutoff = today.getTime() - 30 * 86400000;
+    rt.memos = (rt.memos ?? []).filter((m) => {
+        const [y, mo, d] = m.dueDate.split("-").map(Number);
+        const due = new Date(y, (mo ?? 1) - 1, d ?? 1).getTime();
+        return due >= cutoff;
+    });
     const out: Reminder[] = [];
     for (const r of derived) {
         if (rt.muted[r.id]) continue;
