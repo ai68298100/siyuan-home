@@ -94,7 +94,7 @@
             role="button"
             tabindex="0"
             onkeydown={(e: KeyboardEvent) => e.key === "Enter" && onGoto("ledger")}
-            onclick={() => onGoto("ledger")}
+            onclick={() => { plugin.setActiveLedger(mid); onGoto("ledger"); }}
         >
             <div class="lv-mi t-blue">🗂</div><b>{t(`module.${mid}`)}</b>
             <div class="lv-stat">

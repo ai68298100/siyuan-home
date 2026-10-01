@@ -608,7 +608,8 @@
 | 2026-10-02 | 循环B | siyuan-homepage 深挖（循环B 本阶段收尾） | 通知中心 Webhook 出口产出 B3 扩展待办（Bark/ntfy 或联动转发）；循环 B 进入休眠，触发条件=新竞品信号或实测反馈 |
 | 2026-10-02 | 主线 | C3d 筛选持久化 | runtime.hubFilter；健康巡检全绿 |
 | 2026-10-02 | 主线 | B3b 逾期即时提醒 | 每日首次扫描 overdue>0 且非静默 → error 级提示；lastOverdueAlertDate 去重 |
-| 2026-10-02 | 主线 | B4e 定位动作（R5 降级实施） | 提醒行加定位按钮 → 打开该模块台账文档；行内高亮待非 detached 行路径解锁 | media/pets/vehicles/transit/travel×4/assets-virtual 9 个 + 修复核心缺口 assets-real/health（默认启用却无 schema 的建库缺口）+ 68 枚举 i18n（总 399 键）；gzip 35.3KB；contract gate 24 schema 全过；剩余无 schema：food/address/bookmarks/snippets/parenting/schooling/social |
+| 2026-10-02 | 主线 | B4e 定位动作（R5 降级实施） | 提醒行加定位按钮 → 打开该模块台账文档；行内高亮待非 detached 行路径解锁 |
+| 2026-10-02 | 主线 | C2d 深化 | 模块卡点击 → setActiveLedger 预选对应模块台账 | media/pets/vehicles/transit/travel×4/assets-virtual 9 个 + 修复核心缺口 assets-real/health（默认启用却无 schema 的建库缺口）+ 68 枚举 i18n（总 399 键）；gzip 35.3KB；contract gate 24 schema 全过；剩余无 schema：food/address/bookmarks/snippets/parenting/schooling/social |
 
 ---
 
