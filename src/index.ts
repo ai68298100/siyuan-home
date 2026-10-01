@@ -12,7 +12,7 @@ import { CertsProvider, MembersProvider, SchemaLedgerProvider } from "@/core/hub
 import { dailyDigest, markNotified } from "@/core/hub/notify";
 import { complete, snooze, mute, unmute, renew, addMemo } from "@/core/hub/actions";
 import { provisionModule } from "@/core/provisioner";
-import { CERTS_SCHEMA, MEMBERS_SCHEMA, MEDICINE_SCHEMA, MEMBERSHIPS_SCHEMA, INSURANCE_SCHEMA, SHOPPING_SCHEMA, CONTRACTS_SCHEMA, EXAMS_SCHEMA, ALLOWANCE_SCHEMA, FAVORS_SCHEMA, STOCK_SCHEMA, CHORES_SCHEMA, HOUSE_SCHEMA, validateSchema } from "@/core/schema";
+import { CERTS_SCHEMA, MEMBERS_SCHEMA, MEDICINE_SCHEMA, MEMBERSHIPS_SCHEMA, INSURANCE_SCHEMA, SHOPPING_SCHEMA, CONTRACTS_SCHEMA, EXAMS_SCHEMA, ALLOWANCE_SCHEMA, FAVORS_SCHEMA, STOCK_SCHEMA, CHORES_SCHEMA, HOUSE_SCHEMA, MEDIA_SCHEMA, PETS_SCHEMA, VEHICLES_SCHEMA, TRANSIT_SCHEMA, TRAVEL_PLAN_SCHEMA, TRAVEL_BOOKING_SCHEMA, TRAVEL_PACKING_SCHEMA, TRAVEL_LOG_SCHEMA, ASSETS_VIRTUAL_SCHEMA, ASSETS_REAL_SCHEMA, HEALTH_SCHEMA, validateSchema } from "@/core/schema";
 import type { HomeSettings } from "@/types";
 
 const TAB_TYPE = "hub-tab";
@@ -63,10 +63,15 @@ export default class LvHomePlugin extends Plugin {
         // schema 契约门禁（33.2）：开发期发现违规立即暴露
         const allSchemas: [string, any][] = [
             ["members", MEMBERS_SCHEMA], ["certs", CERTS_SCHEMA],
+            ["assets-real", ASSETS_REAL_SCHEMA], ["health", HEALTH_SCHEMA],
             ["medicine", MEDICINE_SCHEMA], ["memberships", MEMBERSHIPS_SCHEMA], ["insurance", INSURANCE_SCHEMA],
             ["shopping", SHOPPING_SCHEMA], ["contracts", CONTRACTS_SCHEMA], ["exams", EXAMS_SCHEMA],
             ["allowance", ALLOWANCE_SCHEMA], ["favors", FAVORS_SCHEMA], ["stock", STOCK_SCHEMA],
             ["chores", CHORES_SCHEMA], ["house", HOUSE_SCHEMA],
+            ["media", MEDIA_SCHEMA], ["pets", PETS_SCHEMA], ["vehicles", VEHICLES_SCHEMA], ["transit", TRANSIT_SCHEMA],
+            ["travel-plan", TRAVEL_PLAN_SCHEMA], ["travel-booking", TRAVEL_BOOKING_SCHEMA],
+            ["travel-packing", TRAVEL_PACKING_SCHEMA], ["travel-log", TRAVEL_LOG_SCHEMA],
+            ["assets-virtual", ASSETS_VIRTUAL_SCHEMA],
         ];
         for (const [id, schema] of allSchemas) {
             const errors = validateSchema(id, schema);
@@ -100,6 +105,8 @@ export default class LvHomePlugin extends Plugin {
         const plans: [string, any, string][] = [
             ["members", MEMBERS_SCHEMA, this.i18n["module.members"]],
             ["certs", CERTS_SCHEMA, this.i18n["module.certs"]],
+            ["assets-real", ASSETS_REAL_SCHEMA, this.i18n["module.assets-real"]],
+            ["health", HEALTH_SCHEMA, this.i18n["module.health"]],
             ["medicine", MEDICINE_SCHEMA, this.i18n["module.medicine"]],
             ["memberships", MEMBERSHIPS_SCHEMA, this.i18n["module.memberships"]],
             ["insurance", INSURANCE_SCHEMA, this.i18n["module.insurance"]],
@@ -111,6 +118,15 @@ export default class LvHomePlugin extends Plugin {
             ["stock", STOCK_SCHEMA, this.i18n["module.stock"]],
             ["chores", CHORES_SCHEMA, this.i18n["module.chores"]],
             ["house", HOUSE_SCHEMA, this.i18n["module.house"]],
+            ["media", MEDIA_SCHEMA, this.i18n["module.media"]],
+            ["pets", PETS_SCHEMA, this.i18n["module.pets"]],
+            ["vehicles", VEHICLES_SCHEMA, this.i18n["module.vehicles"]],
+            ["transit", TRANSIT_SCHEMA, this.i18n["module.transit"]],
+            ["travel-plan", TRAVEL_PLAN_SCHEMA, this.i18n["module.travel-plan"]],
+            ["travel-booking", TRAVEL_BOOKING_SCHEMA, this.i18n["module.travel-booking"]],
+            ["travel-packing", TRAVEL_PACKING_SCHEMA, this.i18n["module.travel-packing"]],
+            ["travel-log", TRAVEL_LOG_SCHEMA, this.i18n["module.travel-log"]],
+            ["assets-virtual", ASSETS_VIRTUAL_SCHEMA, this.i18n["module.assets-virtual"]],
         ];
         for (const [id, schema, title] of plans) {
             if (!enabled.has(id)) continue;
@@ -125,6 +141,8 @@ export default class LvHomePlugin extends Plugin {
         const providers = [
             new CertsProvider(deps),
             new MembersProvider(deps),
+            new SchemaLedgerProvider("assets-real", ASSETS_REAL_SCHEMA, deps),
+            new SchemaLedgerProvider("health", HEALTH_SCHEMA, deps),
             new SchemaLedgerProvider("medicine", MEDICINE_SCHEMA, deps),
             new SchemaLedgerProvider("memberships", MEMBERSHIPS_SCHEMA, deps),
             new SchemaLedgerProvider("insurance", INSURANCE_SCHEMA, deps),
@@ -133,6 +151,11 @@ export default class LvHomePlugin extends Plugin {
             new SchemaLedgerProvider("stock", STOCK_SCHEMA, deps),
             new SchemaLedgerProvider("chores", CHORES_SCHEMA, deps),
             new SchemaLedgerProvider("house", HOUSE_SCHEMA, deps),
+            new SchemaLedgerProvider("pets", PETS_SCHEMA, deps),
+            new SchemaLedgerProvider("vehicles", VEHICLES_SCHEMA, deps),
+            new SchemaLedgerProvider("transit", TRANSIT_SCHEMA, deps),
+            new SchemaLedgerProvider("travel-plan", TRAVEL_PLAN_SCHEMA, deps),
+            new SchemaLedgerProvider("assets-virtual", ASSETS_VIRTUAL_SCHEMA, deps),
         ];
         const scan = await runScan(providers, this.settings, this.runtime);
         this.scan = scan;

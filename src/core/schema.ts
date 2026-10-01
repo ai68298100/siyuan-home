@@ -197,6 +197,37 @@ export const INSURANCE_SCHEMA: ModuleSchema = {
 
 // ── v0.4/v0.6 批量 schema（02 §4.3 紧凑规格落地）─────────────────
 
+export const ASSETS_REAL_SCHEMA: ModuleSchema = {
+    columns: [
+        ...d("name", "member"),
+        { ...FIELD_DICT.category, options: ["appliance", "furniture", "digital", "toy", "apparel", "jewelry", "collection", "sports", "other_ar"] },
+        { ...FIELD_DICT.status, options: ["inuse", "idle", "lent", "repairing", "disposed"] },
+        ...d("date", "amount", "expiry", "location", "attachments", "tags", "note"),
+        { key: "brand_model", type: "text", labelKey: "field.brand_model" },
+        { key: "warranty_expiry", type: "date", labelKey: "field.warranty_expiry" },
+        { key: "channel", type: "text", labelKey: "field.channel" },
+    ],
+    capture: ["name", "category", "amount", "date", "attachments"],
+    views: [{ key: "by_location", type: "table", groupBy: "location" }],
+    reminders: [{ key: "warranty", field: "warranty_expiry", kind: "oneoff", leadDays: 30 }],
+};
+
+export const HEALTH_SCHEMA: ModuleSchema = {
+    columns: [
+        ...d("name", "member"),
+        { ...FIELD_DICT.category, options: ["visit", "report", "vaccine", "medication", "allergy", "checkup"] },
+        { ...FIELD_DICT.status, options: ["following", "closed"] },
+        ...d("date", "attachments", "note"),
+        { key: "hospital", type: "text", labelKey: "field.hospital" },
+        { key: "department", type: "text", labelKey: "field.department" },
+        { key: "diagnosis", type: "text", labelKey: "field.diagnosis" },
+        { key: "followup_date", type: "date", labelKey: "field.followup_date" },
+    ],
+    capture: ["name", "member", "category", "date", "attachments"],
+    views: [{ key: "by_member", type: "table", groupBy: "member" }],
+    reminders: [{ key: "followup", field: "followup_date", kind: "oneoff", leadDays: 7 }],
+};
+
 export const SHOPPING_SCHEMA: ModuleSchema = {
     columns: [
         ...d("name", "member"),
@@ -293,6 +324,117 @@ export const HOUSE_SCHEMA: ModuleSchema = {
     ],
     capture: ["name", "category", "pay_day", "cycle"],
     reminders: [{ key: "pay_day", field: "pay_day", kind: "anniversary", leadDays: 7, lunarField: "lunar" }],
+};
+
+// ── v0.7/v0.8 批量 schema ────────────────────────────────────
+
+export const MEDIA_SCHEMA: ModuleSchema = {
+    columns: [
+        ...d("name", "member"),
+        { ...FIELD_DICT.category, options: ["movie", "tv", "variety", "book", "comic", "novel"] },
+        { ...FIELD_DICT.status, options: ["wishlist", "consuming", "done", "dropped"] },
+        { key: "rating", type: "number", labelKey: "field.rating" },
+        { key: "progress", type: "text", labelKey: "field.progress" },
+        ...d("url", "date", "note"),
+    ],
+    capture: ["name", "category", "status", "rating"],
+    views: [{ key: "consuming", type: "table", groupBy: "category" }],
+};
+
+export const PETS_SCHEMA: ModuleSchema = {
+    columns: [
+        ...d("name"),
+        { key: "species", type: "select", labelKey: "field.species", options: ["cat", "dog", "other_pet"] },
+        { key: "breed", type: "text", labelKey: "field.breed" },
+        { key: "vaccine_due", type: "date", labelKey: "field.vaccine_due" },
+        { key: "deworm_due", type: "date", labelKey: "field.deworm_due" },
+        ...d("note"),
+    ],
+    capture: ["name", "species", "vaccine_due", "deworm_due"],
+    reminders: [
+        { key: "vaccine", field: "vaccine_due", kind: "oneoff", leadDays: 14 },
+        { key: "deworm", field: "deworm_due", kind: "recurring", leadDays: 7, cycleField: "cycle" },
+    ],
+};
+
+export const VEHICLES_SCHEMA: ModuleSchema = {
+    columns: [
+        ...d("name", "member"),
+        { key: "plate", type: "text", labelKey: "field.plate" },
+        ...d("expiry", "note"),
+        { key: "mileage", type: "number", labelKey: "field.mileage" },
+        { key: "inspection_due", type: "date", labelKey: "field.inspection_due" },
+    ],
+    capture: ["name", "plate", "expiry", "inspection_due"],
+    reminders: [
+        { key: "expiry", field: "expiry", kind: "oneoff", leadDays: 30 },
+        { key: "inspection", field: "inspection_due", kind: "oneoff", leadDays: 30 },
+    ],
+};
+
+export const TRANSIT_SCHEMA: ModuleSchema = {
+    columns: [
+        ...d("name", "member"),
+        { ...FIELD_DICT.category, options: ["etc", "transit_card", "monthly", "senior"] },
+        ...d("expiry", "note"),
+        { key: "card_no", type: "text", labelKey: "field.card_no" },
+    ],
+    capture: ["name", "category", "expiry"],
+    reminders: [{ key: "expiry", field: "expiry", kind: "oneoff", leadDays: 30 }],
+};
+
+export const TRAVEL_PLAN_SCHEMA: ModuleSchema = {
+    columns: [
+        ...d("name", "member"),
+        { ...FIELD_DICT.status, options: ["planning", "ongoing", "finished"] },
+        ...d("date", "expiry", "amount", "note"),
+        { key: "destination", type: "text", labelKey: "field.destination" },
+    ],
+    capture: ["name", "destination", "date", "expiry"],
+    reminders: [{ key: "date", field: "date", kind: "oneoff", leadDays: 7 }],
+};
+
+export const TRAVEL_BOOKING_SCHEMA: ModuleSchema = {
+    columns: [
+        ...d("name"),
+        { ...FIELD_DICT.category, options: ["flight", "hotel", "train", "ticket", "rental"] },
+        ...d("date", "amount", "attachments", "note"),
+        { key: "order_no", type: "text", labelKey: "field.order_no" },
+    ],
+    capture: ["name", "category", "date", "order_no"],
+};
+
+export const TRAVEL_PACKING_SCHEMA: ModuleSchema = {
+    columns: [
+        ...d("name"),
+        { ...FIELD_DICT.status, options: ["draft", "packed"] },
+        ...d("date", "note"),
+        { key: "checklist_doc", type: "text", labelKey: "field.checklist_doc" },
+    ],
+    capture: ["name", "date", "status"],
+};
+
+export const TRAVEL_LOG_SCHEMA: ModuleSchema = {
+    columns: [
+        ...d("name", "member"),
+        ...d("date", "amount", "attachments", "note"),
+        { key: "cities", type: "text", labelKey: "field.cities" },
+    ],
+    capture: ["name", "date", "amount"],
+};
+
+export const ASSETS_VIRTUAL_SCHEMA: ModuleSchema = {
+    columns: [
+        ...d("name", "member"),
+        { ...FIELD_DICT.category, options: ["account", "domain", "game", "nft", "license", "other_v"] },
+        ...d("expiry", "note"),
+        { key: "platform", type: "text", labelKey: "field.platform" },
+        { key: "account_name", type: "text", labelKey: "field.account_name" },
+        { key: "cred_loc", type: "text", labelKey: "field.cred_loc" },
+        { key: "inherit_note", type: "text", labelKey: "field.inherit_note" },
+    ],
+    capture: ["name", "category", "platform", "account_name", "cred_loc"],
+    reminders: [{ key: "expiry", field: "expiry", kind: "oneoff", leadDays: 30 }],
 };
 
 // ── schema 契约校验（33.2 门禁）─────────────────────────────
