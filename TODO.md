@@ -603,6 +603,7 @@
 | 2026-10-02 | 循环B | 外部调研 Things 3 | 双日期分离（deadline/plan）产出新待办；This Evening 晚间分区记可选；来源 culturedcode 官方支持文档 |
 | 2026-10-02 | 循环B | 外部调研 Apple Reminders | Grocery 按品类自动分区产出待办（stock 分组视图）；列视图记可选项；来源 Apple Support |
 | 2026-10-02 | 循环B | 外部调研 Microsoft To Do | My Day/星标/共享列表印证总览与徽章设计；家庭共享列表印证 v2.x kernel broadcast；来源 Microsoft Support |
+| 2026-10-02 | 循环B | 社区需求信号调研 | Issue #15002（dock 时间提醒=社区公认缺口）；家庭垂直在社区侧亦空白——定位持续有效；来源 ld246/GitHub 检索 |
 | 2026-10-02 | 主线 | 33.4 弹层契约（部分） | 续期 Dialog 初始焦点落日期输入；aria-live 需结构配合暂缓 |
 | 2026-10-02 | 主线 | 33.4 微补 | 总览空状态卡 role=status（读屏播报空态切换） |
 | 2026-10-02 | 循环B | 外部调研 Notion 视图 2.0 | 10 种视图与台账映射（form=快速录入原生路径候选，记 C4a 复核点）；map 思源暂无保持列表 |
