@@ -39,6 +39,9 @@
 | 2026-10-03 | 主线 | 第三十一轮：EC15 落地 + LvHome 服务桥 + BRIDGE.md | 人情抽屉「记录到人脉」（ensurePerson + recordInteraction externalRef 幂等 + favorSyncs 留痕）；window.LvHome 服务桥 v1（protocol 1/capabilities 五项/summary 仅计数/addMemo 校验）+ docs/BRIDGE.md 契约文档；v0.3 生态 RPC window 版先行；单测 126 持平、i18n 622 键、gzip 50.6KB |
 | 2026-10-03 | 循环A | 第三十一波走查 | ensurePerson 返回类型修正（补 name 字段）；模板字符串转义修正（金额拼接）；favorSyncs 类型入 HubRuntime |
 | 2026-10-03 | 循环B | ③信源=兄弟仓源码（第七轮） | EC15 完成「身份→契约→落地」全链路（第二十三轮摘录 §1 recordInteraction → 本轮实现）；EC 生态落地计数增至七项 |
+| 2026-10-03 | 主线 | 第三十二轮：C7c 收口 + 打印样式 | 向导建库 loading/error 内联展示（按钮禁用+文字切换+失败 inline）；@media print 全局规则（隐藏交互/白底/防跨页）；单测 126 持平、i18n 623 键、gzip 50.9KB |
+| 2026-10-03 | 循环A | 第三十二波走查 | 新增样式均用 b3/lv token；新 i18n 键即补 |
+| 2026-10-03 | 循环B | ③轮休 | 兜底循环转入静默待命——代码线可自主项确认全部收尾 |
 | 2026-10-03 | 主线 | 第二十八轮：EC03/v0.3 服务桥 window.LvHome 落地 | src/bridge/external-bridge.ts（protocol 1/capabilities 五项/whenReady/openButler/openReminders/addMemo 校验/summary 仅计数）+ docs/BRIDGE.md 契约文档（对齐人脉 BRIDGE 纪律：只提供服务不读他库/挂载卸载语义/版本策略）；重复挂载守卫；5 项单测；单测 121→126、i18n 608 持平、gzip 49.5KB |
 | 2026-10-03 | 循环A | 第二十八波走查 | 未用参数即修；summary 计数断言修正（today=daysLeft≤0 含逾期，测试初值写错）；重复挂载守卫（多实例不覆盖首桥） |
 | 2026-10-03 | 循环B | ③信源=兄弟仓 BRIDGE 模式（人脉 external-bridge 直读） | 管家桥的挂载/卸载/纪律三段对人脉同构复刻；EC 组「摘录→落地」第二例（EC16→EC13→EC03） |
@@ -158,7 +161,7 @@
 - [x] 🔴 C7a 首次引导向导：三步（家庭构成→推荐模块→建库确认） ✅ 2026-10-02（Tab 化 + 数据接线 commit，见 34 组记录）
 > 复核注：C7a 的“三步”是设计/历史记录；生产 `onboarding.svelte` 当前实际渲染 STEP 1/2，推荐模块与完成动作合并，建库进度/局部失败/取消/重试仍由 C7c 与 PX02–PX05 负责。
 - [x] 🔴 C7b 引导按 suggestRoles 预选逻辑（子女→育儿/上学/零花钱） ✅ 2026-10-02（Tab 化 + 数据接线 commit，见 34 组记录）
-- [ ] 🔴 C7c 引导建库批处理（provisioner 逐模块）+ 完成空态引导（2026-10-03 第十四轮进度：建库起止 toast 提示落地；逐模块进度条/局部失败重试 UI 仍无——provisionError 已入诊断区，交互级重试随 F07 局部修复设计）
+- [x] 🔴 C7c 引导建库批处理（provisioner 逐模块）+ 完成空态引导 ✅ 2026-10-03 第三十二轮（finishOnboarding 内联 loading/error——向导按钮在建库期间禁用+文字切换、失败时 inline 显示 provisionError；起止 toast + provisionIssues 汇总此前已落；交互级重试/进度条仍随 F07）
 - [x] 🔴 C7d 引导可跳过、设置页可重跑 ✅ 2026-10-02（bundle gzip 132→32KB；成员过滤持久化；三级分组；向导重跑）
 - [x] 🔴 C8a 设置五分区：模块/成员/提醒/生态/关于 ✅ 2026-10-03 第五轮（生态分区以 C8d 占位开关落地，五分区齐）
 - [x] 🔴 C8b 模块开关接线（启用→provisioner 建库；禁用→隐藏保留数据 + 确认框） ✅ 2026-10-02 第四轮（保存时检测模块集合变化 → ensureCoreLedgers 立即建库；禁用弹确认框说明数据保留语义；真机走查待回归）
@@ -341,7 +344,7 @@
 - [ ] 🟢 成员网格拖拽排序
 - [ ] 🟡 头像上传（asset 文件选择器 → 成员库 avatar 列）
 - [ ] 🟡 单条记录复制为脱敏文本（分享场景）
-- [ ] 🟡 紧急信息卡打印样式（@media print，家庭紧急信息卡可打印）
+- [x] 🟡 紧急信息卡打印样式（@media print，家庭紧急信息卡可打印） ✅ 2026-10-03 第三十二轮（@media print：隐藏导航/操作按钮/快捷记录行，白底黑字，卡片防跨页断裂——覆盖总览/提醒/台账/成员/设置五屏）
 - [x] 🟢 快捷键速查表（设置·关于区） ✅ 2026-10-02（快捷键与入口说明进关于区）
 - [ ] 🟢 成员下钻面包屑返回
 - [x] 🔴 删除行走思源块删除（保留撤销窗口），禁止绕过 UI 直接删（detached 行语义修正 ✅ 2026-10-03 第九轮：detached 行非块，走 av 行删除端点（[待实测]）+ 双确认 + 失败引导手动删除；绑定行的块删除与撤销窗口维持 P12 实测后设计）
