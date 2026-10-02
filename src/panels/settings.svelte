@@ -10,6 +10,8 @@
         getDiagnostics?: () => any;
         /** moduleId → schema 目录（D12 深度健康检查用） */
         schemaCatalog?: Record<string, { columns?: { key: string }[] }>;
+        /** 保存后广播到全部页签（H02） */
+        refreshHub?: () => Promise<unknown>;
     }
 
     let { plugin, settings }: {
