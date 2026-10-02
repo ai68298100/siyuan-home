@@ -54,6 +54,9 @@
 | 2026-10-03 | 主线 | 第三十七轮：onboarding skip 错误处理修复 | skip() 无 try/catch——kernel 不可达时 finishOnboarding 的 Promise rejection 被静默吞掉（真实 bug）；修复后弹 error toast；单测 126 持平、gzip 51.5KB |
 | 2026-10-03 | 循环A | 第三十七波走查 | showError 复用 provisionIssues 键 |
 | 2026-10-03 | 循环B | ③轮休（延续） | 兜底循环静默待命（延续） |
+| 2026-10-03 | 主线 | 第三十八轮：成员保存/删除/台账重建错误处理 | doSave/confirmRemove/rebuildLedger 三条异步链路补 try/catch——内核不可达等异常不再静默吞掉；单测 126 持平、gzip 51.5KB |
+| 2026-10-03 | 循环A | 第三十八波走查 | 未处理 Promise rejection 全扫——panels 层已清零（剩余在 core 层由调用方 catch） |
+| 2026-10-03 | 循环B | ③轮休（延续） | 兜底循环静默待命（延续） |
 | 2026-10-03 | 主线 | 第三十六轮：代码卫生 + EC18/19 确认 | 死代码 safe-mount.ts 移除（ErrorBoundary 取代）；monthlyCompletions 24 个月保留期入 purgeHandled；LeiQie 无 bookmarks/snippets 消费 API（EC18/19 供方依赖确认）；单测 126 持平、gzip 51.4KB |
 | 2026-10-03 | 循环A | 第三十六波走查 | 死代码移除零引用验证；purgeHandled 月度清理边界（24 个月 cutoffKey）逻辑复核 |
 | 2026-10-03 | 循环B | ③信源=兄弟仓源码（第六轮） | LeiQie 无 getBookmarks/getSnippets 对外暴露——EC18/19 维持供方依赖注记 |
