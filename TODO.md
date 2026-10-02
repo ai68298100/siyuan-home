@@ -387,7 +387,7 @@
 - [x] 🟡 CONTRIBUTING.md（开发环境/流程/规范摘要） ✅ 2026-10-02（含约定 8 条：事实源/i18n/内核 API 收口/数据边界/隐私红线等）
 - [ ] 🟡 issue 与 PR 模板落盘 `.github/`（21 组模板的落地项）
 - [ ] 🟢 GitHub Projects 看板或 milestone（v0.2/v0.3；以 TODO.md 为唯一事实源，Projects 仅展示）
-- [ ] 🟡 Releases 流程演练：tag → GitHub Release 附 zip（不发集市）
+- [x] 🟡 Releases 流程演练：tag → GitHub Release 附 zip（不发集市） ✅ 2026-10-02（v0.1.0-alpha.1 实操全程跑通：build→tag→push→prerelease+zip 附件）
 - [ ] 🟡 0.x 预发布约定写入 README（0.x 阶段数据结构可能变，升级需看 migration notes）
 - [ ] 🟢 公开仓库首次 announcement 计划（发帖与否另定）
 - [ ] 🟡 代码目录终审：无实验残留、无注释掉的死代码、无调试入口
@@ -692,6 +692,7 @@
 | 2026-10-02 | 主线 | 33.5 元数据一致性校验脚本 | scripts/check-meta.mjs（name/version 交叉+文件存在性+上架开关提示）；check:meta script |
 | 2026-10-02 | 主线 | 23 组 zip 体积门禁 | check:meta 内置（<10MB） |
 | 2026-10-02 | 主线 | 25 组 issue/PR 模板落盘 .github/ | bug/feature 模板 + PR 自查清单 |
+| 2026-10-02 | 主线 | Releases 流程演练（beta 通道实操） | v0.1.0-alpha.1 prerelease 发布成功（zip 附件+notes）；发布通道全程验证 |
 | 2026-10-02 | 主线 | C5b 成员下钻最小版 | 成员卡点击展开该成员提醒明细（徽章+逐条+完成动作）；完整跨模块时间线留 v0.5+ |
 | 2026-10-02 | 主线 | C1c（部分） | 删除废弃 dashboard.svelte（Tab 化后无引用）；settings 面板为现役保留 |
 | 2026-10-02 | 主线 | C1c 收尾（第一步完成） | LEGACY 段 7 个 dashboard 专用类删除（全局零引用验证）；settings 现役类保留；css 21.8→更精简 |
