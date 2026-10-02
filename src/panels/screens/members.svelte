@@ -65,6 +65,17 @@
 
     async function save() {
         if (!name.trim()) return;
+        // D06 配套：同名成员会让按姓名回填产生歧义——新增时提示确认（编辑不受影响）
+        const dup = !editId && (plugin.settings.members ?? []).some((m: any) => m.name.trim() === name.trim());
+        if (dup) {
+            confirm(t("members.dupTitle"), t("members.dupBody").replace("${name}", name.trim()), () => doSave());
+            return;
+        }
+        await doSave();
+    }
+
+    async function doSave() {
+        if (!name.trim()) return;
         if (editId) {
             const target = (plugin.settings.members ?? []).find((m: any) => m.id === editId);
             if (target) {

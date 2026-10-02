@@ -589,5 +589,9 @@
     "wiz.provisioning": "Creating ledgers for ${n} modules… (a few seconds on first run)",
     "wiz.provisioned": "Ledgers ready for ${n} modules — enjoy!",
     "hub.mergeHint": "Multiple items, same person & day — click to expand",
-    "members.unassigned": "Unassigned member"
+    "members.unassigned": "Unassigned member",
+    "wiz.provisionIssues": "${n} module ledger(s) failed to create: ${modules}. See Settings → About → Diagnostics for reasons and retry",
+    "settings.importNormalized": "Imported (${m} unknown module(s) dropped, ${r} member field(s) repaired)",
+    "members.dupTitle": "Duplicate member name",
+    "members.dupBody": "A member named \"${name}\" already exists. Same names create ambiguity when linking ledger rows by name (manual choice needed). Add another member with this name anyway?"
 }

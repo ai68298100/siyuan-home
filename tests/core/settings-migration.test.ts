@@ -3,7 +3,7 @@
  * + 15 组：坏文件容错 + 17 组：同键通知合并器。
  */
 import { describe, it, expect, beforeEach } from "vitest";
-import { loadSettings } from "@/core/settings";
+import { loadSettings, normalizeImportedSettings } from "@/core/settings";
 import { coalescedNotify, resetNotifyState } from "@/libs/notify-queue";
 
 function pluginWithSettings(data: unknown) {
@@ -62,6 +62,34 @@ describe("坏文件容错（15 组）", () => {
         const s = await loadSettings(plugin);
         expect(s.corruptedSettings).toBe(true);
         expect((saved["settings.json.corrupted.json"] as any).reason).toContain("non-object");
+    });
+});
+
+describe("导入归一化（16 轮：未知模块剔除 + 成员字段修复）", () => {
+    it("未知模块剔除并报告；已知模块保留", () => {
+        const { settings, droppedModules } = normalizeImportedSettings({
+            enabledModules: ["certs", "members", "ghost", "future-thing"],
+            members: [],
+        });
+        expect(settings.enabledModules.sort()).toEqual(["certs", "members"]);
+        expect(droppedModules.sort()).toEqual(["future-thing", "ghost"]);
+    });
+
+    it("成员修复：缺 id 补 id、缺名补 ?、非法角色归 other", () => {
+        const { settings, repairedMembers } = normalizeImportedSettings({
+            enabledModules: ["certs"],
+            members: [
+                { name: "张三", role: "self" },                    // 缺 id
+                { id: "m2", role: "child" },                        // 缺名
+                { id: "m3", name: "李四", role: "wizard" },         // 非法角色
+                { id: "m4", name: "王五", role: "elder" },          // 合法
+            ],
+        });
+        expect(repairedMembers).toBe(3);
+        expect(settings.members[0].id).toBeTruthy();
+        expect(settings.members[1].name).toBe("?");
+        expect(settings.members[2].role).toBe("other");
+        expect(settings.members[3].role).toBe("elder");
     });
 });
 

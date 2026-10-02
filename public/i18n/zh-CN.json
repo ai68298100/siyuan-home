@@ -589,5 +589,9 @@
     "wiz.provisioning": "正在为 ${n} 个模块创建台账…（首次约需数秒）",
     "wiz.provisioned": "已建好 ${n} 个模块的台账，开始使用吧",
     "hub.mergeHint": "同人同日多件事，点击展开",
-    "members.unassigned": "未指定成员"
+    "members.unassigned": "未指定成员",
+    "wiz.provisionIssues": "有 ${n} 个模块建库未成功：${modules}。可到设置 → 关于 → 诊断查看原因并重试",
+    "settings.importNormalized": "导入完成（已剔除 ${m} 个未知模块、修复 ${r} 处成员字段）",
+    "members.dupTitle": "同名成员已存在",
+    "members.dupBody": "已有成员叫「${name}」。同名会让按姓名回填台账时产生歧义（需要人工选择）。确认仍要添加一位同名成员吗？"
 }

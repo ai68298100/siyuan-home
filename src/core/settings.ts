@@ -74,6 +74,47 @@ export async function saveSettings(plugin: Plugin, settings: HomeSettings): Prom
     await plugin.saveData(SETTINGS_NAME, settings);
 }
 
+export interface NormalizedImport {
+    settings: HomeSettings;
+    /** 未知模块 id（已从 enabledModules 剔除并进报告，不再静默丢弃） */
+    droppedModules: string[];
+    /** 成员记录修复数（缺 id 补 id、缺名补 ?、非法角色归 other） */
+    repairedMembers: number;
+}
+
+/**
+ * 导入归一化（设置导入/24 组）：在合并前把导入数据校正到合法形状。
+ * - enabledModules 只保留已知模块 id（未知 = 版本差/手改 → 剔除并报告）；
+ * - members 逐条修复（id/name/role），不给 downstream 留脏形状。
+ */
+export function normalizeImportedSettings(data: Record<string, any>): NormalizedImport {
+    const defaults = defaultSettings();
+    const known = new Set(BUILT_IN_MODULES.map((m) => m.id));
+    const rawEnabled: string[] = Array.isArray(data.enabledModules) ? data.enabledModules.filter((x: any) => typeof x === "string") : [];
+    const enabled = rawEnabled.filter((id) => known.has(id));
+    const droppedModules = [...new Set(rawEnabled.filter((id) => !known.has(id)))];
+
+    let repairedMembers = 0;
+    const roles = new Set(["self", "spouse", "partner", "child", "elder", "kin", "other"]);
+    const members = (Array.isArray(data.members) ? data.members : []).map((m: any) => {
+        const fixed = { ...m };
+        if (!fixed.id || typeof fixed.id !== "string") { fixed.id = `m-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 7)}`; repairedMembers++; }
+        if (typeof fixed.name !== "string" || !fixed.name.trim()) { fixed.name = "?"; repairedMembers++; }
+        if (!roles.has(fixed.role)) { fixed.role = "other"; repairedMembers++; }
+        return fixed;
+    });
+
+    const settings: HomeSettings = {
+        ...defaults,
+        ...data,
+        enabledModules: enabled,
+        members,
+        leadOverrides: isPlainObject(data.leadOverrides) ? (data.leadOverrides as Record<string, number>) : defaults.leadOverrides,
+        dbRefs: isPlainObject(data.dbRefs) ? data.dbRefs : defaults.dbRefs,
+    };
+    return { settings, droppedModules, repairedMembers };
+}
+
 export function newMember(name: string, role: MemberRole, birthday?: string, lunarBirthday?: boolean): FamilyMember {
     return {
         id: `m-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 7)}`,

@@ -119,13 +119,20 @@
                 throw new Error("invalid settings shape");
             }
             confirm(t("settings.importTitle"), t("settings.importBody").replace("${file}", file.name), async () => {
-                const { defaultSettings } = await import("@/core/settings");
-                const merged = { ...defaultSettings(), ...data };
-                plugin.settings = merged;
+                // 24 组/16 轮：导入归一化——未知模块剔除进报告、成员字段修复，不再静默丢弃
+                const { normalizeImportedSettings } = await import("@/core/settings");
+                const norm = normalizeImportedSettings(data);
+                plugin.settings = norm.settings;
                 await import("@/core/settings").then((m) => m.saveSettings(plugin as any, plugin.settings));
                 await plugin.ensureCoreLedgers?.();
                 await plugin.refreshHub?.();
-                showMessage(t("settings.importDone"), 3000, "info");
+                if (norm.droppedModules.length > 0 || norm.repairedMembers > 0) {
+                    showMessage(t("settings.importNormalized")
+                        .replace("${m}", String(norm.droppedModules.length))
+                        .replace("${r}", String(norm.repairedMembers)), 6000, "info");
+                } else {
+                    showMessage(t("settings.importDone"), 3000, "info");
+                }
             });
         } catch (err) {
             showMessage(`${t("settings.importBad")}${err instanceof Error ? ` (${err.message})` : ""}`, 5000, "error");

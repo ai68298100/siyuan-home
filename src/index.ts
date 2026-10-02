@@ -303,7 +303,8 @@ export default class LvHomePlugin extends Plugin {
             await this.ensureCoreLedgers();
             const ref = this.settings.dbRefs[moduleId];
             if (!ref?.avId || !ref.columns) throw new Error("ledger not provisioned");
-            const name = text.length > 40 ? `${text.slice(0, 40)}…` : text;
+            // 码点安全截断（Array.from 按 Unicode 码点切，emoji/生僻字不被劈成乱码）
+            const name = Array.from(text).length > 40 ? `${Array.from(text).slice(0, 40).join("")}…` : text;
             const itemID = await addDetachedRow(ref.avId, name);
             const targetCol = looksUrl ? ref.columns.url : ref.columns.content;
             if (targetCol) {
@@ -387,7 +388,17 @@ export default class LvHomePlugin extends Plugin {
         showMessage(this.i18nText("wiz.provisioning").replace("${n}", String(moduleIds.length)), 4000, "info");
         await this.ensureCoreLedgers();
         await saveSettings(this, this.settings);
-        showMessage(this.i18nText("wiz.provisioned").replace("${n}", String(moduleIds.length)), 3000, "info");
+        // C7c 收尾：建库失败浮出（此前只进诊断区，向导完成后用户无感）
+        const failed = Object.entries(this.settings.dbRefs)
+            .filter(([id, ref]) => this.settings.enabledModules.includes(id) && (ref as any)?.provisionError)
+            .map(([id]) => this.i18nText(`module.${id}`));
+        if (failed.length > 0) {
+            showMessage(this.i18nText("wiz.provisionIssues")
+                .replace("${n}", String(failed.length))
+                .replace("${modules}", failed.join("、")), 8000, "error");
+        } else {
+            showMessage(this.i18nText("wiz.provisioned").replace("${n}", String(moduleIds.length)), 3000, "info");
+        }
         await this.refreshHub();
     }
 
