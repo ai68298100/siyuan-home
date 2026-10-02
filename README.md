@@ -31,6 +31,10 @@ Full feature list, roadmap and market research: [MODULES.md](./MODULES.md).
 
 Full accounting, password vaults, official data integrations, real-time travel info, barcode wallets, telemedicine, media streaming. Lv Home stays at the **ledger + reminders + archive** layer.
 
+## Roadmap
+
+Current status & plans: [ROADMAP.md](./ROADMAP.md).
+
 ## Development
 
 ```bash
