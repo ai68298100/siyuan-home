@@ -540,5 +540,10 @@
     "eco.glean": "Lv Glean (clippings)",
     "eco.exam": "Lv Exam (study plans)",
     "eco.flashcard": "Lv Flashcard (spaced repetition)",
-    "eco.leiqie": "LeiQie (quick inject)"
+    "eco.leiqie": "LeiQie (quick inject)",
+    "capture.menu": "Save to Lv Home",
+    "capture.saved": "Saved to \"${module}\"",
+    "capture.moduleOff": "Module \"${module}\" is disabled — enable it in settings and retry",
+    "capture.failed": "Save failed: ${msg}",
+    "statusbar.tip": "${n} due today — click to view"
 }

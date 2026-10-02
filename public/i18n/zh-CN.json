@@ -540,5 +540,10 @@
     "eco.glean": "小驴拾遗（剪藏归档）",
     "eco.exam": "小驴考试（备考计划）",
     "eco.flashcard": "小驴闪卡（记忆卡片）",
-    "eco.leiqie": "雷切（快速注入）"
+    "eco.leiqie": "雷切（快速注入）",
+    "capture.menu": "存入小驴管家",
+    "capture.saved": "已存入「${module}」",
+    "capture.moduleOff": "「${module}」模块未启用——可在设置中开启后重试",
+    "capture.failed": "存入失败：${msg}",
+    "statusbar.tip": "今日到期 ${n} 件，点击查看"
 }

@@ -9,9 +9,10 @@ import { loadSettings, saveSettings } from "@/core/settings";
 import { loadRuntime, saveRuntime, purgeHandled, listHandled, type HubRuntime } from "@/core/hub/runtime";
 import { runScan, deriveVisible, type ScanResult } from "@/core/hub/scanner";
 import { CertsProvider, MembersProvider, SchemaLedgerProvider, NumericRuleProvider } from "@/core/hub/providers";
-import { dailyDigest, markNotified } from "@/core/hub/notify";
+import { dailyDigest, markNotified, inSilentHours } from "@/core/hub/notify";
 import { complete, snooze, mute, unmute, renew, restore, addMemo, removeMemo } from "@/core/hub/actions";
 import { provisionModule } from "@/core/provisioner";
+import { addDetachedRow, setCell } from "@/core/siyuan";
 import { CERTS_SCHEMA, MEMBERS_SCHEMA, MEDICINE_SCHEMA, MEMBERSHIPS_SCHEMA, INSURANCE_SCHEMA, SHOPPING_SCHEMA, CONTRACTS_SCHEMA, EXAMS_SCHEMA, ALLOWANCE_SCHEMA, FAVORS_SCHEMA, STOCK_SCHEMA, CHORES_SCHEMA, HOUSE_SCHEMA, MEDIA_SCHEMA, PETS_SCHEMA, VEHICLES_SCHEMA, TRANSIT_SCHEMA, TRAVEL_PLAN_SCHEMA, TRAVEL_BOOKING_SCHEMA, TRAVEL_PACKING_SCHEMA, TRAVEL_LOG_SCHEMA, ASSETS_VIRTUAL_SCHEMA, ASSETS_REAL_SCHEMA, HEALTH_SCHEMA, FOOD_SCHEMA, ADDRESS_SCHEMA, BOOKMARKS_SCHEMA, SNIPPETS_SCHEMA, PARENTING_SCHEMA, SCHOOLING_SCHEMA, SOCIAL_SCHEMA, validateSchema } from "@/core/schema";
 import type { HomeSettings } from "@/types";
 
@@ -47,6 +48,19 @@ export default class LvHomePlugin extends Plugin {
     hubListeners = new Set<() => void>();
     /** 扫描序号（H11）：慢的旧扫描不得覆写新扫描结果或之后的手动动作 */
     private scanSeq = 0;
+    /** 下次面板挂载的目标页签（状态栏/通知入口预选） */
+    pendingScreen?: string;
+    private statusbarEl?: HTMLElement;
+    /** C6c 块菜单监听（onunload 精确解绑用） */
+    private captureMenuHandler?: (...args: any[]) => void;
+    /** 状态栏角标更新（28 组：今日到期 N） */
+    private updateStatusbar(count: number) {
+        if (!this.statusbarEl) return;
+        this.statusbarEl.textContent = `⏰ ${count}`;
+        this.statusbarEl.style.display = count > 0 ? "" : "none";
+        this.statusbarEl.setAttribute("aria-label", this.i18nText("statusbar.tip").replace("${n}", String(count)));
+        this.statusbarEl.title = this.i18nText("statusbar.tip").replace("${n}", String(count));
+    }
 
     /** i18n 取值（1.2.8 起 i18n 为 JSONValue，字符串位置统一转 string） */
     i18nText(key: string): string {
@@ -114,6 +128,26 @@ export default class LvHomePlugin extends Plugin {
         this.heartbeat = window.setInterval(() => {
             this.refreshHub().catch((e) => console.warn("[siyuan-home] heartbeat scan failed:", e));
         }, 30 * 60 * 1000);
+
+        // C6c：块菜单入口——选中文字 → 存为常用语/网址（URL 形态分流到 bookmarks，其余进 snippets）
+        this.captureMenuHandler = ((event: { detail: { menu: { addItem: (item: unknown) => void } } }) => {
+            const text = (window.getSelection()?.toString() ?? "").trim();
+            if (!text) return;
+            event.detail.menu.addItem({
+                icon: "iconInbox",
+                label: this.i18nText("capture.menu"),
+                click: () => this.quickCapture(text),
+            });
+        }) as any;
+        this.eventBus.on("open-menu-content", this.captureMenuHandler);
+
+        // 28 组：状态栏「今日到期 N」角标（点击打开管家并预选提醒页）
+        const statusEl = document.createElement("div");
+        statusEl.className = "lv-statusbar";
+        statusEl.style.cssText = "cursor:pointer;padding:0 6px;font-size:12px;display:none";
+        statusEl.onclick = () => { this.pendingScreen = "reminders"; this.showTab(); };
+        this.addStatusBar({ element: statusEl });
+        this.statusbarEl = statusEl;
     }
 
     /** 布局就绪后：首次引导数据准备 + 建库 + 扫描（不阻塞启动） */
@@ -217,7 +251,6 @@ export default class LvHomePlugin extends Plugin {
         }
         // B3b：逾期事项每日首次发现立即提示（H12：与摘要共用静默判断）
         const { localDateKey } = await import("@/core/hub/rule");
-        const { inSilentHours } = await import("@/core/hub/notify");
         const today = localDateKey(new Date());
         if (scan.counts.overdue > 0 && !inSilentHours(this.settings) && this.runtime.lastOverdueAlertDate !== today) {
             this.runtime.lastOverdueAlertDate = today;
@@ -226,6 +259,8 @@ export default class LvHomePlugin extends Plugin {
         // H03：显式清理已完成运行态记录（未处理项永不自动删），清理结果随本次落盘
         purgeHandled(this.runtime, new Date());
         await saveRuntime(this, this.runtime);
+        const todayDue = scan.reminders.filter((r) => r.daysLeft <= 0).length;
+        this.updateStatusbar(todayDue);
         this.hubListeners.forEach((fn) => fn());
         return scan;
     }
@@ -260,7 +295,38 @@ export default class LvHomePlugin extends Plugin {
         } catch (e) {
             console.warn("[siyuan-home] runtime save after action failed:", e instanceof Error ? e.message : e);
         }
+        this.updateStatusbar(reminders.filter((r) => r.daysLeft <= 0).length);
         this.hubListeners.forEach((fn) => fn());
+    }
+
+    /**
+     * C6c：选中文字快速存入（URL 形态 → bookmarks.url；其余 → snippets.content）。
+     * 模块未启用给引导；失败保留原文在剪贴板（文本本就在原文档中，不丢数据）。
+     */
+    async quickCapture(text: string) {
+        const looksUrl = /^https?:\/\/\S+$/i.test(text);
+        const moduleId = looksUrl ? "bookmarks" : "snippets";
+        if (!this.settings.enabledModules.includes(moduleId)) {
+            showMessage(this.i18nText("capture.moduleOff").replace("${module}", this.i18nText(`module.${moduleId}`)), 5000, "info");
+            return;
+        }
+        try {
+            await this.ensureCoreLedgers();
+            const ref = this.settings.dbRefs[moduleId];
+            if (!ref?.avId || !ref.columns) throw new Error("ledger not provisioned");
+            const name = text.length > 40 ? `${text.slice(0, 40)}…` : text;
+            const itemID = await addDetachedRow(ref.avId, name);
+            const targetCol = looksUrl ? ref.columns.url : ref.columns.content;
+            if (targetCol) {
+                await setCell(ref.avId, targetCol, itemID, looksUrl
+                    ? { type: "url", url: { content: text } }
+                    : { type: "text", text: { content: text } });
+            }
+            showMessage(this.i18nText("capture.saved").replace("${module}", this.i18nText(`module.${moduleId}`)), 3000, "info");
+            await this.refreshHub();
+        } catch (e) {
+            showMessage(this.i18nText("capture.failed").replace("${msg}", e instanceof Error ? e.message : String(e)), 5000, "error");
+        }
     }
 
     showTab() {
@@ -353,7 +419,12 @@ export default class LvHomePlugin extends Plugin {
         if (this.heartbeat) window.clearInterval(this.heartbeat);
         this.heartbeat = undefined;
         // 18 组清理审计：面板 destroy 时自行移除 listener，此处兜底清空；
-        // scanSeq 自增使在途扫描结果失效（H11：卸载后不落盘/不通知/不更新 UI）
+        // scanSeq 自增使在途扫描结果失效（H11：卸载后不落盘/不通知/不更新 UI）；
+        // 块菜单监听与状态栏角标解绑/移除
+        if (this.captureMenuHandler) this.eventBus.off("open-menu-content", this.captureMenuHandler);
+        this.captureMenuHandler = undefined;
+        this.statusbarEl?.remove();
+        this.statusbarEl = undefined;
         this.hubListeners.clear();
         this.scanSeq++;
     }

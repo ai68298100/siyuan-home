@@ -21,6 +21,8 @@
         mute: (id: string) => Promise<unknown>;
         unmute: (id: string) => Promise<unknown>;
         showTabDocs: (docId?: string) => void;
+        /** 状态栏/通知入口预选页签（消费后清空） */
+        pendingScreen?: string;
     }
 
     let { plugin }: { plugin: IHomePluginLike } = $props();
@@ -28,7 +30,11 @@
     const t = (key: string) => String(plugin.i18n[key] ?? key);
 
     type ScreenId = "overview" | "reminders" | "ledger" | "members";
-    let screen: ScreenId = $state("overview");
+    // 状态栏/通知入口可预选页签（plugin.pendingScreen，消费后清空）——初始快照为设计意图
+    // svelte-ignore state_referenced_locally
+    const initialScreen = (plugin.pendingScreen as ScreenId | undefined) ?? "overview";
+    if (plugin.pendingScreen) plugin.pendingScreen = undefined;
+    let screen: ScreenId = $state(initialScreen);
     const screens: { id: ScreenId; key: string }[] = [
         { id: "overview", key: "tab.overview" },
         { id: "reminders", key: "tab.reminders" },
