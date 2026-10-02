@@ -83,3 +83,30 @@
         outline-offset: -2px;
     }
 }
+
+// 17 组：紧急信息卡打印样式——隐藏导航/操作按钮，保留核心数据
+@media print {
+    .lv-tabbar,
+    .filters,
+    .lv-rem-ops,
+    .lv-qbtn,
+    .lv-settings__footer,
+    button {
+        display: none !important;
+    }
+
+    .lv-home,
+    .lv-screen {
+        background: white !important;
+        color: black !important;
+    }
+
+    .lv-card {
+        border: 1px solid #ccc !important;
+        break-inside: avoid;
+    }
+
+    .lv-hero h1 {
+        font-size: 1.2rem;
+    }
+}

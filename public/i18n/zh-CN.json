@@ -620,5 +620,6 @@
     "ec15.done": "已在人脉为「${n}」记录交集（${r} 条）",
     "ec15.failed": "人脉记录失败：${msg}",
     "ec15.received": "收礼",
-    "ec15.given": "送礼"
+    "ec15.given": "送礼",
+    "wiz.provisioningShort": "建库中…"
 }

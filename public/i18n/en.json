@@ -620,5 +620,6 @@
     "ec15.done": "Interaction recorded for \"${n}\" (${r} entry)",
     "ec15.failed": "Lv Contacts recording failed: ${msg}",
     "ec15.received": "Received",
-    "ec15.given": "Given"
+    "ec15.given": "Given",
+    "wiz.provisioningShort": "Setting up…"
 }

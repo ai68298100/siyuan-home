@@ -3,6 +3,8 @@
     let { plugin, t, onGoto }: { plugin: HomePluginLike; t: (k: string) => string; onGoto?: (s: string) => void } = $props();
 
     let step = $state(1);
+    let provisioning = $state(false);
+    let provisionError = $state("");
     const roleOptions = ["spouse", "partner", "child", "elder", "kin"];
     let picked: string[] = $state(["self"]);
     let children = $state(0);
@@ -17,12 +19,21 @@
         if (!picked.includes("child")) children = 0;
     }
 
-    // C7 向导 CTA：完成后直达证件快速录入（预选 certs）
+    // C7 向导 CTA：完成后直达证件快速录入（预选 certs）；C7c：建库 loading/error 反馈
     async function finishAndCapture() {
-        const roles = ["self", ...picked];
-        await plugin.finishOnboarding({ roles, children }, recommended);
-        plugin.setActiveLedger("certs");
-        onGoto?.("ledger");
+        if (provisioning) return;
+        provisioning = true;
+        provisionError = "";
+        try {
+            const roles = ["self", ...picked];
+            await plugin.finishOnboarding({ roles, children }, recommended);
+            plugin.setActiveLedger("certs");
+            onGoto?.("ledger");
+        } catch (e) {
+            provisionError = e instanceof Error ? e.message : String(e);
+        } finally {
+            provisioning = false;
+        }
     }
     // 完成=建库+直达证件快速录入（C7 CTA）
     function skip() { plugin.finishOnboarding({ roles: ["self"], children: 0 }, []); }
@@ -59,9 +70,15 @@
             {/each}
             {#if recommended.length === 0}<span class="lv-sub">{t("wiz.noExtra")}</span>{/if}
         </div>
-        <div style="display:flex;justify-content:space-between">
+        <div style="display:flex;justify-content:space-between;align-items:center">
             <button class="b3-button b3-button--outline" onclick={() => (step = 1)}>← {t("wiz.back")}</button>
-            <button class="b3-button b3-button--text" title={t("wiz.finishCta")} onclick={finishAndCapture}>✓ {t("wiz.finishAndCapture")}</button>
+            {#if provisionError}
+                <span class="lv-caption" style="color:var(--lv-danger);flex:1;margin:0 8px">⚠ {provisionError}</span>
+            {/if}
+            <button class="b3-button b3-button--text" disabled={provisioning}
+                title={t("wiz.finishCta")} onclick={finishAndCapture}>
+                {provisioning ? t("wiz.provisioningShort") : `✓ ${t("wiz.finishAndCapture")}`}
+            </button>
         </div>
     {/if}
 </div>
