@@ -494,5 +494,6 @@
     "members.editing": "Editing — save writes back to the ledger row",
     "members.syncError": "Ledger row sync failed",
     "members.syncPartial": "${n} member row(s) failed to sync; settings data kept — see the members page for details",
-    "diag.backfillResult": "Linked ${n}; ${amb} ambiguous name(s) need manual choice; ${stale} stale link(s) cleared"
+    "diag.backfillResult": "Linked ${n}; ${amb} ambiguous name(s) need manual choice; ${stale} stale link(s) cleared",
+    "hub.filterAllModule": "All modules"
 }

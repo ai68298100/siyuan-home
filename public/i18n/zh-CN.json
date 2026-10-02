@@ -494,5 +494,6 @@
     "members.editing": "编辑中——保存写回台账行",
     "members.syncError": "台账行同步失败",
     "members.syncPartial": "${n} 个成员的台账行同步失败；设置侧数据已保留，可在成员页查看详情",
-    "diag.backfillResult": "回填 ${n} 人；同名歧义 ${amb} 人待人工选择；失效关联 ${stale} 人已清除"
+    "diag.backfillResult": "回填 ${n} 人；同名歧义 ${amb} 人待人工选择；失效关联 ${stale} 人已清除",
+    "hub.filterAllModule": "全部模块"
 }

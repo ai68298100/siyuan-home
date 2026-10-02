@@ -21,9 +21,16 @@
         expandedId = expandedId === id ? null : id;
     }
     // 26.7 删除文案升级：说明数据保留语义（仅移除引用，台账行保留）
+    // H16：删除成员后复位指向它的失效筛选（总览与提醒页）
     function confirmRemove(m: any) {
-        confirm(t("members.deleteTitle"), t("members.deleteBody").replace("${name}", m.name), () => {
-            removeMember(plugin, plugin.settings, m.id).then(() => plugin.refreshHub());
+        confirm(t("members.deleteTitle"), t("members.deleteBody").replace("${name}", m.name), async () => {
+            await removeMember(plugin, plugin.settings, m.id);
+            const { saveRuntime } = await import("@/core/hub/runtime");
+            let dirty = false;
+            if (plugin.runtime.filterMemberId === m.id) { plugin.runtime.filterMemberId = undefined; dirty = true; }
+            if (plugin.runtime.hubMemberId === m.id) { plugin.runtime.hubMemberId = undefined; dirty = true; }
+            if (dirty) await saveRuntime(plugin, plugin.runtime);
+            await plugin.refreshHub();
         });
     }
 

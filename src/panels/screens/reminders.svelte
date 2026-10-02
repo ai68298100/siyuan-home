@@ -10,15 +10,33 @@
     // C3d：筛选持久化（runtime.hubFilter）——初始快照为设计意图
     // svelte-ignore state_referenced_locally
     let filter = $state(plugin.runtime.hubFilter ?? "all");
-    async function setFilter(v: string) {
-        filter = v;
-        plugin.runtime.hubFilter = v;
+    // C3a 成员/模块筛选（H16：成员删除后由成员页复位持久化值；本地 $state 驱动，runtime 只作持久化）
+    // svelte-ignore state_referenced_locally
+    let filterMember = $state<string | undefined>(plugin.runtime.hubMemberId);
+    // svelte-ignore state_referenced_locally
+    let filterModule = $state<string | undefined>(plugin.runtime.hubModuleId);
+    const memberOptions = $derived.by(() => {
+        void version;
+        return plugin.settings.members ?? [];
+    });
+    const moduleOptions = $derived.by(() => {
+        void version;
+        return [...new Set((plugin.scan?.reminders ?? []).map((r: any) => r.moduleId))];
+    });
+    async function persistFilter() {
+        plugin.runtime.hubFilter = filter;
+        plugin.runtime.hubMemberId = filterMember;
+        plugin.runtime.hubModuleId = filterModule;
         const { saveRuntime } = await import("@/core/hub/runtime");
         await saveRuntime(plugin, plugin.runtime);
     }
-    const filtered = $derived(
-        filter === "all" ? all : filter === "handled" ? [] : all.filter((r: any) => r.level === filter),
-    );
+    const filtered = $derived.by(() => {
+        const level = filter;
+        let list = level === "all" ? all : level === "handled" ? [] : all.filter((r: any) => r.level === level);
+        if (filterMember) list = list.filter((r: any) => !r.memberId || r.memberId === filterMember);
+        if (filterModule) list = list.filter((r: any) => r.moduleId === filterModule);
+        return list;
+    });
     const levelBadge: Record<string, string> = { overdue: "red", soon: "orange", lead: "yellow" };
     // H07：已处理视图真实数据源（runtime 留痕 + 缓存派生列表回查标题）
     const handledEntries = $derived.by(() => {
@@ -80,13 +98,25 @@
 
 <div class="lv-hero"><h1>{t("hub.title")}</h1><p>{t("hub.subtitle")}</p></div>
 
-<div class="filters" style="display:flex;gap:8px;margin:16px 0">
-    <select class="b3-select" value={filter} onchange={(e) => setFilter((e.target as HTMLSelectElement).value)}>
+<div class="filters" style="display:flex;gap:8px;margin:16px 0;flex-wrap:wrap">
+    <select class="b3-select" value={filter} onchange={(e) => { filter = (e.target as HTMLSelectElement).value; persistFilter(); }}>
         <option value="all">{t("hub.filterAll")}</option>
         <option value="overdue">{t("hub.filterOverdue")}</option>
         <option value="soon">{t("hub.filterSoon")}</option>
         <option value="lead">{t("hub.filterLead")}</option>
         <option value="handled">{t("hub.filterHandled")}</option>
+    </select>
+    <select class="b3-select" value={filterMember ?? ""} onchange={(e) => { filterMember = (e.target as HTMLSelectElement).value || undefined; persistFilter(); }}>
+        <option value="">{t("field.member")}: {t("members.all")}</option>
+        {#each memberOptions as m (m.id)}
+            <option value={m.id}>{m.name}</option>
+        {/each}
+    </select>
+    <select class="b3-select" value={filterModule ?? ""} onchange={(e) => { filterModule = (e.target as HTMLSelectElement).value || undefined; persistFilter(); }}>
+        <option value="">{t("hub.filterAllModule")}</option>
+        {#each moduleOptions as mid (mid)}
+            <option value={mid}>{mid === "adhoc" ? t("adhoc.name") : (t(`module.${mid}`) !== `module.${mid}` ? t(`module.${mid}`) : mid)}</option>
+        {/each}
     </select>
     <span class="fn__flex-1"></span>
     <button class="b3-button b3-button--outline" onclick={() => plugin.refreshHub()}>{t("hub.rescan")}</button>

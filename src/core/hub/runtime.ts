@@ -44,6 +44,10 @@ export interface HubRuntime {
     filterMemberId?: string;
     /** 提醒中枢筛选（C3d：持久化） */
     hubFilter?: string;
+    /** 提醒中枢成员筛选（C3a/H16：成员删除时复位） */
+    hubMemberId?: string;
+    /** 提醒中枢模块筛选（C3a） */
+    hubModuleId?: string;
     /** 上次扫描摘要缓存（通知与总览首屏直读，扫描失败时保留 stale 数据） */
     cache?: {
         reminders: Reminder[];
