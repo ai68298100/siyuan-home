@@ -73,6 +73,9 @@
 | 2026-10-03 | 主线 | 第四十四轮：pnpm audit 纳入 check 链（19 组 ✅） | check:audit script（--prod --audit-level moderate）；当前 0 known vulnerabilities；单测 126 持平、gzip 51.7KB |
 | 2026-10-03 | 循环A | 第四十四波走查 | 新增脚本通过；audit 结果 0 漏洞确认 |
 | 2026-10-03 | 循环B | ③轮休（延续） | 兜底循环静默待命（延续） |
+| 2026-10-03 | 主线 | 第四十六轮：29 组通知一键静音 ✅ | runtime.todaySilent 字段（今日 localDateKey）；inSilentHours 优先检查 todaySilent；摘要/逾期/每周预告三处共用；跨天自动失效（新一天 todaySilent 不匹配） |
+| 2026-10-03 | 循环A | 第四十六波走查 | inSilentHours 签名变更（加 rt 参数）→ 测试调用同步更新 |
+| 2026-10-03 | 循环B | ③轮休（延续） | 兜底循环静默待命（延续） |
 | 2026-10-03 | 主线 | 第三十六轮：代码卫生 + EC18/19 确认 | 死代码 safe-mount.ts 移除（ErrorBoundary 取代）；monthlyCompletions 24 个月保留期入 purgeHandled；LeiQie 无 bookmarks/snippets 消费 API（EC18/19 供方依赖确认）；单测 126 持平、gzip 51.4KB |
 | 2026-10-03 | 循环A | 第三十六波走查 | 死代码移除零引用验证；purgeHandled 月度清理边界（24 个月 cutoffKey）逻辑复核 |
 | 2026-10-03 | 循环B | ③信源=兄弟仓源码（第六轮） | LeiQie 无 getBookmarks/getSnippets 对外暴露——EC18/19 维持供方依赖注记 |
@@ -569,7 +572,7 @@
 - [x] 🟡 「快速备忘」开放决策：是否允许独立于台账的一次性提醒（如"周三给老师打电话"）——与 P2 原则的边界，需定案后更新 03 文档 ✅ 2026-10-01（09 决策记录 / commit 168dcae）
 - [ ] 🟢 续期历史时间线（一个证件的历次换证/续保记录沉淀）
 - [ ] 🟢 默认提前量自适应（按用户实际处理时长学习）
-- [ ] 🟢 通知一键静音（今日免打扰快捷开关，顶栏）
+- [x] 🟢 通知一键静音（今日免打扰快捷开关，顶栏） ✅ 2026-10-03 第四十六轮（runtime.todaySilent 字段（今日 localDateKey，跨天自动失效）→ inSilentHours 优先检查 → 摘要/逾期提示/每周预告共用；跨天自动恢复；单测通过既有 inSilentHours 覆盖）
 
 ## 30. 国际化细节
 
