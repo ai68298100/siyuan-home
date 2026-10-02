@@ -14,8 +14,9 @@ export interface DigestInfo {
     soon: number;
 }
 
-/** 静默时段判断（H12：摘要与逾期提示共用同一规则；跨零点用 from>to 表示，如 22→8） */
-export function inSilentHours(settings: HomeSettings, now: Date = new Date()): boolean {
+/** 静默时段判断（H12）：摘要与逾期提示共用同一规则。todaySilent 快捷开关优先于时段设置。 */
+export function inSilentHours(settings: HomeSettings, rt?: { todaySilent?: string }, now: Date = new Date()): boolean {
+    if (rt?.todaySilent === localDateKey(now)) return true;
     const h = now.getHours();
     const from = settings.silentFrom ?? 22;
     const to = settings.silentTo ?? 8;
@@ -29,7 +30,7 @@ export function dailyDigest(scan: ScanResult, settings: HomeSettings, rt: HubRun
     const hasItems = scan.counts.overdue > 0 || scan.counts.soon > 0;
     // H12：静默时段不弹；lastNotifiedDate 未标记 → 静默结束后的下一次扫描自然补发
     return {
-        shouldNotify: !already && afterHour && hasItems && !inSilentHours(settings, now),
+        shouldNotify: !already && afterHour && hasItems && !inSilentHours(settings, rt, now),
         overdue: scan.counts.overdue,
         soon: scan.counts.soon,
     };
@@ -69,7 +70,7 @@ export function weeklyPreview(scan: ScanResult, settings: HomeSettings, rt: HubR
     const upcoming = scan.reminders.filter((r) => r.daysLeft >= 0 && r.daysLeft <= 7).length;
     const sent = rt.lastWeeklyDigest === weekKey;
     return {
-        shouldNotify: isSunday && !sent && upcoming > 0 && !inSilentHours(settings, now),
+        shouldNotify: isSunday && !sent && upcoming > 0 && !inSilentHours(settings, rt, now),
         upcoming,
         weekKey,
     };

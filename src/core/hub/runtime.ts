@@ -84,6 +84,8 @@ export interface HubRuntime {
     lastOverdueAlertDate?: string;
     /** 每周预告摘要去重：ISO 周键（29 组，如 2026-W40） */
     lastWeeklyDigest?: string;
+    /** 29 组：今日免打扰快捷开关（值为今日 localDateKey，跨天自动失效） */
+    todaySilent?: string;
     /** EC21：最近一次 lv-exam:stats 聚合缓存（只存子集，latest-only；不读题目内容） */
     lastExamStats?: { streak: number; accuracy: number; attempts: number; generatedAt: number };
     /** EC09/EC10：打卡强度摘要缓存（top 5 项目；latest-only） */

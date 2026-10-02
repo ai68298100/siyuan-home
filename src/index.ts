@@ -411,7 +411,7 @@ export default class LvHomePlugin extends Plugin {
             // B3b：逾期事项每日首次发现立即提示（H12：与摘要共用静默判断）
             const { localDateKey } = await import("@/core/hub/rule");
             const today = localDateKey(new Date());
-            if (scan.counts.overdue > 0 && !inSilentHours(this.settings) && this.runtime.lastOverdueAlertDate !== today) {
+            if (scan.counts.overdue > 0 && !inSilentHours(this.settings, this.runtime) && this.runtime.lastOverdueAlertDate !== today) {
                 this.runtime.lastOverdueAlertDate = today;
                 showMessage(this.i18nText("notify.overdue").replace("${n}", String(scan.counts.overdue)), 6000, "error");
             }
