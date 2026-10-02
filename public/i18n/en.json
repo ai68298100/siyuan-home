@@ -600,5 +600,6 @@
     "settings.restoreDone": "Pre-import settings restored",
     "hub.batchPartial": "Processed ${ok}; failed: ${failed}",
     "ledger.exportCsv": "Export CSV",
-    "ledger.exportCsvTip": "Export all columns of this module as CSV (generated locally, respects current sort and search filter)"
+    "ledger.exportCsvTip": "Export all columns of this module as CSV (generated locally, respects current sort and search filter)",
+    "ledger.editSaved": "Saved"
 }

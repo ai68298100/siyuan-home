@@ -124,8 +124,8 @@
         switch (type) {
             case "select": return { type: "select", select: { content: v } };
             case "relation": return { type: "relation", relation: { blockIDs: [v], contents: null } };
-            case "date": return { type: "date", date: { content: new Date(`${v}T00:00:00`).getTime(), isNotEmpty: true, isNotTime: true } };
-            case "number": return { type: "number", number: { content: Number(v), isNotEmpty: true } };
+            case "date": return v === "" ? { type: "date", date: { isNotEmpty: false } } : { type: "date", date: { content: new Date(`${v}T00:00:00`).getTime(), isNotEmpty: true, isNotTime: true } };
+            case "number": return v === "" || v === null ? { type: "number", number: { isNotEmpty: false } } : { type: "number", number: { content: Number(v), isNotEmpty: true } };
             case "url": return { type: "url", url: { content: v } };
             case "checkbox": return { type: "checkbox", checkbox: { checked: !!v } };
             default: return { type: "text", text: { content: String(v) } };
@@ -158,36 +158,42 @@
         }
     }
 
+    // 详情抽屉：值 ↔ 编辑态互转（A5 行编辑 UI 层；relation 复杂编辑暂不开放）
+    function rawFromValue(type: string, v: any): any {
+        switch (type) {
+            case "number": return v?.number?.isNotEmpty && typeof v.number.content === "number" ? v.number.content : "";
+            case "date": return v?.date?.isNotEmpty ? localDateKey(new Date(v.date.content)) : "";
+            case "checkbox": return !!v?.checkbox?.checked;
+            case "select": return v?.select?.content ?? "";
+            case "url": return v?.url?.content ?? "";
+            default: return v?.text?.content ?? "";
+        }
+    }
+
     // C4b：行点击 → 详情抽屉（全列 kv；DOM 构建用户内容，不走 HTML 模板——19 组安全）
     function openDetail(row: any) {
         if (!ref?.columns) return;
         const dlg = new Dialog({
             title: t("ledger.detail"),
             content: `<div class="b3-dialog__content b3-dialog__content--wrap" id="lv-detail-body" style="max-height:60vh;overflow:auto"></div>
-<div class="b3-dialog__action"><button class="b3-button b3-button--cancel" id="lv-detail-del">${t("delete")}</button><span style="flex:1"></span><button class="b3-button b3-button--cancel" id="lv-detail-close">${t("cancel")}</button><button class="b3-button b3-button--text" id="lv-detail-open">${t("ledger.openDoc")} ↗</button></div>`,
+<div class="b3-dialog__action"><button class="b3-button b3-button--cancel" id="lv-detail-del">${t("delete")}</button><span style="flex:1"></span><button class="b3-button b3-button--cancel" id="lv-detail-close">${t("cancel")}</button><button class="b3-button b3-button--text" id="lv-detail-edit">${t("members.edit")}</button><button class="b3-button b3-button--text" id="lv-detail-open">${t("ledger.openDoc")} ↗</button></div>`,
             width: "520px",
         });
         const body = dlg.element.querySelector("#lv-detail-body") as HTMLElement;
         const schemaCols: any[] = plugin.schemaCatalog?.[active]?.columns ?? [];
-        for (const col of schemaCols) {
-            const keyID = ref.columns[col.key];
-            if (!keyID) continue;
-            const line = document.createElement("div");
-            line.className = "fn__flex";
-            line.style.cssText = "gap:10px;padding:4px 0;font-size:13px";
+        // A5 行编辑 UI 层：可编辑类型（relation/mAsset 等复杂类型仍在台账文档编辑）
+        const EDITABLE = new Set(["text", "number", "date", "select", "url", "checkbox"]);
+        const colLabel = (col: any) => (t(`field.${col.key}`) !== `field.${col.key}` ? t(`field.${col.key}`) : col.key);
+        function labelSpan(col: any) {
             const k = document.createElement("span");
             k.className = "ft__on-surface";
             k.style.cssText = "min-width:96px;flex-shrink:0";
-            k.textContent = t(`field.${col.key}`) !== `field.${col.key}` ? t(`field.${col.key}`) : col.key;
-            const v = document.createElement("span");
-            v.style.cssText = "word-break:break-all";
-            v.textContent = cellText(row.cells[keyID]);
-            line.append(k, v);
-            body.appendChild(line);
+            k.textContent = colLabel(col);
+            return k;
         }
-        // 续期/换证历史（29 组：runtime.renewHistory 留痕；无记录不显示该段）
-        const history = (plugin.runtime?.renewHistory?.[row.itemID] ?? []) as { from: string; to: string; at: string }[];
-        if (history.length > 0) {
+        function addHistorySection() {
+            const history = (plugin.runtime?.renewHistory?.[row.itemID] ?? []) as { from: string; to: string; at: string }[];
+            if (history.length === 0) return;
             const head = document.createElement("div");
             head.className = "ft__on-surface";
             head.style.cssText = "margin-top:10px;padding-top:8px;border-top:1px solid var(--b3-border-color);font-size:12px";
@@ -200,10 +206,10 @@
                 body.appendChild(line);
             }
         }
-        // 附件列（A2c）：现有文件列表 + 上传写回（[待实测] 端点；多文件逐一上传，失败逐个报告）
-        const attCol = (plugin.schemaCatalog?.[active]?.columns ?? []).find((c: any) => c.key === "attachments");
-        const attKeyID = ref.columns.attachments;
-        if (attCol && attKeyID) {
+        function addAttachmentsSection() {
+            const attCol: any = schemaCols.find((c) => c.key === "attachments");
+            const attKeyID = ref!.columns.attachments;
+            if (!attCol || !attKeyID) return;
             const attHead = document.createElement("div");
             attHead.className = "ft__on-surface";
             attHead.style.cssText = "margin-top:10px;padding-top:8px;border-top:1px solid var(--b3-border-color);font-size:12px";
@@ -264,7 +270,95 @@
             body.appendChild(uploadBtn);
             body.appendChild(fileInput);
         }
+        // 查看模式：kv 行 + 历史 + 附件
+        function buildView() {
+            body.innerHTML = "";
+            for (const col of schemaCols) {
+                const keyID = ref!.columns[col.key];
+                if (!keyID) continue;
+                const line = document.createElement("div");
+                line.className = "fn__flex";
+                line.style.cssText = "gap:10px;padding:4px 0;font-size:13px";
+                line.append(labelSpan(col));
+                const v = document.createElement("span");
+                v.style.cssText = "word-break:break-all";
+                v.textContent = cellText(row.cells[keyID]);
+                line.append(v);
+                body.appendChild(line);
+            }
+            addHistorySection();
+            addAttachmentsSection();
+        }
+        // 编辑模式（A5）：可编辑类型表单化，保存时逐字段容错写回（D03 语义：失败保留现场并报告）
+        function buildEdit() {
+            body.innerHTML = "";
+            const inputs: { keyID: string; type: string; label: string; get: () => any }[] = [];
+            for (const col of schemaCols) {
+                const keyID = ref!.columns[col.key];
+                if (!keyID || !EDITABLE.has(col.type)) continue;
+                const wrap = document.createElement("div");
+                wrap.className = "fn__flex";
+                wrap.style.cssText = "gap:10px;padding:4px 0;font-size:13px;align-items:center";
+                wrap.append(labelSpan(col));
+                const cur = rawFromValue(col.type, row.cells[keyID]);
+                let control: HTMLInputElement | HTMLSelectElement;
+                if (col.type === "select") {
+                    const sel = document.createElement("select");
+                    sel.className = "b3-select fn__flex-1";
+                    sel.add(new Option("", ""));
+                    for (const opt of col.options ?? []) sel.add(new Option(opt, String(opt)));
+                    sel.value = String(cur ?? "");
+                    control = sel;
+                } else {
+                    const input = document.createElement("input");
+                    input.className = "b3-text-field fn__flex-1";
+                    input.type = col.type === "number" ? "number" : col.type === "date" ? "date" : col.type === "url" ? "url" : "text";
+                    input.value = String(cur ?? "");
+                    if (col.type === "checkbox") { input.type = "checkbox"; input.checked = !!cur; input.className = "b3-switch"; }
+                    control = input;
+                }
+                wrap.append(control);
+                body.appendChild(wrap);
+                inputs.push({ keyID, type: col.type, label: colLabel(col), get: () => (control instanceof HTMLInputElement && control.type === "checkbox" ? control.checked : control.value) });
+            }
+            const saveBar = document.createElement("div");
+            saveBar.style.cssText = "display:flex;gap:8px;margin-top:10px";
+            const save = document.createElement("button");
+            save.className = "b3-button b3-button--text";
+            save.textContent = t("save");
+            const cancel = document.createElement("button");
+            cancel.className = "b3-button b3-button--outline";
+            cancel.textContent = t("cancel");
+            cancel.onclick = () => buildView();
+            save.onclick = async () => {
+                const failed: string[] = [];
+                let changed = 0;
+                for (const e of inputs) {
+                    const v = e.get();
+                    const orig = rawFromValue(e.type, row.cells[e.keyID]);
+                    const same = e.type === "checkbox" ? v === orig : String(v) === String(orig);
+                    if (same) continue;
+                    try {
+                        await setCell(ref!.avId!, e.keyID, row.itemID, cellValue(e.type, v));
+                        changed++;
+                    } catch {
+                        failed.push(e.label); // D03 语义：失败字段聚合报告
+                    }
+                }
+                dlg.destroy();
+                if (changed > 0) {
+                    await load();
+                    await plugin.refreshHub([active]); // PF06：只重扫本模块
+                }
+                if (failed.length > 0) showMessage(t("ledger.savePartial").replace("${fields}", failed.join("、")), 6000, "error");
+                else if (changed > 0) showMessage(t("ledger.editSaved"), 2500, "info");
+            };
+            saveBar.append(save, cancel);
+            body.appendChild(saveBar);
+        }
+        buildView();
         (dlg.element.querySelector("#lv-detail-close") as HTMLButtonElement).onclick = () => dlg.destroy();
+        (dlg.element.querySelector("#lv-detail-edit") as HTMLButtonElement).onclick = () => buildEdit();
         (dlg.element.querySelector("#lv-detail-open") as HTMLButtonElement).onclick = () => { dlg.destroy(); plugin.showTabDocs(ref?.docId); };
         // 17 组：行删除（detached 行走内核 av 删除端点 [待实测]；删除是显式用户动作，双确认说明影响范围）
         (dlg.element.querySelector("#lv-detail-del") as HTMLButtonElement).onclick = () => {
