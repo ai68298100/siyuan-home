@@ -16,7 +16,7 @@
 - [ ] 🟢 分支保护：main 禁直推
 - [ ] 🟢 `plugin.json` 的 `author`/`url` 从占位 lvdaoguan 改为 ai68298100
 - [ ] 🔴 替换 `icon.png`（160×160，≤64KiB，禁止 SVG）
-- [ ] 🟡 制作 `preview.png`（1024×768，≤512KiB，集市展示图）
+- [ ] 🟡 制作 `preview.png`（1024×768，≤512KiB，集市展示图）——生成路径确认：内置图像工具本环境不可用，待图像工具可用时生成（约定见 asset/README.md）
 - [ ] ⏸ 上架时移除 `plugin.json` 的 `disabledInPublish: true`
 - [ ] 🟢 LICENSE 确认（MIT，作者名更新）
 
