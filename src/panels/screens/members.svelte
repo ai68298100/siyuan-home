@@ -186,6 +186,9 @@
         {/if}
         {#if expandedId === m.id}
             <div style="border-top:1px solid var(--lv-line);padding-top:10px;display:flex;flex-direction:column;gap:6px">
+                {#if m.contactSnapshot}
+                    <span class="lv-caption">📞 {t("field.contact")}: {m.contactSnapshot}</span>
+                {/if}
                 {#if alertsFor(m.id).length === 0}
                     <span class="lv-caption">{t("dash.allClear")}</span>
                 {:else}
