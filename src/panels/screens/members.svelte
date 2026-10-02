@@ -1,4 +1,5 @@
 <script lang="ts">
+    import { confirm } from "siyuan";
     import { addMember, removeMember } from "@/core/members";
     import { newSiYuanId } from "@/core/siyuan";
 
