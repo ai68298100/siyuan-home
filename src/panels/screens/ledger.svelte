@@ -167,6 +167,12 @@
                 try {
                     const { removeLedgerRows } = await import("@/core/siyuan");
                     await removeLedgerRows(ref!.avId!, [row.itemID]);
+                    // 行删除后清理其续期流水（孤儿运行态数据）
+                    if (plugin.runtime?.renewHistory?.[row.itemID]) {
+                        delete plugin.runtime.renewHistory[row.itemID];
+                        const { saveRuntime } = await import("@/core/hub/runtime");
+                        await saveRuntime(plugin, plugin.runtime);
+                    }
                     showMessage(t("ledger.delDone"), 2500, "info");
                     dlg.destroy();
                     await load();
