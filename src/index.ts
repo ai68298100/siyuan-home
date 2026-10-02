@@ -1,4 +1,4 @@
-import { Plugin, showMessage, openTab } from "siyuan";
+import { Plugin, showMessage, openTab, Custom } from "siyuan";
 import { mount, unmount } from "svelte";
 import "./index.scss";
 
@@ -46,6 +46,11 @@ export default class LvHomePlugin extends Plugin {
     /** Tab 面板刷新回调（支持多实例，33.1：所有打开的管家面板同步刷新） */
     hubListeners = new Set<() => void>();
 
+    /** i18n 取值（1.2.8 起 i18n 为 JSONValue，字符串位置统一转 string） */
+    i18nText(key: string): string {
+        return String(this.i18n[key] ?? key);
+    }
+
     async onload() {
         const self = this;
         this.settings = await loadSettings(this);
@@ -55,11 +60,11 @@ export default class LvHomePlugin extends Plugin {
         const unmounts = new WeakMap<Element, () => void>();
         this.addTab({
             type: TAB_TYPE,
-            init(this: { element: HTMLElement }) {
+            init(this: Custom) {
                 const um = mount(TabPanel, { target: this.element, props: { plugin: self } });
                 unmounts.set(this.element, um as () => void);
             },
-            destroy(this: { element: HTMLElement }) {
+            destroy(this: Custom) {
                 const um = unmounts.get(this.element);
                 if (um) unmount(um as any);
             },
@@ -67,7 +72,7 @@ export default class LvHomePlugin extends Plugin {
 
         this.addTopBar({
             icon: "iconEmoji",
-            title: this.i18n.butler,
+            title: String(this.i18n.butler ?? "Lv Home"),
             callback: () => this.showTab(),
         });
 
@@ -100,7 +105,7 @@ export default class LvHomePlugin extends Plugin {
         }
 
         if (!this.settings.onboarded) {
-            showMessage(this.i18n.firstRun, 6000, "info");
+            showMessage(this.i18nText("firstRun"), 6000, "info");
         }
 
         // B2d 降级定案（kernel.js 无定时器 API）：前端心跳 30min 驱动定时扫描
@@ -121,44 +126,44 @@ export default class LvHomePlugin extends Plugin {
 
     /** members 先建（relation 目标），其余按需；幂等。启用模块才建库（P4） */
     async ensureCoreLedgers(): Promise<void> {
-        const resolveName = (key: string) => this.i18n[`field.${key}`] ?? key;
+        const resolveName = (key: string) => String(this.i18n[`field.${key}`] ?? key);
         const enabled = new Set(this.settings.enabledModules);
         const plans: [string, any, string][] = [
-            ["members", MEMBERS_SCHEMA, this.i18n["module.members"]],
-            ["certs", CERTS_SCHEMA, this.i18n["module.certs"]],
-            ["assets-real", ASSETS_REAL_SCHEMA, this.i18n["module.assets-real"]],
-            ["health", HEALTH_SCHEMA, this.i18n["module.health"]],
-            ["medicine", MEDICINE_SCHEMA, this.i18n["module.medicine"]],
-            ["memberships", MEMBERSHIPS_SCHEMA, this.i18n["module.memberships"]],
-            ["insurance", INSURANCE_SCHEMA, this.i18n["module.insurance"]],
-            ["shopping", SHOPPING_SCHEMA, this.i18n["module.shopping"]],
-            ["contracts", CONTRACTS_SCHEMA, this.i18n["module.contracts"]],
-            ["exams", EXAMS_SCHEMA, this.i18n["module.exams"]],
-            ["allowance", ALLOWANCE_SCHEMA, this.i18n["module.allowance"]],
-            ["favors", FAVORS_SCHEMA, this.i18n["module.favors"]],
-            ["stock", STOCK_SCHEMA, this.i18n["module.stock"]],
-            ["chores", CHORES_SCHEMA, this.i18n["module.chores"]],
-            ["house", HOUSE_SCHEMA, this.i18n["module.house"]],
-            ["media", MEDIA_SCHEMA, this.i18n["module.media"]],
-            ["pets", PETS_SCHEMA, this.i18n["module.pets"]],
-            ["vehicles", VEHICLES_SCHEMA, this.i18n["module.vehicles"]],
-            ["transit", TRANSIT_SCHEMA, this.i18n["module.transit"]],
-            ["travel-plan", TRAVEL_PLAN_SCHEMA, this.i18n["module.travel-plan"]],
-            ["travel-booking", TRAVEL_BOOKING_SCHEMA, this.i18n["module.travel-booking"]],
-            ["travel-packing", TRAVEL_PACKING_SCHEMA, this.i18n["module.travel-packing"]],
-            ["travel-log", TRAVEL_LOG_SCHEMA, this.i18n["module.travel-log"]],
-            ["assets-virtual", ASSETS_VIRTUAL_SCHEMA, this.i18n["module.assets-virtual"]],
-            ["food", FOOD_SCHEMA, this.i18n["module.food"]],
-            ["address", ADDRESS_SCHEMA, this.i18n["module.address"]],
-            ["bookmarks", BOOKMARKS_SCHEMA, this.i18n["module.bookmarks"]],
-            ["snippets", SNIPPETS_SCHEMA, this.i18n["module.snippets"]],
-            ["parenting", PARENTING_SCHEMA, this.i18n["module.parenting"]],
-            ["schooling", SCHOOLING_SCHEMA, this.i18n["module.schooling"]],
-            ["social", SOCIAL_SCHEMA, this.i18n["module.social"]],
+            ["members", MEMBERS_SCHEMA, this.i18nText("module.members")],
+            ["certs", CERTS_SCHEMA, this.i18nText("module.certs")],
+            ["assets-real", ASSETS_REAL_SCHEMA, this.i18nText("module.assets-real")],
+            ["health", HEALTH_SCHEMA, this.i18nText("module.health")],
+            ["medicine", MEDICINE_SCHEMA, this.i18nText("module.medicine")],
+            ["memberships", MEMBERSHIPS_SCHEMA, this.i18nText("module.memberships")],
+            ["insurance", INSURANCE_SCHEMA, this.i18nText("module.insurance")],
+            ["shopping", SHOPPING_SCHEMA, this.i18nText("module.shopping")],
+            ["contracts", CONTRACTS_SCHEMA, this.i18nText("module.contracts")],
+            ["exams", EXAMS_SCHEMA, this.i18nText("module.exams")],
+            ["allowance", ALLOWANCE_SCHEMA, this.i18nText("module.allowance")],
+            ["favors", FAVORS_SCHEMA, this.i18nText("module.favors")],
+            ["stock", STOCK_SCHEMA, this.i18nText("module.stock")],
+            ["chores", CHORES_SCHEMA, this.i18nText("module.chores")],
+            ["house", HOUSE_SCHEMA, this.i18nText("module.house")],
+            ["media", MEDIA_SCHEMA, this.i18nText("module.media")],
+            ["pets", PETS_SCHEMA, this.i18nText("module.pets")],
+            ["vehicles", VEHICLES_SCHEMA, this.i18nText("module.vehicles")],
+            ["transit", TRANSIT_SCHEMA, this.i18nText("module.transit")],
+            ["travel-plan", TRAVEL_PLAN_SCHEMA, this.i18nText("module.travel-plan")],
+            ["travel-booking", TRAVEL_BOOKING_SCHEMA, this.i18nText("module.travel-booking")],
+            ["travel-packing", TRAVEL_PACKING_SCHEMA, this.i18nText("module.travel-packing")],
+            ["travel-log", TRAVEL_LOG_SCHEMA, this.i18nText("module.travel-log")],
+            ["assets-virtual", ASSETS_VIRTUAL_SCHEMA, this.i18nText("module.assets-virtual")],
+            ["food", FOOD_SCHEMA, this.i18nText("module.food")],
+            ["address", ADDRESS_SCHEMA, this.i18nText("module.address")],
+            ["bookmarks", BOOKMARKS_SCHEMA, this.i18nText("module.bookmarks")],
+            ["snippets", SNIPPETS_SCHEMA, this.i18nText("module.snippets")],
+            ["parenting", PARENTING_SCHEMA, this.i18nText("module.parenting")],
+            ["schooling", SCHOOLING_SCHEMA, this.i18nText("module.schooling")],
+            ["social", SOCIAL_SCHEMA, this.i18nText("module.social")],
         ];
-        for (const [id, schema, title] of plans) {
+        for (const [id, schema] of plans) {
             if (!enabled.has(id)) continue;
-            await provisionModule(this.settings, id, schema, title, { resolveName });
+            await provisionModule(this.settings, id, schema, this.i18nText("module." + id), { resolveName });
         }
         await saveSettings(this, this.settings);
     }
@@ -196,7 +201,7 @@ export default class LvHomePlugin extends Plugin {
         const digest = dailyDigest(scan, this.settings, this.runtime);
         if (digest.shouldNotify) {
             markNotified(this.runtime);
-            const text = this.i18n["notify.digest"]
+            const text = this.i18nText("notify.digest")
                 .replace("${overdue}", String(digest.overdue))
                 .replace("${soon}", String(digest.soon));
             showMessage(text, 6000, "info");
@@ -211,7 +216,7 @@ export default class LvHomePlugin extends Plugin {
         })();
         if (scan.counts.overdue > 0 && !inSilent && this.runtime.lastOverdueAlertDate !== today) {
             this.runtime.lastOverdueAlertDate = today;
-            showMessage(this.i18n["notify.overdue"].replace("${n}", String(scan.counts.overdue)), 6000, "error");
+            showMessage(this.i18nText("notify.overdue").replace("${n}", String(scan.counts.overdue)), 6000, "error");
         }
         await saveRuntime(this, this.runtime);
         this.hubListeners.forEach((fn) => fn());
@@ -223,7 +228,7 @@ export default class LvHomePlugin extends Plugin {
             app: this.app,
             custom: {
                 id: `${this.name}${TAB_TYPE}`,
-                title: this.i18n.butler,
+                title: this.i18nText("butler"),
                 icon: "iconHome",
             },
         });
@@ -286,7 +291,7 @@ export default class LvHomePlugin extends Plugin {
 
     openSetting() {
         svelteDialog({
-            title: this.i18n.settingsTitle,
+            title: this.i18nText("settingsTitle"),
             component: HomeSettingsPanel,
             props: { plugin: this, settings: this.settings },
             width: "860px",
