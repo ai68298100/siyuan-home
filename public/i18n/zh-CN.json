@@ -545,5 +545,13 @@
     "capture.saved": "已存入「${module}」",
     "capture.moduleOff": "「${module}」模块未启用——可在设置中开启后重试",
     "capture.failed": "存入失败：${msg}",
-    "statusbar.tip": "今日到期 ${n} 件，点击查看"
+    "statusbar.tip": "今日到期 ${n} 件，点击查看",
+    "settings.migrateTitle": "设置导出 / 导入",
+    "settings.migratePrivacy": "导出文件包含成员姓名、生日等家庭资料，请妥善保管，不要分享。",
+    "settings.export": "导出设置 (JSON)",
+    "settings.import": "导入设置",
+    "settings.importTitle": "导入设置",
+    "settings.importBody": "将用「${file}」覆盖当前全部设置（模块开关/成员/提前量/台账落点），导入后自动补建缺失台账并重新扫描。台账数据本身不受影响。确定继续？",
+    "settings.importDone": "设置已导入并应用",
+    "settings.importBad": "导入失败：文件不是有效的小驴管家设置"
 }

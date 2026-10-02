@@ -545,5 +545,13 @@
     "capture.saved": "Saved to \"${module}\"",
     "capture.moduleOff": "Module \"${module}\" is disabled — enable it in settings and retry",
     "capture.failed": "Save failed: ${msg}",
-    "statusbar.tip": "${n} due today — click to view"
+    "statusbar.tip": "${n} due today — click to view",
+    "settings.migrateTitle": "Settings export / import",
+    "settings.migratePrivacy": "The export contains family data (names, birthdays). Keep it private — do not share.",
+    "settings.export": "Export settings (JSON)",
+    "settings.import": "Import settings",
+    "settings.importTitle": "Import settings",
+    "settings.importBody": "This replaces ALL current settings (modules/members/lead overrides/ledger refs) with \"${file}\"; missing ledgers are provisioned and a rescan runs after import. Ledger data itself is untouched. Continue?",
+    "settings.importDone": "Settings imported and applied",
+    "settings.importBad": "Import failed: not a valid Lv Home settings file"
 }

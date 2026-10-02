@@ -95,6 +95,43 @@
         });
     }
 
+    // 24 组：设置导出/导入（跨设备/重装迁移辅助）
+    let importInput: HTMLInputElement | undefined = $state();
+
+    function exportSettings() {
+        const payload = JSON.stringify(plugin.settings, null, 2);
+        const blob = new Blob([payload], { type: "application/json" });
+        const a = document.createElement("a");
+        a.href = URL.createObjectURL(blob);
+        a.download = `siyuan-home-settings-${new Date().toISOString().slice(0, 10)}.json`;
+        a.click();
+        URL.revokeObjectURL(a.href);
+    }
+
+    async function importSettings(e: Event) {
+        const file = (e.target as HTMLInputElement).files?.[0];
+        (e.target as HTMLInputElement).value = ""; // 允许重复选择同一文件
+        if (!file) return;
+        try {
+            const data = JSON.parse(await file.text());
+            // 形状校验（33.2：坏文件拒绝导入，不覆盖当前设置）
+            if (!Array.isArray(data?.enabledModules) || !Array.isArray(data?.members) || typeof data?.dbRefs !== "object") {
+                throw new Error("invalid settings shape");
+            }
+            confirm(t("settings.importTitle"), t("settings.importBody").replace("${file}", file.name), async () => {
+                const { defaultSettings } = await import("@/core/settings");
+                const merged = { ...defaultSettings(), ...data };
+                plugin.settings = merged;
+                await import("@/core/settings").then((m) => m.saveSettings(plugin as any, plugin.settings));
+                await plugin.ensureCoreLedgers?.();
+                await plugin.refreshHub?.();
+                showMessage(t("settings.importDone"), 3000, "info");
+            });
+        } catch (err) {
+            showMessage(`${t("settings.importBad")}${err instanceof Error ? ` (${err.message})` : ""}`, 5000, "error");
+        }
+    }
+
     async function save() {
         saving = true;
         try {
@@ -237,6 +274,17 @@
             <!-- C8e：关于区仓库链接（SDK 无 open 导出，走浏览器新窗口） -->
             <button class="b3-button b3-button--outline" style="margin-top:8px;margin-left:6px"
                 onclick={() => window.open("https://github.com/ai68298100/siyuan-home", "_blank")}>{t("about.repo")}</button>
+            <!-- 24 组：设置导出/导入（跨设备/重装迁移辅助） -->
+            <div style="margin-top:14px;border-top:1px solid var(--b3-border-color);padding-top:10px">
+                <p class="lv-caption">{t("settings.migrateTitle")}</p>
+                <p class="lv-caption ft__on-surface" style="color:var(--lv-warn)">⚠ {t("settings.migratePrivacy")}</p>
+                <div style="display:flex;gap:8px;margin-top:6px;flex-wrap:wrap">
+                    <button class="b3-button b3-button--outline" onclick={exportSettings}>{t("settings.export")}</button>
+                    <button class="b3-button b3-button--outline" onclick={() => importInput?.click()}>{t("settings.import")}</button>
+                    <input type="file" accept="application/json,.json" style="display:none"
+                        bind:this={importInput} onchange={(e) => importSettings(e)} />
+                </div>
+            </div>
             <!-- C8d：生态分区占位（v0.3 接线；开关仅展示，不可用） -->
             <div style="margin-top:14px;border-top:1px solid var(--b3-border-color);padding-top:10px">
                 <p class="lv-caption">{t("settings.ecoTitle")}</p>
