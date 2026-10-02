@@ -131,4 +131,6 @@ export interface HomeSettings {
     demoRows?: Record<string, string[]>;
     /** 示例成员 id 清单（一键清除移除引用） */
     demoMemberIds?: string[];
+    /** 15 组：settings.json 损坏已回退默认（onload 弹警告；marker 文件 settings.json.corrupted.json 可查） */
+    corruptedSettings?: boolean;
 }

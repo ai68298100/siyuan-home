@@ -9,7 +9,7 @@ import { loadSettings, saveSettings } from "@/core/settings";
 import { loadRuntime, saveRuntime, purgeHandled, listHandled, type HubRuntime } from "@/core/hub/runtime";
 import { runScan, deriveVisible, type ScanResult } from "@/core/hub/scanner";
 import { buildScanProviders } from "@/core/hub/registry";
-import { dailyDigest, markNotified, inSilentHours } from "@/core/hub/notify";
+import { dailyDigest, markNotified, inSilentHours, weeklyPreview, markWeeklyNotified } from "@/core/hub/notify";
 import { complete, snooze, mute, unmute, renew, restore, addMemo, removeMemo } from "@/core/hub/actions";
 import { provisionModule } from "@/core/provisioner";
 import { addDetachedRow, setCell } from "@/core/siyuan";
@@ -128,6 +128,11 @@ export default class LvHomePlugin extends Plugin {
             showMessage(this.i18nText("firstRun"), 6000, "info");
         }
 
+        // 15 组：settings.json 损坏已回退默认 → 明确警告（诊断区可见 settings.json.corrupted.json 标记）
+        if (this.settings.corruptedSettings) {
+            showMessage(this.i18nText("settings.corrupted"), 8000, "error");
+        }
+
         // B2d 降级定案（kernel.js 无定时器 API）：前端心跳 30min 驱动定时扫描
         this.heartbeat = window.setInterval(() => {
             this.refreshHub().catch((e) => console.warn("[siyuan-home] heartbeat scan failed:", e));
@@ -221,6 +226,12 @@ export default class LvHomePlugin extends Plugin {
             if (scan.counts.overdue > 0 && !inSilentHours(this.settings) && this.runtime.lastOverdueAlertDate !== today) {
                 this.runtime.lastOverdueAlertDate = today;
                 showMessage(this.i18nText("notify.overdue").replace("${n}", String(scan.counts.overdue)), 6000, "error");
+            }
+            // 29 组：每周预告（周日一次，未来 7 天清单计数；ISO 周去重）
+            const weekly = weeklyPreview(scan, this.settings, this.runtime);
+            if (weekly.shouldNotify) {
+                markWeeklyNotified(this.runtime);
+                showMessage(this.i18nText("notify.weekly").replace("${n}", String(weekly.upcoming)), 6000, "info");
             }
         }
         // H03：显式清理已完成运行态记录（未处理项永不自动删），清理结果随本次落盘
@@ -362,8 +373,11 @@ export default class LvHomePlugin extends Plugin {
         this.settings.household = household as any;
         this.settings.enabledModules = Array.from(new Set([...this.settings.enabledModules, ...moduleIds]));
         this.settings.onboarded = true;
+        // C7c：建库批处理进度提示（31 模块串行需数秒；起止均有反馈，失败落 dbRefs.provisionError 诊断可见）
+        showMessage(this.i18nText("wiz.provisioning").replace("${n}", String(moduleIds.length)), 4000, "info");
         await this.ensureCoreLedgers();
         await saveSettings(this, this.settings);
+        showMessage(this.i18nText("wiz.provisioned").replace("${n}", String(moduleIds.length)), 3000, "info");
         await this.refreshHub();
     }
 

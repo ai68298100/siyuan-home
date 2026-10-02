@@ -1,6 +1,6 @@
 /**
  * 21 组：settings 迁移测试（v0.1 遗留结构 → v0.2 读取兼容）
- * + 17 组：同键通知合并器。
+ * + 15 组：坏文件容错 + 17 组：同键通知合并器。
  */
 import { describe, it, expect, beforeEach } from "vitest";
 import { loadSettings } from "@/core/settings";
@@ -35,6 +35,33 @@ describe("settings 迁移（21 组：v0.1 → v0.2）", () => {
         expect(s.enabledModules.length).toBeGreaterThan(0);
         expect(s.members).toEqual([]);
         expect(s.onboarded).toBe(false);
+    });
+});
+
+describe("坏文件容错（15 组）", () => {
+    it("loadData 抛错 → 回退默认 + corruptedSettings 标记 + 备份 marker 落盘", async () => {
+        const saved: Record<string, unknown> = {};
+        const plugin = {
+            loadData: async () => { throw new Error("invalid json"); },
+            saveData: async (n: string, v: unknown) => { saved[n] = v; },
+        } as any;
+        const s = await loadSettings(plugin);
+        expect(s.enabledModules.length).toBeGreaterThan(0); // 默认值
+        expect(s.corruptedSettings).toBe(true);
+        const marker = saved["settings.json.corrupted.json"] as any;
+        expect(marker.source).toBe("settings.json");
+        expect(marker.reason).toContain("invalid json");
+    });
+
+    it("loadData 返回非对象（手工改坏）→ 同样回退并标记", async () => {
+        const saved: Record<string, unknown> = {};
+        const plugin = {
+            loadData: async () => "corrupted-string",
+            saveData: async (n: string, v: unknown) => { saved[n] = v; },
+        } as any;
+        const s = await loadSettings(plugin);
+        expect(s.corruptedSettings).toBe(true);
+        expect((saved["settings.json.corrupted.json"] as any).reason).toContain("non-object");
     });
 });
 

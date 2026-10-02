@@ -583,5 +583,9 @@
     "hub.selectedN": "已选 ${n} 项",
     "hub.selectAll": "全选当前结果",
     "hub.select": "选择该提醒",
-    "hub.batchDone": "已批量处理 ${n} 项"
+    "hub.batchDone": "已批量处理 ${n} 项",
+    "notify.weekly": "下周有 ${n} 件事即将到期，可在提醒中枢提前安排",
+    "settings.corrupted": "设置文件已损坏，已回退默认值并保留损坏标记（settings.json.corrupted.json）——如需找回原设置请从思源备份恢复",
+    "wiz.provisioning": "正在为 ${n} 个模块创建台账…（首次约需数秒）",
+    "wiz.provisioned": "已建好 ${n} 个模块的台账，开始使用吧"
 }

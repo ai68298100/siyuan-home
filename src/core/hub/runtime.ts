@@ -82,15 +82,17 @@ export interface HubRuntime {
     lastNotifiedDate?: string;
     /** 逾期即时提醒去重：最后提示日期（B3b） */
     lastOverdueAlertDate?: string;
+    /** 每周预告摘要去重：ISO 周键（29 组，如 2026-W40） */
+    lastWeeklyDigest?: string;
 }
 
 export function defaultRuntime(): HubRuntime {
     return { schemaVersion: 1, snoozed: {}, muted: {}, handledYear: {}, handledUntil: {}, handled: {}, renewHistory: {}, memos: [] };
 }
 
-/** 旧缓存迁移（33.3）：缺字段补默认值；byModule/derived 为 H02/H04 新增 */
+/** 旧缓存迁移（33.3）：缺字段补默认值；byModule/derived 为 H02/H04 新增。坏文件容错同 settings（15 组） */
 export async function loadRuntime(plugin: Plugin): Promise<HubRuntime> {
-    const data = await plugin.loadData(RUNTIME_NAME);
+    const { data } = await import("../settings").then((m) => m.loadDataSafe(plugin, RUNTIME_NAME));
     if (!data || typeof data !== "object") return defaultRuntime();
     const base = defaultRuntime();
     const merged: HubRuntime = {

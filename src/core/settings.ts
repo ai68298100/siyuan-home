@@ -22,11 +22,37 @@ export function defaultSettings(): HomeSettings {
     };
 }
 
+/** 15 组：坏文件容错——loadData 抛错或返回非对象时备份标记并回退默认值，不让 onload 崩溃 */
+export async function loadDataSafe(plugin: Plugin, name: string): Promise<{ data: any; corrupted: boolean }> {
+    try {
+        const data = await plugin.loadData(name);
+        if (data !== null && data !== undefined && typeof data !== "object") {
+            // 非 JSON 对象（手工改坏/老版本残留）→ 视为损坏
+            await backupCorruptMarker(plugin, name, `non-object: ${typeof data}`);
+            return { data: null, corrupted: true };
+        }
+        return { data, corrupted: false };
+    } catch (e) {
+        await backupCorruptMarker(plugin, name, e instanceof Error ? e.message : String(e));
+        return { data: null, corrupted: true };
+    }
+}
+
+async function backupCorruptMarker(plugin: Plugin, name: string, reason: string): Promise<void> {
+    try {
+        // 只存标记（时间/原因），不改写原文件——原始内容留给用户与思源备份处理
+        await plugin.saveData(`${name}.corrupted.json`, { corruptedAt: new Date().toISOString(), source: name, reason });
+    } catch {
+        // 备份失败也不阻断启动
+    }
+}
+
 export async function loadSettings(plugin: Plugin): Promise<HomeSettings> {
-    const data = await plugin.loadData(SETTINGS_NAME);
+    const { data, corrupted } = await loadDataSafe(plugin, SETTINGS_NAME);
     const defaults = defaultSettings();
     if (!data) {
-        return defaults;
+        // corrupted=true 时保留标记供 onload 弹警告（设置页诊断亦可见 corrupted 文件）
+        return corrupted ? { ...defaults, corruptedSettings: true } : defaults;
     }
     // 用户显式管理模块开关：已有 enabledModules 时完全尊重（含关闭默认模块）；
     // 新增模块的默认启用只走版本化迁移（33.1），运行时不强制回填。

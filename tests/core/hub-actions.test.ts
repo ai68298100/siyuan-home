@@ -14,7 +14,7 @@ import {
 import { runScan, deriveVisible } from "@/core/hub/scanner";
 import { snooze, mute, complete, restore, withRuntime, renew } from "@/core/hub/actions";
 import { CertsProvider, leadFor } from "@/core/hub/providers";
-import { inSilentHours, dailyDigest } from "@/core/hub/notify";
+import { inSilentHours, dailyDigest, weeklyPreview, markWeeklyNotified, isoWeekKey } from "@/core/hub/notify";
 import { setTransport } from "@/core/siyuan";
 import type { DataProvider } from "@/core/hub/providers";
 import type { HomeSettings, Reminder, ReminderRuleSpec } from "@/types";
@@ -339,5 +339,36 @@ describe("H12 静默时段（摘要与逾期提示共用）", () => {
         expect(rt.lastNotifiedDate).toBeUndefined();
         // 12 点（非静默，已过 notifyHour）→ 弹
         expect(dailyDigest(scan, s, rt, at(12)).shouldNotify).toBe(true);
+    });
+});
+
+describe("29 组每周预告", () => {
+    const scanWith = (n: number) => ({
+        reminders: Array.from({ length: n }, (_, i) => ({ id: `r${i}`, moduleId: "certs", ruleKey: "expiry", rowId: `r${i}`, title: `t${i}`, dueDate: "2026-10-05", daysLeft: 3, level: "soon" as const })),
+        counts: { overdue: 0, soon: n, lead: 0 }, scannedAt: "", errors: [], stale: false, derived: [], byModule: {},
+    } as any);
+
+    it("isoWeekKey：2026-10-04（周日）→ 2026-W40；2026-01-01 → 2026-W01；跨年周末不崩", () => {
+        expect(isoWeekKey(new Date(2026, 9, 4))).toBe("2026-W40");
+        expect(isoWeekKey(new Date(2026, 0, 1))).toBe("2026-W01");
+        expect(isoWeekKey(new Date(2027, 0, 3))).toMatch(/^202[67]-W\d{2}$/);
+    });
+
+    it("周日 + 有事项 + 未发 → 弹并记周键；同周再扫不重弹；非周日不弹", () => {
+        const sunday = new Date(2026, 9, 4, 10, 0); // 2026-10-04 周日 10 点（非静默）
+        const s = settings();
+        const rt: HubRuntime = { ...defaultRuntime() };
+        expect(weeklyPreview(scanWith(3), s, rt, sunday).shouldNotify).toBe(true);
+        markWeeklyNotified(rt, sunday);
+        expect(rt.lastWeeklyDigest).toBe("2026-W40");
+        expect(weeklyPreview(scanWith(3), s, rt, new Date(2026, 9, 6, 10, 0)).shouldNotify).toBe(false); // 同周周二
+        expect(weeklyPreview(scanWith(3), s, rt, new Date(2026, 9, 11, 10, 0)).shouldNotify).toBe(true); // 下周日新周键
+    });
+
+    it("静默时段/零事项不弹", () => {
+        const sundayNight = new Date(2026, 9, 4, 23, 0); // 周日 23 点（静默）
+        const rt: HubRuntime = { ...defaultRuntime() };
+        expect(weeklyPreview(scanWith(3), settings(), rt, sundayNight).shouldNotify).toBe(false);
+        expect(weeklyPreview(scanWith(0), settings(), rt, new Date(2026, 9, 4, 10, 0)).shouldNotify).toBe(false);
     });
 });
