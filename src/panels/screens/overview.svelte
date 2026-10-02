@@ -1,8 +1,10 @@
 <script lang="ts">
+    import type { Reminder } from "@/types";
     import Onboarding from "../onboarding.svelte";
+    import type { HomePluginLike } from "@/types/plugin";
     import { localDateKey } from "@/core/hub/rule";
 
-    let { plugin, t, onGoto, version }: { plugin: any; t: (k: string) => string; onGoto: (s: string) => void; version?: number } = $props();
+    let { plugin, t, onGoto, version }: { plugin: HomePluginLike; t: (k: string) => string; onGoto: (s: string) => void; version?: number } = $props();
 
     // version（H02）：hubListeners 触发时递增，驱动以下 $derived 重算（plugin.* 为普通对象引用，本身不追踪）
     const allReminders = $derived.by(() => {
@@ -19,7 +21,7 @@
     // C2e：成员过滤（持久化 runtime.filterMemberId；成员行 memberId 在 v0.2 由行创建顺序关联，未关联时显示全部）
     const reminders = $derived(
         memberFilter
-            ? allReminders.filter((r: any) => !r.memberId || r.memberId === memberFilter)
+            ? allReminders.filter((r: Reminder) => !r.memberId || r.memberId === memberFilter)
             : allReminders,
     );
     const top = $derived(reminders.slice(0, 4));
@@ -104,7 +106,7 @@
 </div>
 <div class="lv-mods">
     {#each plugin.settings.enabledModules.filter((id: string) => id !== "members") as mid (mid)}
-        {@const pending = reminders.filter((r: any) => r.moduleId === mid).length}
+        {@const pending = reminders.filter((r: Reminder) => r.moduleId === mid).length}
         <div
             class="lv-card lv-card--hover lv-mod"
             role="button"

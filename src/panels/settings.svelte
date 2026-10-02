@@ -2,7 +2,7 @@
     import { showMessage, confirm } from "siyuan";
     import { MODULE_GROUPS, modulesByGroup } from "@/core/modules";
     import { newMember, saveSettings } from "@/core/settings";
-    import type { HomeSettings, MemberRole } from "@/types";
+    import type { HomeSettings, MemberRole, FamilyMember } from "@/types";
 
     interface IHomePluginLike {
         i18n: Record<string, unknown>;
@@ -33,7 +33,7 @@
     // svelte-ignore state_referenced_locally
     let draftEnabled: string[] = $state([...settings.enabledModules]);
     // svelte-ignore state_referenced_locally
-    let draftMembers: any[] = $state(settings.members.map((m: any) => ({ ...m })));
+    let draftMembers: FamilyMember[] = $state(settings.members.map((m: FamilyMember) => ({ ...m })));
     // C8c 提醒分区 draft：摘要时段/静默时段 + 提前量覆盖（key → 空串=用默认）
     // svelte-ignore state_referenced_locally
     let draftNotifyHour = $state(settings.notifyHour);
@@ -378,7 +378,7 @@
                                 · {t("diag.columns")} {l.columns}
                             </p>
                         {/each}
-                        {#each diag.ledgers.filter((l: any) => l.error) as l (l.id)}
+                        {#each diag.ledgers.filter((l) => l.error) as l (l.id)}
                             <p class="lv-caption" style="color:var(--lv-danger)">{t(`module.${l.id}`)}: {l.error}</p>
                         {/each}
                         {#if diag.errors.length > 0}
@@ -391,7 +391,7 @@
                                 <p class="lv-caption" style="color:var(--lv-danger)">{c}</p>
                             {/each}
                         {/if}
-                        {#if (plugin.settings.members ?? []).some((m: any) => !m.avItemId || m.syncError)}
+                        {#if (plugin.settings.members ?? []).some((m) => !m.avItemId || m.syncError)}
                             <button class="b3-button b3-button--outline" style="margin-top:6px"
                                 onclick={async () => {
                                     const { backfillMemberLinks } = await import("@/core/members");

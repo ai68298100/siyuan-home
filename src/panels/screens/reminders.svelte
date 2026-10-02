@@ -1,6 +1,8 @@
 <script lang="ts">
     import { Dialog, Menu, showMessage, confirm } from "siyuan";
-    let { plugin, t, version }: { plugin: any; t: (k: string) => string; version?: number } = $props();
+    import type { HomePluginLike } from "@/types/plugin";
+    import type { Reminder } from "@/types";
+    let { plugin, t, version }: { plugin: HomePluginLike; t: (k: string) => string; version?: number } = $props();
 
     // version（H02）：hub 变更时递增，驱动派生重算（plugin.* 为普通对象引用）
     const all = $derived.by(() => {
@@ -24,7 +26,7 @@
     });
     const moduleOptions = $derived.by(() => {
         void version;
-        return [...new Set((plugin.scan?.reminders ?? []).map((r: any) => r.moduleId))];
+        return [...new Set((plugin.scan?.reminders ?? []).map((r: Reminder) => r.moduleId))];
     });
     async function persistFilter() {
         plugin.runtime.hubFilter = filter;
@@ -36,15 +38,15 @@
     }
     const filtered = $derived.by(() => {
         const level = filter;
-        let list = level === "all" ? all : level === "handled" ? [] : all.filter((r: any) => r.level === level);
-        if (filterMember) list = list.filter((r: any) => !r.memberId || r.memberId === filterMember);
-        if (filterModule) list = list.filter((r: any) => r.moduleId === filterModule);
+        let list = level === "all" ? all : level === "handled" ? [] : all.filter((r: Reminder) => r.level === level);
+        if (filterMember) list = list.filter((r: Reminder) => !r.memberId || r.memberId === filterMember);
+        if (filterModule) list = list.filter((r: Reminder) => r.moduleId === filterModule);
         if (dueWithin !== "all") {
             // 时间窗含逾期：dueDate ≤ 今天+N（yyyy-MM-dd 字符串比较安全；逾期恒在窗内）
             const today = new Date();
             const end = new Date(today.getFullYear(), today.getMonth(), today.getDate() + Number(dueWithin));
             const endKey = `${end.getFullYear()}-${String(end.getMonth() + 1).padStart(2, "0")}-${String(end.getDate()).padStart(2, "0")}`;
-            list = list.filter((r: any) => r.dueDate <= endKey);
+            list = list.filter((r: Reminder) => r.dueDate <= endKey);
         }
         return list;
     });
@@ -64,7 +66,7 @@
     }
 
     // H03：未处理备忘的显式删除（确认后物理删除；这是备忘唯一的物理删除路径）
-    function confirmDeleteMemo(r: any) {
+    function confirmDeleteMemo(r: Reminder) {
         confirm(t("delete"), t("hub.memoDeleteBody").replace("${title}", r.title), async () => {
             await plugin.removeMemo(r.id);
             showMessage(t("hub.memoDeleted"), 2500, "info");
@@ -83,7 +85,7 @@
         selected = next;
     }
     function selectAllFiltered() {
-        selected = new Set(filtered.map((r: any) => r.id));
+        selected = new Set(filtered.map((r: Reminder) => r.id));
     }
     function clearSelection() {
         selected = new Set();
@@ -93,7 +95,7 @@
         if (batchBusy || selected.size === 0) return;
         batchBusy = true;
         try {
-            const byId = new Map(all.map((r: any) => [r.id, r]));
+            const byId = new Map<string, Reminder>(all.map((r: Reminder) => [r.id, r] as [string, Reminder]));
             let ok = 0;
             const failed: string[] = [];
             // 逐条容错：单项失败不中断批量（剩余项继续处理），失败清单在回执中报告
@@ -123,7 +125,7 @@
 
     // B4b 续期：思源 Dialog 小窗（H10：失败保留 Dialog 与输入、错误就地显示，不提前销毁）
     // 19 组安全：HTML 模板不插值任何用户内容——标题/条目名经 textContent 挂载，防台账文本注入
-    function renewDialog(r: any) {
+    function renewDialog(r: Reminder) {
         const dlg = new Dialog({
             title: t("act.renew"),
             content: `<div class="b3-dialog__content"><div class="b3-dialog__content" id="lv-renew-sub" style="margin-bottom:8px"></div><input class="b3-text-field fn__block" id="lv-renew-date" type="date"><div class="lv-caption" id="lv-renew-err" role="alert" style="color:var(--b3-card-error-color);display:none"></div></div>
@@ -157,7 +159,7 @@
     }
 
     // C3c 延后天数菜单（1/3/7/30）
-    function snoozeMenu(r: any, ev: MouseEvent) {
+    function snoozeMenu(r: Reminder, ev: MouseEvent) {
         const menu = new Menu("lv-snooze");
         for (const d of [1, 3, 7, 30]) {
             menu.addItem({
@@ -202,11 +204,11 @@
         expandedMerges = next;
     }
     function memberName(id: string): string {
-        return (plugin.settings.members ?? []).find((m: any) => m.id === id)?.name ?? t("members.unassigned");
+        return (plugin.settings.members ?? []).find((m) => m.id === id)?.name ?? t("members.unassigned");
     }
 </script>
 
-{#snippet remRow(r: any)}
+{#snippet remRow(r: Reminder)}
     <div class="lv-rem {r.level}">
         {#if batchMode}
             <input type="checkbox" class="b3-checkbox" aria-label={t("hub.select")}
@@ -308,9 +310,9 @@
 {:else}
     {@const groups = filter === "all"
         ? [
-            { key: "overdue", label: t("hub.groupOverdue"), items: filtered.filter((r: any) => r.level === "overdue") },
-            { key: "soon", label: t("hub.groupSoon"), items: filtered.filter((r: any) => r.level === "soon") },
-            { key: "lead", label: t("hub.groupLead"), items: filtered.filter((r: any) => r.level === "lead") },
+            { key: "overdue", label: t("hub.groupOverdue"), items: filtered.filter((r: Reminder) => r.level === "overdue") },
+            { key: "soon", label: t("hub.groupSoon"), items: filtered.filter((r: Reminder) => r.level === "soon") },
+            { key: "lead", label: t("hub.groupLead"), items: filtered.filter((r: Reminder) => r.level === "lead") },
         ].filter((g) => g.items.length > 0)
         : [{ key: filter, label: "", items: filtered }]}
     {#each groups as g (g.key)}

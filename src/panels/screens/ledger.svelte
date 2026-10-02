@@ -2,8 +2,9 @@
     import { renderLedger, addDetachedRow, setCell, RowIdentityPendingError } from "@/core/siyuan";
     import { localDateKey } from "@/core/hub/rule";
     import { showMessage, Dialog, confirm } from "siyuan";
+    import type { HomePluginLike } from "@/types/plugin";
 
-    let { plugin, t, version }: { plugin: any; t: (k: string) => string; version?: number } = $props();
+    let { plugin, t, version }: { plugin: HomePluginLike; t: (k: string) => string; version?: number } = $props();
 
     // 台账页模块下拉：已建库 + 已启用但未建库的模块（26.7：后者可从页面直接触发重建）
     const ledgers = $derived(

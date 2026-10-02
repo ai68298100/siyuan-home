@@ -3,29 +3,9 @@
     import Reminders from "./screens/reminders.svelte";
     import Ledger from "./screens/ledger.svelte";
     import Members from "./screens/members.svelte";
-    import type { HomeSettings, Reminder } from "@/types";
-    import type { HubRuntime } from "@/core/hub/runtime";
-    import type { ScanResult } from "@/core/hub/scanner";
+    import type { HomePluginLike } from "@/types/plugin";
 
-    interface IHomePluginLike {
-        i18n: Record<string, unknown>;
-        name: string;
-        settings: HomeSettings;
-        runtime: HubRuntime;
-        scan: ScanResult | undefined;
-        hubListeners: Set<() => void>;
-        refreshHub: () => Promise<ScanResult>;
-        openSetting: () => void;
-        complete: (r: Reminder) => Promise<unknown>;
-        snooze: (id: string, days: number) => Promise<unknown>;
-        mute: (id: string) => Promise<unknown>;
-        unmute: (id: string) => Promise<unknown>;
-        showTabDocs: (docId?: string) => void;
-        /** 状态栏/通知入口预选页签（消费后清空） */
-        pendingScreen?: string;
-    }
-
-    let { plugin }: { plugin: IHomePluginLike } = $props();
+    let { plugin }: { plugin: HomePluginLike } = $props();
     // i18n 取值统一转 string（1.2.8 起 JSONValue；screens 以 props 接收 string 返回的 t）
     const t = (key: string) => String(plugin.i18n[key] ?? key);
 

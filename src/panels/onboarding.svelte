@@ -1,5 +1,6 @@
 <script lang="ts">
-    let { plugin, t, onGoto }: { plugin: any; t: (k: string) => string; onGoto?: (s: string) => void } = $props();
+    import type { HomePluginLike } from "@/types/plugin";
+    let { plugin, t, onGoto }: { plugin: HomePluginLike; t: (k: string) => string; onGoto?: (s: string) => void } = $props();
 
     let step = $state(1);
     const roleOptions = ["spouse", "partner", "child", "elder", "kin"];

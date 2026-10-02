@@ -1,9 +1,11 @@
 <script lang="ts">
+    import type { Reminder, FamilyMember } from "@/types";
     import { confirm } from "siyuan";
     import { addMember, updateMember, removeMember } from "@/core/members";
     import { newSiYuanId } from "@/core/siyuan";
+    import type { HomePluginLike } from "@/types/plugin";
 
-    let { plugin, t, version }: { plugin: any; t: (k: string) => string; version?: number } = $props();
+    let { plugin, t, version }: { plugin: HomePluginLike; t: (k: string) => string; version?: number } = $props();
 
     // version（H02）：hub 变更时递增，驱动派生重算（plugin.* 为普通对象引用）
     const members = $derived.by(() => {
@@ -14,7 +16,7 @@
         void version;
         return plugin.scan?.reminders ?? [];
     });
-    const alertsFor = (id: string) => reminders.filter((r: any) => r.memberId === id);
+    const alertsFor = (id: string) => reminders.filter((r: Reminder) => r.memberId === id);
     // C5a 统计 chips：该成员待办按模块聚类的 top-3（数据来自当前扫描，不做全库聚合查询）
     function statChips(id: string): { label: string; n: number }[] {
         const byModule = new Map<string, number>();
@@ -31,7 +33,7 @@
     }
     // 26.7 删除文案升级：说明数据保留语义（仅移除引用，台账行保留）
     // H16：删除成员后复位指向它的失效筛选（总览与提醒页）
-    function confirmRemove(m: any) {
+    function confirmRemove(m: FamilyMember) {
         confirm(t("members.deleteTitle"), t("members.deleteBody").replace("${name}", m.name), async () => {
             await removeMember(plugin, plugin.settings, m.id);
             const { saveRuntime } = await import("@/core/hub/runtime");
@@ -51,7 +53,7 @@
     let editId = $state<string | null>(null);
     const roles = ["self", "spouse", "partner", "child", "elder", "kin", "other"];
 
-    function startEdit(m: any) {
+    function startEdit(m: FamilyMember) {
         editId = m.id;
         name = m.name;
         role = m.role;
@@ -66,7 +68,7 @@
     async function save() {
         if (!name.trim()) return;
         // D06 配套：同名成员会让按姓名回填产生歧义——新增时提示确认（编辑不受影响）
-        const dup = !editId && (plugin.settings.members ?? []).some((m: any) => m.name.trim() === name.trim());
+        const dup = !editId && (plugin.settings.members ?? []).some((m) => m.name.trim() === name.trim());
         if (dup) {
             confirm(t("members.dupTitle"), t("members.dupBody").replace("${name}", name.trim()), () => doSave());
             return;
@@ -77,7 +79,7 @@
     async function doSave() {
         if (!name.trim()) return;
         if (editId) {
-            const target = (plugin.settings.members ?? []).find((m: any) => m.id === editId);
+            const target = (plugin.settings.members ?? []).find((m) => m.id === editId);
             if (target) {
                 await updateMember(plugin, plugin.settings, {
                     ...target, name: name.trim(), role, birthday: birthday || undefined, lunarBirthday: lunar,
