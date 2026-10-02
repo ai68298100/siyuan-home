@@ -45,6 +45,9 @@
 | 2026-10-03 | 主线 | 第三十三轮：月度完成计数 + 29 组部分收口 | complete() 递增 monthlyCompletions[YYYY-MM]；restore 不递减（恢复≠取消完成事实）；总览 hero 条件展示；单测 126 持平、i18n 624 键、gzip 51.1KB |
 | 2026-10-03 | 循环A | 第三十三波走查 | 模板字面量转义即修（月键拼接）；月度完成率 % 口径待 PF01（缺 denominator）——不虚假标注 |
 | 2026-10-03 | 循环B | ③轮休（延续） | 兜底循环静默待命（延续上一轮状态） |
+| 2026-10-03 | 主线 | 第三十四轮：Svelte 5 错误边界 + 性能标记 | ErrorBoundary.svelte（svelte:boundary 四屏包裹+重试按钮）；refreshHub performance.mark/measure（PF01 打点基线）；safeMount.ts 备用；单测 126 持平、gzip 51.3KB |
+| 2026-10-03 | 循环A | 第三十四波走查 | boundary 仅捕获渲染期错误（Svelte 5 设计）；事件处理器异常不在此范围 |
+| 2026-10-03 | 循环B | ③轮休 | 兜底循环静默待命 |
 | 2026-10-03 | 主线 | 第二十八轮：EC03/v0.3 服务桥 window.LvHome 落地 | src/bridge/external-bridge.ts（protocol 1/capabilities 五项/whenReady/openButler/openReminders/addMemo 校验/summary 仅计数）+ docs/BRIDGE.md 契约文档（对齐人脉 BRIDGE 纪律：只提供服务不读他库/挂载卸载语义/版本策略）；重复挂载守卫；5 项单测；单测 121→126、i18n 608 持平、gzip 49.5KB |
 | 2026-10-03 | 循环A | 第二十八波走查 | 未用参数即修；summary 计数断言修正（today=daysLeft≤0 含逾期，测试初值写错）；重复挂载守卫（多实例不覆盖首桥） |
 | 2026-10-03 | 循环B | ③信源=兄弟仓 BRIDGE 模式（人脉 external-bridge 直读） | 管家桥的挂载/卸载/纪律三段对人脉同构复刻；EC 组「摘录→落地」第二例（EC16→EC13→EC03） |
@@ -564,7 +567,7 @@
 - [ ] 🟡 状态管理定案：svelte 5 runes 单例 store 三分（settings / hub / ui），边界写进 08 文档
 - [ ] 🟡 SQL 结果类型化（query 泛型封装 + 每模块手写 Row 类型，禁 any）
 - [x] 🟡 面板 props any 清零：tab-panel 接口已具体类型化（HomeSettings/HubRuntime/ScanResult）；四屏组件的 IHomePluginLike any 字段（28 处）随 C 阶段细化逐屏类型化（循环A 第 2 项剩余） ✅ 2026-10-03 第十九轮（共享 HomePluginLike 契约覆盖六屏+onboarding；面板 ": any" 43→13，剩余为台账行 cells 的内核 JSON 边界，归 21 组 SQL 结果类型化追踪）
-- [ ] 🟡 Svelte 错误边界：面板崩溃不拖垮思源主界面（顶层 error boundary + 降级 UI）
+- [x] 🟡 Svelte 错误边界：面板崩溃不拖垮思源主界面（顶层 error boundary + 降级 UI） ✅ 2026-10-03 第三十四轮（Svelte 5.57 svelte:boundary——四屏各包一层 ErrorBoundary，渲染期错误降级为带错误摘要+重试按钮的卡片；事件处理器异常不在此范围内（Svelte 5 设计）；safeMount.ts 备用挂载守卫）
 - [ ] 🟡 加载态规范落地：何时 skeleton / 何时缓存直渲（对照 08 §4 状态矩阵逐屏标注）
 - [ ] 🟢 关键组件 props 文档注释（含用法示例）
 - [ ] 🟢 视觉回归抽查流程：改 token 后过一遍原型「组件库」屏截图比对
