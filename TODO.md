@@ -82,6 +82,9 @@
 | 2026-10-03 | 主线 | 第四十九轮：代码清理——动态导入静态化 + 死代码移除 | 六屏 dynamic import(hub/runtime) → 静态导入 saveRuntime；safe-mount.ts（从未导入）和 panel-utils.ts（未消费）删除；单测 136 持平、gzip 51.8KB |
 | 2026-10-03 | 循环A | 第四十九波走查 | 静态导入无循环依赖（runtime.ts 不导入 screens）；动态→静态无行为变化（同模块同导出） |
 | 2026-10-03 | 循环B | ③轮休（延续） | 兜底循环静默待命（延续） |
+| 2026-10-03 | 主线 | 第五十一轮：终审遗留四项收口 | EC15 favorSyncs 模块禁用清理 + handledYear 旧年份清理（purgeHandled 扩展）+ 初始打卡摘要拉取（onload 后 3s）+ onboarding skip 错误处理（上轮修复的 skip 路径补 showMessage 导入）；IHomePluginLike 补 runtime 类型；单测 136 持平、gzip 51.9KB |
+| 2026-10-03 | 循环A | 第五十一波走查 | IHomePluginLike 补 runtime 类型（即修 svelte-check）；全部改动无行为变更 |
+| 2026-10-03 | 循环B | ③轮休（延续） | 兜底循环静默待命（延续） |
 | 2026-10-03 | 主线 | 第三十六轮：代码卫生 + EC18/19 确认 | 死代码 safe-mount.ts 移除（ErrorBoundary 取代）；monthlyCompletions 24 个月保留期入 purgeHandled；LeiQie 无 bookmarks/snippets 消费 API（EC18/19 供方依赖确认）；单测 126 持平、gzip 51.4KB |
 | 2026-10-03 | 循环A | 第三十六波走查 | 死代码移除零引用验证；purgeHandled 月度清理边界（24 个月 cutoffKey）逻辑复核 |
 | 2026-10-03 | 循环B | ③信源=兄弟仓源码（第六轮） | LeiQie 无 getBookmarks/getSnippets 对外暴露——EC18/19 维持供方依赖注记 |
