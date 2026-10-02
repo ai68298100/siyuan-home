@@ -4,6 +4,7 @@
     import { addMember, updateMember, removeMember } from "@/core/members";
     import { newSiYuanId } from "@/core/siyuan";
     import type { HomePluginLike } from "@/types/plugin";
+    import { saveRuntime } from "@/core/hub/runtime";
     import { openContactPicker, getContactsBridge } from "@/libs/contact-picker";
     import { showMessage } from "siyuan";
 
@@ -39,8 +40,7 @@
         confirm(t("members.deleteTitle"), t("members.deleteBody").replace("${name}", m.name), async () => {
             try {
                 await removeMember(plugin, plugin.settings, m.id);
-                const { saveRuntime } = await import("@/core/hub/runtime");
-                let dirty = false;
+                                let dirty = false;
                 if (plugin.runtime.filterMemberId === m.id) { plugin.runtime.filterMemberId = undefined; dirty = true; }
                 if (plugin.runtime.hubMemberId === m.id) { plugin.runtime.hubMemberId = undefined; dirty = true; }
                 if (dirty) await saveRuntime(plugin, plugin.runtime);

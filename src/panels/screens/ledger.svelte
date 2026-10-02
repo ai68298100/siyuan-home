@@ -3,6 +3,7 @@
     import { localDateKey } from "@/core/hub/rule";
     import { showMessage, Dialog, confirm } from "siyuan";
     import type { HomePluginLike } from "@/types/plugin";
+    import { saveRuntime } from "@/core/hub/runtime";
     import { openContactPicker } from "@/libs/contact-picker";
 
     let { plugin, t, version }: { plugin: HomePluginLike; t: (k: string) => string; version?: number } = $props();
@@ -31,8 +32,7 @@
         else { sortKey = k; sortAsc = true; }
         plugin.runtime.ledgerSortKey = sortKey;
         plugin.runtime.ledgerSortAsc = sortAsc;
-        const { saveRuntime } = await import("@/core/hub/runtime");
-        await saveRuntime(plugin, plugin.runtime);
+                await saveRuntime(plugin, plugin.runtime);
     }
     const filteredRows = $derived.by(() => {
         const q = searchText.trim().toLowerCase();
@@ -344,8 +344,7 @@
                         note: noteParts.join(" "),
                     });
                     plugin.runtime.favorSyncs = { ...(plugin.runtime.favorSyncs ?? {}), [row.itemID]: { docId: person.docId, at: new Date().toISOString() } };
-                    const { saveRuntime } = await import("@/core/hub/runtime");
-                    await saveRuntime(plugin, plugin.runtime);
+                                        await saveRuntime(plugin, plugin.runtime);
                     showMessage(t("ec15.done").replace("${n}", person.name).replace("${r}", String(result.recorded)), 3000, "info");
                     btn.disabled = false;
                 } catch (e) {
@@ -459,8 +458,7 @@
                         dirty = true;
                     }
                     if (dirty) {
-                        const { saveRuntime } = await import("@/core/hub/runtime");
-                        await saveRuntime(plugin, plugin.runtime);
+                                                await saveRuntime(plugin, plugin.runtime);
                     }
                     showMessage(t("ledger.delDone"), 2500, "info");
                     dlg.destroy();

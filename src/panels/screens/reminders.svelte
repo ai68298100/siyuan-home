@@ -1,6 +1,7 @@
 <script lang="ts">
     import { Dialog, Menu, showMessage, confirm } from "siyuan";
     import type { HomePluginLike } from "@/types/plugin";
+    import { saveRuntime } from "@/core/hub/runtime";
     import type { Reminder } from "@/types";
     let { plugin, t, version }: { plugin: HomePluginLike; t: (k: string) => string; version?: number } = $props();
 
@@ -33,8 +34,7 @@
         plugin.runtime.hubMemberId = filterMember;
         plugin.runtime.hubModuleId = filterModule;
         plugin.runtime.hubDueWithin = dueWithin;
-        const { saveRuntime } = await import("@/core/hub/runtime");
-        await saveRuntime(plugin, plugin.runtime);
+                await saveRuntime(plugin, plugin.runtime);
     }
     const filtered = $derived.by(() => {
         const level = filter;

@@ -2,6 +2,7 @@
     import type { Reminder } from "@/types";
     import Onboarding from "../onboarding.svelte";
     import type { HomePluginLike } from "@/types/plugin";
+    import { saveRuntime } from "@/core/hub/runtime";
     import { localDateKey } from "@/core/hub/rule";
 
     let { plugin, t, onGoto, version }: { plugin: HomePluginLike; t: (k: string) => string; onGoto: (s: string) => void; version?: number } = $props();
@@ -35,8 +36,7 @@
     async function setMemberFilter(id: string | undefined) {
         memberFilter = id;
         plugin.runtime.filterMemberId = id;
-        const { saveRuntime } = await import("@/core/hub/runtime");
-        await saveRuntime(plugin, plugin.runtime);
+                await saveRuntime(plugin, plugin.runtime);
     }
 
     let memoTitle = $state("");
