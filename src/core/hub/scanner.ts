@@ -26,6 +26,8 @@ export async function runScan(
     settings: HomeSettings,
     rt: HubRuntime,
     today: Date = new Date(),
+    /** PF06 增量刷新：只实扫这些模块，其余沿用上次快照（不标记失败）；缺省全量 */
+    only?: Set<string>,
 ): Promise<ScanResult> {
     const enabled = new Set(settings.enabledModules);
     const derivedByModule = new Map<string, Reminder[]>();
@@ -38,6 +40,15 @@ export async function runScan(
         providers.map(async (p) => {
             // 禁用模块不发起读请求（PF04 方向）；adhoc 为备忘通道，不受模块开关约束
             if (!enabled.has(p.moduleId) && p.moduleId !== "adhoc") return;
+            // PF06：不在本次范围的模块沿用旧快照（数据时间不变，不冒充新扫描）
+            if (only && !only.has(p.moduleId)) {
+                const kept = prevByModule[p.moduleId];
+                if (kept) {
+                    derivedByModule.set(p.moduleId, kept.reminders);
+                    atByModule.set(p.moduleId, kept.at);
+                }
+                return;
+            }
             try {
                 derivedByModule.set(p.moduleId, await p.collect(today));
                 atByModule.set(p.moduleId, now);

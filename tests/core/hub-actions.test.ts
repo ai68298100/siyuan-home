@@ -218,6 +218,34 @@ describe("H04 扫描失败保留模块快照", () => {
         expect(res.byModule.certs).toBeUndefined();
     });
 
+    it("PF06 增量扫描：only 范围外沿用旧快照与旧数据时间，范围内实扫", async () => {
+        let certsCalls = 0;
+        let membersCalls = 0;
+        const certsP: DataProvider = { moduleId: "certs", collect: async () => { certsCalls++; return [rem(`c${certsCalls}::certs.expiry`, "2026-10-02", "overdue")]; } };
+        const membersP: DataProvider = { moduleId: "members", collect: async () => { membersCalls++; return [rem(`m${membersCalls}::members.birthday`, "2026-10-20", "lead", "anniversary", "members")]; } };
+        // 第一次全量（生产中 index.ts 会把 byModule 写回 rt.cache）
+        const rt = defaultRuntime();
+        const full = await runScan([certsP, membersP], settings(), rt, TODAY);
+        expect(full.derived).toHaveLength(2);
+        rt.cache = { reminders: full.reminders, counts: full.counts, errors: full.errors, derived: full.derived, byModule: full.byModule };
+        // 增量：只扫 certs
+        const partial = await runScan([certsP, membersP], settings(), rt, new Date(2026, 9, 2), new Set(["certs"]));
+        expect(certsCalls).toBe(2);
+        expect(membersCalls).toBe(1); // members 未实扫
+        const certsAt = partial.byModule.certs.at;
+        const membersAt = partial.byModule.members.at;
+        expect(certsAt > full.byModule.certs.at).toBe(true); // certs 数据时间更新
+        expect(membersAt).toBe(full.byModule.members.at); // members 沿用旧时间（不冒充新扫描）
+        expect(partial.derived.some((r) => r.id.startsWith("m1::"))).toBe(true); // members 旧提醒保留
+    });
+
+    it("PF06：增量扫描结果可正常合并计数（通知评估由 refreshHub 的 onlySet 分支跳过）", async () => {
+        const p: DataProvider = { moduleId: "certs", collect: async () => [rem("a::certs.expiry", "2026-10-02", "overdue")] };
+        const res = await runScan([p], settings(), defaultRuntime(), TODAY, new Set(["certs"]));
+        expect(res.stale).toBe(false);
+        expect(res.counts.overdue).toBe(1);
+    });
+
     it("deriveVisible：禁用模块过滤 + 忽略过滤 + 计数重算（H02 数据源）", async () => {
         const rt: HubRuntime = { ...defaultRuntime(), muted: { "a::certs.expiry": true } };
         const derived = [

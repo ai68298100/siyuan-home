@@ -578,5 +578,10 @@
     "ledger.noAttachments": "No attachments yet",
     "ledger.upload": "Upload attachment",
     "ledger.uploadDone": "Attachments uploaded and saved",
-    "ledger.uploadFailed": "Attachment upload failed: ${msg}"
+    "ledger.uploadFailed": "Attachment upload failed: ${msg}",
+    "hub.batch": "Batch",
+    "hub.selectedN": "${n} selected",
+    "hub.selectAll": "Select all shown",
+    "hub.select": "Select this reminder",
+    "hub.batchDone": "Batch processed ${n} item(s)"
 }

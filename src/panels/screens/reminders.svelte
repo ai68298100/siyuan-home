@@ -71,6 +71,43 @@
         });
     }
 
+    // 17 组：批量操作——选择模式下逐条勾选，批量完成/延后 7 天/忽略（H01 串行队列逐条落盘）
+    let batchMode = $state(false);
+    let selected = $state<Set<string>>(new Set());
+    let batchBusy = $state(false);
+    const selectedCount = $derived(selected.size);
+    function toggleSelect(id: string) {
+        const next = new Set(selected);
+        if (next.has(id)) next.delete(id);
+        else next.add(id);
+        selected = next;
+    }
+    function selectAllFiltered() {
+        selected = new Set(filtered.map((r: any) => r.id));
+    }
+    function clearSelection() {
+        selected = new Set();
+        batchMode = false;
+    }
+    async function runBatch(kind: "done" | "snooze7" | "mute") {
+        if (batchBusy || selected.size === 0) return;
+        batchBusy = true;
+        try {
+            const byId = new Map(all.map((r: any) => [r.id, r]));
+            for (const id of selected) {
+                const r = byId.get(id);
+                if (!r) continue;
+                if (kind === "done") await plugin.complete(r);
+                else if (kind === "snooze7") await plugin.snooze(id, 7);
+                else await plugin.mute(id);
+            }
+            showMessage(t("hub.batchDone").replace("${n}", String(selected.size)), 3000, "info");
+            selected = new Set();
+        } finally {
+            batchBusy = false;
+        }
+    }
+
     // B4b 续期：思源 Dialog 小窗（H10：失败保留 Dialog 与输入、错误就地显示，不提前销毁）
     // 19 组安全：HTML 模板不插值任何用户内容——标题/条目名经 textContent 挂载，防台账文本注入
     function renewDialog(r: any) {
@@ -148,8 +185,21 @@
         <option value="30">{t("hub.due30")}</option>
     </select>
     <span class="fn__flex-1"></span>
+    <button class="b3-button b3-button--outline" class:b3-button--text={batchMode} onclick={() => (batchMode ? clearSelection() : (batchMode = true))}>{t("hub.batch")}</button>
     <button class="b3-button b3-button--outline" onclick={() => plugin.refreshHub()}>{t("hub.rescan")}</button>
 </div>
+
+{#if batchMode}
+    <div class="lv-card" style="padding:8px 14px;display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:10px">
+        <b class="lv-caption">{t("hub.selectedN").replace("${n}", String(selectedCount))}</b>
+        <button class="b3-button b3-button--text" onclick={selectAllFiltered}>{t("hub.selectAll")}</button>
+        <span class="fn__flex-1"></span>
+        <button class="b3-button b3-button--text" disabled={batchBusy || selectedCount === 0} onclick={() => runBatch("done")}>{t("act.done")}</button>
+        <button class="b3-button b3-button--text" disabled={batchBusy || selectedCount === 0} onclick={() => runBatch("snooze7")}>{t("act.snooze7")}</button>
+        <button class="b3-button b3-button--text" disabled={batchBusy || selectedCount === 0} onclick={() => runBatch("mute")}>{t("act.mute")}</button>
+        <button class="b3-button b3-button--outline" onclick={clearSelection}>{t("cancel")}</button>
+    </div>
+{/if}
 
 {#if filter === "handled"}
     {#if handledEntries.length === 0}
@@ -188,6 +238,10 @@
         <div class="lv-card lv-rems">
             {#each g.items as r (r.id)}
                 <div class="lv-rem {r.level}">
+                    {#if batchMode}
+                        <input type="checkbox" class="b3-checkbox" aria-label={t("hub.select")}
+                            checked={selected.has(r.id)} onchange={() => toggleSelect(r.id)} style="flex-shrink:0" />
+                    {/if}
                     <div class="lv-rem-ic">{r.moduleId === "adhoc" ? "📝" : "🗂"}</div>
                     <div class="lv-rem-t"><b>{r.title}</b><span class="lv-num">{r.dueDate}</span></div>
                     <span class="lv-badge {levelBadge[r.level]}">

@@ -243,7 +243,7 @@
                 }
                 dlg.destroy();
                 await load();
-                await plugin.refreshHub();
+                // 附件写入不影响提醒派生——无需扫描（PF06：无相关变更不重扫）
             };
             body.appendChild(uploadBtn);
             body.appendChild(fileInput);
@@ -265,7 +265,7 @@
                     showMessage(t("ledger.delDone"), 2500, "info");
                     dlg.destroy();
                     await load();
-                    await plugin.refreshHub();
+                    await plugin.refreshHub([active]); // PF06：只重扫本模块
                 } catch (e) {
                     // 端点不可用等失败：给出人工路径，不静默假删
                     showMessage(t("ledger.delFailed").replace("${msg}", e instanceof Error ? e.message : String(e)), 6000, "error");
@@ -314,7 +314,7 @@
                 setTimeout(() => { savedModule = ""; }, 8000);
             }
             await load();
-            await plugin.refreshHub();
+            await plugin.refreshHub([active]); // PF06：只重扫本模块（新行可能产生提醒）
         } catch (e) {
             if (e instanceof RowIdentityPendingError) {
                 // D02：行已提交但身份未确认——不自动重试（会重复建行），提示人工核对

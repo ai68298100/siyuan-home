@@ -184,14 +184,16 @@ export default class LvHomePlugin extends Plugin {
         await saveSettings(this, this.settings);
     }
 
-    /** 扫描 → 运行态合并 → 缓存 → 每日摘要 → 通知面板 */
-    async refreshHub(): Promise<ScanResult> {
+    /** 扫描 → 运行态合并 → 缓存 → 每日摘要 → 通知面板。
+     * PF06：传入模块范围则只实扫这些模块（写行后的增量刷新），其余沿用上次快照 */
+    async refreshHub(only?: string | string[]): Promise<ScanResult> {
         const seq = ++this.scanSeq;
+        const onlySet = only ? new Set(Array.isArray(only) ? only : [only]) : undefined;
         const deps = { settings: this.settings, getDbRef: (id: string) => this.settings.dbRefs[id] };
         // 12 轮修复：provider 由 schemaCatalog 程序化派生（手工清单曾漏掉 parenting/schooling，
         // 两模块提醒从未生效）；覆盖契约见 registry.providerCoverage
         const providers = buildScanProviders(this.schemaCatalog, deps);
-        const scan = await runScan(providers, this.settings, this.runtime);
+        const scan = await runScan(providers, this.settings, this.runtime, new Date(), onlySet);
         // H11：扫描期间已有更新的扫描启动（或手动动作已改运行态）→ 旧结果丢弃，不落盘不广播
         if (seq !== this.scanSeq) return scan;
         this.scan = scan;
@@ -203,20 +205,23 @@ export default class LvHomePlugin extends Plugin {
             byModule: scan.byModule,
         };
         this.runtime.scannedAt = scan.scannedAt;
-        const digest = dailyDigest(scan, this.settings, this.runtime);
-        if (digest.shouldNotify) {
-            markNotified(this.runtime);
-            const text = this.i18nText("notify.digest")
-                .replace("${overdue}", String(digest.overdue))
-                .replace("${soon}", String(digest.soon));
-            showMessage(text, 6000, "info");
-        }
-        // B3b：逾期事项每日首次发现立即提示（H12：与摘要共用静默判断）
-        const { localDateKey } = await import("@/core/hub/rule");
-        const today = localDateKey(new Date());
-        if (scan.counts.overdue > 0 && !inSilentHours(this.settings) && this.runtime.lastOverdueAlertDate !== today) {
-            this.runtime.lastOverdueAlertDate = today;
-            showMessage(this.i18nText("notify.overdue").replace("${n}", String(scan.counts.overdue)), 6000, "error");
+        // 摘要与逾期提示只在全量扫描时评估（PF06 增量扫描的数据是部分的，少报会压制当天真实提醒）
+        if (!onlySet) {
+            const digest = dailyDigest(scan, this.settings, this.runtime);
+            if (digest.shouldNotify) {
+                markNotified(this.runtime);
+                const text = this.i18nText("notify.digest")
+                    .replace("${overdue}", String(digest.overdue))
+                    .replace("${soon}", String(digest.soon));
+                showMessage(text, 6000, "info");
+            }
+            // B3b：逾期事项每日首次发现立即提示（H12：与摘要共用静默判断）
+            const { localDateKey } = await import("@/core/hub/rule");
+            const today = localDateKey(new Date());
+            if (scan.counts.overdue > 0 && !inSilentHours(this.settings) && this.runtime.lastOverdueAlertDate !== today) {
+                this.runtime.lastOverdueAlertDate = today;
+                showMessage(this.i18nText("notify.overdue").replace("${n}", String(scan.counts.overdue)), 6000, "error");
+            }
         }
         // H03：显式清理已完成运行态记录（未处理项永不自动删），清理结果随本次落盘
         purgeHandled(this.runtime, new Date());
@@ -286,7 +291,7 @@ export default class LvHomePlugin extends Plugin {
                     : { type: "text", text: { content: text } });
             }
             showMessage(this.i18nText("capture.saved").replace("${module}", this.i18nText(`module.${moduleId}`)), 3000, "info");
-            await this.refreshHub();
+            // 常用语/书签无提醒规则——写入不触发扫描（PF06：无相关变更不重扫）
         } catch (e) {
             const { coalescedNotify } = await import("@/libs/notify-queue");
             coalescedNotify("capture-failed", () =>
@@ -342,11 +347,11 @@ export default class LvHomePlugin extends Plugin {
     async unmute(id: string) { await unmute(this, id); await this.notifyHubChanged(); }
     /** 恢复已处理/忽略项（H07） */
     async restore(id: string) { await restore(this, id); await this.notifyHubChanged(); }
-    /** 续期写回台账行（H10：按规则自己的 field 列，缴费不改保障到期日）→ 全量扫描重算 due */
+    /** 续期写回台账行（H10：按规则自己的 field 列，缴费不改保障到期日）→ 增量重扫该模块 */
     renew(r: any, iso: string) {
         const rule = (this.schemaCatalog[r.moduleId]?.reminders ?? []).find((x: any) => x.key === r.ruleKey);
         return renew(this, r, iso, this.settings.dbRefs[r.moduleId] ?? {}, rule?.field ?? "expiry")
-            .then(() => this.refreshHub());
+            .then(() => this.refreshHub(r.moduleId));
     }
     async addMemo(title: string, due: string) { await addMemo(this, title, due); await this.notifyHubChanged(); }
     /** 删除备忘（显式动作，H03：未处理备忘只经此删除） */
