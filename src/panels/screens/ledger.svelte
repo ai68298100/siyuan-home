@@ -58,6 +58,21 @@
     const ref = $derived(plugin.settings.dbRefs[active]);
     const schemaKeys = $derived<string[]>(ref?.columns ? Object.keys(ref.columns) : []);
 
+    // 13 组/DL11：CSV 导出（当前模块、schema 全列、BOM 头兼容 Excel；本地生成不外传）
+    function exportCsv() {
+        if (!ref?.columns || filteredRows.length === 0) return;
+        const cols = (plugin.schemaCatalog?.[active]?.columns ?? []).filter((c: any) => ref!.columns![c.key]);
+        const esc = (v: string) => (/[",\n]/.test(v) ? `"${v.replace(/"/g, '""')}"` : v);
+        const head = cols.map((c: any) => esc(t(`field.${c.key}`) !== `field.${c.key}` ? t(`field.${c.key}`) : c.key)).join(",");
+        const lines = filteredRows.map((r) => cols.map((c: any) => esc(cellText(r.cells[ref!.columns![c.key]]))).join(","));
+        const blob = new Blob(["\uFEFF" + [head, ...lines].join("\r\n")], { type: "text/csv;charset=utf-8" });
+        const a = document.createElement("a");
+        a.href = URL.createObjectURL(blob);
+        a.download = `lv-${active}-${new Date().toISOString().slice(0, 10)}.csv`;
+        a.click();
+        URL.revokeObjectURL(a.href);
+    }
+
     async function rebuildLedger() {
         rebuilding = true;
         try {
@@ -347,6 +362,8 @@
     {:else}
         <input class="b3-text-field" style="width:150px" type="search" placeholder={t("ledger.search")}
             bind:value={searchText} title={t("ledger.search")} />
+        <button class="b3-button b3-button--outline" title={t("ledger.exportCsvTip")}
+            disabled={filteredRows.length === 0} onclick={exportCsv}>{t("ledger.exportCsv")}</button>
         <button class="b3-button b3-button--outline" onclick={() => plugin.showTabDocs(ref?.docId)}>{t("ledger.openDoc")} ↗</button>
     {/if}
 </div>

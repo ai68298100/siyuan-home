@@ -53,6 +53,10 @@ export default class LvHomePlugin extends Plugin {
     private statusbarEl?: HTMLElement;
     /** C6c 块菜单监听（onunload 精确解绑用） */
     private captureMenuHandler?: (...args: any[]) => void;
+    /** PF06/18 组：他端台账变更（websocket）→ 节流补扫 [待实测] 事件名/频度以实例为准 */
+    private wsHandler?: (...args: any[]) => void;
+    private lastWsRescan = 0;
+    private static WS_RESCAN_MIN_MS = 60 * 1000;
     /** PF13/15 组：可见性恢复补扫（休眠错过心跳的场景）；10 分钟最小间隔合并重复触发 */
     private visibilityHandler?: () => void;
     private lastScanAt = 0;
@@ -167,6 +171,14 @@ export default class LvHomePlugin extends Plugin {
             this.refreshHub(undefined, true).catch((e) => console.warn("[siyuan-home] wake rescan failed:", e));
         };
         document.addEventListener("visibilitychange", this.visibilityHandler);
+
+        // PF06/18 组：他端台账变更（websocket 主通道消息）→ 60 秒节流补扫（多端同步信号）
+        this.wsHandler = () => {
+            if (Date.now() - this.lastWsRescan < LvHomePlugin.WS_RESCAN_MIN_MS) return;
+            this.lastWsRescan = Date.now();
+            this.refreshHub().catch((e) => console.warn("[siyuan-home] ws rescan failed:", e));
+        };
+        this.eventBus.on("ws-main", this.wsHandler);
     }
 
     /** 布局就绪后：首次引导数据准备 + 建库 + 扫描（不阻塞启动） */
@@ -425,11 +437,13 @@ export default class LvHomePlugin extends Plugin {
         this.heartbeat = undefined;
         // 18 组清理审计：面板 destroy 时自行移除 listener，此处兜底清空；
         // scanSeq 自增使在途扫描结果失效（H11：卸载后不落盘/不通知/不更新 UI）；
-        // 块菜单监听与状态栏角标解绑/移除；可见性补扫解绑
+        // 块菜单监听与状态栏角标解绑/移除；可见性补扫解绑；ws 补扫解绑
         if (this.captureMenuHandler) this.eventBus.off("open-menu-content", this.captureMenuHandler);
         this.captureMenuHandler = undefined;
         if (this.visibilityHandler) document.removeEventListener("visibilitychange", this.visibilityHandler);
         this.visibilityHandler = undefined;
+        if (this.wsHandler) this.eventBus.off("ws-main", this.wsHandler);
+        this.wsHandler = undefined;
         this.statusbarEl?.remove();
         this.statusbarEl = undefined;
         this.hubListeners.clear();

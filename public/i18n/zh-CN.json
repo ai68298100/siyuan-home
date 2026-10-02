@@ -598,5 +598,7 @@
     "settings.restoreTitle": "恢复导入前设置",
     "settings.restoreBody": "将用最近一次导入前的自动备份覆盖当前设置，并补建台账、重新扫描。确定继续？",
     "settings.restoreDone": "已恢复导入前的设置",
-    "hub.batchPartial": "已处理 ${ok} 项；${failed} 项失败"
+    "hub.batchPartial": "已处理 ${ok} 项；${failed} 项失败",
+    "ledger.exportCsv": "导出 CSV",
+    "ledger.exportCsvTip": "导出当前模块全部列为 CSV（本地生成，含当前排序与搜索过滤结果）"
 }
