@@ -13,6 +13,7 @@ import { dailyDigest, markNotified, inSilentHours, weeklyPreview, markWeeklyNoti
 import { complete, snooze, mute, unmute, renew, restore, addMemo, removeMemo } from "@/core/hub/actions";
 import { provisionModule } from "@/core/provisioner";
 import { addDetachedRow, setCell } from "@/core/siyuan";
+import { mountLvHomeBridge } from "@/bridge/external-bridge";
 import { CERTS_SCHEMA, MEMBERS_SCHEMA, MEDICINE_SCHEMA, MEMBERSHIPS_SCHEMA, INSURANCE_SCHEMA, SHOPPING_SCHEMA, CONTRACTS_SCHEMA, EXAMS_SCHEMA, ALLOWANCE_SCHEMA, FAVORS_SCHEMA, STOCK_SCHEMA, CHORES_SCHEMA, HOUSE_SCHEMA, MEDIA_SCHEMA, PETS_SCHEMA, VEHICLES_SCHEMA, TRANSIT_SCHEMA, TRAVEL_PLAN_SCHEMA, TRAVEL_BOOKING_SCHEMA, TRAVEL_PACKING_SCHEMA, TRAVEL_LOG_SCHEMA, ASSETS_VIRTUAL_SCHEMA, ASSETS_REAL_SCHEMA, HEALTH_SCHEMA, FOOD_SCHEMA, ADDRESS_SCHEMA, BOOKMARKS_SCHEMA, SNIPPETS_SCHEMA, PARENTING_SCHEMA, SCHOOLING_SCHEMA, SOCIAL_SCHEMA, validateSchema } from "@/core/schema";
 import type { HomeSettings } from "@/types";
 
@@ -48,6 +49,8 @@ export default class LvHomePlugin extends Plugin {
     hubListeners = new Set<() => void>();
     /** 扫描序号（H11）：慢的旧扫描不得覆写新扫描结果或之后的手动动作 */
     private scanSeq = 0;
+    /** EC03/v0.3：服务桥卸载函数 */
+    private disposeLvHomeBridge?: () => void;
     /** 下次面板挂载的目标页签（状态栏/通知入口预选） */
     pendingScreen?: string;
     private statusbarEl?: HTMLElement;
@@ -187,6 +190,16 @@ export default class LvHomePlugin extends Plugin {
 
         // EC16：向雷切注册管家动作（打卡同款已验证模式：app.plugins 探测 + 方法存在性 + 重试）
         this.ensureSpeedSwitchActions();
+
+        // EC03/v0.3 生态首批：管家服务桥 window.LvHome（对齐人脉 window.LvContacts 模式；卸载注销）
+        this.disposeLvHomeBridge = mountLvHomeBridge({
+            settings: this.settings,
+            get scan() { return self.scan; },
+            showTab: () => self.showTab(),
+            openRemindersTab: () => { self.pendingScreen = "reminders"; self.showTab(); },
+            addMemo: (title, due) => self.addMemo(title, due),
+            onBridgeDisposed: () => { self.disposeLvHomeBridge = undefined; },
+        });
     }
 
     /**
@@ -538,6 +551,9 @@ export default class LvHomePlugin extends Plugin {
         this.visibilityHandler = undefined;
         if (this.wsHandler) this.eventBus.off("ws-main", this.wsHandler);
         this.wsHandler = undefined;
+        // EC03/v0.3：服务桥卸载（delete window.LvHome）
+        if (this.disposeLvHomeBridge) this.disposeLvHomeBridge();
+        this.disposeLvHomeBridge = undefined;
         // EC16：雷切动作注销 + 重试计时器清理
         if (this.speedSwitchRetry !== undefined) {
             window.clearTimeout(this.speedSwitchRetry);
