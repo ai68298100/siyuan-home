@@ -5,7 +5,7 @@
   "description": "Lv Home - family & life butler plugin for Siyuan (https://b3log.org/siyuan)",
   "repository": "github:ai68298100/siyuan-home",
   "homepage": "https://github.com/ai68298100/siyuan-home/releases/latest",
-  "author": "lvdaoguan",
+  "author": "ai68298100",
   "license": "MIT",
   "packageManager": "pnpm@11.4.0",
   "engines": {
