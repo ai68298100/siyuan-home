@@ -15,6 +15,19 @@ if (pkg.version !== plugin.version) {
 if (plugin.displayName?.default && plugin.displayName["zh-CN"] === undefined) {
     errors.push("plugin.json displayName 缺 zh-CN");
 }
+// R05：author/url 一致性——模板占位符未替换是最常见根因（40 轮实测）
+if (plugin.author === "lvdaoguan" || plugin.author === "YOUR_NAME") {
+    errors.push(`plugin.json author is template placeholder "${plugin.author}" — replace with actual GitHub username`);
+}
+if (plugin.url?.includes("lvdaoguan")) {
+    errors.push(`plugin.json url contains template placeholder "lvdaoguan" — replace with actual repo URL`);
+}
+if (pkg.author && plugin.author && pkg.author !== plugin.author) {
+    errors.push(`author mismatch: package.json "${pkg.author}" vs plugin.json "${plugin.author}"`);
+}
+if (plugin.url && !plugin.url.startsWith("https://github.com/")) {
+    errors.push(`plugin.json url should be a GitHub HTTPS URL: "${plugin.url}"`);
+}
 for (const f of ["src/index.ts", "plugin.json", "icon.png", "preview.png", "README.md", "README.zh-CN.md", "LICENSE", "public/i18n/zh-CN.json", "public/i18n/en.json"]) {
     if (!existsSync(f)) errors.push(`missing file: ${f}`);
 }
