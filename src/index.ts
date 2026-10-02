@@ -57,6 +57,9 @@ export default class LvHomePlugin extends Plugin {
     private wsHandler?: (...args: any[]) => void;
     private lastWsRescan = 0;
     private static WS_RESCAN_MIN_MS = 60 * 1000;
+    /** EC16：向雷切注册管家动作（disposer 收集；重试计时器上限 10 次） */
+    private speedSwitchDisposers: Array<() => void> = [];
+    private speedSwitchRetry?: number;
     /** PF13/15 组：可见性恢复补扫（休眠错过心跳的场景）；10 分钟最小间隔合并重复触发 */
     private visibilityHandler?: () => void;
     private lastScanAt = 0;
@@ -179,6 +182,50 @@ export default class LvHomePlugin extends Plugin {
             this.refreshHub().catch((e) => console.warn("[siyuan-home] ws rescan failed:", e));
         };
         this.eventBus.on("ws-main", this.wsHandler);
+
+        // EC16：向雷切注册管家动作（打卡同款已验证模式：app.plugins 探测 + 方法存在性 + 重试）
+        this.ensureSpeedSwitchActions();
+    }
+
+    /** 探测雷切（manifest name = siyuan-speed-switch）并注册管家动作；未安装时限次重试后静默放弃 */
+    private ensureSpeedSwitchActions(attempt = 0): void {
+        if (this.speedSwitchDisposers.length > 0) return; // 已注册
+        const plugins = (this.app as {plugins?: unknown} | undefined)?.plugins;
+        const candidates = Array.isArray(plugins)
+            ? plugins
+            : plugins && typeof plugins === "object" ? Object.values(plugins as Record<string, unknown>) : [];
+        const speedSwitch = candidates.find((candidate) => {
+            if (!candidate || typeof candidate !== "object") return false;
+            const p = candidate as {name?: unknown; registerQuickAction?: unknown};
+            return typeof p.registerQuickAction === "function"
+                && (p.name === "siyuan-speed-switch" || p.name === "小驴速切" || p.name === "siyuanSpeedSwitch");
+        }) as {registerQuickAction?: (options: unknown) => (() => void) | void} | undefined;
+        if (!speedSwitch?.registerQuickAction) {
+            // 未加载（或加载顺序靠后）：1200ms 重试，上限 10 次（约 12s）后放弃——雷切本会话内再启用则下次启动生效
+            if (attempt < 10 && this.speedSwitchRetry === undefined) {
+                this.speedSwitchRetry = window.setTimeout(() => {
+                    this.speedSwitchRetry = undefined;
+                    this.ensureSpeedSwitchActions(attempt + 1);
+                }, 1200);
+            }
+            return;
+        }
+        const register = speedSwitch.registerQuickAction.bind(speedSwitch);
+        const actions: {id: string; label: string; handler: () => void}[] = [
+            {id: "lvhome.open-overview", label: this.i18nText("butler"), handler: () => this.showTab()},
+            {id: "lvhome.open-reminders", label: this.i18nText("tab.reminders"), handler: () => { this.pendingScreen = "reminders"; this.showTab(); }},
+        ];
+        for (const action of actions) {
+            const dispose = register({
+                id: action.id,
+                label: action.label,
+                icon: "iconHome",
+                value: "open",
+                targets: ["desktop", "sidebar", "mobile"],
+                handler: () => action.handler(),
+            });
+            if (typeof dispose === "function") this.speedSwitchDisposers.push(dispose);
+        }
     }
 
     /** 布局就绪后：首次引导数据准备 + 建库 + 扫描（不阻塞启动） */
@@ -444,6 +491,15 @@ export default class LvHomePlugin extends Plugin {
         this.visibilityHandler = undefined;
         if (this.wsHandler) this.eventBus.off("ws-main", this.wsHandler);
         this.wsHandler = undefined;
+        // EC16：雷切动作注销 + 重试计时器清理
+        if (this.speedSwitchRetry !== undefined) {
+            window.clearTimeout(this.speedSwitchRetry);
+            this.speedSwitchRetry = undefined;
+        }
+        for (const dispose of this.speedSwitchDisposers) {
+            try { dispose(); } catch { /* 雷切可能已卸载——注销失败即无需注销 */ }
+        }
+        this.speedSwitchDisposers = [];
         this.statusbarEl?.remove();
         this.statusbarEl = undefined;
         this.hubListeners.clear();
