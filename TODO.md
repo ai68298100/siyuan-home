@@ -21,6 +21,9 @@
 | 2026-10-03 | 主线 | 第二十四轮：契约摘录 §4 三项深读完成 | 雷切 read 载荷定案（快照对象/错误降级为空态+重试提示/cacheTtlMs 缓存/context.signal 中止）；打卡 CheckinApi 全方法面登记（queryItems/getEventsInRange 半开区间+truncated/recordEventsBatch 幂等 1:1/occasions 三方法/强度摘要 ≤366 天）；拾遗确认**无任何外部桥**（GleanFacade 为内部 UI 契约——EC26-28 提供方依赖坐实）；**EC10 结论：EC09 绑定 UI 必须先行（绑定模型是产品决策），否决抢跑实现**——摘录 §4 更新并新增 §5 判断；单测 121 持平 |
 | 2026-10-03 | 循环A | 摘录复核 | 全部条目源码直读非转述；拾遗零暴露结论经 index.ts+types.ts 双文件确认 |
 | 2026-10-03 | 循环B | ③信源=兄弟仓源码（连续两轮，零网络） | ①研究产出即待办资产（摘录 §4 深读完成）；②EC10 顺序决策（EC09 先行）记录在案；EC26 供方依赖注记补入 |
+| 2026-10-03 | 主线 | 第二十五轮：EC16 落地（管家→雷切动作注册） | 按打卡已验证模式实现：app.plugins 探测 + 方法存在性 + 1200ms×10 重试 + disposer 收集；注册「打开管家/打开提醒中枢」两动作（提醒预选）；卸载全注销；单测 121 持平、gzip 48.2KB；[待实测] 同实例联调随 EC30 |
+| 2026-10-03 | 循环A | 第二十五波走查 | 未用字段即修；动作 label 全走 i18n 现有键；重复注册守卫（disposers 非空即返回）复核 |
+| 2026-10-03 | 循环B | ③信源=兄弟仓源码（第三轮） | 契约摘录→落地代码的完整闭环首次达成（EC16：摘录 §3 → index.ts 实现）；EC13/17 同路径可复制 |
 | 2026-10-03 | 循环A | 契约摘录复核 | 全部签名来自源码直读非文档转述；未初始化抛错/卸载注销/重复注册保护三处运行时语义已登记；EC12 owner 定案点未越界 |
 | 2026-10-03 | 循环B | ①研究产出即待办资产 ③信源=兄弟仓库源码（零网络） | 摘录 §4 登记 3 项待下轮深读；EC10 触发源修正（checkin:* 优于 ws-main）反向注记本轮 ws-main 实现为兜底 |
 | 2026-10-03 | 循环A | 兜底循环深化：全仓九项终审 | ①调试残留 0/TODO 注释仅 1 处文档性引用；②面板 any 存量 43 处（32 组追踪中，本轮零新增）；③120 测试覆盖新逻辑；④新 UI 全走 b3/lv token；⑤43 个 md 相对链接零失效（README 新增链接即修 1 处路径）；⑥i18n 600 键对齐；⑦新交互 aria/键盘齐备；⑧gzip 46.8KB<100KB；⑨日志脱敏复核（批量失败 warn 仅记错误不记标题）；README 能力表与 CHANGELOG Unreleased 对齐十七轮真实能力（R06 事实边界：待实测项明确标注） |
@@ -999,7 +1002,7 @@
 - [ ] 🟡 **EC13 人脉办理者选择**：通过 `LvContacts.searchPeople/getPerson` 选择合同、保单、学校等联系人；保存公开 docId/itemId/名称快照，v1 不假定电话邮箱生日可取。（2026-10-03 契约摘录：**源码签名确认**——`window.LvContacts` protocol 1，capabilities=[searchPeople,getPerson,ensurePerson,recordInteraction]；未初始化时全部方法抛错须引导；另有 ensurePerson 按名建人（幂等）；见 docs/research/2026-10-03-EC-源码契约摘录.md §1）
 - [ ] 🟡 **EC14 家庭成员与人脉映射**：显式绑定/解绑家庭成员和联系人，处理同名候选；双向回链需提供方新契约，不直接改人脉数据库。
 - [ ] 🟡 **EC15 人情/旅行交互记录**：用户确认人物后调用 `recordInteraction`，使用稳定事务 ref、日期、地点和最小备注；重试幂等，不因打开台账自动记会面。
-- [ ] 🟡 **EC16 雷切管家动作入口**：用真实实例 `registerQuickAction/Adapter` 注册打开面板、提醒、备忘等动作；重复加载不重复注册，返回函数可注销，不模拟 DOM 点击。（2026-10-03 契约摘录：**完整签名确认**——id 限 [A-Za-z0-9._:-]、token 防覆盖、返回幂等 disposer；见摘录 §3；对接=registerQuickAction({id:"lvhome.open-reminders",...})）
+- [x] 🟡 **EC16 雷切管家动作入口**：用真实实例 `registerQuickAction/Adapter` 注册打开面板、提醒、备忘等动作；重复加载不重复注册，返回函数可注销，不模拟 DOM 点击。 ✅ 2026-10-03 第二十五轮（管家侧代码落地：app.plugins 探测 siyuan-speed-switch + registerQuickAction 方法存在性校验（打卡同款已验证模式）；注册"打开管家/打开提醒中枢"两动作（提醒预选 pendingScreen）；disposer 收集 + 卸载全注销 + 重试上限 10 次防泄漏；[待实测] 与雷切同实例联调随 EC30）
 - [ ] 🟡 **EC17 雷切家庭摘要组件**：用 `registerHomeModule` 提供有界计数/标题/更新时间；loading、error、stale 分开，默认不共享生日/金额/证件，点击落到真实管家位置。（2026-10-03 契约摘录：**完整 options 签名确认**——含 configSchema/refreshOn/readOnly/read(config,device)/source 元数据；read 返回 shape 需再读 home-model.js——摘录 §4 待办；见 docs/research/2026-10-03-EC-源码契约摘录.md §3）
 - [ ] 🟢 **EC18 雷切书签入口**：拟定只读 `home.getBookmarks` 的字段、限量和授权，URL 仅 http(s)，点击才打开；非法/缺失目标及关闭模块有提示，账号备注不默认共享。
 - [ ] 🟢 **EC19 雷切常用语承接**：管家纯文本 snippets 与雷切 HTML/CSS/JS 片段严格分开；复制/插入由用户选择，不把家庭文本变成可执行代码。
