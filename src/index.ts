@@ -60,6 +60,8 @@ export default class LvHomePlugin extends Plugin {
     /** EC16：向雷切注册管家动作（disposer 收集；重试计时器上限 10 次） */
     private speedSwitchDisposers: Array<() => void> = [];
     private speedSwitchRetry?: number;
+    /** EC17：家庭摘要模块 disposer */
+    private homeModuleDisposer?: (() => void) | undefined;
     /** PF13/15 组：可见性恢复补扫（休眠错过心跳的场景）；10 分钟最小间隔合并重复触发 */
     private visibilityHandler?: () => void;
     private lastScanAt = 0;
@@ -187,6 +189,35 @@ export default class LvHomePlugin extends Plugin {
         this.ensureSpeedSwitchActions();
     }
 
+    /**
+     * EC17：家庭摘要快照（只读，计数有界——默认不共享标题/日期/生日/金额，EC17 边界）。
+     * 形态按雷切 normalizeSnapshot 协议 v2.1：stat 英雄区 + items 行 + sourceHealth 三态。
+     */
+    private buildHomeSummarySnapshot(): Record<string, unknown> {
+        try {
+            const rems = this.scan?.reminders ?? [];
+            const overdue = rems.filter((r) => r.level === "overdue").length;
+            const soon = rems.filter((r) => r.level === "soon").length;
+            const today = rems.filter((r) => r.daysLeft <= 0).length;
+            const stale = this.scan?.stale ?? false;
+            return {
+                title: this.i18nText("butler"),
+                stat: {value: String(today), label: this.i18nText("hub.groupOverdue")},
+                items: [
+                    {label: this.i18nText("hub.groupOverdue"), value: String(overdue), command: "siyuan-home::openButler"},
+                    {label: this.i18nText("hub.groupSoon"), value: String(soon), command: "siyuan-home::openButler"},
+                ],
+                updatedAt: Date.now(),
+                sourceHealth: stale ? "stale" : "fresh",
+                emptyHint: rems.length === 0 ? this.i18nText("dash.allClear") : undefined,
+            };
+        } catch (e) {
+            // 雷切约定：错误降级为空态快照 + 重试提示，不抛（见摘录 §4.1）
+            console.warn("[siyuan-home] summary snapshot failed:", e instanceof Error ? e.message : e);
+            return {title: this.i18nText("butler"), items: [], emptyHint: this.i18nText("hub.stale")};
+        }
+    }
+
     /** 探测雷切（manifest name = siyuan-speed-switch）并注册管家动作；未安装时限次重试后静默放弃 */
     private ensureSpeedSwitchActions(attempt = 0): void {
         if (this.speedSwitchDisposers.length > 0) return; // 已注册
@@ -225,6 +256,22 @@ export default class LvHomePlugin extends Plugin {
                 handler: () => action.handler(),
             });
             if (typeof dispose === "function") this.speedSwitchDisposers.push(dispose);
+        }
+        // EC17：家庭摘要模块（只读；read 返回计数快照；clickCommand 落管家总览）
+        const homeCapable = speedSwitch as {registerHomeModule?: (options: unknown) => (() => void) | void};
+        if (typeof homeCapable.registerHomeModule === "function" && !this.homeModuleDisposer) {
+            const dispose = homeCapable.registerHomeModule({
+                moduleId: "lvhome.summary",
+                title: this.i18nText("butler"),
+                icon: "iconHome",
+                supportedDevices: ["desktop", "sidebar", "mobile"],
+                sizes: ["xs", "small", "medium"],
+                protocolVersion: 1,
+                readOnly: true,
+                clickCommand: "siyuan-home::openButler",
+                read: () => this.buildHomeSummarySnapshot(),
+            });
+            if (typeof dispose === "function") this.homeModuleDisposer = dispose;
         }
     }
 
@@ -500,6 +547,11 @@ export default class LvHomePlugin extends Plugin {
             try { dispose(); } catch { /* 雷切可能已卸载——注销失败即无需注销 */ }
         }
         this.speedSwitchDisposers = [];
+        // EC17：家庭摘要模块注销
+        if (this.homeModuleDisposer) {
+            try { this.homeModuleDisposer(); } catch { /* 雷切可能已卸载 */ }
+            this.homeModuleDisposer = undefined;
+        }
         this.statusbarEl?.remove();
         this.statusbarEl = undefined;
         this.hubListeners.clear();
