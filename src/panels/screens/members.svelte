@@ -37,13 +37,17 @@
     // H16：删除成员后复位指向它的失效筛选（总览与提醒页）
     function confirmRemove(m: FamilyMember) {
         confirm(t("members.deleteTitle"), t("members.deleteBody").replace("${name}", m.name), async () => {
-            await removeMember(plugin, plugin.settings, m.id);
-            const { saveRuntime } = await import("@/core/hub/runtime");
-            let dirty = false;
-            if (plugin.runtime.filterMemberId === m.id) { plugin.runtime.filterMemberId = undefined; dirty = true; }
-            if (plugin.runtime.hubMemberId === m.id) { plugin.runtime.hubMemberId = undefined; dirty = true; }
-            if (dirty) await saveRuntime(plugin, plugin.runtime);
-            await plugin.refreshHub();
+            try {
+                await removeMember(plugin, plugin.settings, m.id);
+                const { saveRuntime } = await import("@/core/hub/runtime");
+                let dirty = false;
+                if (plugin.runtime.filterMemberId === m.id) { plugin.runtime.filterMemberId = undefined; dirty = true; }
+                if (plugin.runtime.hubMemberId === m.id) { plugin.runtime.hubMemberId = undefined; dirty = true; }
+                if (dirty) await saveRuntime(plugin, plugin.runtime);
+                await plugin.refreshHub();
+            } catch (e) {
+                showMessage(t("ledger.saveFailed").replace("${msg}", e instanceof Error ? e.message : String(e)), 5000, "error");
+            }
         });
     }
 
@@ -102,23 +106,27 @@
 
     async function doSave() {
         if (!name.trim()) return;
-        if (editId) {
-            const target = (plugin.settings.members ?? []).find((m) => m.id === editId);
-            if (target) {
-                await updateMember(plugin, plugin.settings, {
-                    ...target, name: name.trim(), role, birthday: birthday || undefined, lunarBirthday: lunar,
+        try {
+            if (editId) {
+                const target = (plugin.settings.members ?? []).find((m) => m.id === editId);
+                if (target) {
+                    await updateMember(plugin, plugin.settings, {
+                        ...target, name: name.trim(), role, birthday: birthday || undefined, lunarBirthday: lunar,
+                    });
+                }
+                cancelEdit();
+            } else {
+                await addMember(plugin, plugin.settings, {
+                    id: newSiYuanId(),
+                    name: name.trim(), role, birthday: birthday || undefined,
+                    lunarBirthday: lunar, createdAt: new Date().toISOString(),
                 });
+                name = ""; role = "self"; birthday = ""; lunar = false;
             }
-            cancelEdit();
-        } else {
-            await addMember(plugin, plugin.settings, {
-                id: newSiYuanId(),
-                name: name.trim(), role, birthday: birthday || undefined,
-                lunarBirthday: lunar, createdAt: new Date().toISOString(),
-            });
-            name = ""; role = "self"; birthday = ""; lunar = false;
+            await plugin.refreshHub();
+        } catch (e) {
+            showMessage(t("ledger.saveFailed").replace("${msg}", e instanceof Error ? e.message : String(e)), 5000, "error");
         }
-        await plugin.refreshHub();
     }
 </script>
 
