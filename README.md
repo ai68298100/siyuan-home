@@ -4,7 +4,7 @@
 
 **A family archive that reminds you before things expire** — the family & life butler plugin for SiYuan notes.
 
-[![CI](https://github.com/ai68298100/siyuan-home/actions/workflows/ci.yml/badge.svg)](https://github.com/ai68298100/siyuan-home/actions/workflows/ci.yml) [![Release](https://img.shields.io/github/v/release/ai68298100/siyuan-home)](https://github.com/ai68298100/siyuan-home/releases/latest) [![License](https://img.shields.io/github/license/ai68298100/siyuan-home)](./LICENSE) [![Tests](https://img.shields.io/badge/tests-33%20passing-brightgreen)](./tests)
+[![CI](https://github.com/ai68298100/siyuan-home/actions/workflows/ci.yml/badge.svg)](https://github.com/ai68298100/siyuan-home/actions/workflows/ci.yml) [![Release](https://img.shields.io/github/v/release/ai68298100/siyuan-home)](https://github.com/ai68298100/siyuan-home/releases/latest) [![License](https://img.shields.io/github/license/ai68298100/siyuan-home)](./LICENSE) [![Tests](https://img.shields.io/badge/tests-120%20passing-brightgreen)](./tests)
 
 Family archive · unified expiry reminder hub · household workspace
 
@@ -28,7 +28,7 @@ Certificates expire, medicine expires, insurance needs renewal, subscriptions au
 | 👥 **Members as first-class citizens** | Self / spouse / partner / children / elders / kin — every ledger is organized per member, filter "everything about my son" in one click |
 | 🗃 **31 life modules** | People & records · assets & shopping · daily living · parenting & school · travel · media (details below) |
 | 🔒 **Local-first** | Everything lives in your SiYuan workspace; no telemetry, no network calls; share the ledger notebook with your family |
-| 🔗 **Rows are blocks** | Ledger rows are SiYuan blocks — linkable from daily notes ("mom's passport" inside your journal) |
+| 🔗 **Native databases** | Ledgers are SiYuan attribute-view databases inside a dedicated notebook — open any ledger doc to edit, link or embed it in daily notes ("mom's passport" inside your journal) |
 | 🧩 **Modules on demand** | Disabled modules create no data and stay out of the UI; parenting/school only suggested when you have kids |
 
 ## 📦 Install (v0.2.0)

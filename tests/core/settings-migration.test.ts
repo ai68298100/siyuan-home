@@ -4,6 +4,7 @@
  */
 import { describe, it, expect, beforeEach } from "vitest";
 import { loadSettings, normalizeImportedSettings } from "@/core/settings";
+import { loadRuntime } from "@/core/hub/runtime";
 import { coalescedNotify, resetNotifyState } from "@/libs/notify-queue";
 
 function pluginWithSettings(data: unknown) {
@@ -39,6 +40,17 @@ describe("settings 迁移（21 组：v0.1 → v0.2）", () => {
 });
 
 describe("坏文件容错（15 组）", () => {
+    it("runtime：loadData 抛错 → 回退默认运行态（与 settings 同一 loadDataSafe 路径）", async () => {
+        const plugin = {
+            loadData: async () => { throw new Error("runtime corrupted"); },
+            saveData: async () => undefined,
+        } as any;
+        const rt = await loadRuntime(plugin);
+        expect(rt.snoozed).toEqual({});
+        expect(rt.memos).toEqual([]);
+        expect(rt.schemaVersion).toBe(1);
+    });
+
     it("loadData 抛错 → 回退默认 + corruptedSettings 标记 + 备份 marker 落盘", async () => {
         const saved: Record<string, unknown> = {};
         const plugin = {

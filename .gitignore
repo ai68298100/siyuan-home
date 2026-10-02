@@ -17,3 +17,4 @@ tmp
 # local tooling state (playwright session artifacts, build outputs)
 .playwright-cli/
 output/
+coverage
