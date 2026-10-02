@@ -14,7 +14,7 @@ importers:
     devDependencies:
       '@sveltejs/vite-plugin-svelte':
         specifier: ^7.3.0
-        version: 7.3.0(svelte@5.57.0)(vite@8.3.1(@types/node@26.4.0)(sass@1.103.1))
+        version: 7.3.0(svelte@5.57.0)(vite@8.3.1(@types/node@26.4.0)(sass@1.105.0))
       '@tsconfig/svelte':
         specifier: ^5.0.8
         version: 5.0.8
@@ -61,8 +61,8 @@ importers:
         specifier: ^4.1.5
         version: 4.1.5
       sass:
-        specifier: ^1.103.1
-        version: 1.103.1
+        specifier: ^1.105.0
+        version: 1.105.0
       siyuan:
         specifier: 1.2.8
         version: 1.2.8
@@ -80,16 +80,16 @@ importers:
         version: 6.0.3
       vite:
         specifier: ^8.3.1
-        version: 8.3.1(@types/node@26.4.0)(sass@1.103.1)
+        version: 8.3.1(@types/node@26.4.0)(sass@1.105.0)
       vite-plugin-static-copy:
         specifier: ^4.1.1
-        version: 4.1.1(vite@8.3.1(@types/node@26.4.0)(sass@1.103.1))
+        version: 4.1.1(vite@8.3.1(@types/node@26.4.0)(sass@1.105.0))
       vite-plugin-zip-pack:
         specifier: ^1.2.4
-        version: 1.2.4(vite@8.3.1(@types/node@26.4.0)(sass@1.103.1))
+        version: 1.2.4(vite@8.3.1(@types/node@26.4.0)(sass@1.105.0))
       vitest:
         specifier: ^5.0.3
-        version: 5.0.3(@types/node@26.4.0)(@vitest/coverage-v8@5.0.3)(vite@8.3.1(@types/node@26.4.0)(sass@1.103.1))
+        version: 5.0.3(@types/node@26.4.0)(@vitest/coverage-v8@5.0.3)(vite@8.3.1(@types/node@26.4.0)(sass@1.105.0))
 
 packages:
 
@@ -1127,8 +1127,8 @@ packages:
   nice-try@1.0.5:
     resolution: {integrity: sha512-1nh45deeb5olNY7eX82BkPO7SSxR5SSYJiPTrTdFUVYwAl8CKMA5N9PjTYkHiRjisVcxcQ1HXdLhx2qxxJzLNQ==}
 
-  node-addon-api@7.0.0:
-    resolution: {integrity: sha512-vgbBJTS4m5/KkE16t5Ly0WW9hz46swAstv0hYYwMtbG7AznRhNyfLRe8HZAiWIpcHzoO7HxhLuBQj9rJ/Ho0ZA==}
+  node-addon-api@7.1.1:
+    resolution: {integrity: sha512-5m3bsyrjFWE1xf7nz7YXdN4udnVtXK6/Yfgn5qnahL6bCkf2yKt4k3nuTKAtT4r3IG8JNR2ncsIMdZuAzJjHQQ==}
 
   normalize-package-data@2.3.2:
     resolution: {integrity: sha512-BLkLLQrgJd5ftBSfln5rTM5CfaIGduO/6EIT6yvrIKf29glir9A6Pg3YfEN+gp7ypAURrMQ2idHq48xB+2hsYQ==}
@@ -1316,8 +1316,8 @@ packages:
     resolution: {integrity: sha512-x/+Cz4YrimQxQccJf5mKEbIa1NzeCRNI5Ecl/ekmlYaampdNLPalVyIcCZNNH3MvmqBugV5TMYZXv0ljslUlaw==}
     engines: {node: '>= 0.4'}
 
-  sass@1.103.1:
-    resolution: {integrity: sha512-9icZURbP51S6S0QGoyaeqk9uB06GNWxsFYWfH5RgpFgqK5FA8tJcM3AdVxrZEVJ7dz+L87nG95gBKf4VuaMHGw==}
+  sass@1.105.0:
+    resolution: {integrity: sha512-4EjSuRTyG8M4yRXXY1PT9OUV5zz23xBxJkbIAprohKHqf6HOU4MCpE3U3vAC+iO1gxobBjESNbcj8rYAQZWnyA==}
     engines: {node: '>=20.19.0'}
     hasBin: true
 
@@ -1814,7 +1814,7 @@ snapshots:
     dependencies:
       detect-libc: 2.1.2
       is-glob: 4.0.3
-      node-addon-api: 7.0.0
+      node-addon-api: 7.1.1
       picomatch: 4.0.7
     optionalDependencies:
       '@parcel/watcher-android-arm64': 2.6.0
@@ -1884,14 +1884,14 @@ snapshots:
 
   '@sveltejs/load-config@0.2.3': {}
 
-  '@sveltejs/vite-plugin-svelte@7.3.0(svelte@5.57.0)(vite@8.3.1(@types/node@26.4.0)(sass@1.103.1))':
+  '@sveltejs/vite-plugin-svelte@7.3.0(svelte@5.57.0)(vite@8.3.1(@types/node@26.4.0)(sass@1.105.0))':
     dependencies:
       deepmerge: 4.3.1
       magic-string: 1.2.3
       obug: 2.1.4
       svelte: 5.57.0
-      vite: 8.3.1(@types/node@26.4.0)(sass@1.103.1)
-      vitefu: 1.1.3(vite@8.3.1(@types/node@26.4.0)(sass@1.103.1))
+      vite: 8.3.1(@types/node@26.4.0)(sass@1.105.0)
+      vitefu: 1.1.3(vite@8.3.1(@types/node@26.4.0)(sass@1.105.0))
 
   '@tsconfig/node10@1.0.13': {}
 
@@ -1940,7 +1940,7 @@ snapshots:
       obug: 2.1.4
       std-env: 4.3.0
       tinyrainbow: 3.2.0
-      vitest: 5.0.3(@types/node@26.4.0)(@vitest/coverage-v8@5.0.3)(vite@8.3.1(@types/node@26.4.0)(sass@1.103.1))
+      vitest: 5.0.3(@types/node@26.4.0)(@vitest/coverage-v8@5.0.3)(vite@8.3.1(@types/node@26.4.0)(sass@1.105.0))
 
   '@vitest/istanbul-lib-coverage@1.0.2': {}
 
@@ -1948,14 +1948,14 @@ snapshots:
     dependencies:
       '@vitest/istanbul-lib-coverage': 1.0.2
 
-  '@vitest/mocker@5.0.3(vite@8.3.1(@types/node@26.4.0)(sass@1.103.1))':
+  '@vitest/mocker@5.0.3(vite@8.3.1(@types/node@26.4.0)(sass@1.105.0))':
     dependencies:
       '@jridgewell/trace-mapping': 0.3.31
       '@vitest/spy': 5.0.3
       estree-walker: 3.0.3
       magic-string: 1.2.3
     optionalDependencies:
-      vite: 8.3.1(@types/node@26.4.0)(sass@1.103.1)
+      vite: 8.3.1(@types/node@26.4.0)(sass@1.105.0)
 
   '@vitest/spy@5.0.3': {}
 
@@ -2689,7 +2689,7 @@ snapshots:
 
   nice-try@1.0.5: {}
 
-  node-addon-api@7.0.0:
+  node-addon-api@7.1.1:
     optional: true
 
   normalize-package-data@2.3.2:
@@ -2900,7 +2900,7 @@ snapshots:
       es-errors: 1.3.0
       is-regex: 1.2.1
 
-  sass@1.103.1:
+  sass@1.105.0:
     dependencies:
       chokidar: 5.0.0
       immutable: 5.1.9
@@ -3180,20 +3180,20 @@ snapshots:
       spdx-correct: 3.2.0
       spdx-expression-parse: 3.0.0
 
-  vite-plugin-static-copy@4.1.1(vite@8.3.1(@types/node@26.4.0)(sass@1.103.1)):
+  vite-plugin-static-copy@4.1.1(vite@8.3.1(@types/node@26.4.0)(sass@1.105.0)):
     dependencies:
       chokidar: 3.6.0
       p-map: 7.0.7
       picocolors: 1.1.1
       tinyglobby: 0.2.17
-      vite: 8.3.1(@types/node@26.4.0)(sass@1.103.1)
+      vite: 8.3.1(@types/node@26.4.0)(sass@1.105.0)
 
-  vite-plugin-zip-pack@1.2.4(vite@8.3.1(@types/node@26.4.0)(sass@1.103.1)):
+  vite-plugin-zip-pack@1.2.4(vite@8.3.1(@types/node@26.4.0)(sass@1.105.0)):
     dependencies:
       jszip: 3.10.1
-      vite: 8.3.1(@types/node@26.4.0)(sass@1.103.1)
+      vite: 8.3.1(@types/node@26.4.0)(sass@1.105.0)
 
-  vite@8.3.1(@types/node@26.4.0)(sass@1.103.1):
+  vite@8.3.1(@types/node@26.4.0)(sass@1.105.0):
     dependencies:
       lightningcss: 1.33.0
       picomatch: 4.0.7
@@ -3203,16 +3203,16 @@ snapshots:
     optionalDependencies:
       '@types/node': 26.4.0
       fsevents: 2.3.3
-      sass: 1.103.1
+      sass: 1.105.0
 
-  vitefu@1.1.3(vite@8.3.1(@types/node@26.4.0)(sass@1.103.1)):
+  vitefu@1.1.3(vite@8.3.1(@types/node@26.4.0)(sass@1.105.0)):
     optionalDependencies:
-      vite: 8.3.1(@types/node@26.4.0)(sass@1.103.1)
+      vite: 8.3.1(@types/node@26.4.0)(sass@1.105.0)
 
-  vitest@5.0.3(@types/node@26.4.0)(@vitest/coverage-v8@5.0.3)(vite@8.3.1(@types/node@26.4.0)(sass@1.103.1)):
+  vitest@5.0.3(@types/node@26.4.0)(@vitest/coverage-v8@5.0.3)(vite@8.3.1(@types/node@26.4.0)(sass@1.105.0)):
     dependencies:
       '@types/chai': 5.2.3
-      '@vitest/mocker': 5.0.3(vite@8.3.1(@types/node@26.4.0)(sass@1.103.1))
+      '@vitest/mocker': 5.0.3(vite@8.3.1(@types/node@26.4.0)(sass@1.105.0))
       chai: 6.2.2
       es-module-lexer: 2.3.2
       expect-type: 1.4.0
@@ -3223,7 +3223,7 @@ snapshots:
       tinybench: 6.2.0
       tinyexec: 1.3.1
       tinyglobby: 0.2.17
-      vite: 8.3.1(@types/node@26.4.0)(sass@1.103.1)
+      vite: 8.3.1(@types/node@26.4.0)(sass@1.105.0)
       why-is-node-running: 3.2.1
     optionalDependencies:
       '@types/node': 26.4.0
