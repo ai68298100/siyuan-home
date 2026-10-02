@@ -48,9 +48,9 @@ async function demoRow(
         else if (typeof v === "string") await write(key, { type: "text", text: { content: v } });
         else if (typeof v === "boolean") await write(key, { type: "checkbox", checkbox: { checked: v } });
     }
-    // 默认状态（schema status 枚举首值）与快速表单一致
+    // 默认状态（schema 显式声明优先，否则枚举首值；D11）与快速表单一致
     const statusCol = (schemaCatalog[moduleId]?.columns ?? []).find((c: any) => c.key === "status");
-    if (statusCol?.options?.length) await write("status", { type: "select", select: { content: statusCol.options[0] } });
+    if (statusCol?.options?.length) await write("status", { type: "select", select: { content: statusCol.default ?? statusCol.options[0] } });
     return true;
 }
 

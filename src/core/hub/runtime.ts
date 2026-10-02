@@ -50,6 +50,9 @@ export interface HubRuntime {
     hubModuleId?: string;
     /** 提醒中枢时间窗筛选（C3a，天）：all=不限 / 0=今天 / 7 / 30（含逾期） */
     hubDueWithin?: string;
+    /** 台账页排序偏好（17 组：列 key + 方向，跨会话记忆） */
+    ledgerSortKey?: string;
+    ledgerSortAsc?: boolean;
     /** 上次扫描摘要缓存（通知与总览首屏直读，扫描失败时保留 stale 数据） */
     cache?: {
         reminders: Reminder[];
@@ -108,8 +111,14 @@ export async function loadRuntime(plugin: Plugin): Promise<HubRuntime> {
     return merged;
 }
 
+let lastSerialized: string | undefined;
+
 export async function saveRuntime(plugin: Plugin, rt: HubRuntime): Promise<void> {
+    // PF09：序列化比对，无变化不落盘（筛选/动作频繁触发的场景减少全量写入）
+    const json = JSON.stringify(rt);
+    if (json === lastSerialized) return;
     await plugin.saveData(RUNTIME_NAME, rt);
+    lastSerialized = json;
 }
 
 /** 已完成运行态记录的保留期（天）：过期后才可被 purgeHandled 清除 */

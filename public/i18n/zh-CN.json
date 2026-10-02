@@ -573,5 +573,6 @@
     "ledger.delTitle": "删除台账行",
     "ledger.delBody": "删除「${name}」这一行？仅删除该行数据，不影响文档与其他行。",
     "ledger.delDone": "已删除",
-    "ledger.delFailed": "删除失败：${msg}。请到台账文档中手动删除该行。"
+    "ledger.delFailed": "删除失败：${msg}。请到台账文档中手动删除该行。",
+    "ledger.sortTip": "点击排序（再点切换方向）"
 }

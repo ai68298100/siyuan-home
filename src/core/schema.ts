@@ -21,6 +21,8 @@ export interface ColumnDef {
     labelKey?: string;
     /** select 枚举（i18n 键：field.<key>.opt.<value>） */
     options?: string[];
+    /** select 默认值（D11：显式声明，调整枚举顺序不改变新行状态；缺省 = options[0]） */
+    default?: string;
     required?: boolean;
     /** 视图默认宽度占比（相对） */
     width?: number;
@@ -101,7 +103,7 @@ export const CERTS_SCHEMA: ModuleSchema = {
     columns: [
         ...d("name", "member"),
         { ...FIELD_DICT.category, options: ["id", "hukou", "passport", "visa", "permit", "license", "vehicle_lic", "birth_cert", "other"] },
-        { ...FIELD_DICT.status, options: ["valid", "expired", "renewed", "void"] },
+        { ...FIELD_DICT.status, options: ["valid", "expired", "renewed", "void"], default: "valid" },
         ...d("date"),
         ...CERT_PRIVATE,
         ...d("expiry", "due", "remind_before", "location", "attachments", "note"),
@@ -154,7 +156,7 @@ export const MEDICINE_SCHEMA: ModuleSchema = {
     columns: [
         ...d("name", "member"),
         { ...FIELD_DICT.category, options: ["rx", "otc", "external", "device", "supplement"] },
-        { ...FIELD_DICT.status, options: ["inuse", "standby", "med_expired", "discarded"] },
+        { ...FIELD_DICT.status, options: ["inuse", "standby", "med_expired", "discarded"], default: "inuse" },
         ...d("expiry", "remind_before"),
         { key: "stock_qty", type: "number", labelKey: "field.stock_qty" },
         { key: "low_stock_at", type: "number", labelKey: "field.low_stock_at" },
@@ -588,6 +590,12 @@ export function validateSchema(id: string, schema: ModuleSchema): string[] {
         else if (f.type !== "number") errors.push(`[${id}] numericRule ${n.key} field "${n.field}" 非number列`);
         if (!th) errors.push(`[${id}] numericRule ${n.key} thresholdField 未知列 "${n.thresholdField}"`);
         else if (th.type !== "number") errors.push(`[${id}] numericRule ${n.key} thresholdField "${n.thresholdField}" 非number列`);
+    }
+    // D11：select 默认值必须命中枚举（显式声明的默认不随枚举顺序漂移）
+    for (const c of schema.columns) {
+        if (c.default !== undefined && !(c.options ?? []).includes(c.default)) {
+            errors.push(`[${id}] 列 "${c.key}" default "${c.default}" 不在 options 内`);
+        }
     }
     return errors;
 }

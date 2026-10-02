@@ -19,13 +19,38 @@
     let rebuilding = $state(false);
     // 17 组：台账内搜索（标题/备注 contains，与成员过滤不叠加——本页无成员过滤）
     let searchText = $state("");
+    // 17 组：排序偏好记忆（表头点击切换列/方向，跨会话持久化）
+    // svelte-ignore state_referenced_locally
+    let sortKey = $state<string>(plugin.runtime.ledgerSortKey ?? "");
+    // svelte-ignore state_referenced_locally
+    let sortAsc = $state<boolean>(plugin.runtime.ledgerSortAsc ?? true);
+    async function toggleSort(k: string) {
+        if (sortKey === k) sortAsc = !sortAsc;
+        else { sortKey = k; sortAsc = true; }
+        plugin.runtime.ledgerSortKey = sortKey;
+        plugin.runtime.ledgerSortAsc = sortAsc;
+        const { saveRuntime } = await import("@/core/hub/runtime");
+        await saveRuntime(plugin, plugin.runtime);
+    }
     const filteredRows = $derived.by(() => {
         const q = searchText.trim().toLowerCase();
-        if (!q) return rows;
-        return rows.filter((r) => {
-            const nameCol = ref?.columns?.name ? (r.cells[ref.columns.name]?.text?.content ?? r.cells[ref.columns.name]?.block?.content ?? "") : "";
-            const noteCol = ref?.columns?.note ? (r.cells[ref.columns.note]?.text?.content ?? "") : "";
-            return nameCol.toLowerCase().includes(q) || noteCol.toLowerCase().includes(q);
+        let list = rows;
+        if (q) {
+            list = list.filter((r) => {
+                const nameCol = ref?.columns?.name ? (r.cells[ref.columns.name]?.text?.content ?? r.cells[ref.columns.name]?.block?.content ?? "") : "";
+                const noteCol = ref?.columns?.note ? (r.cells[ref.columns.note]?.text?.content ?? "") : "";
+                return nameCol.toLowerCase().includes(q) || noteCol.toLowerCase().includes(q);
+            });
+        }
+        const keyID = sortKey ? ref?.columns?.[sortKey] : undefined;
+        if (!keyID) return list;
+        return [...list].sort((a, b) => {
+            const av = cellText(a.cells[keyID]);
+            const bv = cellText(b.cells[keyID]);
+            const an = parseFloat(av);
+            const bn = parseFloat(bv);
+            const cmp = !isNaN(an) && !isNaN(bn) && av !== "—" && bv !== "—" ? an - bn : av.localeCompare(bv);
+            return sortAsc ? cmp : -cmp;
         });
     });
 
@@ -210,13 +235,14 @@
                 if (e.type === "number" && (v === undefined || isNaN(Number(v)))) continue;
                 await tryCell(t(`field.${e.key}`), cols[e.key], cellValue(e.type, e.key === "name" ? String(v ?? "").trim() : v));
             }
-            // C6a 增量 3：自动写入默认状态（schema status 枚举第一个值，如 certs=valid / medicine=inuse）
+            // C6a 增量 3：自动写入默认状态（schema 显式声明优先，否则枚举首值；D11）
             const statusCol = (plugin.schemaCatalog?.[active]?.columns ?? []).find((c: any) => c.key === "status");
-            if (statusCol?.options?.length) await tryCell(t("field.status"), cols.status, { type: "select", select: { content: statusCol.options[0] } });
+            if (statusCol?.options?.length) await tryCell(t("field.status"), cols.status, { type: "select", select: { content: statusCol.default ?? statusCol.options[0] } });
             if (failed.length > 0) {
-                // 输入与 itemID 均保留：再次保存补写同一行
+                // 输入与 itemID 均保留：再次保存补写同一行（同键 60s 合并，重试不重复轰炸——17 组）
                 saveError = t("ledger.savePartial").replace("${fields}", failed.join("、"));
-                showMessage(saveError, 6000, "error");
+                const { coalescedNotify } = await import("@/libs/notify-queue");
+                coalescedNotify("ledger-save-error", () => showMessage(saveError, 6000, "error"));
             } else {
                 resetForm();
                 // C6b 保存回执：模块去向 + "保存并查看"入口（短暂展示，不打断录入）
@@ -326,7 +352,12 @@
         <table>
             <thead><tr>
                 {#each schemaKeys.filter((k) => ["name", "status", "expiry", "due"].includes(k)) as k (k)}
-                    <th>{t(`field.${k}`)}</th>
+                    <th>
+                        <button class="b3-button b3-button--text" style="padding:0 2px;font-weight:600" title={t("ledger.sortTip")}
+                            onclick={() => toggleSort(k)}>
+                            {t(`field.${k}`)}{sortKey === k ? (sortAsc ? " ↑" : " ↓") : ""}
+                        </button>
+                    </th>
                 {/each}
             </tr></thead>
             <tbody>
