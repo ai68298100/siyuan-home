@@ -158,22 +158,69 @@ export async function createAttributeView(docId: string, avIdSeed: string): Prom
     return blockId;
 }
 
+/**
+ * 主键行 ID 全量读取（D01）：逐页 200 行直到不足一页；
+ * 扫描不得只读首页（>200 行的台账此前会静默漏提醒）。
+ * 上限 100 页（2 万行）防内核异常导致的死循环。
+ */
 export async function primaryRowItemIDs(avID: string, pageSize = 200): Promise<string[]> {
-    const d = await post<any>("/api/av/getAttributeViewPrimaryKeyValues", { id: avID, page: 1, pageSize });
-    return (d?.rows?.values ?? []).map((v: any) => v.id);
+    const ids: string[] = [];
+    for (let page = 1; ; page++) {
+        const d = await post<any>("/api/av/getAttributeViewPrimaryKeyValues", { id: avID, page, pageSize });
+        const batch: string[] = (d?.rows?.values ?? []).map((v: any) => v.id);
+        ids.push(...batch);
+        if (batch.length < pageSize) return ids;
+        if (page >= 100) throw new KernelError("av.getAttributeViewPrimaryKeyValues", -4, "pagination did not converge");
+    }
 }
 
-/** 加 detached 行，返回新行 itemID（加行前后行集合 diff 得出） */
+/**
+ * 新行身份未确认（D02）：行已提交到内核，但无法唯一确定 itemID。
+ * 调用方必须提示"已提交待确认"并避免诱导重复创建，不得静默当作成功或失败重试。
+ */
+export class RowIdentityPendingError extends Error {
+    readonly candidates: string[];
+    constructor(candidates: string[]) {
+        super(candidates.length > 1
+            ? `row committed, ${candidates.length} identity candidates`
+            : "row committed but identity not confirmed");
+        this.name = "RowIdentityPendingError";
+        this.candidates = candidates;
+    }
+}
+
+/** 从 addAttributeViewBlocks 响应收集可能的行 ID（响应形态随版本变化，仅认已知键） */
+function rowIDsFromAddResponse(d: any): string[] {
+    const out: string[] = [];
+    const push = (v: any) => { if (typeof v === "string" && v) out.push(v); };
+    if (Array.isArray(d?.rowIDs)) d.rowIDs.forEach(push);
+    if (Array.isArray(d?.operations)) d.operations.forEach((op: any) => push(op?.rowID));
+    if (Array.isArray(d?.rows)) d.rows.forEach((r: any) => push(r?.id));
+    return out;
+}
+
+/**
+ * 加 detached 行，返回新行 itemID（D02）：
+ * 1) 响应直接携带且不在加行前集合中的 ID 唯一 → 确认；
+ * 2) 否则加行前后全量集合 diff 唯一 → 确认；
+ * 3) 多候选（如并发加行）→ RowIdentityPendingError，不猜。
+ */
 export async function addDetachedRow(avID: string, content: string): Promise<string> {
     const before = new Set(await primaryRowItemIDs(avID));
-    await post("/api/av/addAttributeViewBlocks", {
+    const d = await post<any>("/api/av/addAttributeViewBlocks", {
         avID, blockID: "", srcs: [{ blockID: "", content, isDetached: true }],
     });
-    await new Promise((r) => setTimeout(r, 300));
-    const after = await primaryRowItemIDs(avID);
-    const added = after.find((id) => !before.has(id));
-    if (!added) throw new KernelError("av.addAttributeViewBlocks", -3, "row added but itemID not found");
-    return added;
+    const fromResponse = rowIDsFromAddResponse(d).filter((id) => !before.has(id));
+    await new Promise((r) => setTimeout(r, 300)); // 块索引异步重建
+    const added = (await primaryRowItemIDs(avID)).filter((id) => !before.has(id));
+    const confirmed = fromResponse.length === 1 ? fromResponse[0] : added.length === 1 ? added[0] : undefined;
+    if (confirmed) return confirmed;
+    throw new RowIdentityPendingError(added.length ? Array.from(new Set(added)) : fromResponse);
+}
+
+/** 删除 av 行（detached 行删除路径；[待实测] 端点/payload 以 3.8.x 实例为准，接线 UI 前必须实测并配确认框） */
+export async function removeLedgerRows(avID: string, rowIDs: string[]): Promise<void> {
+    await post("/api/av/removeAttributeViewBlocks", { avID, rowIDs });
 }
 
 /** 单元格写值（value 按列类型：{type:"text",text:{content}} / {type:"date",date:{content,isNotEmpty}} / {type:"relation",relation:{blockIDs}} …） */
@@ -186,8 +233,16 @@ export interface AvRow {
     cells: Record<string, any>; // 列 keyID → value
 }
 
+export interface LedgerRead {
+    columns: any[];
+    rows: AvRow[];
+    rowCount: number;
+    /** true = 一次 render 全量返回；false = 返回行数 < rowCount（D01：调用方必须进诊断/报错，不得当空成功） */
+    complete: boolean;
+}
+
 /** 读取台账（表格视图）列与行。cells 以列 keyID 索引；value 无 keyID 时按位置回退（Spike 未确认该字段） */
-export async function renderLedger(avID: string): Promise<{ columns: any[]; rows: AvRow[]; rowCount: number }> {
+export async function renderLedger(avID: string): Promise<LedgerRead> {
     const d = await post<any>("/api/av/renderAttributeView", { id: avID });
     const view = d?.view ?? {};
     const cols: any[] = view.columns ?? [];
@@ -200,5 +255,6 @@ export async function renderLedger(avID: string): Promise<{ columns: any[]; rows
         });
         return { itemID: r.id, cells };
     });
-    return { columns: cols, rows, rowCount: view.rowCount ?? rows.length };
+    const rowCount = view.rowCount ?? rows.length;
+    return { columns: cols, rows, rowCount, complete: rows.length >= rowCount };
 }

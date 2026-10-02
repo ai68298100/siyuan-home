@@ -55,7 +55,9 @@ export class CertsProvider implements DataProvider {
         if (!ref?.avId || !ref.columns) return [];
         const schema = CERTS_SCHEMA;
         const out: Reminder[] = [];
-        const { rows } = await renderLedger(ref.avId);
+        const read = await renderLedger(ref.avId);
+        if (!read.complete) throw new Error(`ledger read incomplete (${read.rows.length}/${read.rowCount} rows)`);
+        const { rows } = read;
         // relation 列（成员）→ 行 itemID → settings.members（avItemId 反查，成员过滤键）
         const members = this.deps.settings.members ?? [];
         for (const row of rows) {
@@ -102,7 +104,9 @@ export class SchemaLedgerProvider implements DataProvider {
         const ref = this.deps.getDbRef(this.moduleId);
         if (!ref?.avId || !ref.columns) return [];
         const out: Reminder[] = [];
-        const { rows } = await renderLedger(ref.avId);
+        const read = await renderLedger(ref.avId);
+        if (!read.complete) throw new Error(`ledger read incomplete (${read.rows.length}/${read.rowCount} rows)`);
+        const { rows } = read;
         const members = this.deps.settings.members ?? [];
         // 通用终态过滤：状态命中即跳过（字典 status 枚举的非活跃值）
         const skip = new Set(["archived", "void", "expired", "renewed", "refunded", "discarded", "surrendered", "ins_expired", "med_expired", "m_expired"]);
@@ -139,7 +143,9 @@ export class MembersProvider implements DataProvider {
         if (!ref?.avId || !ref.columns) return [];
         const schema = MEMBERS_SCHEMA;
         const out: Reminder[] = [];
-        const { rows } = await renderLedger(ref.avId);
+        const read = await renderLedger(ref.avId);
+        if (!read.complete) throw new Error(`ledger read incomplete (${read.rows.length}/${read.rowCount} rows)`);
+        const { rows } = read;
         for (const row of rows) {
             const cell = (key: string) => row.cells[ref.columns![key]];
             const status = selectFromValue(cell("status"));
