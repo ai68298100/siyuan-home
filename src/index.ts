@@ -8,7 +8,7 @@ import { svelteDialog } from "@/libs/dialog";
 import { loadSettings, saveSettings } from "@/core/settings";
 import { loadRuntime, saveRuntime, purgeHandled, listHandled, type HubRuntime } from "@/core/hub/runtime";
 import { runScan, deriveVisible, type ScanResult } from "@/core/hub/scanner";
-import { CertsProvider, MembersProvider, SchemaLedgerProvider, NumericRuleProvider } from "@/core/hub/providers";
+import { buildScanProviders } from "@/core/hub/registry";
 import { dailyDigest, markNotified, inSilentHours } from "@/core/hub/notify";
 import { complete, snooze, mute, unmute, renew, restore, addMemo, removeMemo } from "@/core/hub/actions";
 import { provisionModule } from "@/core/provisioner";
@@ -172,44 +172,12 @@ export default class LvHomePlugin extends Plugin {
         }
     }
 
-    /** members 先建（relation 目标），其余按需；幂等。启用模块才建库（P4） */
+    /** members 先建（relation 目标），其余按需；幂等。启用模块才建库（P4）。
+     * 12 轮修复：遍历 schemaCatalog（members 声明序居首），删除第二份手工清单防漂移 */
     async ensureCoreLedgers(): Promise<void> {
         const resolveName = (key: string) => String(this.i18n[`field.${key}`] ?? key);
         const enabled = new Set(this.settings.enabledModules);
-        const plans: [string, any, string][] = [
-            ["members", MEMBERS_SCHEMA, this.i18nText("module.members")],
-            ["certs", CERTS_SCHEMA, this.i18nText("module.certs")],
-            ["assets-real", ASSETS_REAL_SCHEMA, this.i18nText("module.assets-real")],
-            ["health", HEALTH_SCHEMA, this.i18nText("module.health")],
-            ["medicine", MEDICINE_SCHEMA, this.i18nText("module.medicine")],
-            ["memberships", MEMBERSHIPS_SCHEMA, this.i18nText("module.memberships")],
-            ["insurance", INSURANCE_SCHEMA, this.i18nText("module.insurance")],
-            ["shopping", SHOPPING_SCHEMA, this.i18nText("module.shopping")],
-            ["contracts", CONTRACTS_SCHEMA, this.i18nText("module.contracts")],
-            ["exams", EXAMS_SCHEMA, this.i18nText("module.exams")],
-            ["allowance", ALLOWANCE_SCHEMA, this.i18nText("module.allowance")],
-            ["favors", FAVORS_SCHEMA, this.i18nText("module.favors")],
-            ["stock", STOCK_SCHEMA, this.i18nText("module.stock")],
-            ["chores", CHORES_SCHEMA, this.i18nText("module.chores")],
-            ["house", HOUSE_SCHEMA, this.i18nText("module.house")],
-            ["media", MEDIA_SCHEMA, this.i18nText("module.media")],
-            ["pets", PETS_SCHEMA, this.i18nText("module.pets")],
-            ["vehicles", VEHICLES_SCHEMA, this.i18nText("module.vehicles")],
-            ["transit", TRANSIT_SCHEMA, this.i18nText("module.transit")],
-            ["travel-plan", TRAVEL_PLAN_SCHEMA, this.i18nText("module.travel-plan")],
-            ["travel-booking", TRAVEL_BOOKING_SCHEMA, this.i18nText("module.travel-booking")],
-            ["travel-packing", TRAVEL_PACKING_SCHEMA, this.i18nText("module.travel-packing")],
-            ["travel-log", TRAVEL_LOG_SCHEMA, this.i18nText("module.travel-log")],
-            ["assets-virtual", ASSETS_VIRTUAL_SCHEMA, this.i18nText("module.assets-virtual")],
-            ["food", FOOD_SCHEMA, this.i18nText("module.food")],
-            ["address", ADDRESS_SCHEMA, this.i18nText("module.address")],
-            ["bookmarks", BOOKMARKS_SCHEMA, this.i18nText("module.bookmarks")],
-            ["snippets", SNIPPETS_SCHEMA, this.i18nText("module.snippets")],
-            ["parenting", PARENTING_SCHEMA, this.i18nText("module.parenting")],
-            ["schooling", SCHOOLING_SCHEMA, this.i18nText("module.schooling")],
-            ["social", SOCIAL_SCHEMA, this.i18nText("module.social")],
-        ];
-        for (const [id, schema] of plans) {
+        for (const [id, schema] of Object.entries(this.schemaCatalog)) {
             if (!enabled.has(id)) continue;
             await provisionModule(this.settings, id, schema, this.i18nText("module." + id), { resolveName });
         }
@@ -220,27 +188,9 @@ export default class LvHomePlugin extends Plugin {
     async refreshHub(): Promise<ScanResult> {
         const seq = ++this.scanSeq;
         const deps = { settings: this.settings, getDbRef: (id: string) => this.settings.dbRefs[id] };
-        const providers = [
-            new CertsProvider(deps),
-            new MembersProvider(deps),
-            new SchemaLedgerProvider("assets-real", ASSETS_REAL_SCHEMA, deps),
-            new SchemaLedgerProvider("health", HEALTH_SCHEMA, deps),
-            new SchemaLedgerProvider("medicine", MEDICINE_SCHEMA, deps),
-            new NumericRuleProvider("medicine", MEDICINE_SCHEMA, deps), // H15 低库存（数值侧）
-            new SchemaLedgerProvider("memberships", MEMBERSHIPS_SCHEMA, deps),
-            new SchemaLedgerProvider("insurance", INSURANCE_SCHEMA, deps),
-            new SchemaLedgerProvider("contracts", CONTRACTS_SCHEMA, deps),
-            new SchemaLedgerProvider("exams", EXAMS_SCHEMA, deps),
-            new SchemaLedgerProvider("stock", STOCK_SCHEMA, deps),
-            new NumericRuleProvider("stock", STOCK_SCHEMA, deps), // H15 囤货低库存
-            new SchemaLedgerProvider("chores", CHORES_SCHEMA, deps),
-            new SchemaLedgerProvider("house", HOUSE_SCHEMA, deps),
-            new SchemaLedgerProvider("pets", PETS_SCHEMA, deps),
-            new SchemaLedgerProvider("vehicles", VEHICLES_SCHEMA, deps),
-            new SchemaLedgerProvider("transit", TRANSIT_SCHEMA, deps),
-            new SchemaLedgerProvider("travel-plan", TRAVEL_PLAN_SCHEMA, deps),
-            new SchemaLedgerProvider("assets-virtual", ASSETS_VIRTUAL_SCHEMA, deps),
-        ];
+        // 12 轮修复：provider 由 schemaCatalog 程序化派生（手工清单曾漏掉 parenting/schooling，
+        // 两模块提醒从未生效）；覆盖契约见 registry.providerCoverage
+        const providers = buildScanProviders(this.schemaCatalog, deps);
         const scan = await runScan(providers, this.settings, this.runtime);
         // H11：扫描期间已有更新的扫描启动（或手动动作已改运行态）→ 旧结果丢弃，不落盘不广播
         if (seq !== this.scanSeq) return scan;

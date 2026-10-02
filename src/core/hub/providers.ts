@@ -61,7 +61,7 @@ function numberFromValue(v: any): number | undefined {
     return n.content;
 }
 
-interface ProviderDeps {
+export interface ProviderDeps {
     settings: HomeSettings;
     /** 取模块 dbRef（avId + columns 映射） */
     getDbRef: (moduleId: string) => DbRef | undefined;
