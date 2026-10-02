@@ -314,6 +314,10 @@
   }
   @media (max-width: 760px) {
     .lv-hero h1 { font-size: 21px; }
+    // 26.7 触屏设备：无 hover，操作按钮常显（替代长按实现）
+    @media (hover: none) {
+      .lv-rem .lv-rem-ops { display: flex; opacity: 1; transform: none; }
+    }
     .lv-rem .lv-rem-ops { display: none; }
     // 26.7 窄屏 tabbar：标题隐藏，页签横向滚动
     .lv-tabbar { flex-wrap: wrap; }
