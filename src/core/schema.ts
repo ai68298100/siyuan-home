@@ -559,6 +559,14 @@ export const ASSETS_VIRTUAL_SCHEMA: ModuleSchema = {
 export function validateSchema(id: string, schema: ModuleSchema): string[] {
     const keys = new Set(schema.columns.map((c) => c.key));
     const errors: string[] = [];
+    // D11：重复列 key（建列映射会互相覆盖）
+    const seen = new Set<string>();
+    for (const c of schema.columns) {
+        if (seen.has(c.key)) errors.push(`[${id}] 重复列 key "${c.key}"`);
+        seen.add(c.key);
+    }
+    // D11：capture ≤5（02 §4.1 快速录入上限）
+    if ((schema.capture ?? []).length > 5) errors.push(`[${id}] capture 超过 5 列（02 §4.1）`);
     for (const k of schema.capture ?? []) {
         if (!keys.has(k)) errors.push(`[${id}] capture 引用未知列 "${k}"`);
     }
@@ -571,9 +579,15 @@ export function validateSchema(id: string, schema: ModuleSchema): string[] {
         if (r.cycleField && !keys.has(r.cycleField)) errors.push(`[${id}] reminder ${r.key} cycleField 未知列`);
         if (r.lunarField && !keys.has(r.lunarField)) errors.push(`[${id}] reminder ${r.key} lunarField 未知列`);
     }
+    // D11：数值阈值规则的两列必须存在且为 number 类型（阈值语义依赖数值比较）
+    const byKey = new Map(schema.columns.map((c) => [c.key, c]));
     for (const n of schema.numericRules ?? []) {
-        if (!keys.has(n.field)) errors.push(`[${id}] numericRule ${n.key} field 未知列 "${n.field}"`);
-        if (!keys.has(n.thresholdField)) errors.push(`[${id}] numericRule ${n.key} thresholdField 未知列 "${n.thresholdField}"`);
+        const f = byKey.get(n.field);
+        const th = byKey.get(n.thresholdField);
+        if (!f) errors.push(`[${id}] numericRule ${n.key} field 未知列 "${n.field}"`);
+        else if (f.type !== "number") errors.push(`[${id}] numericRule ${n.key} field "${n.field}" 非number列`);
+        if (!th) errors.push(`[${id}] numericRule ${n.key} thresholdField 未知列 "${n.thresholdField}"`);
+        else if (th.type !== "number") errors.push(`[${id}] numericRule ${n.key} thresholdField "${n.thresholdField}" 非number列`);
     }
     return errors;
 }

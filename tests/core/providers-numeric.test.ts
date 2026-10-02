@@ -6,7 +6,7 @@
 import { describe, it, expect, afterEach } from "vitest";
 import { setTransport } from "@/core/siyuan";
 import { NumericRuleProvider, MembersProvider } from "@/core/hub/providers";
-import { MEDICINE_SCHEMA, STOCK_SCHEMA } from "@/core/schema";
+import { MEDICINE_SCHEMA, STOCK_SCHEMA, validateSchema } from "@/core/schema";
 import { defaultSettings } from "@/core/settings";
 import type { DbRef, FamilyMember, HomeSettings } from "@/types";
 
@@ -39,6 +39,24 @@ const txt = (s: string) => ({ type: "text", text: { content: s } });
 const sel = (s: string) => ({ type: "select", select: { content: s } });
 
 const settings = (members: FamilyMember[] = []): HomeSettings => ({ ...defaultSettings(), members });
+
+describe("D11 schema 契约门禁（扩展）", () => {
+    it("31 个生产 schema 全部通过门禁（含 numericRules 类型检查）", () => {
+        for (const s of [MEDICINE_SCHEMA, STOCK_SCHEMA]) {
+            expect(validateSchema("test", s)).toEqual([]);
+        }
+    });
+    it("重复列 key / capture>5 / 非number阈值列 → 报错", () => {
+        const errs = validateSchema("t", {
+            columns: [{ key: "a", type: "text" }, { key: "a", type: "text" }, { key: "n", type: "text" }],
+            capture: ["a", "a", "a", "a", "a", "a"],
+            numericRules: [{ key: "low", field: "n", thresholdField: "n" }],
+        } as any);
+        expect(errs.some((e) => e.includes("重复列"))).toBe(true);
+        expect(errs.some((e) => e.includes("capture 超过"))).toBe(true);
+        expect(errs.filter((e) => e.includes("非number")).length).toBe(2);
+    });
+});
 
 describe("NumericRuleProvider（H15 低库存）", () => {
     const deps = (dbRefs: Record<string, DbRef>, members?: FamilyMember[]) => ({
