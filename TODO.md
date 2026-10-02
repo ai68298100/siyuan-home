@@ -24,6 +24,9 @@
 | 2026-10-03 | 主线 | 第二十五轮：EC16 落地（管家→雷切动作注册） | 按打卡已验证模式实现：app.plugins 探测 + 方法存在性 + 1200ms×10 重试 + disposer 收集；注册「打开管家/打开提醒中枢」两动作（提醒预选）；卸载全注销；单测 121 持平、gzip 48.2KB；[待实测] 同实例联调随 EC30 |
 | 2026-10-03 | 循环A | 第二十五波走查 | 未用字段即修；动作 label 全走 i18n 现有键；重复注册守卫（disposers 非空即返回）复核 |
 | 2026-10-03 | 循环B | ③信源=兄弟仓源码（第三轮） | 契约摘录→落地代码的完整闭环首次达成（EC16：摘录 §3 → index.ts 实现）；EC13/17 同路径可复制 |
+| 2026-10-03 | 主线 | 第二十七轮：EC17 落地（家庭摘要模块进雷切） | lvhome.summary 只读模块——read 返回 normalizeSnapshot v2.1 形态（stat 英雄区逾期+今日计数/items 两行 command 深链/sourceHealth fresh-stale/emptyHint）；**只共享计数不共享标题日期生日金额**（EC17 边界）；错误降级空态快照；同 EC16 探测/重试模式；卸载注销；单测 121 持平、gzip 49.2KB |
+| 2026-10-03 | 循环A | 第二十七波走查 | 快照构建 try-catch 全包（雷切约定错误不抛）；计数口径与提醒中枢一致（scan.reminders 派生）；无新增 i18n |
+| 2026-10-03 | 循环B | ③信源=兄弟仓源码（第四轮） | EC17 完成「身份→契约→read 载荷→落地」全链路；EC 生态三角（EC16/EC13/EC17）全部落地 |
 | 2026-10-03 | 主线 | 第二十六轮：EC13 v1 落地（人脉联系人选人） | 四 schema（contracts/insurance/schooling/exams）增 contact 文本列（D08 补列续跑自动迁移+快照 -u）；详情抽屉「从人脉选择」——window.LvContacts.searchPeople 实时搜索（旧请求丢弃 PF07）、快照存 `名称 [docId]`、未装/未初始化/失败三态降级；D08 补列续跑首次实战（既有台账自动获新列）；单测 121 持平、i18n 603→608、gzip 48.8KB |
 | 2026-10-03 | 循环A | 第二十六波走查 | 快照 diff 仅 contact 列；搜索竞态守卫（seq 计数）；快照格式在抽屉/思源原生 UI 双侧可读 |
 | 2026-10-03 | 循环B | ③信源=兄弟仓源码（第四轮） | EC13 完成「身份→契约→落地」全链路（第二十三轮摘录 §1 → 本轮实现）；EC17 同路径待复制 |
@@ -1006,7 +1009,7 @@
 - [ ] 🟡 **EC14 家庭成员与人脉映射**：显式绑定/解绑家庭成员和联系人，处理同名候选；双向回链需提供方新契约，不直接改人脉数据库。
 - [ ] 🟡 **EC15 人情/旅行交互记录**：用户确认人物后调用 `recordInteraction`，使用稳定事务 ref、日期、地点和最小备注；重试幂等，不因打开台账自动记会面。
 - [x] 🟡 **EC16 雷切管家动作入口**：用真实实例 `registerQuickAction/Adapter` 注册打开面板、提醒、备忘等动作；重复加载不重复注册，返回函数可注销，不模拟 DOM 点击。 ✅ 2026-10-03 第二十五轮（管家侧代码落地：app.plugins 探测 siyuan-speed-switch + registerQuickAction 方法存在性校验（打卡同款已验证模式）；注册"打开管家/打开提醒中枢"两动作（提醒预选 pendingScreen）；disposer 收集 + 卸载全注销 + 重试上限 10 次防泄漏；[待实测] 与雷切同实例联调随 EC30）
-- [ ] 🟡 **EC17 雷切家庭摘要组件**：用 `registerHomeModule` 提供有界计数/标题/更新时间；loading、error、stale 分开，默认不共享生日/金额/证件，点击落到真实管家位置。（2026-10-03 契约摘录：**完整 options 签名确认**——含 configSchema/refreshOn/readOnly/read(config,device)/source 元数据；read 返回 shape 需再读 home-model.js——摘录 §4 待办；见 docs/research/2026-10-03-EC-源码契约摘录.md §3）
+- [x] 🟡 **EC17 雷切家庭摘要组件**：用 `registerHomeModule` 提供有界计数/标题/更新时间；loading、error、stale 分开，默认不共享生日/金额/证件，点击落到真实管家位置。 ✅ 2026-10-03 第二十七轮（`lvhome.summary` 只读模块落地：read 返回 normalizeSnapshot v2.1 形态——stat 英雄区（逾期+今日计数）+ items 两行（逾期/7 天，command 深链 `siyuan-home::openButler`）+ sourceHealth fresh/stale + emptyHint；**只共享计数，不共享标题/日期/生日/金额**（EC17 边界）；错误降级为空态快照；卸载注销；[待实测] 同实例渲染随 EC30。摘录 §4.1 read 载荷已定案）
 - [ ] 🟢 **EC18 雷切书签入口**：拟定只读 `home.getBookmarks` 的字段、限量和授权，URL 仅 http(s)，点击才打开；非法/缺失目标及关闭模块有提示，账号备注不默认共享。
 - [ ] 🟢 **EC19 雷切常用语承接**：管家纯文本 snippets 与雷切 HTML/CSS/JS 片段严格分开；复制/插入由用户选择，不把家庭文本变成可执行代码。
 - [ ] 🟡 **EC20 考试计划关联**（依赖 EC03/EC04/EC05/MD06）：区分报名/考试日期和证书到期/复审日期；稳定绑定计划/题库 ID，考试当前无公开计划服务，先定最小契约再实现。
