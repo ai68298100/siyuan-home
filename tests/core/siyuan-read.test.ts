@@ -5,10 +5,12 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import {
     setTransport,
+    setUploadTransport,
     primaryRowItemIDs,
     renderLedger,
     addDetachedRow,
     removeLedgerRows,
+    uploadAsset,
     RowIdentityPendingError,
     KernelError,
 } from "@/core/siyuan";
@@ -140,5 +142,27 @@ describe("removeLedgerRows", () => {
         };
         await removeLedgerRows("av-1", ["row-1", "row-2"]);
         expect(calls[0].payload).toEqual({ avID: "av-1", rowIDs: ["row-1", "row-2"] });
+    });
+});
+
+describe("uploadAsset（A2c，[待实测] 端点层契约）", () => {
+    afterEach(() => setUploadTransport(null));
+
+    it("成功：返回 succMap 首个 name/path", async () => {
+        setUploadTransport(async (formData: FormData) => {
+            expect(formData.get("assetsPath")).toBe("/assets/siyuan-home/");
+            expect(formData.get("file")).toBeInstanceOf(File);
+            return { code: 0, msg: "", data: { succMap: { "保单.png": "/assets/siyuan-home/保单-20260101120000.png" } } };
+        });
+        const file = new File(["x"], "保单.png", { type: "image/png" });
+        const out = await uploadAsset(file);
+        expect(out).toEqual({ name: "保单.png", path: "/assets/siyuan-home/保单-20260101120000.png" });
+    });
+
+    it("非零 code → KernelError；空 succMap → KernelError", async () => {
+        setUploadTransport(async () => ({ code: 5, msg: "size limit" }));
+        await expect(uploadAsset(new File(["x"], "a.png"))).rejects.toThrow(KernelError);
+        setUploadTransport(async () => ({ code: 0, msg: "", data: { succMap: {} } }));
+        await expect(uploadAsset(new File(["x"], "a.png"))).rejects.toThrow(/succMap/);
     });
 });

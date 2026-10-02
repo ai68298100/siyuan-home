@@ -184,6 +184,70 @@
                 body.appendChild(line);
             }
         }
+        // 附件列（A2c）：现有文件列表 + 上传写回（[待实测] 端点；多文件逐一上传，失败逐个报告）
+        const attCol = (plugin.schemaCatalog?.[active]?.columns ?? []).find((c: any) => c.key === "attachments");
+        const attKeyID = ref.columns.attachments;
+        if (attCol && attKeyID) {
+            const attHead = document.createElement("div");
+            attHead.className = "ft__on-surface";
+            attHead.style.cssText = "margin-top:10px;padding-top:8px;border-top:1px solid var(--b3-border-color);font-size:12px";
+            attHead.textContent = t("field.attachments");
+            body.appendChild(attHead);
+            const existing = (row.cells[attKeyID]?.mAsset ?? []) as { name?: string; content?: string }[];
+            for (const f of existing) {
+                const line = document.createElement("div");
+                line.style.cssText = "padding:2px 0;font-size:12.5px;word-break:break-all";
+                line.textContent = `📎 ${f.name ?? f.content ?? "?"}`;
+                body.appendChild(line);
+            }
+            if (existing.length === 0) {
+                const none = document.createElement("div");
+                none.className = "ft__on-surface";
+                none.style.cssText = "font-size:12.5px";
+                none.textContent = t("ledger.noAttachments");
+                body.appendChild(none);
+            }
+            const uploadBtn = document.createElement("button");
+            uploadBtn.className = "b3-button b3-button--outline";
+            uploadBtn.style.cssText = "margin-top:6px;font-size:12px";
+            uploadBtn.textContent = t("ledger.upload");
+            const fileInput = document.createElement("input");
+            fileInput.type = "file";
+            fileInput.multiple = true;
+            fileInput.style.display = "none";
+            uploadBtn.onclick = () => fileInput.click();
+            fileInput.onchange = async () => {
+                const files = Array.from(fileInput.files ?? []);
+                if (files.length === 0) return;
+                const failed: string[] = [];
+                const appended = [...existing];
+                for (const f of files) {
+                    try {
+                        const { uploadAsset } = await import("@/core/siyuan");
+                        const { name, path } = await uploadAsset(f);
+                        appended.push({ name, content: path });
+                    } catch (e) {
+                        failed.push(`${f.name}: ${e instanceof Error ? e.message : String(e)}`);
+                    }
+                }
+                if (appended.length !== existing.length) {
+                    try {
+                        await setCell(ref!.avId!, attKeyID, row.itemID, { type: "mAsset", mAsset: appended });
+                        const msg = failed.length ? `${t("ledger.uploadFailed").replace("${msg}", failed.join("; "))}` : t("ledger.uploadDone");
+                        showMessage(msg, 5000, failed.length ? "error" : "info");
+                    } catch (e) {
+                        showMessage(t("ledger.uploadFailed").replace("${msg}", e instanceof Error ? e.message : String(e)), 6000, "error");
+                    }
+                } else if (failed.length) {
+                    showMessage(t("ledger.uploadFailed").replace("${msg}", failed.join("; ")), 6000, "error");
+                }
+                dlg.destroy();
+                await load();
+                await plugin.refreshHub();
+            };
+            body.appendChild(uploadBtn);
+            body.appendChild(fileInput);
+        }
         (dlg.element.querySelector("#lv-detail-close") as HTMLButtonElement).onclick = () => dlg.destroy();
         (dlg.element.querySelector("#lv-detail-open") as HTMLButtonElement).onclick = () => { dlg.destroy(); plugin.showTabDocs(ref?.docId); };
         // 17 组：行删除（detached 行走内核 av 删除端点 [待实测]；删除是显式用户动作，双确认说明影响范围）

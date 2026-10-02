@@ -61,6 +61,7 @@ exports[`31 模块 schema 契约快照（21 组） > 每个 schema 的结构快�
       "type": "asset",
     },
     {
+      "default": "active",
       "key": "status",
       "labelKey": "field.status",
       "options": [
@@ -273,6 +274,7 @@ exports[`31 模块 schema 契约快照（21 组） > 每个 schema 的结构快�
       "type": "select",
     },
     {
+      "default": "inuse",
       "key": "status",
       "labelKey": "field.status",
       "options": [
@@ -387,6 +389,7 @@ exports[`31 模块 schema 契约快照（21 组） > 每个 schema 的结构快�
       "type": "select",
     },
     {
+      "default": "following",
       "key": "status",
       "labelKey": "field.status",
       "options": [
@@ -585,6 +588,7 @@ exports[`31 模块 schema 契约快照（21 组） > 每个 schema 的结构快�
       "type": "select",
     },
     {
+      "default": "active",
       "key": "status",
       "labelKey": "field.status",
       "options": [
@@ -711,6 +715,7 @@ exports[`31 模块 schema 契约快照（21 组） > 每个 schema 的结构快�
       "type": "select",
     },
     {
+      "default": "in_force",
       "key": "status",
       "labelKey": "field.status",
       "options": [
@@ -900,6 +905,7 @@ exports[`31 模块 schema 契约快照（21 组） > 每个 schema 的结构快�
       "type": "select",
     },
     {
+      "default": "ct_active",
       "key": "status",
       "labelKey": "field.status",
       "options": [
@@ -988,6 +994,7 @@ exports[`31 模块 schema 契约快照（21 组） > 每个 schema 的结构快�
       "type": "select",
     },
     {
+      "default": "preparing",
       "key": "status",
       "labelKey": "field.status",
       "options": [
@@ -1435,6 +1442,7 @@ exports[`31 模块 schema 契约快照（21 组） > 每个 schema 的结构快�
       "type": "select",
     },
     {
+      "default": "wishlist",
       "key": "status",
       "labelKey": "field.status",
       "options": [
@@ -1702,6 +1710,7 @@ exports[`31 模块 schema 契约快照（21 组） > 每个 schema 的结构快�
       "type": "relation",
     },
     {
+      "default": "planning",
       "key": "status",
       "labelKey": "field.status",
       "options": [
@@ -1817,6 +1826,7 @@ exports[`31 模块 schema 契约快照（21 组） > 每个 schema 的结构快�
       "type": "text",
     },
     {
+      "default": "draft",
       "key": "status",
       "labelKey": "field.status",
       "options": [
@@ -2267,6 +2277,7 @@ exports[`31 模块 schema 契约快照（21 组） > 每个 schema 的结构快�
       "type": "select",
     },
     {
+      "default": "applying",
       "key": "status",
       "labelKey": "field.status",
       "options": [

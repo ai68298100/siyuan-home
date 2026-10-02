@@ -139,7 +139,7 @@ export const MEMBERS_SCHEMA: ModuleSchema = {
     columns: [
         ...d("name"),
         ...MEMBERS_PRIVATE,
-        { ...FIELD_DICT.status, options: ["active", "archived"] },
+        { ...FIELD_DICT.status, options: ["active", "archived"], default: "active" },
         ...d("note"),
     ],
     capture: ["name", "role", "birthday", "lunar"],
@@ -173,7 +173,7 @@ export const MEMBERSHIPS_SCHEMA: ModuleSchema = {
     columns: [
         ...d("name", "member"),
         { ...FIELD_DICT.category, options: ["member_card", "prepaid", "subscription", "coupon", "points"] },
-        { ...FIELD_DICT.status, options: ["active", "m_expired", "refunded"] },
+        { ...FIELD_DICT.status, options: ["active", "m_expired", "refunded"], default: "active" },
         ...d("expiry", "cycle", "amount", "note"),
         { key: "next_pay", type: "date", labelKey: "field.next_pay" },
         { key: "trial_end", type: "date", labelKey: "field.trial_end" },
@@ -193,7 +193,7 @@ export const INSURANCE_SCHEMA: ModuleSchema = {
     columns: [
         ...d("name", "member"),
         { ...FIELD_DICT.category, options: ["health", "critical", "accident", "life", "vehicle", "property", "other_ins"] },
-        { ...FIELD_DICT.status, options: ["in_force", "paying", "ins_expired", "surrendered"] },
+        { ...FIELD_DICT.status, options: ["in_force", "paying", "ins_expired", "surrendered"], default: "in_force" },
         { key: "insurer", type: "text", labelKey: "field.insurer" },
         { key: "policy_no", type: "text", labelKey: "field.policy_no" },
         { key: "premium", type: "number", labelKey: "field.premium" },
@@ -216,7 +216,7 @@ export const ASSETS_REAL_SCHEMA: ModuleSchema = {
     columns: [
         ...d("name", "member"),
         { ...FIELD_DICT.category, options: ["appliance", "furniture", "digital", "toy", "apparel", "jewelry", "collection", "sports", "other_ar"] },
-        { ...FIELD_DICT.status, options: ["inuse", "idle", "lent", "repairing", "disposed"] },
+        { ...FIELD_DICT.status, options: ["inuse", "idle", "lent", "repairing", "disposed"], default: "inuse" },
         ...d("date", "amount", "expiry", "location", "attachments", "tags", "note"),
         { key: "brand_model", type: "text", labelKey: "field.brand_model" },
         { key: "warranty_expiry", type: "date", labelKey: "field.warranty_expiry" },
@@ -231,7 +231,7 @@ export const HEALTH_SCHEMA: ModuleSchema = {
     columns: [
         ...d("name", "member"),
         { ...FIELD_DICT.category, options: ["visit", "report", "vaccine", "medication", "allergy", "checkup"] },
-        { ...FIELD_DICT.status, options: ["following", "closed"] },
+        { ...FIELD_DICT.status, options: ["following", "closed"], default: "following" },
         ...d("date", "attachments", "note"),
         { key: "hospital", type: "text", labelKey: "field.hospital" },
         { key: "department", type: "text", labelKey: "field.department" },
@@ -259,7 +259,7 @@ export const CONTRACTS_SCHEMA: ModuleSchema = {
     columns: [
         ...d("name", "member"),
         { ...FIELD_DICT.category, options: ["rent", "renovation", "purchase", "labor", "property_ct", "other_ct"] },
-        { ...FIELD_DICT.status, options: ["ct_active", "ct_expired", "terminated"] },
+        { ...FIELD_DICT.status, options: ["ct_active", "ct_expired", "terminated"], default: "ct_active" },
         ...d("date", "expiry", "remind_before", "attachments", "note"),
         { key: "party", type: "text", labelKey: "field.party" },
         { key: "deposit", type: "number", labelKey: "field.deposit" },
@@ -272,7 +272,7 @@ export const EXAMS_SCHEMA: ModuleSchema = {
     columns: [
         ...d("name", "member"),
         { ...FIELD_DICT.category, options: ["vocational", "title", "language", "academic", "other_ex"] },
-        { ...FIELD_DICT.status, options: ["preparing", "passed", "ex_expired"] },
+        { ...FIELD_DICT.status, options: ["preparing", "passed", "ex_expired"], default: "preparing" },
         ...d("expiry", "attachments", "note"),
         { key: "issuer", type: "text", labelKey: "field.issuer" },
         { key: "exam_date", type: "date", labelKey: "field.exam_date" },
@@ -410,7 +410,7 @@ export const SCHOOLING_SCHEMA: ModuleSchema = {
     columns: [
         ...d("name", "member"),
         { ...FIELD_DICT.category, options: ["kindergarten", "primary", "junior", "senior", "college", "grad_school", "extracurricular"] },
-        { ...FIELD_DICT.status, options: ["applying", "enrolled", "graduated"] },
+        { ...FIELD_DICT.status, options: ["applying", "enrolled", "graduated"], default: "applying" },
         { key: "school", type: "text", labelKey: "field.school" },
         { key: "grade", type: "text", labelKey: "field.grade" },
         { key: "teacher", type: "text", labelKey: "field.teacher" },
@@ -441,7 +441,7 @@ export const MEDIA_SCHEMA: ModuleSchema = {
     columns: [
         ...d("name", "member"),
         { ...FIELD_DICT.category, options: ["movie", "tv", "variety", "book", "comic", "novel"] },
-        { ...FIELD_DICT.status, options: ["wishlist", "consuming", "done", "dropped"] },
+        { ...FIELD_DICT.status, options: ["wishlist", "consuming", "done", "dropped"], default: "wishlist" },
         { key: "rating", type: "number", labelKey: "field.rating" },
         { key: "progress", type: "text", labelKey: "field.progress" },
         ...d("url", "date", "note"),
@@ -504,7 +504,7 @@ export const TRANSIT_SCHEMA: ModuleSchema = {
 export const TRAVEL_PLAN_SCHEMA: ModuleSchema = {
     columns: [
         ...d("name", "member"),
-        { ...FIELD_DICT.status, options: ["planning", "ongoing", "finished"] },
+        { ...FIELD_DICT.status, options: ["planning", "ongoing", "finished"], default: "planning" },
         ...d("date", "expiry", "amount", "note"),
         { key: "destination", type: "text", labelKey: "field.destination" },
     ],
@@ -525,7 +525,7 @@ export const TRAVEL_BOOKING_SCHEMA: ModuleSchema = {
 export const TRAVEL_PACKING_SCHEMA: ModuleSchema = {
     columns: [
         ...d("name"),
-        { ...FIELD_DICT.status, options: ["draft", "packed"] },
+        { ...FIELD_DICT.status, options: ["draft", "packed"], default: "draft" },
         ...d("date", "note"),
         { key: "checklist_doc", type: "text", labelKey: "field.checklist_doc" },
     ],

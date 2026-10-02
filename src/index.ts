@@ -53,6 +53,10 @@ export default class LvHomePlugin extends Plugin {
     private statusbarEl?: HTMLElement;
     /** C6c 块菜单监听（onunload 精确解绑用） */
     private captureMenuHandler?: (...args: any[]) => void;
+    /** PF13/15 组：可见性恢复补扫（休眠错过心跳的场景）；10 分钟最小间隔合并重复触发 */
+    private visibilityHandler?: () => void;
+    private lastScanAt = 0;
+    private static WAKE_RESCAN_MIN_MS = 10 * 60 * 1000;
     /** 状态栏角标更新（28 组：今日到期 N） */
     private updateStatusbar(count: number) {
         if (!this.statusbarEl) return;
@@ -148,6 +152,14 @@ export default class LvHomePlugin extends Plugin {
         statusEl.onclick = () => { this.pendingScreen = "reminders"; this.showTab(); };
         this.addStatusBar({ element: statusEl });
         this.statusbarEl = statusEl;
+
+        // PF13/15 组：休眠/切走后恢复可见 → 补扫（错过 30min 心跳的场景）；10 分钟最小间隔合并重复触发
+        this.visibilityHandler = () => {
+            if (document.visibilityState !== "visible") return;
+            if (Date.now() - this.lastScanAt < LvHomePlugin.WAKE_RESCAN_MIN_MS) return;
+            this.refreshHub().catch((e) => console.warn("[siyuan-home] wake rescan failed:", e));
+        };
+        document.addEventListener("visibilitychange", this.visibilityHandler);
     }
 
     /** 布局就绪后：首次引导数据准备 + 建库 + 扫描（不阻塞启动） */
@@ -259,6 +271,7 @@ export default class LvHomePlugin extends Plugin {
         // H03：显式清理已完成运行态记录（未处理项永不自动删），清理结果随本次落盘
         purgeHandled(this.runtime, new Date());
         await saveRuntime(this, this.runtime);
+        this.lastScanAt = Date.now();
         const todayDue = scan.reminders.filter((r) => r.daysLeft <= 0).length;
         this.updateStatusbar(todayDue);
         this.hubListeners.forEach((fn) => fn());
@@ -422,9 +435,11 @@ export default class LvHomePlugin extends Plugin {
         this.heartbeat = undefined;
         // 18 组清理审计：面板 destroy 时自行移除 listener，此处兜底清空；
         // scanSeq 自增使在途扫描结果失效（H11：卸载后不落盘/不通知/不更新 UI）；
-        // 块菜单监听与状态栏角标解绑/移除
+        // 块菜单监听与状态栏角标解绑/移除；可见性补扫解绑
         if (this.captureMenuHandler) this.eventBus.off("open-menu-content", this.captureMenuHandler);
         this.captureMenuHandler = undefined;
+        if (this.visibilityHandler) document.removeEventListener("visibilitychange", this.visibilityHandler);
+        this.visibilityHandler = undefined;
         this.statusbarEl?.remove();
         this.statusbarEl = undefined;
         this.hubListeners.clear();

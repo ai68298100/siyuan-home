@@ -574,5 +574,9 @@
     "ledger.delBody": "删除「${name}」这一行？仅删除该行数据，不影响文档与其他行。",
     "ledger.delDone": "已删除",
     "ledger.delFailed": "删除失败：${msg}。请到台账文档中手动删除该行。",
-    "ledger.sortTip": "点击排序（再点切换方向）"
+    "ledger.sortTip": "点击排序（再点切换方向）",
+    "ledger.noAttachments": "暂无附件",
+    "ledger.upload": "上传附件",
+    "ledger.uploadDone": "附件已上传并写入",
+    "ledger.uploadFailed": "附件上传失败：${msg}"
 }

@@ -574,5 +574,9 @@
     "ledger.delBody": "Delete the row \"${name}\"? Only this row is removed — the document and other rows are unaffected.",
     "ledger.delDone": "Deleted",
     "ledger.delFailed": "Delete failed: ${msg}. Please delete the row manually in the ledger document.",
-    "ledger.sortTip": "Click to sort (click again to flip)"
+    "ledger.sortTip": "Click to sort (click again to flip)",
+    "ledger.noAttachments": "No attachments yet",
+    "ledger.upload": "Upload attachment",
+    "ledger.uploadDone": "Attachments uploaded and saved",
+    "ledger.uploadFailed": "Attachment upload failed: ${msg}"
 }

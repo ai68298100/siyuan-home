@@ -228,6 +228,39 @@ export async function removeLedgerRows(avID: string, rowIDs: string[]): Promise<
     await post("/api/av/removeAttributeViewBlocks", { avID, rowIDs });
 }
 
+// ── 附件（asset，A2c）────────────────────────────────────────
+
+type UploadTransport = (formData: FormData) => Promise<IRawResponse>;
+
+let uploadTransport: UploadTransport | null = null;
+
+/** 测试注入点：替换底层上传传输（默认 fetch multipart；fetchSyncPost 不支持 FormData） */
+export function setUploadTransport(t: UploadTransport | null): void {
+    uploadTransport = t;
+}
+
+async function defaultUploadTransport(formData: FormData): Promise<IRawResponse> {
+    const res = await fetch("/api/asset/upload", { method: "POST", body: formData });
+    return (await res.json()) as IRawResponse;
+}
+
+/**
+ * 上传文件到思源 assets（A2c），返回 { name, path } 供 asset/mAsset 列写入。
+ * [待实测] 端点 /api/asset/upload 与响应 succMap 形态以 3.8.x 实例为准（实机回归第一项）。
+ */
+export async function uploadAsset(file: File, assetsPath = "/assets/siyuan-home/"): Promise<{ name: string; path: string }> {
+    const formData = new FormData();
+    formData.append("file", file);
+    formData.append("assetsPath", assetsPath);
+    const res = await (uploadTransport ?? defaultUploadTransport)(formData);
+    if (!res || typeof res.code !== "number") throw new KernelError("asset.upload", -1, "malformed response envelope");
+    if (res.code !== 0) throw new KernelError("asset.upload", res.code, res.msg ?? "upload failed");
+    const succMap = res.data?.succMap ?? {};
+    const entry = Object.entries(succMap as Record<string, string>)[0];
+    if (!entry) throw new KernelError("asset.upload", -3, "no file in succMap");
+    return { name: entry[0], path: entry[1] };
+}
+
 /** 单元格写值（value 按列类型：{type:"text",text:{content}} / {type:"date",date:{content,isNotEmpty}} / {type:"relation",relation:{blockIDs}} …） */
 export async function setCell(avID: string, keyID: string, itemID: string, value: unknown): Promise<void> {
     await post("/api/av/batchSetAttributeViewBlockAttrs", { avID, values: [{ keyID, itemID, value }] });
