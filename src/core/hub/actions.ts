@@ -89,18 +89,32 @@ export function restore(plugin: Plugin, reminderId: string) {
     });
 }
 
-/** 续期（certs oneoff）：写回台账行到期日；成功后清除该提醒的 snooze/mute/已办（历史链见 TODO 16 组） */
-export async function renew(plugin: Plugin, r: Reminder, newDueISO: string, dbRef: { avId?: string; columns?: Record<string, string> }) {
-    const expiryKey = dbRef.columns?.expiry;
-    if (!dbRef.avId || !expiryKey) throw new Error("ledger not provisioned");
+/**
+ * 续期（H10）：写回规则自己的 field 列（缴费动作不改保障到期日——next_pay 规则写 next_pay，
+ * 签注写 due，默认效期列），成功后清除该提醒的 snooze/mute/已办，并留续期流水。
+ * fieldKey 由调用方从 schema.reminders 解析（actions 不依赖 schema）。
+ */
+export async function renew(
+    plugin: Plugin,
+    r: Reminder,
+    newDueISO: string,
+    dbRef: { avId?: string; columns?: Record<string, string> },
+    fieldKey = "expiry",
+) {
+    const targetKey = dbRef.columns?.[fieldKey] ?? dbRef.columns?.expiry ?? dbRef.columns?.due;
+    if (!dbRef.avId || !targetKey) throw new Error("ledger not provisioned");
     const ms = new Date(`${newDueISO}T00:00:00`).getTime();
-    await setCell(dbRef.avId, expiryKey, r.rowId, {
+    await setCell(dbRef.avId, targetKey, r.rowId, {
         type: "date", date: { content: ms, isNotEmpty: true, hasEndDate: false, isNotTime: true },
     });
     return withRuntime(plugin, (rt) => {
         delete rt.snoozed[r.id];
         delete rt.muted[r.id];
         delete rt.handled[r.id];
+        rt.renewHistory[r.rowId] = [
+            ...(rt.renewHistory[r.rowId] ?? []),
+            { from: r.dueDate, to: newDueISO, at: new Date().toISOString() },
+        ];
     });
 }
 

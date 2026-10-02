@@ -7,14 +7,16 @@
  * - H07 已处理视图与恢复
  * - H04 扫描失败保留模块快照；禁用模块不发起请求
  */
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, afterEach } from "vitest";
 import {
     applyRuntime, defaultRuntime, listHandled, purgeHandled, type HubRuntime,
 } from "@/core/hub/runtime";
 import { runScan, deriveVisible } from "@/core/hub/scanner";
-import { snooze, mute, complete, restore, withRuntime } from "@/core/hub/actions";
+import { snooze, mute, complete, restore, withRuntime, renew } from "@/core/hub/actions";
+import { CertsProvider, leadFor } from "@/core/hub/providers";
+import { setTransport } from "@/core/siyuan";
 import type { DataProvider } from "@/core/hub/providers";
-import type { HomeSettings, Reminder } from "@/types";
+import type { HomeSettings, Reminder, ReminderRuleSpec } from "@/types";
 
 const TODAY = new Date(2026, 9, 1);
 
@@ -225,5 +227,58 @@ describe("H04 扫描失败保留模块快照", () => {
         const { reminders, counts } = deriveVisible(derived, settings(["certs", "members"]), rt, TODAY);
         expect(reminders.map((r) => r.id)).toEqual(["b::members.birthday"]); // 忽略的 a、未启用的 f 均剔除
         expect(counts).toEqual({ overdue: 0, soon: 0, lead: 1 });
+    });
+});
+
+describe("H10 续期目标列分派", () => {
+    afterEach(() => setTransport(null));
+
+    it("next_pay 规则写 next_pay 列（缴费不改保障到期日）+ 续期流水留痕", async () => {
+        const written: any[] = [];
+        setTransport(async (endpoint: string, payload: any) => {
+            expect(endpoint).toBe("/api/av/batchSetAttributeViewBlockAttrs");
+            written.push(payload);
+            return { code: 0, msg: "", data: null };
+        });
+        const { plugin, store } = memoryPlugin();
+        const r = rem("row9::insurance.next_pay", "2026-10-05", "lead", "recurring", "insurance");
+        const dbRef = { avId: "av-ins", columns: { next_pay: "k-nextpay", expiry: "k-expiry" } };
+        await renew(plugin, r, "2026-11-05", dbRef, "next_pay");
+        expect(written[0].values[0].keyID).toBe("k-nextpay");
+        const rt: HubRuntime = JSON.parse(store["hub-runtime.json"]);
+        expect(rt.renewHistory.row9).toEqual([{ from: "2026-10-05", to: "2026-11-05", at: expect.any(String) }]);
+    });
+
+    it("默认 fieldKey=expiry；台账未建库 → 报错且运行态不变", async () => {
+        const { plugin, store } = memoryPlugin();
+        const r = rem("row8::certs.expiry", "2026-10-05", "lead");
+        await expect(renew(plugin, r, "2027-10-05", {})).rejects.toThrow("ledger not provisioned");
+        expect(store["hub-runtime.json"]).toBeUndefined(); // 写回失败不落运行态（H10：失败保留现场）
+    });
+});
+
+describe("H04 缺列报错 + H14 提前量校验", () => {
+    afterEach(() => setTransport(null));
+
+    it("提醒规则依赖列缺失 → collect 显式抛错（进诊断+保留快照，不静默跳过）", async () => {
+        setTransport(async (endpoint: string) => {
+            if (endpoint === "/api/av/renderAttributeView") {
+                return { code: 0, msg: "", data: { view: { columns: [], rowCount: 0, rows: [] } } };
+            }
+            return { code: 0, msg: "", data: { rows: { values: [] } } };
+        });
+        // dbRef 缺 expiry/due 列
+        const p = new CertsProvider({ settings: settings(), getDbRef: () => ({ avId: "av-1", columns: { name: "k1", status: "k2" } }) });
+        await expect(p.collect(TODAY)).rejects.toThrow(/missing reminder column/);
+    });
+
+    it("leadFor：NaN/Infinity/负数回退默认；有限值 clamp 3650", () => {
+        const rule: ReminderRuleSpec = { key: "expiry", field: "expiry", kind: "oneoff", leadDays: 30 };
+        const s = (v: any): HomeSettings => ({ ...settings(), leadOverrides: { "certs.expiry": v } });
+        expect(leadFor(s(NaN), "certs", rule)).toBe(30);
+        expect(leadFor(s(Infinity), "certs", rule)).toBe(30);
+        expect(leadFor(s(-5), "certs", rule)).toBe(30);
+        expect(leadFor(s(99999), "certs", rule)).toBe(3650);
+        expect(leadFor(s(10), "certs", rule)).toBe(10);
     });
 });

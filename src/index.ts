@@ -313,8 +313,12 @@ export default class LvHomePlugin extends Plugin {
     async unmute(id: string) { await unmute(this, id); await this.notifyHubChanged(); }
     /** 恢复已处理/忽略项（H07） */
     async restore(id: string) { await restore(this, id); await this.notifyHubChanged(); }
-    /** 续期写回台账行 → 全量扫描重算 due（不用 notifyHubChanged，行数据已变） */
-    renew(r: any, iso: string) { return renew(this, r, iso, this.settings.dbRefs[r.moduleId] ?? {}).then(() => this.refreshHub()); }
+    /** 续期写回台账行（H10：按规则自己的 field 列，缴费不改保障到期日）→ 全量扫描重算 due */
+    renew(r: any, iso: string) {
+        const rule = (this.schemaCatalog[r.moduleId]?.reminders ?? []).find((x: any) => x.key === r.ruleKey);
+        return renew(this, r, iso, this.settings.dbRefs[r.moduleId] ?? {}, rule?.field ?? "expiry")
+            .then(() => this.refreshHub());
+    }
     async addMemo(title: string, due: string) { await addMemo(this, title, due); await this.notifyHubChanged(); }
     /** 删除备忘（显式动作，H03：未处理备忘只经此删除） */
     async removeMemo(id: string) { await removeMemo(this, id); await this.notifyHubChanged(); }
