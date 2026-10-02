@@ -82,6 +82,8 @@ export const FIELD_DICT: Record<string, ColumnDef> = {
     location:      { key: "location", type: "text", labelKey: "field.location" },
     attachments:   { key: "attachments", type: "mAsset", labelKey: "field.attachments" },
     url:           { key: "url", type: "url", labelKey: "field.url" },
+    /** EC13：外部联系人快照（人脉 docId），文本列存 `名称 [docId]`——快照可见可搜，不做跨插件 relation（v2 再议） */
+    contact:       { key: "contact", type: "text", labelKey: "field.contact" },
     tags:          { key: "tags", type: "mSelect", labelKey: "field.tags" },
     note:          { key: "note", type: "text", labelKey: "field.note" },
     due:           { key: "due", type: "date", labelKey: "field.due" }, // 中枢写回的下次发生日
@@ -195,6 +197,7 @@ export const INSURANCE_SCHEMA: ModuleSchema = {
         { ...FIELD_DICT.category, options: ["health", "critical", "accident", "life", "vehicle", "property", "other_ins"] },
         { ...FIELD_DICT.status, options: ["in_force", "paying", "ins_expired", "surrendered"], default: "in_force" },
         { key: "insurer", type: "text", labelKey: "field.insurer" },
+        { key: "contact", type: "text", labelKey: "field.contact" }, // EC13：对接人（人脉快照）
         { key: "policy_no", type: "text", labelKey: "field.policy_no" },
         { key: "premium", type: "number", labelKey: "field.premium" },
         { key: "pay_cycle", type: "select", labelKey: "field.cycle", options: ["month", "quarter", "year"] },
@@ -262,6 +265,7 @@ export const CONTRACTS_SCHEMA: ModuleSchema = {
         { ...FIELD_DICT.status, options: ["ct_active", "ct_expired", "terminated"], default: "ct_active" },
         ...d("date", "expiry", "remind_before", "attachments", "note"),
         { key: "party", type: "text", labelKey: "field.party" },
+        { key: "contact", type: "text", labelKey: "field.contact" }, // EC13：对接人（人脉快照）
         { key: "deposit", type: "number", labelKey: "field.deposit" },
     ],
     capture: ["name", "category", "expiry", "attachments"],
@@ -275,6 +279,7 @@ export const EXAMS_SCHEMA: ModuleSchema = {
         { ...FIELD_DICT.status, options: ["preparing", "passed", "ex_expired"], default: "preparing" },
         ...d("expiry", "attachments", "note"),
         { key: "issuer", type: "text", labelKey: "field.issuer" },
+        { key: "contact", type: "text", labelKey: "field.contact" }, // EC13：对接人（人脉快照）
         { key: "exam_date", type: "date", labelKey: "field.exam_date" },
     ],
     capture: ["name", "member", "exam_date", "expiry"],
@@ -414,6 +419,7 @@ export const SCHOOLING_SCHEMA: ModuleSchema = {
         { key: "school", type: "text", labelKey: "field.school" },
         { key: "grade", type: "text", labelKey: "field.grade" },
         { key: "teacher", type: "text", labelKey: "field.teacher" },
+        { key: "contact", type: "text", labelKey: "field.contact" }, // EC13：对接人（人脉快照）
         ...d("amount", "due", "note"),
         { key: "enroll_year", type: "number", labelKey: "field.enroll_year" },
     ],

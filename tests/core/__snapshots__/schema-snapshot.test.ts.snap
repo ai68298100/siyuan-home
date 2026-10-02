@@ -732,6 +732,11 @@ exports[`31 模块 schema 契约快照（21 组） > 每个 schema 的结构快�
       "type": "text",
     },
     {
+      "key": "contact",
+      "labelKey": "field.contact",
+      "type": "text",
+    },
+    {
       "key": "policy_no",
       "labelKey": "field.policy_no",
       "type": "text",
@@ -946,6 +951,11 @@ exports[`31 模块 schema 契约快照（21 组） > 每个 schema 的结构快�
       "type": "text",
     },
     {
+      "key": "contact",
+      "labelKey": "field.contact",
+      "type": "text",
+    },
+    {
       "key": "deposit",
       "labelKey": "field.deposit",
       "type": "number",
@@ -1022,6 +1032,11 @@ exports[`31 模块 schema 契约快照（21 组） > 每个 schema 的结构快�
     {
       "key": "issuer",
       "labelKey": "field.issuer",
+      "type": "text",
+    },
+    {
+      "key": "contact",
+      "labelKey": "field.contact",
       "type": "text",
     },
     {
@@ -2300,6 +2315,11 @@ exports[`31 模块 schema 契约快照（21 组） > 每个 schema 的结构快�
     {
       "key": "teacher",
       "labelKey": "field.teacher",
+      "type": "text",
+    },
+    {
+      "key": "contact",
+      "labelKey": "field.contact",
       "type": "text",
     },
     {

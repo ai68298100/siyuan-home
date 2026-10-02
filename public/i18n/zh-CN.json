@@ -601,5 +601,10 @@
     "hub.batchPartial": "已处理 ${ok} 项；${failed} 项失败",
     "ledger.exportCsv": "导出 CSV",
     "ledger.exportCsvTip": "导出当前模块全部列为 CSV（本地生成，含当前排序与搜索过滤结果）",
-    "ledger.editSaved": "已保存"
+    "ledger.editSaved": "已保存",
+    "field.contact": "对接人（人脉）",
+    "ledger.pickContact": "从人脉选择",
+    "ledger.contactsMissing": "未检测到小驴人脉（需 v0.4.1+ 并已完成初始化）",
+    "ledger.contactsEmpty": "没有匹配的联系人",
+    "ledger.contactsError": "人脉搜索失败：${msg}"
 }
