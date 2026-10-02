@@ -86,6 +86,8 @@ export interface HubRuntime {
     lastWeeklyDigest?: string;
     /** EC21：最近一次 lv-exam:stats 聚合缓存（只存子集，latest-only；不读题目内容） */
     lastExamStats?: { streak: number; accuracy: number; attempts: number; generatedAt: number };
+    /** EC15：人情往来已同步到人脉的行（favor 行 itemID → {docId, at}） */
+    favorSyncs?: Record<string, { docId: string; at: string }>;
 }
 
 export function defaultRuntime(): HubRuntime {

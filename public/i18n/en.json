@@ -612,5 +612,13 @@
     "members.contactLinked": "Lv Contacts contact linked",
     "members.contactUnlinked": "Contact unlinked",
     "mod.examStreak": "📝 ${n}-day study streak · ${p}% accuracy",
-    "mod.examStatsTip": "Data from Lv Exam (updated ${d}; aggregates only)"
+    "mod.examStatsTip": "Data from Lv Exam (updated ${d}; aggregates only)",
+    "ec15.title": "Lv Contacts interaction",
+    "ec15.record": "Record to Lv Contacts",
+    "ec15.again": "Record again",
+    "ec15.synced": "synced",
+    "ec15.done": "Interaction recorded for \"${n}\" (${r} entry)",
+    "ec15.failed": "Lv Contacts recording failed: ${msg}",
+    "ec15.received": "Received",
+    "ec15.given": "Given"
 }

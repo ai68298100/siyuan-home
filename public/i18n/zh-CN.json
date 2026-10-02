@@ -612,5 +612,13 @@
     "members.contactLinked": "已关联人脉联系人",
     "members.contactUnlinked": "已解除关联",
     "mod.examStreak": "📝 备考连续 ${n} 天 · 正确率 ${p}%",
-    "mod.examStatsTip": "来自小驴考试的数据（${d} 更新；仅聚合统计）"
+    "mod.examStatsTip": "来自小驴考试的数据（${d} 更新；仅聚合统计）",
+    "ec15.title": "人脉交集记录",
+    "ec15.record": "记录到人脉",
+    "ec15.again": "再次记录",
+    "ec15.synced": "已同步",
+    "ec15.done": "已在人脉为「${n}」记录交集（${r} 条）",
+    "ec15.failed": "人脉记录失败：${msg}",
+    "ec15.received": "收礼",
+    "ec15.given": "送礼"
 }
