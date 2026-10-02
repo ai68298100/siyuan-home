@@ -2,8 +2,8 @@
 // ① 设计系统（docs/design/07 §3、08）—— C1-C8 全部 UI 的实现基座
 @use "./styles/design-system";
 
-// ② v0.1 面板遗留样式（LEGACY）：dashboard/settings 两块 svelte 仍引用；
-//    C1 Tab 化改造时整体删除，替换为 design-system 中的 .lv-* 组件。
+// ② settings.svelte 现役样式（C1c 收尾完成：dashboard 已删、类名已统一 lv-settings 命名空间；
+//    仅剩此文件与 design-system 两处，无 LEGACY 残留）
 .lv-home {
     padding: 16px;
     display: flex;
@@ -14,33 +14,22 @@
     overflow: auto;
 }
 
-// C1c 收尾：dashboard 专用类已删（.lv-home__header/title/section/section-title/card/empty-card/grid 全零引用验证）
-// settings.svelte 现役类已统一 lv-settings 命名空间（下方定义）
+// 注意：思源原生 .b3-tab-bar 样式不得在此全局重定义（会污染主界面）——
+// settings 面板的页签样式改由 design-system 的 .lv-tabbar 承担（C1c 遗留已迁移）
 
-.lv-settings__group {
-    margin-bottom: 12px;
-}
-
-.lv-settings__group-title {
-    font-size: 12px;
-    font-weight: 600;
-    text-transform: uppercase;
-    letter-spacing: 0.04em;
-    opacity: 0.6;
-    margin: 4px 0 8px;
-}
-
-// 设置面板（现役：settings.svelte；类名已统一 lv-settings 命名空间）
 .lv-settings {
     min-height: 480px;
 }
+
 .lv-settings__group {
     margin-bottom: 12px;
 }
+
 .lv-settings__group-title {
     font-weight: 600;
     font-size: 14px;
     opacity: 0.85;
+    margin: 4px 0 8px;
 }
 
 .lv-settings__hint {
@@ -74,12 +63,6 @@
     gap: 8px;
     margin-top: 8px;
     align-items: center;
-}
-
-.b3-tab-bar {
-    gap: 4px;
-    border-bottom: 1px solid var(--b3-border-color);
-    padding-bottom: 8px;
 }
 
 .lv-settings__about {
