@@ -30,6 +30,9 @@
 | 2026-10-03 | 主线 | 第二十六轮：EC13 v1 落地（人脉联系人选人） | 四 schema（contracts/insurance/schooling/exams）增 contact 文本列（D08 补列续跑自动迁移+快照 -u）；详情抽屉「从人脉选择」——window.LvContacts.searchPeople 实时搜索（旧请求丢弃 PF07）、快照存 `名称 [docId]`、未装/未初始化/失败三态降级；D08 补列续跑首次实战（既有台账自动获新列）；单测 121 持平、i18n 603→608、gzip 48.8KB |
 | 2026-10-03 | 循环A | 第二十六波走查 | 快照 diff 仅 contact 列；搜索竞态守卫（seq 计数）；快照格式在抽屉/思源原生 UI 双侧可读 |
 | 2026-10-03 | 循环B | ③信源=兄弟仓源码（第四轮） | EC13 完成「身份→契约→落地」全链路（第二十三轮摘录 §1 → 本轮实现）；EC17 同路径待复制 |
+| 2026-10-03 | 主线 | 第二十九轮：EC14 落地 + 考试线源码挖掘 | openContactPicker 抽取共享（ledger 复用零行为差）；FamilyMember.contactSnapshot + 成员卡关联/解除（EC14 ✅）；考试线源码挖掘——lv-exam:stats PublicStats v1 载荷全量（attempts/accuracy/eliminated/activeWrong/streak/hours 24/daily 56 天，脱敏无题目内容）+ lv-exam:open-question{qid} + 闪卡 ExamPlan 形状确认；摘录 §6 新增；单测 126 持平、i18n 612 键、gzip 49.8KB |
+| 2026-10-03 | 循环A | 第二十九波走查 | 重复 import 即修；成员卡按钮 stopPropagation 防误触展开；快照列省略号+title 全文 |
+| 2026-10-03 | 循环B | ③信源=兄弟仓源码（第五轮） | EC20 契约候选记录（exams.expiry ↔ ExamPlan.examDate）；EC23 绑定 id 需闪卡方暴露——不抢跑 |
 | 2026-10-03 | 主线 | 第二十八轮：EC03/v0.3 服务桥 window.LvHome 落地 | src/bridge/external-bridge.ts（protocol 1/capabilities 五项/whenReady/openButler/openReminders/addMemo 校验/summary 仅计数）+ docs/BRIDGE.md 契约文档（对齐人脉 BRIDGE 纪律：只提供服务不读他库/挂载卸载语义/版本策略）；重复挂载守卫；5 项单测；单测 121→126、i18n 608 持平、gzip 49.5KB |
 | 2026-10-03 | 循环A | 第二十八波走查 | 未用参数即修；summary 计数断言修正（today=daysLeft≤0 含逾期，测试初值写错）；重复挂载守卫（多实例不覆盖首桥） |
 | 2026-10-03 | 循环B | ③信源=兄弟仓 BRIDGE 模式（人脉 external-bridge 直读） | 管家桥的挂载/卸载/纪律三段对人脉同构复刻；EC 组「摘录→落地」第二例（EC16→EC13→EC03） |
@@ -1009,13 +1012,13 @@
 - [ ] 🟡 **EC11 家务/备考绑定已有习惯**（依赖 EC03/EC04/D09）：展示已有项目和绑定效果；一键新建仅在提供方公开能力存在时启用，否则引导到打卡创建后返回，不使用不存在的 `habits.list`。
 - [ ] 🟡 **EC12 生日/纪念日提醒归属**（依赖 H08/H09/H12/EC03）：先验证打卡 v5 的 `occasions.read/occasions.complete` 能力及其所有者，生日来源另定；无生日写入契约时只引用，不生成双份提醒。（2026-10-03 契约摘录：occasions.read/complete **v4 即存在、localOnly、effect read/write**；打卡 v5 形式化契约含 20 能力 since 矩阵+8 种集成事件+硬限制——EC10 触发源用 checkin:* 事件比 ws-main 更精准；owner 定案点保持）
 - [ ] 🟡 **EC13 人脉办理者选择**：通过 `LvContacts.searchPeople/getPerson` 选择合同、保单、学校等联系人；保存公开 docId/itemId/名称快照，v1 不假定电话邮箱生日可取。（2026-10-03 契约摘录：**源码签名确认**——`window.LvContacts` protocol 1，capabilities=[searchPeople,getPerson,ensurePerson,recordInteraction]；未初始化时全部方法抛错须引导；另有 ensurePerson 按名建人（幂等）；见 docs/research/2026-10-03-EC-源码契约摘录.md §1） ✅ 2026-10-03 第二十六轮 v1 落地（contracts/insurance/schooling/exams 四 schema 增 contact 文本列（D08 补列续跑自动迁移）；详情抽屉编辑模式加「从人脉选择」——searchPeople 关键字实时搜索+旧请求丢弃+键盘可选；快照存 `名称 [docId]`；人脉未装/未初始化/搜索失败三态降级；schema 快照 -u 更新（仅 contact 列））
-- [ ] 🟡 **EC14 家庭成员与人脉映射**：显式绑定/解绑家庭成员和联系人，处理同名候选；双向回链需提供方新契约，不直接改人脉数据库。
+- [x] 🟡 **EC14 家庭成员与人脉映射**：显式绑定/解绑家庭成员和联系人，处理同名候选；双向回链需提供方新契约，不直接改人脉数据库。 ✅ 2026-10-03 第二十九轮（成员卡「关联联系人/解除关联」——共享 openContactPicker（同 EC13 对话框）；FamilyMember.contactSnapshot 存 `名称 [docId]` 快照；settings 侧持久化、人脉数据零改写；双向回链维持提供方契约注记；同名候选由选人列表自然呈现）
 - [ ] 🟡 **EC15 人情/旅行交互记录**：用户确认人物后调用 `recordInteraction`，使用稳定事务 ref、日期、地点和最小备注；重试幂等，不因打开台账自动记会面。
 - [x] 🟡 **EC16 雷切管家动作入口**：用真实实例 `registerQuickAction/Adapter` 注册打开面板、提醒、备忘等动作；重复加载不重复注册，返回函数可注销，不模拟 DOM 点击。 ✅ 2026-10-03 第二十五轮（管家侧代码落地：app.plugins 探测 siyuan-speed-switch + registerQuickAction 方法存在性校验（打卡同款已验证模式）；注册"打开管家/打开提醒中枢"两动作（提醒预选 pendingScreen）；disposer 收集 + 卸载全注销 + 重试上限 10 次防泄漏；[待实测] 与雷切同实例联调随 EC30）
 - [x] 🟡 **EC17 雷切家庭摘要组件**：用 `registerHomeModule` 提供有界计数/标题/更新时间；loading、error、stale 分开，默认不共享生日/金额/证件，点击落到真实管家位置。 ✅ 2026-10-03 第二十七轮（`lvhome.summary` 只读模块落地：read 返回 normalizeSnapshot v2.1 形态——stat 英雄区（逾期+今日计数）+ items 两行（逾期/7 天，command 深链 `siyuan-home::openButler`）+ sourceHealth fresh/stale + emptyHint；**只共享计数，不共享标题/日期/生日/金额**（EC17 边界）；错误降级为空态快照；卸载注销；[待实测] 同实例渲染随 EC30。摘录 §4.1 read 载荷已定案）
 - [ ] 🟢 **EC18 雷切书签入口**：拟定只读 `home.getBookmarks` 的字段、限量和授权，URL 仅 http(s)，点击才打开；非法/缺失目标及关闭模块有提示，账号备注不默认共享。
 - [ ] 🟢 **EC19 雷切常用语承接**：管家纯文本 snippets 与雷切 HTML/CSS/JS 片段严格分开；复制/插入由用户选择，不把家庭文本变成可执行代码。
-- [ ] 🟡 **EC20 考试计划关联**（依赖 EC03/EC04/EC05/MD06）：区分报名/考试日期和证书到期/复审日期；稳定绑定计划/题库 ID，考试当前无公开计划服务，先定最小契约再实现。
+- [ ] 🟡 **EC20 考试计划关联**（依赖 EC03/EC04/EC05/MD06）：区分报名/考试日期和证书到期/复审日期；稳定绑定计划/题库 ID，考试当前无公开计划服务，先定最小契约再实现。（2026-10-03 源码挖掘：闪卡侧 **ExamPlan 形状确认**——{id,name,examDate YYYY-MM-DD,scopeKind all|deck|notebook,scopeId,scopeName,cramDays,totalCards?,enabled,archived?}，存于闪卡内部无对外桥；EC23 最小契约候选=管家 exams.expiry ↔ ExamPlan.examDate 日期互查，绑定 id 需闪卡方暴露）
 - [ ] 🟡 **EC21 考试统计快照**（依赖 EC02/EC03/EC08）：消费 `lv-exam:stats` 聚合数据，不读题目/答案；明确当前仅见首发事件，先设计快照查询、重放或持续更新依赖，不能宣称实时。
 - [ ] 🟡 **EC22 考试成果归档**（依赖 D03/D09/EC05）：用户选择成绩单/错题总结文档关联考证台账，保留源文档和日期；重复归档不复制文档，撤销关联不删除原文。
 - [ ] 🟡 **EC23 闪卡考试计划协同**（依赖 EC03/EC04/EC05/MD06）：关联 Cards ExamPlan 与考证事项，保留范围和类型；日期变更预览双方影响，提醒唯一发送者，避免 30/7/1 天重复轰炸。
