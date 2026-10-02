@@ -152,6 +152,11 @@ export function purgeHandled(rt: HubRuntime, today: Date, keepDays = HANDLED_KEE
         // 已办期已翻篇（下一期 due 晚于该期），条目不再起隐藏作用，可安全清除
         if (until < todayKey) delete rt.handledUntil[id];
     }
+    // handledYear 旧年份清理（当年已办跨年后条目不再起隐藏作用）
+    const currentYear = today.getFullYear();
+    for (const [id, year] of Object.entries(rt.handledYear)) {
+        if (typeof year === "number" && year < currentYear) delete rt.handledYear[id];
+    }
     // monthlyCompletions 保留最近 24 个月（29 组：跨两年前的月度计数归档/丢弃）
     if (rt.monthlyCompletions) {
         const cutoff = new Date(today.getFullYear(), today.getMonth() - 24, 1);

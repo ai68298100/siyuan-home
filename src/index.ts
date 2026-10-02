@@ -197,6 +197,9 @@ export default class LvHomePlugin extends Plugin {
         // EC16：向雷切注册管家动作（打卡同款已验证模式：app.plugins 探测 + 方法存在性 + 重试）
         this.ensureSpeedSwitchActions();
 
+        // EC09/EC10：启动时初始打卡摘要拉取（打卡可能已先于管家加载）
+        window.setTimeout(() => this.pullCheckinSummary(), 3000);
+
         // EC03/v0.3 生态首批：管家服务桥 window.LvHome（对齐人脉 window.LvContacts 模式；卸载注销）
         this.disposeLvHomeBridge = mountLvHomeBridge({
             settings: this.settings,

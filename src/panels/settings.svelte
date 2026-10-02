@@ -7,6 +7,7 @@
     interface IHomePluginLike {
         i18n: Record<string, unknown>;
         settings: HomeSettings;
+        runtime?: { favorSyncs?: Record<string, Record<string, { docId: string; at: string }>> };
         getDiagnostics?: () => any;
         /** moduleId → schema 目录（D12 深度健康检查 / C8c leadOverrides 枚举用） */
         schemaCatalog?: Record<string, { columns?: { key: string }[]; reminders?: { key: string; field: string; kind: string; leadDays: number }[] }>;
@@ -191,7 +192,14 @@
             );
             await saveSettings(plugin as any, plugin.settings);
             // C8b：模块开关接线——新启用模块立即建库（禁用只隐藏保留数据）
-            if (modulesChanged) await plugin.ensureCoreLedgers?.();
+            if (modulesChanged) {
+                // EC15：禁用模块时清理其 favorSyncs 运行态数据
+                const disabledModules = [...prevModules].filter((id) => !draftEnabled.includes(id));
+                if (disabledModules.length > 0 && plugin.runtime?.favorSyncs) {
+                    for (const mid of disabledModules) delete plugin.runtime.favorSyncs[mid];
+                }
+                await plugin.ensureCoreLedgers?.();
+            }
             // D05：设置页与成员页同走成员 DAL——差异同步到 members 台账行（新增建行/变更写回）
             const { syncMembersToAv } = await import("@/core/members");
             const rep = await syncMembersToAv(plugin as any, plugin.settings, prevMembers);
