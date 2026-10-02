@@ -57,6 +57,8 @@ export default class LvHomePlugin extends Plugin {
     private visibilityHandler?: () => void;
     private lastScanAt = 0;
     private static WAKE_RESCAN_MIN_MS = 10 * 60 * 1000;
+    /** 20 组：全量扫描去抖——Tab/面板快速开关 30 秒内不重复全量（增量扫描与手动强制不受限） */
+    private static FULL_SCAN_MIN_MS = 30 * 1000;
     /** 状态栏角标更新（28 组：今日到期 N） */
     private updateStatusbar(count: number) {
         if (!this.statusbarEl) return;
@@ -162,7 +164,7 @@ export default class LvHomePlugin extends Plugin {
         this.visibilityHandler = () => {
             if (document.visibilityState !== "visible") return;
             if (Date.now() - this.lastScanAt < LvHomePlugin.WAKE_RESCAN_MIN_MS) return;
-            this.refreshHub().catch((e) => console.warn("[siyuan-home] wake rescan failed:", e));
+            this.refreshHub(undefined, true).catch((e) => console.warn("[siyuan-home] wake rescan failed:", e));
         };
         document.addEventListener("visibilitychange", this.visibilityHandler);
     }
@@ -171,7 +173,7 @@ export default class LvHomePlugin extends Plugin {
     async onLayoutReady() {
         try {
             await this.ensureCoreLedgers();
-            await this.refreshHub();
+            await this.refreshHub(undefined, true);
         } catch (e) {
             console.warn("[siyuan-home] initial provision/scan deferred:", e instanceof Error ? e.message : e);
         }
@@ -190,10 +192,18 @@ export default class LvHomePlugin extends Plugin {
     }
 
     /** 扫描 → 运行态合并 → 缓存 → 每日摘要 → 通知面板。
-     * PF06：传入模块范围则只实扫这些模块（写行后的增量刷新），其余沿用上次快照 */
-    async refreshHub(only?: string | string[]): Promise<ScanResult> {
+     * PF06：传入模块范围则只实扫这些模块（写行后的增量刷新），其余沿用上次快照；
+     * 20 组：非强制全量扫描 30 秒内去抖（Tab 快速开关不重复全量），force 用于手动重扫/设置变更 */
+    async refreshHub(only?: string | string[], force = false): Promise<ScanResult> {
         const seq = ++this.scanSeq;
         const onlySet = only ? new Set(Array.isArray(only) ? only : [only]) : undefined;
+        if (!onlySet && !force && this.lastScanAt && Date.now() - this.lastScanAt < LvHomePlugin.FULL_SCAN_MIN_MS) {
+            const cached = this.scan;
+            if (cached) {
+                this.hubListeners.forEach((fn) => fn());
+                return cached;
+            }
+        }
         const deps = { settings: this.settings, getDbRef: (id: string) => this.settings.dbRefs[id] };
         // 12 轮修复：provider 由 schemaCatalog 程序化派生（手工清单曾漏掉 parenting/schooling，
         // 两模块提醒从未生效）；覆盖契约见 registry.providerCoverage

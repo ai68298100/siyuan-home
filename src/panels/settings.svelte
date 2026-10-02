@@ -10,8 +10,8 @@
         getDiagnostics?: () => any;
         /** moduleId → schema 目录（D12 深度健康检查 / C8c leadOverrides 枚举用） */
         schemaCatalog?: Record<string, { columns?: { key: string }[]; reminders?: { key: string; field: string; kind: string; leadDays: number }[] }>;
-        /** 保存后广播到全部页签（H02） */
-        refreshHub?: () => Promise<unknown>;
+        /** 保存后广播到全部页签（H02）；force=设置变更不受去抖限制 */
+        refreshHub?: (only?: string | string[], force?: boolean) => Promise<unknown>;
         /** C8b：新启用模块立即建库 */
         ensureCoreLedgers?: () => Promise<void>;
     }
@@ -157,8 +157,8 @@
             // D05：设置页与成员页同走成员 DAL——差异同步到 members 台账行（新增建行/变更写回）
             const { syncMembersToAv } = await import("@/core/members");
             const rep = await syncMembersToAv(plugin as any, plugin.settings, prevMembers);
-            // H02：设置变更（模块开关/成员）广播到全部页签（重扫收敛提醒与计数）
-            await plugin.refreshHub?.();
+            // H02：设置变更（模块开关/成员）广播到全部页签（强制全量重扫——设置变更不受去抖限制）
+            await plugin.refreshHub?.(undefined, true);
             if (rep.failed.length > 0) {
                 showMessage(t("members.syncPartial").replace("${n}", String(rep.failed.length)), 5000, "error");
             } else {

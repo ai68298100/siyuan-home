@@ -587,5 +587,7 @@
     "notify.weekly": "${n} item(s) come due within the next week — plan ahead in the reminder hub",
     "settings.corrupted": "Settings file was corrupted — defaults restored and a marker kept (settings.json.corrupted.json). Restore from a SiYuan backup to recover the previous settings.",
     "wiz.provisioning": "Creating ledgers for ${n} modules… (a few seconds on first run)",
-    "wiz.provisioned": "Ledgers ready for ${n} modules — enjoy!"
+    "wiz.provisioned": "Ledgers ready for ${n} modules — enjoy!",
+    "hub.mergeHint": "Multiple items, same person & day — click to expand",
+    "members.unassigned": "Unassigned member"
 }
