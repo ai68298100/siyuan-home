@@ -10,6 +10,8 @@
 | 2026-10-03 | 循环B | ③轮休（两日内已覆盖八信源/检索） | ①② 不适用（对抗审查产出已当场消化）——记录轮休 |
 | 2026-10-03 | 循环A | 兜底循环深化：全仓九项终审 | ①调试残留 0/TODO 注释仅 1 处文档性引用；②面板 any 存量 43 处（32 组追踪中，本轮零新增）；③120 测试覆盖新逻辑；④新 UI 全走 b3/lv token；⑤43 个 md 相对链接零失效（README 新增链接即修 1 处路径）；⑥i18n 600 键对齐；⑦新交互 aria/键盘齐备；⑧gzip 46.8KB<100KB；⑨日志脱敏复核（批量失败 warn 仅记错误不记标题）；README 能力表与 CHANGELOG Unreleased 对齐十七轮真实能力（R06 事实边界：待实测项明确标注） |
 | 2026-10-03 | 循环B | 终审收尾 | ⑨项中唯一开放项=②any 存量（随 C 阶段细化逐屏类型化，已有追踪项）；全仓终审闭环，兜底循环转入静默等待（触发条件=真机回归/新模块/外部反馈） |
+| 2026-10-03 | 主线 | 第十九轮：32 组 props any 清零（终审开放项②收口） | 新建 src/types/plugin.ts 共享 HomePluginLike 契约（结构性类型，插件类天然满足）；tab-panel 删除本地窄接口，六屏 plugin prop 全部类型化；提醒/成员 lambda 类型化（Reminder/FamilyMember）；面板 ": any" 43→13（剩余全部为台账行 cells 的内核 JSON 边界，归 21 组 SQL 结果类型化）；单测 120 持平、i18n 591→595、gzip 46.8KB |
+| 2026-10-03 | 循环A | 终审②收口复核 | 终审九项至此全部闭环（②由 43→13 且契约面清零，剩余归 21 组）；本轮类型化零行为变更（check/test/build/smoke 全绿） |
 
 > 标记：🔴 优先修复/当前验收门槛 · 🟡 后续迭代 · 🟢 远期/可选 · ⛔ 被阻塞（注明实际条件）· ⏸ 暂缓（集市上架，触发条件另定）
 > **发布策略（2026-10-01 定）**：开发到一定程度后公开 GitHub 仓库与 Release；**集市上架整体暂缓**（见第 26 组）。
@@ -519,7 +521,7 @@
 - [ ] 🟡 组件目录规范：`src/panels/<screen>/`（index.svelte + 子组件拆分原则，禁止单文件超 300 行）
 - [ ] 🟡 状态管理定案：svelte 5 runes 单例 store 三分（settings / hub / ui），边界写进 08 文档
 - [ ] 🟡 SQL 结果类型化（query 泛型封装 + 每模块手写 Row 类型，禁 any）
-- [ ] 🟡 面板 props any 清零：tab-panel 接口已具体类型化（HomeSettings/HubRuntime/ScanResult）；四屏组件的 IHomePluginLike any 字段（28 处）随 C 阶段细化逐屏类型化（循环A 第 2 项剩余）
+- [x] 🟡 面板 props any 清零：tab-panel 接口已具体类型化（HomeSettings/HubRuntime/ScanResult）；四屏组件的 IHomePluginLike any 字段（28 处）随 C 阶段细化逐屏类型化（循环A 第 2 项剩余） ✅ 2026-10-03 第十九轮（共享 HomePluginLike 契约覆盖六屏+onboarding；面板 ": any" 43→13，剩余为台账行 cells 的内核 JSON 边界，归 21 组 SQL 结果类型化追踪）
 - [ ] 🟡 Svelte 错误边界：面板崩溃不拖垮思源主界面（顶层 error boundary + 降级 UI）
 - [ ] 🟡 加载态规范落地：何时 skeleton / 何时缓存直渲（对照 08 §4 状态矩阵逐屏标注）
 - [ ] 🟢 关键组件 props 文档注释（含用法示例）
