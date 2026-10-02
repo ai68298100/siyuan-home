@@ -1,5 +1,6 @@
 <script lang="ts">
     import type { HomePluginLike } from "@/types/plugin";
+    import { showMessage } from "siyuan";
     let { plugin, t, onGoto }: { plugin: HomePluginLike; t: (k: string) => string; onGoto?: (s: string) => void } = $props();
 
     let step = $state(1);
@@ -35,8 +36,13 @@
             provisioning = false;
         }
     }
-    // 完成=建库+直达证件快速录入（C7 CTA）
-    function skip() { plugin.finishOnboarding({ roles: ["self"], children: 0 }, []); }
+    // 完成=建库+直达证件快速录入（C7 CTA）；skip 路径同样经 finishOnboarding（需容错）
+    function skip() {
+        plugin.finishOnboarding({ roles: ["self"], children: 0 }, []).catch((e: unknown) => {
+            console.error("[siyuan-home] onboarding skip failed:", e);
+            showMessage(t("wiz.provisionIssues").replace("${n}", "0").replace("${modules}", ""), 6000, "error");
+        });
+    }
 </script>
 
 <div class="lv-card" style="padding:28px;margin-bottom:16px;border-color:var(--lv-accent-line)">
