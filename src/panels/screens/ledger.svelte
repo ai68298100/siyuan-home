@@ -125,14 +125,20 @@
             {/each}
         </select>
     {/if}
-    <select class="b3-select" bind:value={newMember}>
-        <option value="">{t("field.member")}: {t("members.all")}</option>
-        {#each memberOptions as m (m.avItemId ?? m.id)}
-            <option value={m.avItemId}>{m.name}</option>
-        {/each}
-    </select>
-    <input class="b3-text-field" type="date" title={t("field.expiry")} bind:value={newExpiry} />
-    <input class="b3-text-field" type="number" style="width:90px" placeholder={t("field.amount")} bind:value={newAmount} />
+    {#if ref?.columns?.member}
+        <select class="b3-select" bind:value={newMember}>
+            <option value="">{t("field.member")}: {t("members.all")}</option>
+            {#each memberOptions as m (m.avItemId ?? m.id)}
+                <option value={m.avItemId}>{m.name}</option>
+            {/each}
+        </select>
+    {/if}
+    {#if ref?.columns?.expiry}
+        <input class="b3-text-field" type="date" title={t("field.expiry")} bind:value={newExpiry} />
+    {/if}
+    {#if ref?.columns?.amount}
+        <input class="b3-text-field" type="number" style="width:90px" placeholder={t("field.amount")} bind:value={newAmount} />
+    {/if}
     <input class="b3-text-field" style="min-width:140px" placeholder={t("field.url")} bind:value={newUrl} />
     <button class="b3-button b3-button--text" onclick={createRow} disabled={!ref?.avId}>＋ {t("ledger.add")}</button>
 </div>
