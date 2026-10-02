@@ -3,7 +3,8 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>小驴管家 Lv Home · UI 原型 v2（质感与灵动）</title>
+<link rel="icon" href="data:,">
+<title>小驴管家 Lv Home · UI 原型 v4（场景与 AI 协作）</title>
 <style>
 /* ============================================================
    小驴管家 · 视觉设计语言 v1.1（docs/design/07）
@@ -62,6 +63,15 @@ body{
   -webkit-font-smoothing:antialiased; text-rendering:optimizeLegibility;
   transition:background var(--lv-t-slow) var(--lv-ease), color var(--lv-t-slow) var(--lv-ease);
 }
+/* v3 质感补强：把仪表台的层次放在内容之后，避免装饰抢夺提醒注意力 */
+body{background:
+  radial-gradient(900px 420px at 50% -160px,var(--lv-aura),transparent 72%),
+  var(--lv-bg)}
+.app{isolation:isolate}
+.prototype-notice{display:flex;justify-content:space-between;align-items:center;gap:16px;box-shadow:var(--lv-shadow-1),inset 0 1px 0 var(--lv-inset)}
+.prototype-notice a{white-space:nowrap;text-decoration:none;font-weight:500}
+.prototype-notice a:hover{text-decoration:underline}
+.prototype-notice b{flex:none}.prototype-notice .notice-copy{flex:1;min-width:0}
 /* 材质层：环境辉光 + 胶片颗粒（非交互、低于感知阈值的修饰） */
 body::before{
   content:"";position:fixed;inset:0;pointer-events:none;z-index:1;opacity:var(--lv-noise);
@@ -90,6 +100,9 @@ input,select{font:inherit}
   border-bottom:1px solid transparent;transition:border var(--lv-t-med) var(--lv-ease), box-shadow var(--lv-t-med) var(--lv-ease);
 }
 .topbar.scrolled{border-bottom-color:var(--lv-line);box-shadow:0 8px 24px rgba(0,0,0,.14)}
+.prototype-notice{margin:12px 0 4px;padding:10px 14px;border:1px solid var(--lv-accent-line);border-radius:var(--lv-r-2);
+  background:var(--lv-accent-soft);color:var(--lv-tx-2);font-size:12px;line-height:1.55}
+.prototype-notice b{color:var(--lv-accent);font-weight:600}
 .brand{display:flex;align-items:center;gap:10px;flex:none}
 .brand-mark{
   width:26px;height:26px;border-radius:8px;display:grid;place-items:center;color:#fff;position:relative;
@@ -203,6 +216,8 @@ input,select{font:inherit}
 .rem.overdue:hover::before{color:var(--lv-danger)}
 .rem.soon:hover::before{color:var(--lv-warn)}
 .rem.lead:hover::before{color:var(--lv-amber)}
+.rem.demo-ack{animation:demoAck 900ms var(--lv-ease)}
+@keyframes demoAck{0%{background:var(--lv-accent-soft)}100%{background:transparent}}
 .rem .ic{width:34px;height:34px;border-radius:10px;display:grid;place-items:center;flex:none;font-size:15px;
   background:var(--lv-surface-2);border:1px solid var(--lv-line);
   box-shadow:inset 0 1px 0 var(--lv-inset)}
@@ -214,6 +229,8 @@ input,select{font:inherit}
 .rem .when span{font-size:11.5px;color:var(--lv-tx-3)}
 .rem .ops{display:flex;gap:4px;flex:none;opacity:0;transform:translateX(6px);transition:all var(--lv-t-med) var(--lv-ease)}
 .rem:hover .ops{opacity:1;transform:none}
+.rem:focus-within .ops{opacity:1;transform:none}
+.rem .ops .btn{min-height:30px}
 .quick{display:flex;gap:8px;flex-wrap:wrap}
 .qbtn{display:inline-flex;align-items:center;gap:8px;padding:9px 16px;border-radius:var(--lv-r-2);
   background:var(--lv-surface);border:1px solid var(--lv-line);font-size:13px;color:var(--lv-tx-2);
@@ -251,6 +268,10 @@ input,select{font:inherit}
 .spark i:nth-child(5){transition-delay:430ms}
 .spark i.hi{background:var(--lv-accent)}
 .mod:hover .spark i.hi{box-shadow:0 0 6px var(--lv-accent-line)}
+.mod{min-height:142px;position:relative;overflow:hidden}
+.mod::after{content:"";position:absolute;inset:auto -28px -42px auto;width:112px;height:112px;border-radius:50%;
+  background:radial-gradient(circle,var(--lv-accent-soft),transparent 68%);opacity:.55;pointer-events:none;transition:transform var(--lv-t-slow) var(--lv-spring),opacity var(--lv-t-med)}
+.mod:hover::after{transform:translate(-12px,-10px);opacity:.9}
 
 /* ── 提醒中枢 ─────────────────────────────────────────── */
 .filters{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin:18px 0 14px}
@@ -265,7 +286,7 @@ input,select{font:inherit}
 /* ── 台账 ─────────────────────────────────────────────── */
 .ledger-head{display:flex;align-items:center;gap:12px;margin:18px 0 12px;flex-wrap:wrap}
 .ledger-head h1{font-size:17px;font-weight:600}
-.table-wrap{overflow:hidden}
+.table-wrap{overflow-x:auto}
 table{width:100%;border-collapse:collapse;font-size:13px}
 thead th{position:sticky;top:0;background:var(--lv-surface);text-align:left;font-size:11.5px;font-weight:500;
   color:var(--lv-tx-3);padding:10px 16px;border-bottom:1px solid var(--lv-line);white-space:nowrap;letter-spacing:.03em}
@@ -289,9 +310,11 @@ tbody tr.sel{background:var(--lv-accent-soft);box-shadow:inset 2px 0 0 var(--lv-
   transform:translateX(36px);opacity:0;pointer-events:none;
   transition:transform var(--lv-t-sheet) var(--lv-spring),opacity var(--lv-t-slow) var(--lv-ease);
   display:flex;flex-direction:column}
+.drawer:not(.open),.modal:not(.open){visibility:hidden}
 .drawer.open{transform:none;opacity:1;pointer-events:auto}
 .drawer-head{display:flex;align-items:center;gap:10px;padding:18px 22px;border-bottom:1px solid var(--lv-line)}
 .drawer-head h3{font-size:15px;font-weight:600}
+.drawer-head .badge{flex:none;white-space:nowrap}
 .drawer-body{padding:20px 22px;overflow:auto;flex:1;display:flex;flex-direction:column;gap:20px;
   scrollbar-width:thin;scrollbar-color:var(--lv-line-strong) transparent}
 .drawer-body::-webkit-scrollbar{width:8px}
@@ -383,13 +406,14 @@ tbody tr.sel{background:var(--lv-accent-soft);box-shadow:inset 2px 0 0 var(--lv-
 /* ── 弹层：快速录入 ───────────────────────────────────── */
 .modal{position:fixed;inset:0;display:grid;place-items:center;z-index:110;pointer-events:none}
 .modal .sheet{width:480px;max-width:92vw;background:var(--lv-surface);border:1px solid var(--lv-line-strong);
+  max-height:calc(100dvh - 32px);display:flex;flex-direction:column;
   border-radius:var(--lv-r-4);box-shadow:var(--lv-shadow-3), inset 0 1px 0 var(--lv-inset);
   opacity:0;transform:translateY(16px) scale(.97);
   transition:transform var(--lv-t-sheet) var(--lv-spring),opacity var(--lv-t-slow) var(--lv-ease)}
 .modal.open{pointer-events:auto}
 .modal.open .sheet{opacity:1;transform:none}
 .sheet-head{display:flex;align-items:center;gap:10px;padding:16px 22px;border-bottom:1px solid var(--lv-line)}
-.sheet-body{padding:20px 22px;display:flex;flex-direction:column;gap:14px}
+.sheet-body{padding:20px 22px;display:flex;flex-direction:column;gap:14px;min-height:0;overflow:auto}
 .frow{display:grid;grid-template-columns:76px 1fr;gap:12px;align-items:center}
 .frow label{font-size:12.5px;color:var(--lv-tx-3)}
 .frow input[type=text],.frow input[type=number]{width:100%;padding:8px 12px;border-radius:var(--lv-r-2);
@@ -397,6 +421,8 @@ tbody tr.sel{background:var(--lv-accent-soft);box-shadow:inset 2px 0 0 var(--lv-
   box-shadow:inset 0 1px 2px rgba(0,0,0,.08);transition:border var(--lv-t-fast) var(--lv-ease)}
 .frow input:focus{outline:none;border-color:var(--lv-accent-line)}
 .sheet-foot{display:flex;gap:8px;justify-content:flex-end;padding:14px 22px;border-top:1px solid var(--lv-line)}
+.sheet-foot{flex-wrap:wrap}.frow input[type=date]{width:100%;padding:8px 12px;border:1px solid var(--lv-line);border-radius:var(--lv-r-2);background:var(--lv-surface-2);color:var(--lv-tx);min-width:0}
+.frow .select{width:100%;min-width:0}.btn:disabled{opacity:.5;cursor:default}.record-link{text-align:left;font-size:inherit;padding:0}.record-link:hover{color:var(--lv-accent);text-decoration:underline}
 
 /* ── 空态 ─────────────────────────────────────────────── */
 .empty{padding:48px 24px;text-align:center;display:flex;flex-direction:column;align-items:center;gap:10px}
@@ -405,6 +431,44 @@ tbody tr.sel{background:var(--lv-accent-soft);box-shadow:inset 2px 0 0 var(--lv-
   box-shadow:inset 0 1px 0 var(--lv-inset), 0 0 24px var(--lv-accent-soft)}
 .empty b{font-size:14px;font-weight:500}
 .empty span{font-size:12.5px;color:var(--lv-tx-3);max-width:300px}
+.demo-toast{position:fixed;left:50%;bottom:26px;z-index:130;transform:translate(-50%,12px);opacity:0;pointer-events:none;padding:9px 14px;border-radius:999px;background:var(--lv-tx);color:var(--lv-bg);font-size:12px;box-shadow:var(--lv-shadow-2);transition:opacity var(--lv-t-med),transform var(--lv-t-med)}
+.demo-toast.show{opacity:1;transform:translate(-50%,0)}
+.live-region{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+.context-strip{display:flex;align-items:center;gap:14px;flex-wrap:wrap;margin:8px 0 2px;padding:9px 12px;border:1px solid var(--lv-line);
+  border-radius:var(--lv-r-2);background:color-mix(in srgb,var(--lv-surface) 84%,transparent);color:var(--lv-tx-3);font-size:11.5px}
+.context-strip strong{color:var(--lv-tx-2);font-weight:500}
+.context-strip .context-action{margin-left:auto;color:var(--lv-accent);cursor:pointer}
+.context-strip .context-action:hover{text-decoration:underline}
+.focus-row{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin:18px 0 2px}
+.focus-card{display:flex;align-items:center;gap:11px;padding:12px 14px;border:1px solid var(--lv-line);border-radius:var(--lv-r-2);background:var(--lv-surface);box-shadow:var(--lv-shadow-1),inset 0 1px 0 var(--lv-inset)}
+.focus-card .focus-icon{width:30px;height:30px;display:grid;place-items:center;border-radius:9px;background:var(--lv-surface-2);color:var(--lv-accent)}
+.focus-card b{display:block;font-size:13px;font-weight:500}.focus-card span{display:block;color:var(--lv-tx-3);font-size:11.5px;margin-top:1px}.focus-card button{margin-left:auto;color:var(--lv-accent);font-size:11.5px}
+[hidden]{display:none!important}
+.assistant-entry{display:flex;align-items:center;gap:14px;padding:15px 18px;margin:16px 0 6px;background:linear-gradient(110deg,var(--lv-accent-soft),var(--lv-surface) 70%)}
+.assistant-entry .assistant-mark{width:36px;height:36px;flex:none;display:grid;place-items:center;border:1px solid var(--lv-accent-line);border-radius:12px;color:var(--lv-accent);background:var(--lv-surface);font-size:20px}
+.assistant-entry .assistant-copy{flex:1;min-width:0}.assistant-entry b{font-size:13px;font-weight:600}.assistant-entry p{font-size:12px;color:var(--lv-tx-3);margin-top:3px}
+.assistant-entry .badge{margin-left:8px}
+.demo-controls{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin:12px 0;font-size:12px;color:var(--lv-tx-3)}
+.state-banner{border:1px solid var(--lv-line);border-radius:var(--lv-r-2);padding:12px 14px;font-size:12px;background:var(--lv-surface-2);margin-bottom:14px}
+.state-banner b{display:block;color:var(--lv-tx);margin-bottom:3px}.state-banner p{color:var(--lv-tx-2)}
+.state-banner[data-tone=warning]{border-color:var(--lv-warn);background:var(--lv-warn-soft)}
+.state-banner[data-tone=error]{border-color:var(--lv-danger);background:var(--lv-danger-soft)}
+.state-banner .btn{margin-top:10px}
+.ai-panel{border:1px solid var(--lv-accent-line);border-radius:var(--lv-r-3);padding:16px;background:var(--lv-accent-soft);scroll-margin-top:18px}
+.ai-panel h4{font-size:14px;font-weight:600;margin-bottom:5px}.ai-caption{font-size:11.5px;color:var(--lv-tx-2);line-height:1.7}
+.ai-panel .demo-controls{margin:12px 0}.ai-panel .select{max-width:100%}
+.ai-scope{display:flex;flex-direction:column;gap:8px;border:1px solid var(--lv-line);background:var(--lv-surface);border-radius:var(--lv-r-2);padding:12px;margin:12px 0;font-size:12px}
+.ai-scope label{display:flex;gap:8px;align-items:flex-start;cursor:pointer}.ai-scope input{margin-top:3px;accent-color:var(--lv-accent)}
+.ai-scope small{color:var(--lv-tx-3);line-height:1.7}.ai-source{border-top:1px solid var(--lv-line);padding:10px 0;font-size:12px}
+.ai-source summary{cursor:pointer;color:var(--lv-accent);padding:3px 0}.ai-source p{margin-top:8px;color:var(--lv-tx-2);overflow-wrap:anywhere}
+.ai-result{padding:12px;background:var(--lv-surface);border:1px solid var(--lv-line);border-radius:var(--lv-r-2);margin-top:12px}
+.ai-result section+section{margin-top:14px;padding-top:12px;border-top:1px solid var(--lv-line)}
+.ai-result h5{font-size:12px;margin-bottom:5px;font-weight:600}.ai-result p,.ai-result li{font-size:12px;color:var(--lv-tx-2);line-height:1.8}
+.ai-result ol{padding-left:18px}.ai-confirm{display:flex;gap:8px;font-size:12px;margin:12px 0;align-items:flex-start;cursor:pointer}
+.ai-confirm input{margin-top:4px;accent-color:var(--lv-accent)}
+.ai-receipt{font-size:12px;color:var(--lv-tx-2);border-left:2px solid var(--lv-accent);padding-left:10px;margin-top:12px}
+.drawer-source-note{font-size:11.5px;color:var(--lv-tx-3);padding:10px 12px;background:var(--lv-surface-2);border-radius:var(--lv-r-2)}
+.focus-card button:hover{text-decoration:underline}
 
 /* ── 组件库（活体样式指南，与 07/08 文档同步）──────────── */
 .sg-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:14px;margin-top:16px}
@@ -423,18 +487,47 @@ tbody tr.sel{background:var(--lv-accent-soft);box-shadow:inset 2px 0 0 var(--lv-
 @media (prefers-reduced-motion:reduce){
   *,*::before,*::after{animation:none!important;transition:none!important}
 }
+@media (forced-colors:active){
+  .prototype-notice,.card,.chip,.btn,.focus-card,.context-strip{border:1px solid CanvasText;box-shadow:none}
+  .rem::before,.sev,.pulse{forced-color-adjust:none;border:1px solid CanvasText}
+  .btn.primary,.chip.on{forced-color-adjust:none;background:Highlight;color:HighlightText}
+}
+@media (max-width:920px){
+  .app{padding-left:20px;padding-right:20px}.topbar{gap:12px}.brand .tag{display:none}.hub-status{display:none}
+}
 @media (max-width:760px){
   .app{padding:0 16px 60px}
   .settings{grid-template-columns:1fr}
   .set-nav{flex-direction:row;overflow-x:auto;position:static}
   .hub-status{display:none}
-  .rem .ops{display:none}
+  .topbar{flex-wrap:wrap}.nav{order:3;flex-basis:100%}.nav button{flex:none;min-height:40px}
+  .rem{display:grid;grid-template-columns:34px minmax(0,1fr) auto;gap:8px 10px}
+  .rem .ops{display:flex;grid-column:2/-1;flex-wrap:wrap;opacity:1;transform:none}
+  .rem .ops .btn{flex-shrink:0}
+  .rem .t b{white-space:normal}.rem .t span{display:block;overflow-wrap:anywhere}
+  .rem .ops .btn,.focus-card button{min-height:44px;min-width:44px}
+  .drawer{width:100%;max-width:100vw}.drawer-foot{flex-wrap:wrap}
+  .iconbtn{flex:none;min-width:44px;min-height:44px}
+  .sheet-head{display:grid;grid-template-columns:minmax(0,1fr) 44px}
+  .sheet-head .select{grid-column:1/-1;grid-row:2;width:100%;margin-left:0!important}
+  .sheet-head .iconbtn{grid-column:2;grid-row:1}
+  .sg-grid{grid-template-columns:minmax(0,1fr)}
+  .demo-toast{max-width:calc(100vw - 32px);width:max-content;border-radius:var(--lv-r-2);bottom:max(16px,env(safe-area-inset-bottom))}
   .hero h1{font-size:21px}
+  .prototype-notice{align-items:flex-start;flex-direction:column;gap:5px}.prototype-notice a{white-space:normal}
+  .focus-row{grid-template-columns:1fr}.context-strip{align-items:flex-start}.context-strip .context-action{margin-left:0}
+  .assistant-entry{flex-wrap:wrap}.assistant-entry .assistant-copy{flex-basis:calc(100% - 50px)}.assistant-entry>.btn{margin-left:50px}
+  .ai-panel{padding:12px}.ai-scope label,.ai-source summary{min-height:32px}
+}
+@media (any-hover:none),(any-pointer:coarse){
+  .rem .ops{opacity:1;transform:none}.rem .ops .btn,.iconbtn,.focus-card button{min-width:44px;min-height:44px}
 }
 </style>
 </head>
 <body>
 <div class="app">
+
+  <div class="prototype-notice"><b>交互原型 · 目标体验</b><span class="notice-copy">这是视觉与交互演示，不代表当前生产版本已接通。引导、快速录入、详情抽屉、完整设置和 AI 入口仍在规划或部分实现；当前能力以源码与真机回归为准。</span><a href="../docs/design/04-交互与UI原型.md" style="color:var(--lv-accent)">UI 状态说明 ↗</a></div>
 
   <!-- 顶栏 -->
   <header class="topbar" id="topbar">
@@ -442,7 +535,7 @@ tbody tr.sel{background:var(--lv-accent-soft);box-shadow:inset 2px 0 0 var(--lv-
       <div class="brand-mark">
         <svg width="14" height="14" viewBox="0 0 16 16" fill="none"><path d="M3 6.5a5 5 0 0 1 10 0V9a4 4 0 0 1-4 4H7a4 4 0 0 1-4-4V6.5Z" stroke="#fff" stroke-width="1.6"/><circle cx="6" cy="7.6" r="1" fill="#fff"/><circle cx="10" cy="7.6" r="1" fill="#fff"/></svg>
       </div>
-      <div><b>小驴管家</b><div class="tag mono">Lv Home · 原型 v2</div></div>
+      <div><b>小驴管家</b><div class="tag mono">Lv Home · 原型 v4</div></div>
     </div>
     <nav class="nav" id="nav">
       <span class="nav-pill" id="pill"></span>
@@ -455,36 +548,51 @@ tbody tr.sel{background:var(--lv-accent-soft);box-shadow:inset 2px 0 0 var(--lv-
       <button data-s="styleguide">组件库</button>
     </nav>
     <div class="top-actions">
-      <div class="hub-status"><span class="pulse"></span><span>提醒中枢 · 今日已扫描 <span class="mono">08:00</span></span></div>
-      <button class="iconbtn" title="快速记录" onclick="openModal()">⚡</button>
-      <button class="iconbtn" title="切换主题" onclick="toggleTheme()">◐</button>
+      <div class="hub-status"><span class="pulse"></span><span>演示数据 · 非生产扫描状态</span></div>
+      <button class="iconbtn" title="快速记录" aria-label="快速记录" onclick="openModal()">⚡</button>
+      <button class="iconbtn" title="切换主题" aria-label="切换主题" onclick="toggleTheme()">◐</button>
     </div>
   </header>
 
+  <div class="context-strip" aria-label="当前工作范围">
+    <span><strong>提醒样例范围</strong> <span id="context-reminder-scope">全家 · 全部模块 · 30 天内</span></span>
+    <span><strong>模拟快照</strong> 2026-10-01 08:00</span>
+    <span><strong>演示状态</strong> 资料为合成示例</span>
+    <button class="context-action" type="button" onclick="go('styleguide')">查看状态说明 ↗</button>
+  </div>
+
   <!-- ═══ 总览 ═══ -->
+  <div class="state-banner" id="capture-receipt" role="status" tabindex="-1" hidden></div>
   <section class="screen on" id="s-overview">
     <div class="hero">
       <div>
         <h1>早安，小飞驴家</h1>
-        <p>10 月 1 日 周四 · 一切都在轨道上</p>
+        <p>10 月 1 日 周四 · 演示数据，状态需要以实际扫描为准</p>
       </div>
       <div class="count"><b class="num" id="heroCount">4</b><span>件事需要留意</span></div>
     </div>
 
-    <div class="members">
-      <button class="chip on">全部</button>
-      <button class="chip"><span class="ava" style="background:linear-gradient(135deg,#5b7ff0,#7c9bff)">我</span>我</button>
-      <button class="chip"><span class="ava" style="background:linear-gradient(135deg,#c76fb4,#e08cc9)">雷</span>老婆</button>
-      <button class="chip"><span class="ava" style="background:linear-gradient(135deg,#58b98c,#7fd3a8)">仔</span>儿子</button>
-      <button class="chip"><span class="ava" style="background:linear-gradient(135deg,#c99044,#e0b06a)">妈</span>妈妈</button>
-      <button class="chip">＋</button>
+    <div class="members" aria-label="提醒样例成员筛选">
+      <button class="chip on" data-overview-member="all" onclick="setDemoFilter('member','all')">全部</button>
+      <button class="chip" data-overview-member="self" onclick="setDemoFilter('member','self')"><span class="ava" aria-hidden="true" style="background:linear-gradient(135deg,#5b7ff0,#7c9bff)">我</span>我</button>
+      <button class="chip" data-overview-member="spouse" onclick="setDemoFilter('member','spouse')"><span class="ava" aria-hidden="true" style="background:linear-gradient(135deg,#c76fb4,#e08cc9)">雷</span>老婆</button>
+      <button class="chip" data-overview-member="child" onclick="setDemoFilter('member','child')"><span class="ava" aria-hidden="true" style="background:linear-gradient(135deg,#58b98c,#7fd3a8)">仔</span>儿子</button>
+      <button class="chip" data-overview-member="mom" onclick="setDemoFilter('member','mom')"><span class="ava" aria-hidden="true" style="background:linear-gradient(135deg,#c99044,#e0b06a)">妈</span>妈妈</button>
+      <button class="chip" aria-label="清除提醒样例筛选" onclick="clearDemoFilters()">重置范围</button>
+    </div>
+
+    <div class="focus-row" aria-label="今天的工作重点">
+      <div class="focus-card"><span class="focus-icon">◷</span><div><b>今日处理</b><span id="focus-due-summary">1 件逾期 · 1 件 7 天内</span></div><button type="button" onclick="go('reminders')">打开</button></div>
+      <div class="focus-card"><span class="focus-icon">⌁</span><div><b>待确认</b><span id="focus-review-summary">身份证资料需要核对</span></div><button type="button" id="focus-review-open" onclick="openDrawer(document.querySelector('#s-ledger tbody tr'))">查看</button></div>
+      <div class="focus-card"><span class="focus-icon">✓</span><div><b>数据状态</b><span>合成快照 · 可查看失败样例</span></div><button type="button" onclick="openReminderState('partial')">查看</button></div>
     </div>
 
     <div class="sec-title">
       <h2>即将到期</h2><span class="sub">未来 30 天</span>
       <a class="link" href="#" onclick="go('reminders');return false">提醒中枢 →</a>
     </div>
-    <div class="card reminders">
+    <div class="state-banner" id="overview-filter-empty" role="status" hidden><b>当前范围没有匹配提醒</b><p>四条合成样例中没有命中当前条件；这不表示没有成员资料或待办理事项。</p><button class="btn" onclick="clearDemoFilters()">清除提醒筛选</button></div>
+    <div class="card reminders" id="overview-reminders">
       <div class="rem overdue">
         <div class="ic">🪪</div>
         <div class="t"><b>妈妈的身份证</b><span>证件 · 身份证 · 存放 玄关抽屉 A</span></div>
@@ -499,58 +607,63 @@ tbody tr.sel{background:var(--lv-accent-soft);box-shadow:inset 2px 0 0 var(--lv-
       </div>
       <div class="rem lead">
         <div class="ic">📺</div>
-        <div class="t"><b>视频会员自动续费</b><span>订阅 · 月付 ¥25 · 连续包月</span></div>
+        <div class="t"><b>视频会员自动续费</b><span>我 · 订阅 · 月付 ¥25 · 连续包月</span></div>
         <div class="when"><b class="num" style="color:var(--lv-amber)">12 天后</b><span class="num">10-13</span></div>
         <div class="ops"><button class="btn ghost">续期…</button><button class="btn ghost">延后</button></div>
       </div>
       <div class="rem lead">
         <div class="ic">🛡️</div>
-        <div class="t"><b>全车保险续保</b><span>保单 · 车险 · 人保</span></div>
+        <div class="t"><b>全车保险续保</b><span>我 · 保单 · 车险 · 人保</span></div>
         <div class="when"><b class="num" style="color:var(--lv-amber)">25 天后</b><span class="num">10-26</span></div>
         <div class="ops"><button class="btn ghost">续期…</button><button class="btn ghost">延后</button></div>
       </div>
     </div>
 
+    <div class="card assistant-entry" id="assistant-entry">
+      <span class="assistant-mark" aria-hidden="true">✦</span>
+      <div class="assistant-copy"><b>看懂提醒，准备下一步</b><span class="badge gray">AI 协作 · 规划</span><p>合成样例：妈妈的身份证。先看登记字段和日期规则，再核对解释与清单。</p></div>
+      <button class="btn" type="button" onclick="openAIExample()">查看解释样例 →</button>
+    </div>
     <div class="sec-title"><h2>快速记录</h2><span class="sub">不用打开台账</span></div>
     <div class="quick">
-      <button class="qbtn" onclick="openModal()"><span class="qi">🛒</span>购物</button>
-      <button class="qbtn" onclick="openModal()"><span class="qi">💊</span>药品 / 囤货</button>
-      <button class="qbtn" onclick="openModal()"><span class="qi">🎬</span>看过 / 读完</button>
-      <button class="qbtn" onclick="openModal()"><span class="qi">🧧</span>人情往来</button>
+      <button class="qbtn" onclick="openModal('shopping')"><span class="qi">🛒</span>购物</button>
+      <button class="qbtn" onclick="openModal('medicine')"><span class="qi">💊</span>药品 / 囤货</button>
+      <button class="qbtn" onclick="openModal('media')"><span class="qi">🎬</span>看过 / 读完</button>
+      <button class="qbtn" onclick="openModal('favors')"><span class="qi">🧧</span>人情往来</button>
       <button class="qbtn" onclick="openModal()"><span class="qi">✏️</span>更多…</button>
     </div>
 
-    <div class="sec-title"><h2>我的模块</h2><span class="sub">已启用 7 / 31</span><a class="link" href="#" onclick="go('settings');return false">在设置中启用 →</a></div>
+    <div class="sec-title"><h2>模块样例</h2><span class="sub">独立合成统计 · 不随提醒范围汇总</span><a class="link" href="#" onclick="go('settings');return false">查看设置样例 →</a></div>
     <div class="mods">
-      <div class="card mod" onclick="go('ledger')">
+      <div class="card mod" onclick="openModule('certs')">
         <div class="mi t-blue">🪪</div><b>证件管理</b>
         <div class="stat"><b class="num">12</b><span>条 · <span style="color:var(--lv-danger)">1</span> 待办</span><span class="up badge red">1 ⚠</span></div>
       </div>
-      <div class="card mod" onclick="go('ledger')">
+      <div class="card mod" onclick="openModule('medicine')">
         <div class="mi t-green">💊</div><b>家庭药箱</b>
         <div class="stat"><b class="num">9</b><span>种 · 余量 2 低</span><span class="up badge orange">2 ⚠</span></div>
       </div>
-      <div class="card mod" onclick="go('ledger')">
+      <div class="card mod" onclick="openModule('assets-real')">
         <div class="mi t-cyan">📦</div><b>实物资产</b>
         <div class="stat"><b class="num">34</b><span>件 · 估值 ¥86k</span>
           <span class="spark"><i style="height:40%"></i><i style="height:55%"></i><i style="height:45%"></i><i style="height:70%"></i><i class="hi" style="height:95%"></i></span>
         </div>
       </div>
-      <div class="card mod" onclick="go('ledger')">
+      <div class="card mod" onclick="openModule('memberships')">
         <div class="mi t-purple">🔁</div><b>会员与订阅</b>
         <div class="stat"><b class="num">¥86</b><span>月均 · 8 项</span>
           <span class="spark"><i style="height:30%"></i><i style="height:35%"></i><i style="height:50%"></i><i style="height:52%"></i><i class="hi" style="height:60%"></i></span>
         </div>
       </div>
-      <div class="card mod" onclick="go('ledger')">
+      <div class="card mod" onclick="openModule('favors')">
         <div class="mi t-rose">🧧</div><b>礼尚往来</b>
         <div class="stat"><b class="num">+1,200</b><span>本年净收 · 26 笔</span><span class="up badge green">顺差</span></div>
       </div>
-      <div class="card mod" onclick="go('ledger')">
+      <div class="card mod" onclick="openModule('schooling')">
         <div class="mi t-amber">🧒</div><b>上学管理</b>
         <div class="stat"><b class="num">中班</b><span>阳光幼儿园 · 学费 11 月缴</span></div>
       </div>
-      <div class="card mod" onclick="go('ledger')">
+      <div class="card mod" onclick="openModule('media')">
         <div class="mi t-blue">🎬</div><b>影音书库</b>
         <div class="stat"><b class="num">156</b><span>部 · 在看 6 · 在读 2</span></div>
       </div>
@@ -560,12 +673,17 @@ tbody tr.sel{background:var(--lv-accent-soft);box-shadow:inset 2px 0 0 var(--lv-
   <!-- ═══ 提醒中枢 ═══ -->
   <section class="screen" id="s-reminders">
     <div class="hero"><h1>提醒中枢</h1><p>所有日期敏感事项，从台账自动派生</p></div>
+    <div class="demo-controls"><label for="reminder-demo-state">查看演示状态</label><select class="select" id="reminder-demo-state" onchange="setReminderState(this.value)"><option value="normal">完整合成快照</option><option value="empty">读取成功 · 无提醒</option><option value="filtered">当前筛选 · 无结果</option><option value="missing">未创建数据库</option><option value="partial">部分读取失败</option><option value="stale">快照已陈旧</option><option value="error">读取失败</option></select></div>
+    <div class="state-banner" id="reminder-state-summary" role="status" hidden></div>
+    <div id="reminder-content">
     <div class="filters">
-      <select class="select"><option>全部模块</option><option>证件</option><option>疫苗</option><option>订阅</option><option>保单</option></select>
-      <select class="select"><option>全部成员</option><option>我</option><option>老婆</option><option>儿子</option><option>妈妈</option></select>
-      <select class="select"><option>未来 30 天</option><option>未来 7 天</option><option>已逾期</option><option>全部</option></select>
+      <select class="select" id="demo-filter-module" aria-label="提醒模块筛选" onchange="setDemoFilter('module',this.value)"><option value="all">全部模块</option><option value="certs">证件</option><option value="parenting">疫苗</option><option value="memberships">订阅</option><option value="insurance">保单</option></select>
+      <select class="select" id="demo-filter-member" aria-label="提醒成员筛选" onchange="setDemoFilter('member',this.value)"><option value="all">全部成员</option><option value="self">我</option><option value="spouse">老婆</option><option value="child">儿子</option><option value="mom">妈妈</option></select>
+      <select class="select" id="demo-filter-days" aria-label="提醒时间筛选" onchange="setDemoFilter('days',this.value)"><option value="30">30 天内与逾期</option><option value="7">7 天内与逾期</option><option value="overdue">已逾期</option><option value="all">全部</option></select>
       <label class="chip" style="margin-left:auto;cursor:pointer"><input type="checkbox" style="accent-color:var(--lv-accent)">显示已处理</label>
     </div>
+    <p class="ai-caption" id="reminder-filter-summary">当前演示范围 · 4 条提醒</p>
+    <div class="state-banner" id="reminder-filter-empty" role="status" hidden><b>当前筛选没有匹配结果</b><p>资料已读取，但没有命中当前组合条件。</p><button class="btn" onclick="clearDemoFilters()">清除提醒筛选</button></div>
 
     <div class="group-label">已逾期 · 1</div>
     <div class="card reminders">
@@ -573,7 +691,7 @@ tbody tr.sel{background:var(--lv-accent-soft);box-shadow:inset 2px 0 0 var(--lv-
         <div class="ic">🪪</div>
         <div class="t"><b>妈妈的身份证</b><span>证件 / 身份证 · 到期日 2026-09-29</span></div>
         <div class="when"><b class="num" style="color:var(--lv-danger)">-2 天</b></div>
-        <div class="ops"><button class="btn ghost">续期…</button><button class="btn ghost">延后 ▾</button><button class="btn ghost">定位</button></div>
+        <div class="ops"><button class="btn ghost" onclick="openAIExample()">解释依据</button><button class="btn ghost">续期…</button><button class="btn ghost">延后 ▾</button><button class="btn ghost">定位</button></div>
       </div>
     </div>
 
@@ -591,13 +709,13 @@ tbody tr.sel{background:var(--lv-accent-soft);box-shadow:inset 2px 0 0 var(--lv-
     <div class="card reminders">
       <div class="rem lead">
         <div class="ic">📺</div>
-        <div class="t"><b>视频会员自动续费</b><span>订阅 · 连续包月 · ¥25/月</span></div>
+        <div class="t"><b>视频会员自动续费</b><span>我 · 订阅 · 连续包月 · ¥25/月</span></div>
         <div class="when"><b class="num">12 天</b></div>
         <div class="ops"><button class="btn ghost">续期…</button><button class="btn ghost">延后 ▾</button><button class="btn ghost">定位</button></div>
       </div>
       <div class="rem lead">
         <div class="ic">🛡️</div>
-        <div class="t"><b>全车保险续保</b><span>保单 · 车险 · 缴费周期 年</span></div>
+        <div class="t"><b>全车保险续保</b><span>我 · 保单 · 车险 · 缴费周期 年</span></div>
         <div class="when"><b class="num">25 天</b></div>
         <div class="ops"><button class="btn ghost">续期…</button><button class="btn ghost">延后 ▾</button><button class="btn ghost">定位</button></div>
       </div>
@@ -606,9 +724,10 @@ tbody tr.sel{background:var(--lv-accent-soft);box-shadow:inset 2px 0 0 var(--lv-
     <div class="group-label">已忽略 / 已处理</div>
     <div class="card">
       <div class="empty">
-        <div class="eic">✓</div><b>干净</b>
-        <span>延后与已处理的提醒会归档在这里，可随时恢复。</span>
+        <div class="eic">◷</div><b>此样例没有处理记录</b>
+        <span>延后会改变下次提示时间；完成或忽略分别保留处理回执，不代表实际办理已完成。</span>
       </div>
+    </div>
     </div>
   </section>
 
@@ -616,14 +735,14 @@ tbody tr.sel{background:var(--lv-accent-soft);box-shadow:inset 2px 0 0 var(--lv-
   <section class="screen" id="s-ledger">
     <div class="ledger-head">
       <h1>证件管理</h1>
-      <select class="select"><option>🪪 证件管理</option><option>💊 家庭药箱</option><option>📦 实物资产</option></select>
-      <span class="badge gray">嵌入思源原生数据库视图</span>
+      <select class="select" aria-label="台账模块" onchange="openModule(this.value);this.value='certs'"><option value="certs">🪪 证件管理</option><option value="medicine">💊 家庭药箱</option><option value="assets-real">📦 实物资产</option></select>
+      <span class="badge gray">合成表格 · 原生视图目标体验</span>
       <span style="flex:1"></span>
       <button class="btn ghost">📄 模板</button>
       <button class="btn">在文档中打开 ↗</button>
-      <button class="btn primary" onclick="openModal()">＋ 新建</button>
+      <button class="btn primary" onclick="openModal('certs')">＋ 新建</button>
     </div>
-    <div class="card table-wrap">
+    <div class="card table-wrap" role="region" aria-label="合成证件台账，可横向滚动" tabindex="0">
       <table>
         <thead><tr>
           <th style="width:26px"></th><th>名称</th><th>成员</th><th>类型</th>
@@ -669,7 +788,7 @@ tbody tr.sel{background:var(--lv-accent-soft);box-shadow:inset 2px 0 0 var(--lv-
       </table>
     </div>
     <p style="margin-top:10px;font-size:12px;color:var(--lv-tx-3)">
-      行即块：每行可复制块引用，在日记中双链（如「妈妈的身份证」）；筛选、排序、分组为思源原生能力。
+      这里展示合成证件资料。目标是在思源原生数据库中编辑，并在绑定条件满足时定位原块；当前表格未嵌入思源，不提供真实附件或块定位。
     </p>
   </section>
 
@@ -727,9 +846,9 @@ tbody tr.sel{background:var(--lv-accent-soft);box-shadow:inset 2px 0 0 var(--lv-
   <!-- ═══ 引导 ═══ -->
   <section class="screen" id="s-onboarding">
     <div class="aura"><div class="wiz">
-      <div class="step">STEP 1 / 3</div>
+      <div class="step">目标步骤 1 / 3 · 当前仅展示此步</div>
       <h1>先认识一下家里都有谁</h1>
-      <p>成员是所有模块的组织维度。之后随时可以在设置中增减，生日支持农历。</p>
+      <p>这里选择家庭构成，不创建真实成员。后续目标是选择一个模块并完成首条资料；完整引导路径仍待验证。</p>
       <div class="roles">
         <button class="rolechip on">🙋 我</button>
         <button class="rolechip on">👫 配偶</button>
@@ -739,10 +858,10 @@ tbody tr.sel{background:var(--lv-accent-soft);box-shadow:inset 2px 0 0 var(--lv-
         <button class="rolechip">🐾 宠物</button>
       </div>
       <div class="wiz-foot">
-        <button class="btn ghost skip">跳过引导</button>
+        <button class="btn ghost skip" onclick="go('overview')">跳过样例</button>
         <span style="flex:1"></span>
-        <button class="btn">上一步</button>
-        <button class="btn primary" onclick="go('settings')">下一步 · 选择模块 →</button>
+        <button class="btn" disabled>上一步</button>
+        <button class="btn primary" onclick="go('settings')">查看模块样例 →</button>
       </div>
     </div></div>
   </section>
@@ -761,7 +880,7 @@ tbody tr.sel{background:var(--lv-accent-soft);box-shadow:inset 2px 0 0 var(--lv-
       <div class="set-pane">
         <div class="card set-card">
           <h3>人员档案</h3>
-          <div class="hint">家庭成员始终开启；证件建议优先录入，提醒中枢立即生效。</div>
+          <div class="hint">成员是组织维度；证件建议优先录入。本页开关只演示选择，不会建库或启动扫描；保存与失败恢复见规划。</div>
           <div class="togglerow"><div class="tt"><b>证件管理</b><span>效期规则化提醒 · 扫描件 · 存放位置</span></div><span class="badge gray">核心</span><button class="sw on" onclick="this.classList.toggle('on')" aria-label="开关"></button></div>
           <div class="togglerow"><div class="tt"><b>病历与健康</b><span>就诊 · 处方 · 报告 · 疫苗 · 过敏史</span></div><span class="badge gray">核心</span><button class="sw on" onclick="this.classList.toggle('on')" aria-label="开关"></button></div>
           <div class="togglerow"><div class="tt"><b>社保医保</b><span>账户档案 · 退休倒计时</span></div><button class="sw" onclick="this.classList.toggle('on')" aria-label="开关"></button></div>
@@ -786,7 +905,7 @@ tbody tr.sel{background:var(--lv-accent-soft);box-shadow:inset 2px 0 0 var(--lv-
 
   <!-- ═══ 组件库（活体样式指南）═══ -->
   <section class="screen" id="s-styleguide">
-    <div class="hero"><h1>组件库</h1><p>全部组件与状态 · 与 docs/design/07、08 同步，C 阶段实现以此为准</p></div>
+    <div class="hero"><h1>组件库</h1><p>视觉状态演示 · 与 docs/design/07、08 对照；生产接线以源码和回归证据为准</p></div>
 
     <div class="sg-grid">
       <div class="card sg-cell">
@@ -912,6 +1031,7 @@ tbody tr.sel{background:var(--lv-accent-soft);box-shadow:inset 2px 0 0 var(--lv-
 
       <div class="card sg-cell">
         <b>表格 / 附件 / 明细</b>
+        <div class="table-wrap" role="region" aria-label="合成表格样例，可横向滚动" tabindex="0">
         <table style="margin:-6px 0 10px">
           <thead><tr><th>名称</th><th>到期</th><th>状态</th></tr></thead>
           <tbody>
@@ -919,16 +1039,17 @@ tbody tr.sel{background:var(--lv-accent-soft);box-shadow:inset 2px 0 0 var(--lv-
             <tr><td>我的护照</td><td class="num">2029-05-10</td><td><span class="badge green">有效</span></td></tr>
           </tbody>
         </table>
+        </div>
         <div class="files" style="margin-bottom:10px">
           <button class="file">🖼 正页.jpg</button><button class="file">📄 攻略 ↗</button>
         </div>
-        <dl class="kv"><dt>存放位置</dt><dd>玄关抽屉 A</dd><dt>块 ID</dt><dd class="mono">20261001-ab12cd3</dd></dl>
+        <dl class="kv"><dt>存放位置</dt><dd>玄关抽屉 A</dd><dt>合成来源</dt><dd class="mono">certs-demo-01（无真实块）</dd></dl>
       </div>
 
       <div class="card sg-cell">
         <b>空态 · 骨架 · 弹层</b>
         <div class="empty" style="padding:20px 8px">
-          <div class="eic">✓</div><b>干净</b><span>延后与已处理的提醒会归档在这里。</span>
+          <div class="eic">◷</div><b>此样例没有处理记录</b><span>延后保留下次提示时间；完成、忽略与实际办妥分别核对。</span>
         </div>
         <div style="display:flex;gap:10px;align-items:center;margin-bottom:12px">
           <div class="lv-skel" style="width:120px;height:14px"></div>
@@ -950,73 +1071,95 @@ tbody tr.sel{background:var(--lv-accent-soft);box-shadow:inset 2px 0 0 var(--lv-
     </p>
   </section>
 </div>
+  <div class="demo-toast" id="prototype-toast" role="status" aria-live="polite"></div>
+  <div class="live-region" id="prototype-announcer" role="status" aria-live="polite"></div>
 
 <!-- 抽屉：详情 -->
-<div class="mask" id="mask" onclick="closeDrawer()"></div>
-<aside class="drawer" id="drawer" aria-label="条目详情">
+<div class="mask" id="mask" onclick="closeTopLayer()"></div>
+<aside class="drawer" id="drawer" role="dialog" aria-labelledby="drawer-title" aria-hidden="true" tabindex="-1" inert>
   <div class="drawer-head">
-    <h3>妈妈的身份证</h3>
-    <span class="badge red">已逾期</span>
+    <div style="min-width:0"><h3 id="drawer-title">妈妈的身份证</h3><p class="ai-caption" id="drawer-demo-caption">v4 合成样例 · 基准日 2026-10-01</p></div>
+    <span class="badge red" id="drawer-status">已逾期</span>
     <span style="flex:1"></span>
-    <button class="iconbtn" onclick="closeDrawer()">✕</button>
+    <button class="iconbtn" aria-label="关闭详情" onclick="closeDrawer()">✕</button>
   </div>
   <div class="drawer-body">
-    <dl class="kv">
-      <dt>成员</dt><dd>妈妈</dd>
-      <dt>类型</dt><dd>身份证 · 居民身份证</dd>
-      <dt>证件号</dt><dd class="mono">****1234 <span style="color:var(--lv-tx-3)">（脱敏，点击查看）</span></dd>
-      <dt>签发日</dt><dd class="num">2016-10-01</dd>
-      <dt>到期日</dt><dd class="num" style="color:var(--lv-danger)">2026-09-29 · 逾期 2 天</dd>
-      <dt>提前提醒</dt><dd class="num">90 天</dd>
-      <dt>存放位置</dt><dd>玄关抽屉 A</dd>
-      <dt>规则</dt><dd>长期（换新后生效）</dd>
+    <div class="drawer-source-note" id="drawer-source-note">合成记录 · 固定快照 2026-10-01 · 无真实资料读取</div>
+    <dl class="kv" id="drawer-fields">
+      <dt>成员</dt><dd id="detail-member">妈妈</dd>
+      <dt>类型</dt><dd id="detail-type">身份证</dd>
+      <dt>证件号</dt><dd class="mono" id="detail-number">****1234（合成尾号）</dd>
+      <dt>签发日</dt><dd class="num" id="detail-issued">2016-10-01</dd>
+      <dt>到期日</dt><dd class="num" id="detail-due">2026-09-29</dd>
+      <dt>提前提醒</dt><dd class="num" id="detail-lead">90 天</dd>
+      <dt>存放位置</dt><dd id="detail-location">玄关抽屉 A</dd>
+      <dt>规则</dt><dd id="detail-rule">证件到期规则 · 合成 v1</dd>
     </dl>
+    <div id="drawer-linked-content">
     <div>
       <div style="font-size:12px;color:var(--lv-tx-3);margin-bottom:8px">附件</div>
       <div class="files">
-        <button class="file">🖼 身份证正页.jpg</button>
-        <button class="file">🖼 国徽面.jpg</button>
+        <button class="file" onclick="demoFeedback('附件仅为合成占位，没有可打开的文件')">🖼 身份证正页.jpg · 示例</button>
+        <button class="file" onclick="demoFeedback('附件仅为合成占位，没有可打开的文件')">🖼 国徽面.jpg · 示例</button>
       </div>
     </div>
     <div>
       <div style="font-size:12px;color:var(--lv-tx-3);margin-bottom:8px">相关</div>
-      <div class="files"><button class="file">📄 换证办理攻略 ↗</button><button class="file">📍 户籍大厅（地址库）</button></div>
+      <div class="files"><button class="file" onclick="demoFeedback('此样例未提供地区办证要求，请通过正式渠道核对')">📄 办理材料 · 待补依据</button></div>
     </div>
-    <div style="font-size:11.5px;color:var(--lv-tx-3)" class="mono">块 ID：20261001140532-ab12cd3 · 可复制双链</div>
+    </div>
+    <section class="ai-panel" id="ai-panel" aria-labelledby="ai-title" hidden>
+      <h4 id="ai-title" tabindex="-1">✦ AI 协作 · 解释这条提醒</h4>
+      <p class="ai-caption">未连接思源智能体。以下内容来自固定合成样例，不会发送资料或调用模型。</p>
+      <p class="ai-caption">本次状态只在本页保留，其他记录不展示此结果；重置或刷新页面会清除。</p>
+      <div class="ai-scope">
+        <b>本次范围：妈妈 · 证件 · 身份证到期提醒</b>
+        <label><input type="checkbox" id="ai-record-source" checked onchange="invalidateAIExample()">登记字段：名称、成员、到期日</label>
+        <label><input type="checkbox" id="ai-rule-source" checked onchange="invalidateAIExample()"><span id="ai-rule-source-label">日期规则轨迹：基准日、提前量、逾期结果</span></label>
+        <small>默认排除：完整证件号、证件照片、存放位置、其他成员资料。<br>快照：2026-10-01 08:00 · 仅当前合成记录。</small>
+      </div>
+      <details class="ai-source"><summary>依据 S1 · 查看登记字段片段</summary><p>合成记录 certs-demo-01：妈妈的身份证；登记到期日 2026-09-29。未提供新证件、换证回执或已办妥事实。</p></details>
+      <details class="ai-source" id="ai-rule-evidence"><summary>依据 S2 · 查看规则轨迹片段</summary><p>合成规则 certs-expiry-demo-v1：基准日期 2026-10-01；提前量 90 天；固定样例结果为已逾期 2 天。此结果由样例规则给定，不由模型重新计算。</p></details>
+      <details class="ai-source"><summary>内置提示词 · 本次任务</summary><p class="mono">common.explain_reminder.v1 · draft-1</p><p>只解释当前记录为什么出现提醒。引用 S1/S2，区分登记事实、规则结果、未知与调整建议。缺少规则轨迹时停止可靠解释；不推断办理完成，不修改提醒或证件字段。</p></details>
+      <div class="demo-controls"><label for="ai-demo-state">演示条件</label><select class="select" id="ai-demo-state" onchange="invalidateAIExample()"><option value="ready">合成来源齐全</option><option value="unconfigured">模型未配置</option><option value="missing">来源不足</option><option value="stale">来源已变化</option><option value="failed">请求失败</option></select></div>
+      <div class="state-banner" id="ai-state-message" role="status" hidden></div>
+      <button class="btn primary" type="button" id="ai-show-result" onclick="showAIExample()">查看合成结果</button>
+      <div class="ai-result" id="ai-result" hidden>
+        <section><h5>有依据的说明 <span class="badge gray">S1 · S2</span></h5><p>登记日期已经早于合成快照的基准日，规则返回“已逾期 2 天”。这能解释提醒出现，不能说明是否已经申请或完成换证。</p></section>
+        <section><h5>未知与待核对 <span class="badge orange">未确认</span></h5><p>没有新证件、办理回执或所在地区的材料要求，无法判断是否办妥，也无法确认材料是否齐全。</p></section>
+        <section><h5>下一步核对清单 <span class="badge gray">建议草稿</span></h5><ol><li>确认登记到期日是否仍是当前事实。</li><li>如已换证，核对新证件与实际回执后再更新台账。</li><li>如尚未办理，通过正式渠道核对本地要求。</li></ol></section>
+        <label class="ai-confirm"><input type="checkbox" id="ai-reviewed" onchange="reviewAIExample()">我已核对本次演示依据，清单仍作为草稿</label>
+        <p class="ai-receipt" id="ai-review-receipt" role="status" hidden></p>
+      </div>
+      <p class="ai-caption" style="margin-top:12px">手工路径：直接查看上方登记字段和 S1/S2，核对资料后从台账编辑；AI 关闭也不影响这条路径。</p>
+      <button class="btn ghost" type="button" style="margin-top:8px" onclick="resetAIExample()">重置本次演示</button>
+    </section>
   </div>
   <div class="drawer-foot">
-    <button class="btn primary">续期…</button>
-    <button class="btn">延后 ▾</button>
-    <button class="btn">编辑</button>
+    <button class="btn primary" onclick="demoFeedback('续期入口预览')">续期…</button>
+    <button class="btn" onclick="demoFeedback('延后入口预览')">延后 ▾</button>
+    <button class="btn" onclick="demoFeedback('编辑入口预览')">编辑</button>
     <span style="flex:1"></span>
-    <button class="btn ghost">归档</button>
+    <button class="btn ghost" onclick="demoFeedback('归档入口预览')">归档</button>
   </div>
 </aside>
 
 <!-- 弹层：快速录入 -->
-<div class="modal" id="modal">
+<div class="modal" id="modal" role="dialog" aria-labelledby="modal-title" aria-hidden="true" tabindex="-1" onclick="if(event.target===this)closeModal()" inert>
   <div class="sheet" onclick="event.stopPropagation()">
     <div class="sheet-head">
-      <b style="font-size:14px">⚡ 快速记录</b>
-      <select class="select" style="margin-left:auto"><option>🛒 购物</option><option>💊 药品 / 囤货</option><option>🎬 影音</option><option>🧧 人情</option></select>
-      <button class="iconbtn" onclick="closeModal()">✕</button>
+      <b id="modal-title" style="font-size:14px">⚡ 快速记录</b>
+      <select class="select" id="capture-module" aria-label="记录模块" style="margin-left:auto" onchange="configureCapture(this.value)"><option value="shopping">🛒 购物</option><option value="medicine">💊 药品 / 囤货</option><option value="media">🎬 影音</option><option value="favors">🧧 人情</option><option value="certs">🪪 证件</option></select>
+      <button class="iconbtn" aria-label="关闭快速记录" onclick="closeModal()">✕</button>
     </div>
     <div class="sheet-body">
-      <div class="frow"><label>名称</label><input type="text" placeholder="种草的空气炸锅"></div>
-      <div class="frow"><label>金额</label><input type="number" placeholder="299" style="width:120px"></div>
-      <div class="frow"><label>成员</label>
-        <div style="display:flex;gap:6px">
-          <button class="chip on">我</button><button class="chip">老婆</button><button class="chip">全家</button>
-        </div>
-      </div>
-      <div class="frow"><label>日期</label><input type="text" value="今天" style="width:120px"></div>
-      <div class="frow"><label></label><label style="display:flex;gap:6px;align-items:center;cursor:pointer">
-        <input type="checkbox" style="accent-color:var(--lv-accent)" checked>保存后顺手建档为实物资产</label></div>
+      <div id="capture-fields" style="display:flex;flex-direction:column;gap:14px"></div>
+      <p class="ai-caption" id="capture-demo-note">仅预览本模块录入字段，附件为引用占位。关闭也会暂存本页草稿；刷新页面清除，不创建台账或提醒。</p>
     </div>
     <div class="sheet-foot">
-      <button class="btn ghost" onclick="closeModal()">取消</button>
-      <button class="btn" onclick="closeModal()">保存</button>
-      <button class="btn primary" onclick="closeModal()">保存并查看</button>
+      <button class="btn ghost" onclick="closeModal()">关闭并保留草稿</button>
+      <button class="btn" onclick="saveCaptureExample(false)">模拟保存</button>
+      <button class="btn primary" onclick="saveCaptureExample(true)">模拟保存并查看</button>
     </div>
   </div>
 </div>
@@ -1026,12 +1169,18 @@ const $=s=>document.querySelector(s), $$=s=>[...document.querySelectorAll(s)];
 
 /* 屏幕切换 + 导航胶囊滑动 */
 function go(name){
+  const target=$('#s-'+name);
+  if(!target)return;
   $$('.screen').forEach(x=>x.classList.remove('on'));
-  $('#s-'+name).classList.add('on');
+  target.classList.add('on');
   const btn=$$('#nav button').find(b=>b.dataset.s===name);
   $$('#nav button').forEach(b=>b.classList.toggle('on',b===btn));
+  $$('#nav button').forEach(b=>b.setAttribute('aria-current',b===btn?'page':'false'));
   movePill(btn);
   window.scrollTo({top:0,behavior:'instant'});
+  document.title=`小驴管家 · ${target.querySelector('h1')?.textContent||'工作台'} · UI 原型 v4`;
+  const announcer=document.querySelector('#prototype-announcer');
+  if(announcer)announcer.textContent=`已打开${target.querySelector('h1')?.textContent||'页面'}`;
 }
 const nav=$('#nav'), pill=$('#pill');
 function movePill(btn){
@@ -1050,8 +1199,9 @@ window.addEventListener('scroll',()=>{
 
 /* chips / 角色 chips 可切换 */
 $$('.chip,.rolechip').forEach(el=>el.addEventListener('click',()=>{
-  if(el.querySelector('input'))return;
+  if(el.querySelector('input')||el.hasAttribute('onclick'))return;
   el.classList.toggle('on');
+  el.setAttribute('aria-pressed',String(el.classList.contains('on')));
 }));
 
 /* 主题切换 */
@@ -1060,32 +1210,223 @@ function toggleTheme(){
   h.dataset.theme=h.dataset.theme==='dark'?'light':'dark';
 }
 
+/* 只操作本页合成样例；以下状态和表单均不调用思源或模型。 */
+const moduleLabels={certs:'证件管理',medicine:'家庭药箱','assets-real':'实物资产',memberships:'会员与订阅',favors:'礼尚往来',schooling:'上学管理',media:'影音书库',shopping:'购物'};
+const demoReminderRows=[{module:'certs',member:'mom',days:-2},{module:'parenting',member:'child',days:3},{module:'memberships',member:'self',days:12},{module:'insurance',member:'self',days:25}];
+const demoFilters={member:'all',module:'all',days:'30'};
+const demoMemberNames={all:'全家',self:'我',spouse:'老婆',child:'儿子',mom:'妈妈'};
+function renderDemoFilters(){
+  const matches=demoReminderRows.map((row,index)=>({...row,index})).filter(row=>(demoFilters.member==='all'||row.member===demoFilters.member)&&(demoFilters.module==='all'||row.module===demoFilters.module)&&(demoFilters.days==='all'||(demoFilters.days==='overdue'?row.days<0:row.days<=Number(demoFilters.days))));
+  const indices=new Set(matches.map(row=>row.index));
+  for(const selector of ['#s-overview .rem','#s-reminders .rem'])$$(selector).forEach((row,index)=>{row.hidden=!indices.has(index)});
+  $('#heroCount').textContent=matches.length;$('#overview-reminders').hidden=!matches.length;
+  $('#overview-filter-empty').hidden=!!matches.length;$('#reminder-filter-empty').hidden=!!matches.length;
+  $('#reminder-filter-summary').textContent=`当前合成快照范围 · ${matches.length} 条提醒（共 4 条样例）`;
+  $('#focus-due-summary').textContent=`${matches.filter(row=>row.days<0).length} 件逾期 · ${matches.filter(row=>row.days>=0&&row.days<=7).length} 件 7 天内`;
+  const includesMom=indices.has(0);$('#assistant-entry').hidden=!includesMom;$('#focus-review-open').disabled=!includesMom;
+  $('#focus-review-summary').textContent=includesMom?'身份证资料需要核对':'当前范围没有待核对样例';
+  $$('[data-overview-member]').forEach(button=>{const selected=button.dataset.overviewMember===demoFilters.member;button.classList.toggle('on',selected);button.setAttribute('aria-pressed',String(selected))});
+  for(const key of ['member','module','days'])$('#demo-filter-'+key).value=demoFilters[key];
+  const moduleName={all:'全部样例模块',certs:'证件',parenting:'疫苗',memberships:'订阅',insurance:'保单'}[demoFilters.module];
+  const timeName={all:'全部样例日期',overdue:'仅逾期','7':'7 天内与逾期','30':'30 天内与逾期'}[demoFilters.days];
+  $('#context-reminder-scope').textContent=`${demoMemberNames[demoFilters.member]} · ${moduleName} · ${timeName}`;
+  const buckets=[row=>row.days<0,row=>row.days>=0&&row.days<=7,row=>row.days>7];
+  $$('#s-reminders .group-label').slice(0,3).forEach((heading,index)=>{const count=matches.filter(buckets[index]).length;heading.textContent=`${['已逾期','未来 7 天','8–30 天'][index]} · ${count}`;heading.hidden=!count;heading.nextElementSibling.hidden=!count});
+}
+function setDemoFilter(key,value){demoFilters[key]=value;setReminderState('normal');renderDemoFilters()}
+function clearDemoFilters(){Object.assign(demoFilters,{member:'all',module:'all',days:'30'});setReminderState('normal');renderDemoFilters()}
+function openModule(module){
+  if(module==='certs'){go('ledger');return}
+  demoFeedback(`${moduleLabels[module]||'该模块'}：尚未提供台账样例，请查看规划说明`);
+}
+$$('.mod[onclick]').forEach(card=>{
+  card.setAttribute('role','button');card.tabIndex=0;
+  card.setAttribute('aria-label',`${card.querySelector(':scope>b').textContent} · 查看演示范围`);
+  card.addEventListener('keydown',e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();card.click()}});
+});
+$$('#s-ledger tbody tr').forEach((row,index)=>{
+  row.dataset.demoRecord=`certs-demo-${String(index+1).padStart(2,'0')}`;
+  const nameNode=row.cells[1].firstChild,button=document.createElement('button');
+  button.type='button';button.className='record-link';button.textContent=nameNode.textContent.trim();
+  button.setAttribute('aria-label',`查看${button.textContent}详情`);nameNode.replaceWith(button);
+});
+const reminderStates={
+  empty:{title:'读取成功，当前范围没有到期提醒',text:'合成样例：证件模块已完整读取，没有符合当前日期规则的记录。这不表示没有资料或其他待办理事项。',tone:'neutral'},
+  filtered:{title:'当前筛选没有匹配结果',text:'合成样例：选择“老婆”后没有命中这 4 条提醒。清除条件后可返回完整样例；这不表示没有驾驶证资料。',tone:'neutral'},
+  missing:{title:'目标数据库尚未创建',text:'合成样例：没有读取结果，提醒数量未知。下一步应核对模块与建库落点；不能把未知显示为 0。',tone:'warning'},
+  partial:{title:'部分资料读取失败，保留可用快照',text:'以下内容来自上一份合成快照，并按当前条件筛选；失败范围的数量未知。不能据此声称已扫描全部模块或没有其他提醒。',tone:'warning'},
+  stale:{title:'这份提醒快照已经陈旧',text:'以下内容保留 2026-10-01 的合成基准日。请先重新核对来源与日期，不能按浏览器今天的日期理解为实时提醒。',tone:'warning'},
+  error:{title:'读取失败，当前结果未知',text:'合成样例：没有新结果。可以手工查看登记资料，或返回完整演示快照；这里不会执行真实扫描。',tone:'error'}
+};
+function setReminderState(kind){
+  if(kind==='filtered'){Object.assign(demoFilters,{member:'spouse',module:'all',days:'30'});renderDemoFilters()}
+  $('#reminder-demo-state').value=kind;
+  const banner=$('#reminder-state-summary'),state=reminderStates[kind];
+  banner.replaceChildren();banner.hidden=!state;
+  $('#reminder-content').hidden=!!state&&!['partial','stale'].includes(kind);
+  if(!state)return;
+  banner.dataset.tone=state.tone;
+  const title=document.createElement('b'),text=document.createElement('p'),button=document.createElement('button');
+  title.textContent=state.title;text.textContent=state.text;button.className='btn';button.type='button';
+  button.textContent='返回正常演示并清除筛选';button.onclick=()=>clearDemoFilters();banner.append(title,text,button);
+}
+function openReminderState(kind){go('reminders');setReminderState(kind);$('#reminder-state-summary').scrollIntoView({block:'start'})}
+
 /* 抽屉 */
+const layerFocus={drawer:null,modal:null};
+let previousOverflow='';
+function syncLayers(){
+  const drawer=$('#drawer'),modal=$('#modal');
+  const hasDrawer=drawer.classList.contains('open'),hasModal=modal.classList.contains('open');
+  const isOpen=hasDrawer||hasModal;
+  if(isOpen&&!$('.app').inert)previousOverflow=document.body.style.overflow;
+  $('.app').inert=isOpen;drawer.inert=!hasDrawer||hasModal;modal.inert=!hasModal;
+  drawer.setAttribute('aria-hidden',String(!hasDrawer||hasModal));modal.setAttribute('aria-hidden',String(!hasModal));
+  drawer.setAttribute('aria-modal',String(hasDrawer&&!hasModal));modal.setAttribute('aria-modal',String(hasModal));
+  $('#mask').classList.toggle('open',isOpen);
+  document.body.style.overflow=isOpen?'hidden':previousOverflow;
+}
 function openDrawer(tr){
+  if(!tr)return;
+  layerFocus.drawer=document.activeElement;
   $$('#s-ledger tbody tr').forEach(r=>r.classList.remove('sel'));
   tr.classList.add('sel');
-  $('#mask').classList.add('open');$('#drawer').classList.add('open');
+  const cells=tr.cells,isMom=tr.dataset.demoRecord==='certs-demo-01';
+  $('#drawer-title').textContent=cells[1].firstChild.textContent.trim();
+  const status=cells[7].querySelector('.badge');
+  $('#drawer-status').textContent=status.textContent;$('#drawer-status').className=status.className;
+  for(const [selector,index] of [['#detail-member',2],['#detail-type',3],['#detail-issued',4],['#detail-due',5],['#detail-lead',6]]){
+    const value=cells[index].textContent.trim(),isLongTerm=status.textContent.trim()==='长期';
+    $(selector).textContent=value==='—'?(isLongTerm&&index===5?'长期有效（合成登记）':isLongTerm&&index===6?'不适用（无到期提醒）':'未登记'):value;
+  }
+  $('#detail-number').textContent=isMom?'****1234（合成尾号）':'样例未提供';
+  $('#detail-location').textContent=isMom?'玄关抽屉 A':'样例未提供';
+  $('#detail-rule').textContent=cells[5].textContent.trim()==='—'?'无到期日期，不派生此类提醒':'证件到期规则 · 合成 v1';
+  $('#drawer-source-note').textContent=`合成记录 ${tr.dataset.demoRecord} · 固定快照 2026-10-01 · 无真实资料读取`;
+  $('#drawer-linked-content').hidden=!isMom;$('#ai-panel').hidden=!isMom;
+  $('#drawer-demo-caption').textContent=`v4 合成样例 · 基准日 2026-10-01${isMom?' · AI 未连接':''}`;
+  $('#drawer').classList.add('open');syncLayers();
+  $('#drawer .iconbtn')?.focus();
 }
-function closeDrawer(){$('#mask').classList.remove('open');$('#drawer').classList.remove('open')}
+function closeDrawer(){if(!$('#drawer').classList.contains('open'))return;$('#drawer').classList.remove('open');syncLayers();layerFocus.drawer?.focus()}
 
 /* 快速录入 */
-function openModal(){$('#modal').classList.add('open');$('#mask').classList.add('open')}
-function closeModal(){$('#modal').classList.remove('open');if(!$('#drawer').classList.contains('open'))$('#mask').classList.remove('open')}
-document.addEventListener('keydown',e=>{if(e.key==='Escape'){closeModal();closeDrawer()}});
-
-/* 主数字滚动（总览「需要留意」计数） */
-(() => {
-  const el=document.getElementById('heroCount');
-  if(!el)return;
-  const target=+el.textContent||0; const t0=performance.now(), dur=560;
-  el.textContent='0';
-  function tick(t){
-    const p=Math.min((t-t0)/dur,1), e=1-Math.pow(1-p,3);
-    el.textContent=Math.round(target*e);
-    if(p<1)requestAnimationFrame(tick);
+const captureDefinitions={
+  shopping:{name:'购物',fields:[['name','名称','text','种草的空气炸锅'],['amount','金额','number','299'],['date','购买日','date'],['channel','渠道','text','购买渠道']]},
+  medicine:{name:'家庭药箱',fields:[['name','名称','text','药品名称与规格'],['category','类别','select',[['rx','处方药'],['otc','非处方药'],['external','外用'],['device','器械'],['supplement','补充品']]],['expiry','到期日','date'],['stock_qty','库存数量','number','1'],['location','位置','text','存放位置']]},
+  media:{name:'影音书库',fields:[['name','名称','text','书籍或影片名称'],['category','类别','select',[['movie','电影'],['tv','剧集'],['variety','综艺'],['book','图书'],['comic','漫画'],['novel','小说']]],['status','状态','select',[['wishlist','想看 / 想读'],['consuming','在看 / 在读'],['done','已完成'],['dropped','已放弃']]],['rating','评分','number','可留空']]},
+  favors:{name:'礼尚往来',fields:[['name','名称','text','往来事件'],['direction','方向','select',[['in','收礼'],['out','送礼']]],['person','亲友','text','亲友姓名'],['amount','金额','number','0'],['date','发生日','date']]},
+  certs:{name:'证件管理',fields:[['name','名称','text','证件名称'],['member','成员','select',[['mom','妈妈'],['self','我'],['spouse','老婆'],['child','儿子']]],['category','类型','select',[['id','身份证'],['hukou','户口簿'],['passport','护照'],['visa','签证'],['permit','通行证'],['license','驾驶证'],['vehicle_lic','行驶证'],['birth_cert','出生证明'],['other','其他']]],['expiry','到期日','date'],['attachments','附件','text','仅预览附件引用，不上传']]}
+};
+const captureDrafts={};let currentCapture=null;
+function storeCaptureDraft(){
+  if(!currentCapture)return;
+  captureDrafts[currentCapture]=Object.fromEntries($$('#capture-fields [data-field]').map(el=>[el.dataset.field,el.value]));
+}
+function configureCapture(module){
+  storeCaptureDraft();currentCapture=captureDefinitions[module]?module:'shopping';
+  const definition=captureDefinitions[currentCapture],draft=captureDrafts[currentCapture]||{};
+  $('#capture-module').value=currentCapture;$('#modal-title').textContent=`快速记录 · ${definition.name}`;
+  const container=$('#capture-fields');container.replaceChildren();
+  for(const [key,label,type,extra] of definition.fields){
+    const row=document.createElement('div'),labelNode=document.createElement('label'),control=document.createElement(type==='select'?'select':'input');
+    row.className='frow';labelNode.htmlFor=`capture-${key}`;labelNode.textContent=label;
+    control.id=`capture-${key}`;control.dataset.field=key;
+    if(type==='select'){
+      control.className='select';const empty=document.createElement('option');empty.value='';empty.textContent='请选择';control.append(empty);
+      for(const [value,text] of extra){const option=document.createElement('option');option.value=value;option.textContent=text;control.append(option)}
+    }else{
+      control.type=type;if(extra)control.placeholder=extra;
+      if(type==='number')control.step='any';
+      if(key==='attachments'){control.readOnly=true;control.setAttribute('aria-describedby','capture-demo-note')}
+    }
+    control.value=draft[key]??'';row.append(labelNode,control);container.append(row);
   }
-  requestAnimationFrame(tick);
-})();
+}
+function openModal(module='shopping'){layerFocus.modal=document.activeElement;configureCapture(module);$('#modal').classList.add('open');syncLayers();$('#capture-name')?.focus()}
+function closeModal(){if(!$('#modal').classList.contains('open'))return;storeCaptureDraft();$('#modal').classList.remove('open');syncLayers();layerFocus.modal?.focus()}
+function saveCaptureExample(view){
+  storeCaptureDraft();const module=currentCapture,definition=captureDefinitions[module],draft={...captureDrafts[module]};closeModal();
+  const receipt=$('#capture-receipt');receipt.hidden=false;receipt.replaceChildren();
+  const title=document.createElement('b'),text=document.createElement('p'),back=document.createElement('button'),dismiss=document.createElement('button');
+  title.textContent=`本页演示草稿 · ${definition.name}`;
+  text.textContent=definition.fields.map(([key,label,type,options])=>`${label}：${(type==='select'?options.find(([value])=>value===draft[key])?.[1]:draft[key])||'未填'}`).join(' · ')+'。未写入业务数据，未创建提醒；刷新页面会清除。';
+  back.className='btn';back.textContent='回到本次草稿';back.onclick=()=>openModal(module);
+  dismiss.className='btn ghost';dismiss.textContent='收起回执';dismiss.onclick=()=>{receipt.hidden=true;$('#nav button.on')?.focus()};receipt.append(title,text,back,dismiss);
+  demoFeedback(`${definition.name} · 已保留本页演示草稿`);if(view){receipt.scrollIntoView({block:'start'});receipt.focus({preventScroll:true})}
+}
+function openAIExample(){
+  openDrawer($('#s-ledger tbody tr'));$('#ai-panel').scrollIntoView({block:'start'});$('#ai-title').focus({preventScroll:true});
+}
+const aiExampleStates={
+  unconfigured:{title:'模型未配置 · 演示不可用状态',text:'正式接入后，此处应引导核对思源中的模型服务。当前仍可手工查看登记字段和规则；本页没有实际连接。'},
+  missing:{title:'规则轨迹缺失，不能可靠解释',text:'此条件模拟没有读取到 S2；登记字段仍可查看。需要补齐规则依据，不能用一段解释填补缺口。'},
+  stale:{title:'来源已变化，旧结果需要重新核对',text:'此条件模拟记录或规则变更。旧确认已撤回，保留的片段只是 v1 合成快照；回到范围预览后再核对。'},
+  failed:{title:'请求失败 · 合成错误状态',text:'这里没有实际发起请求。正式流程应保留范围与资料，并提供重试、取消和手工出口；当前可以继续查看 S1/S2。'}
+};
+function invalidateAIExample(){
+  const kind=$('#ai-demo-state').value,missingRule=kind==='missing';
+  $('#ai-rule-source').disabled=missingRule;$('#ai-rule-evidence').hidden=missingRule;
+  $('#ai-rule-source-label').textContent=missingRule?'日期规则轨迹：此条件未读取':'日期规则轨迹：基准日、提前量、逾期结果';
+  $('#ai-result').hidden=true;$('#ai-reviewed').checked=false;$('#ai-review-receipt').hidden=true;
+  const absentScope=!$('#ai-record-source').checked||!$('#ai-rule-source').checked;
+  const state=aiExampleStates[kind]||(absentScope?{title:'本次范围缺少必要依据',text:'登记字段与规则轨迹都属于解释这条提醒的必要输入。补齐选择后再查看；没有依据时不提供确定结论。'}:null);
+  const banner=$('#ai-state-message');banner.replaceChildren();banner.hidden=!state;
+  $('#ai-show-result').disabled=!!state;
+  if(state){banner.dataset.tone=kind==='failed'?'error':'warning';const title=document.createElement('b'),text=document.createElement('p');title.textContent=state.title;text.textContent=state.text;banner.append(title,text)}
+}
+function showAIExample(){
+  invalidateAIExample();if($('#ai-show-result').disabled)return;
+  $('#ai-result').hidden=false;$('#prototype-announcer').textContent='已显示合成解释：有依据的说明、未知项和清单草稿。没有调用模型。';
+}
+function reviewAIExample(){
+  const checked=$('#ai-reviewed').checked,receipt=$('#ai-review-receipt');receipt.hidden=!checked;
+  receipt.textContent='已核对本次合成依据。清单仍为草稿，未修改登记日期、提醒或办理状态；尚无实际换证回执。';
+}
+function resetAIExample(){
+  $('#ai-demo-state').value='ready';$('#ai-record-source').checked=true;$('#ai-rule-source').checked=true;
+  $$('#ai-panel details').forEach(detail=>{detail.open=false});invalidateAIExample();$('#ai-show-result').focus();
+  $('#prototype-announcer').textContent='已重置本次 AI 合成样例，返回范围预览。';
+}
+function closeTopLayer(){if($('#modal').classList.contains('open'))closeModal();else closeDrawer()}
+document.addEventListener('keydown',e=>{
+  if(e.isComposing)return;
+  const top=$('#modal').classList.contains('open')?$('#modal'):$('#drawer').classList.contains('open')?$('#drawer'):null;
+  if(!top)return;
+  if(e.key==='Escape'){e.preventDefault();closeTopLayer()}
+  if(e.key==='Tab'){
+    const controls=[...top.querySelectorAll('button,input,select,a[href],summary,[tabindex="0"]')].filter(x=>!x.disabled&&x.getClientRects().length);
+    const first=controls[0],last=controls.at(-1);
+    if(e.shiftKey&&document.activeElement===first){e.preventDefault();last?.focus()}
+    else if(!e.shiftKey&&document.activeElement===last){e.preventDefault();first?.focus()}
+  }
+});
+
+/* 原型状态反馈：演示动作只改变界面，不写入思源数据。 */
+function demoFeedback(action){
+  const toast=$('#prototype-toast');
+  toast.textContent=`演示反馈：${action}（未写入业务数据）`;toast.classList.add('show');
+  window.clearTimeout(window.__lvToast);window.__lvToast=window.setTimeout(()=>toast.classList.remove('show'),2400);
+}
+document.addEventListener('click',e=>{
+  const button=e.target.closest('.rem .btn,.focus-card button');
+  if(!button||button.disabled)return;
+  const text=button.textContent.trim();
+  if(['完成','延后','忽略','续期…'].some(x=>text.startsWith(x))){
+    const row=button.closest('.rem');
+    if(row){row.classList.add('demo-ack');setTimeout(()=>row.classList.remove('demo-ack'),900)}
+    demoFeedback(text);
+  }
+});
+document.querySelectorAll('#nav button').forEach(b=>b.setAttribute('aria-current',b.classList.contains('on')?'page':'false'));
+document.querySelectorAll('.chip,.rolechip').forEach(b=>{if(!b.querySelector('input'))b.setAttribute('aria-pressed',String(b.classList.contains('on')))});
+$$('.sw').forEach((button,index)=>{
+  button.setAttribute('role','switch');
+  button.setAttribute('aria-label',`${button.closest('.togglerow')?.querySelector('b')?.textContent||'组件开关样例 '+(index+1)} · 仅演示选择`);
+  const update=()=>button.setAttribute('aria-checked',String(button.classList.contains('on')));update();button.addEventListener('click',update);
+});
+
+renderDemoFilters();
 </script>
 </body>
 </html>

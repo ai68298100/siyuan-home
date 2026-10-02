@@ -13,3 +13,7 @@ tmp
 
 # local tooling state
 .mimosa/
+
+# local tooling state (playwright session artifacts, build outputs)
+.playwright-cli/
+output/
