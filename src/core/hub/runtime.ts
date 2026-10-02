@@ -148,6 +148,14 @@ export function purgeHandled(rt: HubRuntime, today: Date, keepDays = HANDLED_KEE
         // 已办期已翻篇（下一期 due 晚于该期），条目不再起隐藏作用，可安全清除
         if (until < todayKey) delete rt.handledUntil[id];
     }
+    // monthlyCompletions 保留最近 24 个月（29 组：跨两年前的月度计数归档/丢弃）
+    if (rt.monthlyCompletions) {
+        const cutoff = new Date(today.getFullYear(), today.getMonth() - 24, 1);
+        const cutoffKey = `${cutoff.getFullYear()}-${String(cutoff.getMonth() + 1).padStart(2, "0")}`;
+        for (const key of Object.keys(rt.monthlyCompletions)) {
+            if (key < cutoffKey) delete rt.monthlyCompletions[key];
+        }
+    }
 }
 
 /** 规则类型分派（H05）：旧缓存无 kind 时按 ruleKey 推断（birthday=周年，其余 oneoff） */
