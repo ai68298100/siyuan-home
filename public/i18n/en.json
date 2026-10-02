@@ -593,5 +593,10 @@
     "wiz.provisionIssues": "${n} module ledger(s) failed to create: ${modules}. See Settings → About → Diagnostics for reasons and retry",
     "settings.importNormalized": "Imported (${m} unknown module(s) dropped, ${r} member field(s) repaired)",
     "members.dupTitle": "Duplicate member name",
-    "members.dupBody": "A member named \"${name}\" already exists. Same names create ambiguity when linking ledger rows by name (manual choice needed). Add another member with this name anyway?"
+    "members.dupBody": "A member named \"${name}\" already exists. Same names create ambiguity when linking ledger rows by name (manual choice needed). Add another member with this name anyway?",
+    "settings.restoreBtn": "Restore pre-import settings",
+    "settings.restoreTitle": "Restore pre-import settings",
+    "settings.restoreBody": "This replaces current settings with the automatic backup taken before the last import, then re-provisions ledgers and rescans. Continue?",
+    "settings.restoreDone": "Pre-import settings restored",
+    "hub.batchPartial": "Processed ${ok}; failed: ${failed}"
 }

@@ -94,14 +94,27 @@
         batchBusy = true;
         try {
             const byId = new Map(all.map((r: any) => [r.id, r]));
+            let ok = 0;
+            const failed: string[] = [];
+            // 逐条容错：单项失败不中断批量（剩余项继续处理），失败清单在回执中报告
             for (const id of selected) {
                 const r = byId.get(id);
                 if (!r) continue;
-                if (kind === "done") await plugin.complete(r);
-                else if (kind === "snooze7") await plugin.snooze(id, 7);
-                else await plugin.mute(id);
+                try {
+                    if (kind === "done") await plugin.complete(r);
+                    else if (kind === "snooze7") await plugin.snooze(id, 7);
+                    else await plugin.mute(id);
+                    ok++;
+                } catch (e) {
+                    failed.push((r as any).title || id);
+                    console.warn("[siyuan-home] batch item failed:", e instanceof Error ? e.message : e);
+                }
             }
-            showMessage(t("hub.batchDone").replace("${n}", String(selected.size)), 3000, "info");
+            if (failed.length > 0) {
+                showMessage(t("hub.batchPartial").replace("${ok}", String(ok)).replace("${failed}", failed.join("、")), 7000, "error");
+            } else {
+                showMessage(t("hub.batchDone").replace("${n}", String(ok)), 3000, "info");
+            }
             selected = new Set();
         } finally {
             batchBusy = false;

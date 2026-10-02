@@ -14,6 +14,8 @@
         refreshHub?: (only?: string | string[], force?: boolean) => Promise<unknown>;
         /** C8b：新启用模块立即建库 */
         ensureCoreLedgers?: () => Promise<void>;
+        /** UG03/DL07：导入前备份探测与恢复 */
+        loadData?: (name: string) => Promise<unknown>;
     }
 
     let { plugin, settings }: {
@@ -97,6 +99,12 @@
 
     // 24 组：设置导出/导入（跨设备/重装迁移辅助）
     let importInput: HTMLInputElement | undefined = $state();
+    // UG03/DL07：导入前自动备份当前设置，可一键恢复（导入链的数据安全闭环）
+    let preImportBackupExists = $state(false);
+    $effect(() => {
+        // 面板打开时探测一次（备份文件是否存在）
+        plugin.loadData?.("settings.pre-import.json").then((v: unknown) => { preImportBackupExists = !!v; }).catch(() => undefined);
+    });
 
     function exportSettings() {
         const payload = JSON.stringify(plugin.settings, null, 2);
@@ -106,6 +114,22 @@
         a.download = `siyuan-home-settings-${new Date().toISOString().slice(0, 10)}.json`;
         a.click();
         URL.revokeObjectURL(a.href);
+    }
+
+    async function restorePreImport() {
+        confirm(t("settings.restoreTitle"), t("settings.restoreBody"), async () => {
+            try {
+                const backup = await plugin.loadData?.("settings.pre-import.json");
+                if (!backup) { showMessage(t("settings.importBad"), 4000, "error"); return; }
+                plugin.settings = backup as HomeSettings;
+                await import("@/core/settings").then((m) => m.saveSettings(plugin as any, plugin.settings));
+                await plugin.ensureCoreLedgers?.();
+                await plugin.refreshHub?.();
+                showMessage(t("settings.restoreDone"), 3000, "info");
+            } catch (e) {
+                showMessage(t("settings.importBad"), 4000, "error");
+            }
+        });
     }
 
     async function importSettings(e: Event) {
@@ -119,6 +143,13 @@
                 throw new Error("invalid settings shape");
             }
             confirm(t("settings.importTitle"), t("settings.importBody").replace("${file}", file.name), async () => {
+                // UG03/DL07：覆盖前自动备份当前设置（可经"恢复导入前设置"一键回滚）
+                try {
+                    await (plugin as any).saveData?.("settings.pre-import.json", JSON.parse(JSON.stringify(plugin.settings)));
+                    preImportBackupExists = true;
+                } catch {
+                    // 备份失败不阻断导入（导出的 JSON 文件仍是用户侧备份）
+                }
                 // 24 组/16 轮：导入归一化——未知模块剔除进报告、成员字段修复，不再静默丢弃
                 const { normalizeImportedSettings } = await import("@/core/settings");
                 const norm = normalizeImportedSettings(data);
@@ -290,6 +321,10 @@
                     <button class="b3-button b3-button--outline" onclick={() => importInput?.click()}>{t("settings.import")}</button>
                     <input type="file" accept="application/json,.json" style="display:none"
                         bind:this={importInput} onchange={(e) => importSettings(e)} />
+                    {#if preImportBackupExists}
+                        <!-- UG03/DL07：导入前自动备份的回滚入口 -->
+                        <button class="b3-button b3-button--outline" onclick={restorePreImport}>{t("settings.restoreBtn")}</button>
+                    {/if}
                 </div>
             </div>
             <!-- 24 组/CM07：示例数据一键生成/清除（新用户体验与截图；【示例】前缀可识别可回滚） -->
