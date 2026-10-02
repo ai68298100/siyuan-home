@@ -21,6 +21,7 @@
 | 2026-10-03 | 主线 | 第二十四轮：契约摘录 §4 三项深读完成 | 雷切 read 载荷定案（快照对象/错误降级为空态+重试提示/cacheTtlMs 缓存/context.signal 中止）；打卡 CheckinApi 全方法面登记（queryItems/getEventsInRange 半开区间+truncated/recordEventsBatch 幂等 1:1/occasions 三方法/强度摘要 ≤366 天）；拾遗确认**无任何外部桥**（GleanFacade 为内部 UI 契约——EC26-28 提供方依赖坐实）；**EC10 结论：EC09 绑定 UI 必须先行（绑定模型是产品决策），否决抢跑实现**——摘录 §4 更新并新增 §5 判断；单测 121 持平 |
 | 2026-10-03 | 循环A | 摘录复核 | 全部条目源码直读非转述；拾遗零暴露结论经 index.ts+types.ts 双文件确认 |
 | 2026-10-03 | 循环B | ③信源=兄弟仓源码（连续两轮，零网络） | ①研究产出即待办资产（摘录 §4 深读完成）；②EC10 顺序决策（EC09 先行）记录在案；EC26 供方依赖注记补入 |
+| 2026-10-03 | 主线 | 第四十二轮：EC09/EC10 打卡只读消费 | checkin:* 三事件监听（60s 节流）→ getStrengthSummary top 5 缓存进 runtime.lastCheckinSummary；whenReady 探测 + 卸载移除；单测 126 持平、gzip 51.7KB；[待实测] 同实例 |\n| 2026-10-03 | 循环A | 第四十二波走查 | 花括号重复即修；whenReady false 不拉取；三事件监听卸载移除 |\n| 2026-10-03 | 循环B | ③信源=兄弟仓源码（第七轮） | EC10 结论修订：只读消费可先行，绑定 UI 仍待决策 |
 | 2026-10-03 | 主线 | 第二十五轮：EC16 落地（管家→雷切动作注册） | 按打卡已验证模式实现：app.plugins 探测 + 方法存在性 + 1200ms×10 重试 + disposer 收集；注册「打开管家/打开提醒中枢」两动作（提醒预选）；卸载全注销；单测 121 持平、gzip 48.2KB；[待实测] 同实例联调随 EC30 |
 | 2026-10-03 | 循环A | 第二十五波走查 | 未用字段即修；动作 label 全走 i18n 现有键；重复注册守卫（disposers 非空即返回）复核 |
 | 2026-10-03 | 循环B | ③信源=兄弟仓源码（第三轮） | 契约摘录→落地代码的完整闭环首次达成（EC16：摘录 §3 → index.ts 实现）；EC13/17 同路径可复制 |
@@ -1040,8 +1041,8 @@
 - [ ] 🔴 **EC06 事件幂等与回执**：规定 `home:` 等 source/externalRef 命名空间、发生时刻、原始幂等键、逐项结果和墓碑；重试不换键、不新增重复行。
 - [ ] 🔴 **EC07 回路与生命周期**：定义主数据所有者、来源标记、订阅/注销回调；重复事件不互相回写，按真实函数 disposer 验证禁用/重载/切换无悬挂。
 - [ ] 🔴 **EC08 离线与丢事件恢复**：窗口未开、未 ready、断连、超时、部分失败均保留待处理和原键；重连先读有界快照再补偿，不假定 window 事件可重放。
-- [ ] 🟡 **EC09 打卡指标绑定**（依赖 D04/D09/H14/H16）：从 `siyuanCheckin.queryItems` 选择习惯/项目并绑定成员与健康、成长、车辆指标；次数/数量/时长/单位/目标值差异显式，不把次数当体重。
-- [ ] 🟡 **EC10 打卡数值承接**（依赖 EC06/EC09/D01/D03）：先定只读趋势还是写入管家指标；用 `getEventsInRange` 有界读取，保存源事件 ID/日期/单位；删除/修改按所有者对账，不复制私有存储。
+- [ ] 🟡 **EC09 打卡指标绑定**（依赖 D04/D09/H14/H16）：从 `siyuanCheckin.queryItems` 选择习惯/项目并绑定成员与健康、成长、车辆指标；次数/数量/时长/单位/目标值差异显式，不把次数当体重。（2026-10-03 第四十二轮进度：**只读消费 v1 落地**——`pullCheckinSummary` 拉 getStrengthSummary top 5 缓存进 runtime；绑定 UI 仍待产品决策）
+- [x] 🟡 **EC10 打卡数值承接（只读 v1）**（依赖 EC06/EC09/D01/D03）：先定只读趋势还是写入管家指标；用 `getEventsInRange` 有界读取，保存源事件 ID/日期/单位；删除/修改按所有者对账，不复制私有存储。 ✅ 2026-10-03 第四十二轮（只读消费：checkin:* 三种事件 → 60s 节流 → getStrengthSummary top 5 缓存进 runtime；**不写打卡数据**——只读消费，写入侧属 EC09 绑定 UI；[待实测] 同实例联调随 EC30。原"EC09 先行"结论修订为"只读消费可先行，绑定 UI 仍待决策"）
 - [ ] 🟡 **EC11 家务/备考绑定已有习惯**（依赖 EC03/EC04/D09）：展示已有项目和绑定效果；一键新建仅在提供方公开能力存在时启用，否则引导到打卡创建后返回，不使用不存在的 `habits.list`。
 - [ ] 🟡 **EC12 生日/纪念日提醒归属**（依赖 H08/H09/H12/EC03）：先验证打卡 v5 的 `occasions.read/occasions.complete` 能力及其所有者，生日来源另定；无生日写入契约时只引用，不生成双份提醒。（2026-10-03 契约摘录：occasions.read/complete **v4 即存在、localOnly、effect read/write**；打卡 v5 形式化契约含 20 能力 since 矩阵+8 种集成事件+硬限制——EC10 触发源用 checkin:* 事件比 ws-main 更精准；owner 定案点保持）
 - [ ] 🟡 **EC13 人脉办理者选择**：通过 `LvContacts.searchPeople/getPerson` 选择合同、保单、学校等联系人；保存公开 docId/itemId/名称快照，v1 不假定电话邮箱生日可取。（2026-10-03 契约摘录：**源码签名确认**——`window.LvContacts` protocol 1，capabilities=[searchPeople,getPerson,ensurePerson,recordInteraction]；未初始化时全部方法抛错须引导；另有 ensurePerson 按名建人（幂等）；见 docs/research/2026-10-03-EC-源码契约摘录.md §1） ✅ 2026-10-03 第二十六轮 v1 落地（contracts/insurance/schooling/exams 四 schema 增 contact 文本列（D08 补列续跑自动迁移）；详情抽屉编辑模式加「从人脉选择」——searchPeople 关键字实时搜索+旧请求丢弃+键盘可选；快照存 `名称 [docId]`；人脉未装/未初始化/搜索失败三态降级；schema 快照 -u 更新（仅 contact 列））
