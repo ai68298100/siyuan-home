@@ -468,5 +468,22 @@
     "members.deleteTitle": "Remove member",
     "members.deleteBody": "This removes the member reference for \"${name}\" (ledger rows like certificates and reminders are kept and can be reassigned later). Remove?",
     "ledger.notProvisioned": "Ledger not provisioned yet",
-    "ledger.notProvisionedHint": "Click \"Rebuild ledger\" above to create an empty one (existing data is unaffected)."
+    "ledger.notProvisionedHint": "Click \"Rebuild ledger\" above to create an empty one (existing data is unaffected).",
+    "hub.restore": "Restore",
+    "hub.restoreDone": "Restored — item is back in the active list",
+    "hub.handledUnknown": "(source record no longer in scan results)",
+    "hub.handledDone": "Completed",
+    "hub.handledMuted": "Muted",
+    "hub.handledYear": "Done this year",
+    "hub.handledPeriod": "Completed this period",
+    "hub.handledMemo": "Memo completed",
+    "ledger.saving": "Saving…",
+    "ledger.reset": "Reset form",
+    "ledger.savePartial": "Row created, but some fields failed to write: ${fields}. Input kept — press save again to retry the same row.",
+    "ledger.saveFailed": "Save failed: ${msg}. Input kept.",
+    "ledger.savePending": "Row committed but its identity could not be confirmed. Check the ledger document before continuing; auto-retry skipped to avoid duplicates.",
+    "diag.health": "Deep health check",
+    "diag.healthSummary": "Health check: all ${total} enabled modules readable",
+    "diag.healthSummaryBad": "Health check: ${ok}/${total} OK${detail}",
+    "diag.healthMissingCols": "missing ${n} schema column(s)"
 }

@@ -47,10 +47,11 @@
         movePill(navEl?.querySelector(`[data-s="${screen}"]`) as HTMLElement | undefined);
     });
 
-    // Tab 挂载即注册刷新回调（扫描完成 → 触发 rune 更新；多实例安全）
-    let tick = $state(0);
+    // Tab 挂载即注册刷新回调（扫描完成 → version 递增驱动各屏 $derived 重算，H02：
+    // 动作/扫描后留在当前页即时更新，不靠切页重挂载；多实例安全）
+    let version = $state(0);
     $effect(() => {
-        const listener = () => { tick += 1; };
+        const listener = () => { version += 1; };
         (plugin.hubListeners as Set<() => void>).add(listener);
         void plugin.refreshHub();
         return () => { (plugin.hubListeners as Set<() => void>).delete(listener); };
@@ -79,13 +80,13 @@
     {#key screen}
         <main class="lv-screen lv-anim">
             {#if screen === "overview"}
-                <Overview {plugin} {t} onGoto={(s: ScreenId) => (screen = s)} />
+                <Overview {plugin} {t} {version} onGoto={(s: ScreenId) => (screen = s)} />
             {:else if screen === "reminders"}
-                <Reminders {plugin} {t} />
+                <Reminders {plugin} {t} {version} />
             {:else if screen === "ledger"}
-                <Ledger {plugin} {t} />
+                <Ledger {plugin} {t} {version} />
             {:else}
-                <Members {plugin} {t} />
+                <Members {plugin} {t} {version} />
             {/if}
         </main>
     {/key}

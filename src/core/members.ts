@@ -80,20 +80,21 @@ export async function backfillMemberLinks(
     return { linked, unmatched };
 }
 
-/** 编辑成员（设置侧为准；av 侧行值尽力同步） */
+/** 编辑成员（设置侧为准；av 侧行值尽力同步——按 avItemId 精确写回，无关联行时仅设置侧生效） */
 export async function updateMember(plugin: Plugin, settings: HomeSettings, member: FamilyMember): Promise<void> {
     settings.members = settings.members.map((m) => (m.id === member.id ? member : m));
     await saveSettings(plugin, settings);
     try {
         const ref = settings.dbRefs.members;
-        if (ref?.avId && ref.columns) {
-            const rows = await import("./siyuan").then((m) => m.primaryRowItemIDs(ref.avId!));
-            // v0.2 简化：按姓名主键匹配行（稳定身份标记见 33.2 待办）
-            const target = rows[0];
-            void target;
+        if (ref?.avId && ref.columns && member.avItemId) {
+            // 主键 name 列 + 其余列按 avItemId 精确更新（不按姓名匹配，避免同名误写他人，D05）
+            if (ref.columns.name) {
+                await setCell(ref.avId, ref.columns.name, member.avItemId, { type: "text", text: { content: member.name } });
+            }
+            await writeMemberCells(ref, member.avItemId, member);
         }
-    } catch {
-        // 尽力同步，失败静默（诊断区可见）
+    } catch (e) {
+        console.warn("[siyuan-home] member ledger sync deferred:", e instanceof Error ? e.message : e);
     }
 }
 

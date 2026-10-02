@@ -1,19 +1,31 @@
 <script lang="ts">
     import Onboarding from "../onboarding.svelte";
+    import { localDateKey } from "@/core/hub/rule";
 
-    let { plugin, t, onGoto }: { plugin: any; t: (k: string) => string; onGoto: (s: string) => void } = $props();
+    let { plugin, t, onGoto, version }: { plugin: any; t: (k: string) => string; onGoto: (s: string) => void; version?: number } = $props();
 
-    const allReminders = $derived(plugin.scan?.reminders ?? []);
-    const members = $derived(plugin.settings.members ?? []);
+    // version（H02）：hubListeners 触发时递增，驱动以下 $derived 重算（plugin.* 为普通对象引用，本身不追踪）
+    const allReminders = $derived.by(() => {
+        void version;
+        return plugin.scan?.reminders ?? [];
+    });
+    const members = $derived.by(() => {
+        void version;
+        return plugin.settings.members ?? [];
+    });
+    // C2e：成员过滤——本地 $state 驱动（runtime.filterMemberId 只作持久化；普通对象属性读不追踪）
+    // svelte-ignore state_referenced_locally
+    let memberFilter = $state<string | undefined>(plugin.runtime.filterMemberId);
     // C2e：成员过滤（持久化 runtime.filterMemberId；成员行 memberId 在 v0.2 由行创建顺序关联，未关联时显示全部）
     const reminders = $derived(
-        plugin.runtime.filterMemberId
-            ? allReminders.filter((r: any) => !r.memberId || r.memberId === plugin.runtime.filterMemberId)
+        memberFilter
+            ? allReminders.filter((r: any) => !r.memberId || r.memberId === memberFilter)
             : allReminders,
     );
     const top = $derived(reminders.slice(0, 4));
 
     async function setMemberFilter(id: string | undefined) {
+        memberFilter = id;
         plugin.runtime.filterMemberId = id;
         const { saveRuntime } = await import("@/core/hub/runtime");
         await saveRuntime(plugin, plugin.runtime);
@@ -23,7 +35,8 @@
     let memoDue = $state("");
     function addMemo() {
         if (!memoTitle.trim()) return;
-        const d = memoDue || new Date(Date.now() + 3 * 86400000).toISOString().slice(0, 10);
+        // 默认到期日走本地时区（33.3：禁 toISOString，UTC+8 夜间会偏一天）
+        const d = memoDue || localDateKey(new Date(Date.now() + 3 * 86400000));
         plugin.addMemo(memoTitle.trim(), d);
         memoTitle = ""; memoDue = "";
     }
@@ -39,9 +52,9 @@
 </div>
 
 <div class="lv-members" style="margin-bottom:4px">
-    <button class="lv-chip {!plugin.runtime.filterMemberId ? 'on' : ''}" onclick={() => setMemberFilter(undefined)}>{t("members.all")}</button>
+    <button class="lv-chip {!memberFilter ? 'on' : ''}" onclick={() => setMemberFilter(undefined)}>{t("members.all")}</button>
     {#each members as m (m.id)}
-        <button class="lv-chip {plugin.runtime.filterMemberId === m.id ? 'on' : ''}" onclick={() => setMemberFilter(m.id)}>
+        <button class="lv-chip {memberFilter === m.id ? 'on' : ''}" onclick={() => setMemberFilter(m.id)}>
             <span class="lv-avatar" style="background:linear-gradient(135deg,var(--lv-accent),var(--lv-accent-2))">{m.name.slice(0, 1)}</span>{m.name}
         </button>
     {/each}

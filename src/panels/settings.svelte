@@ -8,6 +8,8 @@
         i18n: Record<string, unknown>;
         settings: HomeSettings;
         getDiagnostics?: () => any;
+        /** moduleId → schema 目录（D12 深度健康检查用） */
+        schemaCatalog?: Record<string, { columns?: { key: string }[] }>;
     }
 
     let { plugin, settings }: {
@@ -194,6 +196,19 @@
                                 const dups = await findDuplicateLedgers(plugin.settings);
                                 showMessage(dups.length === 0 ? t("diag.dupNone") : t("diag.dupFound").replace("${n}", String(dups.length)) + ": " + dups.map((d) => d.hpath).join(", "), 6000, dups.length ? "error" : "info");
                             }}>{t("diag.dupCheck")}</button>
+                        <!-- D12 最小健康检查：实际读取每个启用模块，登记存在≠健康 -->
+                        <button class="b3-button b3-button--outline" style="margin-top:6px"
+                            onclick={async () => {
+                                const { runHealthCheck } = await import("@/core/health");
+                                const report = await runHealthCheck(plugin.settings, plugin.schemaCatalog ?? {});
+                                const bad = report.modules.filter((m) => !m.ok);
+                                const detail = bad.map((m) => `${t(`module.${m.moduleId}`)}: ${m.error ?? t("diag.healthMissingCols").replace("${n}", String(m.missingColumns?.length ?? 0))}`).join("；");
+                                showMessage(
+                                    (detail
+                                        ? t("diag.healthSummaryBad").replace("${ok}", String(report.modules.length - bad.length)).replace("${total}", String(report.modules.length)).replace("${detail}", detail)
+                                        : t("diag.healthSummary").replace("${total}", String(report.modules.length))),
+                                    7000, bad.length ? "error" : "info");
+                            }}>{t("diag.health")}</button>
                     </div>
                 {/if}
             {/if}

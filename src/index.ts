@@ -6,11 +6,11 @@ import TabPanel from "@/panels/tab-panel.svelte";
 import HomeSettingsPanel from "@/panels/settings.svelte";
 import { svelteDialog } from "@/libs/dialog";
 import { loadSettings, saveSettings } from "@/core/settings";
-import { loadRuntime, saveRuntime, type HubRuntime } from "@/core/hub/runtime";
-import { runScan, type ScanResult } from "@/core/hub/scanner";
+import { loadRuntime, saveRuntime, purgeHandled, listHandled, type HubRuntime } from "@/core/hub/runtime";
+import { runScan, deriveVisible, type ScanResult } from "@/core/hub/scanner";
 import { CertsProvider, MembersProvider, SchemaLedgerProvider } from "@/core/hub/providers";
 import { dailyDigest, markNotified } from "@/core/hub/notify";
-import { complete, snooze, mute, unmute, renew, addMemo } from "@/core/hub/actions";
+import { complete, snooze, mute, unmute, renew, restore, addMemo, removeMemo } from "@/core/hub/actions";
 import { provisionModule } from "@/core/provisioner";
 import { CERTS_SCHEMA, MEMBERS_SCHEMA, MEDICINE_SCHEMA, MEMBERSHIPS_SCHEMA, INSURANCE_SCHEMA, SHOPPING_SCHEMA, CONTRACTS_SCHEMA, EXAMS_SCHEMA, ALLOWANCE_SCHEMA, FAVORS_SCHEMA, STOCK_SCHEMA, CHORES_SCHEMA, HOUSE_SCHEMA, MEDIA_SCHEMA, PETS_SCHEMA, VEHICLES_SCHEMA, TRANSIT_SCHEMA, TRAVEL_PLAN_SCHEMA, TRAVEL_BOOKING_SCHEMA, TRAVEL_PACKING_SCHEMA, TRAVEL_LOG_SCHEMA, ASSETS_VIRTUAL_SCHEMA, ASSETS_REAL_SCHEMA, HEALTH_SCHEMA, FOOD_SCHEMA, ADDRESS_SCHEMA, BOOKMARKS_SCHEMA, SNIPPETS_SCHEMA, PARENTING_SCHEMA, SCHOOLING_SCHEMA, SOCIAL_SCHEMA, validateSchema } from "@/core/schema";
 import type { HomeSettings } from "@/types";
@@ -45,6 +45,8 @@ export default class LvHomePlugin extends Plugin {
     };
     /** Tab 面板刷新回调（支持多实例，33.1：所有打开的管家面板同步刷新） */
     hubListeners = new Set<() => void>();
+    /** 扫描序号（H11）：慢的旧扫描不得覆写新扫描结果或之后的手动动作 */
+    private scanSeq = 0;
 
     /** i18n 取值（1.2.8 起 i18n 为 JSONValue，字符串位置统一转 string） */
     i18nText(key: string): string {
@@ -170,6 +172,7 @@ export default class LvHomePlugin extends Plugin {
 
     /** 扫描 → 运行态合并 → 缓存 → 每日摘要 → 通知面板 */
     async refreshHub(): Promise<ScanResult> {
+        const seq = ++this.scanSeq;
         const deps = { settings: this.settings, getDbRef: (id: string) => this.settings.dbRefs[id] };
         const providers = [
             new CertsProvider(deps),
@@ -191,11 +194,15 @@ export default class LvHomePlugin extends Plugin {
             new SchemaLedgerProvider("assets-virtual", ASSETS_VIRTUAL_SCHEMA, deps),
         ];
         const scan = await runScan(providers, this.settings, this.runtime);
+        // H11：扫描期间已有更新的扫描启动（或手动动作已改运行态）→ 旧结果丢弃，不落盘不广播
+        if (seq !== this.scanSeq) return scan;
         this.scan = scan;
         this.runtime.cache = {
             reminders: scan.reminders,
             counts: scan.counts,
             errors: scan.errors,
+            derived: scan.derived,
+            byModule: scan.byModule,
         };
         this.runtime.scannedAt = scan.scannedAt;
         const digest = dailyDigest(scan, this.settings, this.runtime);
@@ -218,9 +225,44 @@ export default class LvHomePlugin extends Plugin {
             this.runtime.lastOverdueAlertDate = today;
             showMessage(this.i18nText("notify.overdue").replace("${n}", String(scan.counts.overdue)), 6000, "error");
         }
+        // H03：显式清理已完成运行态记录（未处理项永不自动删），清理结果随本次落盘
+        purgeHandled(this.runtime, new Date());
         await saveRuntime(this, this.runtime);
         this.hubListeners.forEach((fn) => fn());
         return scan;
+    }
+
+    /**
+     * 动作后即时刷新（H02）：免重扫，从缓存派生列表重算可见集合并广播全部面板。
+     * 动作只改运行态，不回写台账（renew 除外——走 refreshHub 全量扫描）。
+     */
+    async notifyHubChanged(): Promise<void> {
+        const { reminders, counts } = deriveVisible(
+            this.runtime.cache?.derived ?? [],
+            this.settings,
+            this.runtime,
+        );
+        this.scan = {
+            ...(this.scan ?? {
+                reminders, counts, scannedAt: this.runtime.scannedAt ?? new Date().toISOString(),
+                errors: [], stale: false, derived: this.runtime.cache?.derived ?? [], byModule: this.runtime.cache?.byModule ?? {},
+            }),
+            reminders,
+            counts,
+        };
+        this.runtime.cache = {
+            reminders,
+            counts,
+            errors: this.runtime.cache?.errors ?? [],
+            derived: this.runtime.cache?.derived ?? [],
+            byModule: this.runtime.cache?.byModule ?? {},
+        };
+        try {
+            await saveRuntime(this, this.runtime);
+        } catch (e) {
+            console.warn("[siyuan-home] runtime save after action failed:", e instanceof Error ? e.message : e);
+        }
+        this.hubListeners.forEach((fn) => fn());
     }
 
     showTab() {
@@ -264,13 +306,20 @@ export default class LvHomePlugin extends Plugin {
         };
     }
 
-    // ── 提醒动作（B4，转发 actions.ts）──
-    complete(r: any) { return complete(this, r); }
-    snooze(id: string, days: number) { return snooze(this, id, days); }
-    mute(id: string) { return mute(this, id); }
-    unmute(id: string) { return unmute(this, id); }
-    renew(r: any, iso: string) { return renew(this, r, iso, this.settings.dbRefs[r.moduleId] ?? {}); }
-    addMemo(title: string, due: string) { return addMemo(this, title, due); }
+    // ── 提醒动作（B4 + H05/H07，转发 actions.ts；动作后 notifyHubChanged 即时刷新）──
+    async complete(r: any) { await complete(this, r); await this.notifyHubChanged(); }
+    async snooze(id: string, days: number) { await snooze(this, id, days); await this.notifyHubChanged(); }
+    async mute(id: string) { await mute(this, id); await this.notifyHubChanged(); }
+    async unmute(id: string) { await unmute(this, id); await this.notifyHubChanged(); }
+    /** 恢复已处理/忽略项（H07） */
+    async restore(id: string) { await restore(this, id); await this.notifyHubChanged(); }
+    /** 续期写回台账行 → 全量扫描重算 due（不用 notifyHubChanged，行数据已变） */
+    renew(r: any, iso: string) { return renew(this, r, iso, this.settings.dbRefs[r.moduleId] ?? {}).then(() => this.refreshHub()); }
+    async addMemo(title: string, due: string) { await addMemo(this, title, due); await this.notifyHubChanged(); }
+    /** 删除备忘（显式动作，H03：未处理备忘只经此删除） */
+    async removeMemo(id: string) { await removeMemo(this, id); await this.notifyHubChanged(); }
+    /** 已处理视图数据（H07） */
+    listHandled() { return listHandled(this.runtime, this.runtime.cache?.derived ?? []); }
     async finishOnboarding(household: { roles: string[]; children: number }, moduleIds: string[]) {
         this.settings.household = household as any;
         this.settings.enabledModules = Array.from(new Set([...this.settings.enabledModules, ...moduleIds]));

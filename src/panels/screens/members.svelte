@@ -3,10 +3,17 @@
     import { addMember, removeMember } from "@/core/members";
     import { newSiYuanId } from "@/core/siyuan";
 
-    let { plugin, t }: { plugin: any; t: (k: string) => string } = $props();
+    let { plugin, t, version }: { plugin: any; t: (k: string) => string; version?: number } = $props();
 
-    const members = $derived(plugin.settings.members ?? []);
-    const reminders = $derived(plugin.scan?.reminders ?? []);
+    // version（H02）：hub 变更时递增，驱动派生重算（plugin.* 为普通对象引用）
+    const members = $derived.by(() => {
+        void version;
+        return plugin.settings.members ?? [];
+    });
+    const reminders = $derived.by(() => {
+        void version;
+        return plugin.scan?.reminders ?? [];
+    });
     const alertsFor = (id: string) => reminders.filter((r: any) => r.memberId === id);
     // C5b：卡片点击展开该成员提醒明细（含日期与动作）
     let expandedId = $state<string | null>(null);
@@ -79,7 +86,7 @@
                             <span class="lv-badge {r.level === 'overdue' ? 'red' : r.level === 'soon' ? 'orange' : 'yellow'}">{r.dueDate}</span>
                             <span>{r.title}</span>
                             <span style="flex:1"></span>
-                            <button class="b3-button b3-button--text" onclick={() => plugin.complete(r).then(() => plugin.refreshHub())}>{t("act.done")}</button>
+                            <button class="b3-button b3-button--text" onclick={() => plugin.complete(r)}>{t("act.done")}</button>
                         </div>
                     {/each}
                 {/if}

@@ -468,5 +468,22 @@
     "members.deleteTitle": "删除成员",
     "members.deleteBody": "将移除「${name}」的成员引用（证件/提醒等台账行会保留，之后可在对应模块重新指派）。确定删除？",
     "ledger.notProvisioned": "此模块台账尚未建库",
-    "ledger.notProvisionedHint": "点上方\"重建台账\"即可创建空台账（不会影响已有数据）。"
+    "ledger.notProvisionedHint": "点上方\"重建台账\"即可创建空台账（不会影响已有数据）。",
+    "hub.restore": "恢复",
+    "hub.restoreDone": "已恢复，事项回到活跃列表",
+    "hub.handledUnknown": "（源记录已不在当前扫描结果）",
+    "hub.handledDone": "已完成",
+    "hub.handledMuted": "已忽略",
+    "hub.handledYear": "今年已办",
+    "hub.handledPeriod": "本期已完成",
+    "hub.handledMemo": "备忘已完成",
+    "ledger.saving": "保存中…",
+    "ledger.reset": "清除表单",
+    "ledger.savePartial": "行已创建，但部分字段写入失败：${fields}。输入已保留，再次点击保存将补写同一行。",
+    "ledger.saveFailed": "保存失败：${msg}。输入已保留。",
+    "ledger.savePending": "行已提交但无法确认新行身份，请在台账文档中核对后再继续；为避免重复创建，未自动重试。",
+    "diag.health": "深度健康检查",
+    "diag.healthSummary": "健康检查：${total} 个启用模块全部可读",
+    "diag.healthSummaryBad": "健康检查：${ok}/${total} 正常${detail}",
+    "diag.healthMissingCols": "缺 ${n} 个 schema 列"
 }

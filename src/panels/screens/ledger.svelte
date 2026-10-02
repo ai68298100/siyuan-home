@@ -1,7 +1,9 @@
 <script lang="ts">
-    import { renderLedger, addDetachedRow, setCell } from "@/core/siyuan";
+    import { renderLedger, addDetachedRow, setCell, RowIdentityPendingError } from "@/core/siyuan";
+    import { localDateKey } from "@/core/hub/rule";
+    import { showMessage } from "siyuan";
 
-    let { plugin, t }: { plugin: any; t: (k: string) => string } = $props();
+    let { plugin, t, version }: { plugin: any; t: (k: string) => string; version?: number } = $props();
 
     // 台账页模块下拉：已建库 + 已启用但未建库的模块（26.7：后者可从页面直接触发重建）
     const ledgers = $derived(
@@ -39,7 +41,7 @@
             loading = false;
         }
     }
-    $effect(() => { void active; void plugin.scan?.scannedAt; load(); });
+    $effect(() => { void version; void active; void plugin.scan?.scannedAt; load(); });
 
     // capture 快速表单：name + category + member + expiry + amount（capture 列集驱动，枚举从 schema 读）
     let newName = $state("");
@@ -49,58 +51,71 @@
     let newAmount: number | undefined = $state();
     let newUrl = $state("");
     let newNote = $state("");
+    // D03：保存状态与恢复——saving 防双击；失败保留输入；已建行 itemID 保留，重试补写同一行
+    let saving = $state(false);
+    let saveError = $state("");
+    let identityPending = $state(false); // 行已提交但身份未确认（D02）：禁止自动重试，防重复建行
+    let pendingItemID: string | null = null;
     const memberOptions = $derived(plugin.settings.members ?? []);
     const memberAvId = $derived(plugin.settings.dbRefs.members?.avId);
     const categoryOptions = $derived<string[]>(
         (plugin.schemaCatalog?.[active]?.columns ?? []).find((c: any) => c.key === "category")?.options ?? [],
     );
 
-    async function createRow() {
-        if (!ref?.avId || !newName.trim()) return;
-        const itemID = await addDetachedRow(ref.avId, newName.trim());
-        const cols = ref.columns ?? {};
-        if (newCategory && cols.category) {
-            await setCell(ref.avId, cols.category, itemID, {
-                type: "select", select: { content: newCategory },
-            });
-        }
-        // C6a 增量 3：自动写入默认状态（schema status 枚举第一个值，如 certs=valid / medicine=inuse）
-        const statusCol = (plugin.schemaCatalog?.[active]?.columns ?? []).find((c: any) => c.key === "status");
-        if (statusCol?.options?.length && cols.status) {
-            await setCell(ref.avId, cols.status, itemID, {
-                type: "select", select: { content: statusCol.options[0] },
-            });
-        }
-        if (newExpiry && cols.expiry) {
-            await setCell(ref.avId, cols.expiry, itemID, {
-                type: "date", date: { content: new Date(`${newExpiry}T00:00:00`).getTime(), isNotEmpty: true, isNotTime: true },
-            });
-        }
-        if (newMember && cols.member && memberAvId) {
-            await setCell(ref.avId, cols.member, itemID, {
-                type: "relation", relation: { blockIDs: [newMember], contents: null },
-            });
-        }
-        // C6a 增量 5：note 备注列（几乎所有模块 capture 通用补充）
-        if (newNote && cols.note) {
-            await setCell(ref.avId, cols.note, itemID, {
-                type: "text", text: { content: newNote },
-            });
-        }
-        // C6a 增量 4：URL 列（shopping/bookmarks/media 等 capture 常见列）
-        if (newUrl && cols.url) {
-            await setCell(ref.avId, cols.url, itemID, {
-                type: "url", url: { content: newUrl },
-            });
-        }
-        if (typeof newAmount === "number" && !isNaN(newAmount) && cols.amount) {
-            await setCell(ref.avId, cols.amount, itemID, {
-                type: "number", number: { content: newAmount, isNotEmpty: true },
-            });
-        }
+    function resetForm() {
         newName = ""; newCategory = ""; newExpiry = ""; newMember = ""; newAmount = undefined; newUrl = ""; newNote = "";
-        await load();
-        await plugin.refreshHub();
+        saveError = ""; identityPending = false; pendingItemID = null;
+    }
+
+    async function createRow() {
+        if (!ref?.avId || !newName.trim() || saving || identityPending) return;
+        saving = true;
+        saveError = "";
+        try {
+            // 重试路径：部分字段失败时复用已建行（补写同一行，不重复建行）
+            const itemID = pendingItemID ?? await addDetachedRow(ref.avId, newName.trim());
+            pendingItemID = itemID;
+            const cols = ref.columns ?? {};
+            const failed: string[] = [];
+            const tryCell = async (label: string, key: string, value: unknown) => {
+                if (!key) return;
+                try {
+                    await setCell(ref.avId!, key, itemID, value);
+                } catch {
+                    failed.push(label); // D03：单字段失败不清空表单，逐字段保留现场
+                }
+            };
+            if (newCategory) await tryCell(t("field.category"), cols.category, { type: "select", select: { content: newCategory } });
+            // C6a 增量 3：自动写入默认状态（schema status 枚举第一个值，如 certs=valid / medicine=inuse）
+            const statusCol = (plugin.schemaCatalog?.[active]?.columns ?? []).find((c: any) => c.key === "status");
+            if (statusCol?.options?.length) await tryCell(t("field.status"), cols.status, { type: "select", select: { content: statusCol.options[0] } });
+            if (newExpiry) await tryCell(t("field.expiry"), cols.expiry, { type: "date", date: { content: new Date(`${newExpiry}T00:00:00`).getTime(), isNotEmpty: true, isNotTime: true } });
+            if (newMember && memberAvId) await tryCell(t("field.member"), cols.member, { type: "relation", relation: { blockIDs: [newMember], contents: null } });
+            // C6a 增量 5/4：note 备注列与 URL 列（多数模块 capture 通用）
+            if (newNote) await tryCell(t("field.note"), cols.note, { type: "text", text: { content: newNote } });
+            if (newUrl) await tryCell(t("field.url"), cols.url, { type: "url", url: { content: newUrl } });
+            if (typeof newAmount === "number" && !isNaN(newAmount)) await tryCell(t("field.amount"), cols.amount, { type: "number", number: { content: newAmount, isNotEmpty: true } });
+            if (failed.length > 0) {
+                // 输入与 itemID 均保留：再次保存补写同一行
+                saveError = t("ledger.savePartial").replace("${fields}", failed.join("、"));
+                showMessage(saveError, 6000, "error");
+            } else {
+                resetForm();
+            }
+            await load();
+            await plugin.refreshHub();
+        } catch (e) {
+            if (e instanceof RowIdentityPendingError) {
+                // D02：行已提交但身份未确认——不自动重试（会重复建行），提示人工核对
+                identityPending = true;
+                saveError = t("ledger.savePending");
+            } else {
+                saveError = t("ledger.saveFailed").replace("${msg}", e instanceof Error ? e.message : String(e));
+            }
+            showMessage(saveError, 6000, "error");
+        } finally {
+            saving = false;
+        }
     }
 </script>
 
@@ -150,7 +165,13 @@
     {#if ref?.columns?.note}
         <input class="b3-text-field fn__flex-1" style="min-width:140px" placeholder={t("field.note")} bind:value={newNote} />
     {/if}
-    <button class="b3-button b3-button--text" onclick={createRow} disabled={!ref?.avId}>＋ {t("ledger.add")}</button>
+    {#if saveError}
+        <div class="lv-caption" role="alert" style="color:var(--lv-danger);flex-basis:100%">⚠ {saveError}</div>
+        <button class="b3-button b3-button--text" onclick={resetForm}>{t("ledger.reset")}</button>
+    {/if}
+    <button class="b3-button b3-button--text" onclick={createRow} disabled={!ref?.avId || saving || identityPending || !newName.trim()}>
+        {saving ? t("ledger.saving") : `＋ ${t("ledger.add")}`}
+    </button>
 </div>
 
 {#if loading}
@@ -176,7 +197,7 @@
                             {@const v = r.cells[ref.columns[k]]}
                             <td class="lv-num">
                                 {v?.type === "text" ? (v.text?.content ?? "—")
-                                    : v?.type === "date" ? (v.date?.isNotEmpty ? new Date(v.date.content).toISOString().slice(0, 10) : "—")
+                                    : v?.type === "date" ? (v.date?.isNotEmpty ? localDateKey(new Date(v.date.content)) : "—")
                                     : v?.type === "select" ? (v.select?.content ?? "—")
                                     : v?.type === "block" ? (v.block?.content ?? "—")
                                     : "—"}
