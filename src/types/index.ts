@@ -19,6 +19,8 @@ export interface FamilyMember {
     avItemId?: string;
     /** 最近一次台账行同步失败的摘要（D05：可见可重试；成功后清除） */
     syncError?: string;
+    /** EC14：人脉联系人绑定快照（`名称 [docId]`）；仅引用快照，不改写人脉数据 */
+    contactSnapshot?: string;
     notes?: string;
     createdAt: string;
 }

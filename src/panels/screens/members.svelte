@@ -4,6 +4,8 @@
     import { addMember, updateMember, removeMember } from "@/core/members";
     import { newSiYuanId } from "@/core/siyuan";
     import type { HomePluginLike } from "@/types/plugin";
+    import { openContactPicker, getContactsBridge } from "@/libs/contact-picker";
+    import { showMessage } from "siyuan";
 
     let { plugin, t, version }: { plugin: HomePluginLike; t: (k: string) => string; version?: number } = $props();
 
@@ -60,6 +62,28 @@
         birthday = m.birthday ?? "";
         lunar = !!m.lunarBirthday;
         expandedId = null;
+    }
+
+    // EC14：成员 ↔ 人脉联系人绑定（仅存快照 `名称 [docId]`，不改写人脉数据）
+    function linkContact(m: FamilyMember) {
+        if (!getContactsBridge()) {
+            showMessage(t("ledger.contactsMissing"), 5000, "info");
+            return;
+        }
+        openContactPicker({ t: (k) => t(k), showMessage: (msg, timeout, type) => showMessage(msg, timeout, type) }, (snapshot) => {
+            const target = (plugin.settings.members ?? []).find((x) => x.id === m.id);
+            if (!target) return;
+            target.contactSnapshot = snapshot;
+            import("@/core/settings").then((mod) => mod.saveSettings(plugin, plugin.settings));
+            showMessage(t("members.contactLinked"), 2500, "info");
+        });
+    }
+    function unlinkContact(m: FamilyMember) {
+        const target = (plugin.settings.members ?? []).find((x) => x.id === m.id);
+        if (!target?.contactSnapshot) return;
+        target.contactSnapshot = undefined;
+        import("@/core/settings").then((mod) => mod.saveSettings(plugin, plugin.settings));
+        showMessage(t("members.contactUnlinked"), 2500, "info");
     }
     function cancelEdit() {
         editId = null; name = ""; role = "self"; birthday = ""; lunar = false;
@@ -130,6 +154,12 @@
             <span class="lv-avatar lg" style="background:linear-gradient(135deg,var(--lv-accent),var(--lv-accent-2))">{m.name.slice(0, 1)}</span>
             <div><b>{m.name}</b><div class="lv-caption">{t(`role.${m.role}`)}{m.lunarBirthday ? " 🌙" : ""} {m.birthday ?? ""}</div></div>
             <span style="flex:1"></span>
+            {#if m.contactSnapshot}
+                <span class="lv-caption" style="max-width:140px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title={m.contactSnapshot}>📞 {m.contactSnapshot.split(" [")[0]}</span>
+                <button class="b3-button b3-button--text" onclick={(e) => { e.stopPropagation(); unlinkContact(m); }}>{t("members.contactUnlink")}</button>
+            {:else}
+                <button class="b3-button b3-button--text" onclick={(e) => { e.stopPropagation(); linkContact(m); }}>{t("members.contactLink")}</button>
+            {/if}
             <button class="b3-button b3-button--text" onclick={(e) => { e.stopPropagation(); startEdit(m); }}>{t("members.edit")}</button>
             <button class="b3-button b3-button--text" onclick={(e) => { e.stopPropagation(); confirmRemove(m); }}>{t("delete")}</button>
         </div>

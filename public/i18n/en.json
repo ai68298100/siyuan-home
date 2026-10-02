@@ -606,5 +606,9 @@
     "ledger.pickContact": "Pick from Lv Contacts",
     "ledger.contactsMissing": "Lv Contacts not detected (needs v0.4.1+ and initialized)",
     "ledger.contactsEmpty": "No matching contacts",
-    "ledger.contactsError": "Contact search failed: ${msg}"
+    "ledger.contactsError": "Contact search failed: ${msg}",
+    "members.contactLink": "Link contact",
+    "members.contactUnlink": "Unlink",
+    "members.contactLinked": "Lv Contacts contact linked",
+    "members.contactUnlinked": "Contact unlinked"
 }

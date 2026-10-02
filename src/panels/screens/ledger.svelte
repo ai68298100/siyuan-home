@@ -3,6 +3,7 @@
     import { localDateKey } from "@/core/hub/rule";
     import { showMessage, Dialog, confirm } from "siyuan";
     import type { HomePluginLike } from "@/types/plugin";
+    import { openContactPicker } from "@/libs/contact-picker";
 
     let { plugin, t, version }: { plugin: HomePluginLike; t: (k: string) => string; version?: number } = $props();
 
@@ -170,62 +171,16 @@
         }
     }
 
-    // EC13：从人脉选人（window.LvContacts.searchPeople；快照格式 `名称 [docId]`；人脉未装/未初始化给降级提示）
+    // EC13：从人脉选人（共享对话框见 src/libs/contact-picker.ts；快照格式 `名称 [docId]`）
     function pickFromContacts(onPicked: (snapshot: string) => void) {
-        const bridge = (window as { LvContacts?: { searchPeople: (kw: string) => Promise<{ docId: string; name: string }[]> } }).LvContacts;
-        if (!bridge?.searchPeople) {
-            showMessage(t("ledger.contactsMissing"), 5000, "info");
-            return;
-        }
-        const dlg = new Dialog({
-            title: t("ledger.pickContact"),
-            content: `<div class="b3-dialog__content"><input class="b3-text-field fn__block" id="lv-pick-kw" placeholder="${t("ledger.search")}"><div id="lv-pick-list" style="max-height:50vh;overflow:auto;margin-top:8px"></div></div>
-<div class="b3-dialog__action"><button class="b3-button b3-button--cancel" id="lv-pick-close">${t("cancel")}</button></div>`,
-            width: "460px",
-        });
-        const kw = dlg.element.querySelector("#lv-pick-kw") as HTMLInputElement;
-        const list = dlg.element.querySelector("#lv-pick-list") as HTMLElement;
-        (dlg.element.querySelector("#lv-pick-close") as HTMLButtonElement).onclick = () => dlg.destroy();
-        kw.focus();
-        let seq = 0;
-        const runSearch = async () => {
-            const keyword = kw.value.trim();
-            const mine = ++seq;
-            try {
-                const people = await bridge.searchPeople(keyword);
-                if (mine !== seq) return; // 旧请求结果丢弃（PF07 语义）
-                list.innerHTML = "";
-                if (people.length === 0) {
-                    const empty = document.createElement("div");
-                    empty.className = "ft__on-surface";
-                    empty.style.cssText = "padding:6px 0;font-size:12.5px";
-                    empty.textContent = t("ledger.contactsEmpty");
-                    list.appendChild(empty);
-                    return;
-                }
-                for (const p of people) {
-                    const rowEl = document.createElement("div");
-                    rowEl.className = "lv-row-link";
-                    rowEl.style.cssText = "padding:6px 8px;font-size:13px;border-radius:4px";
-                    rowEl.setAttribute("role", "button");
-                    rowEl.setAttribute("tabindex", "0");
-                    rowEl.textContent = p.name;
-                    const pick_ = () => { onPicked(`${p.name} [${p.docId}]`); dlg.destroy(); };
-                    rowEl.onclick = pick_;
-                    rowEl.onkeydown = (e: KeyboardEvent) => e.key === "Enter" && pick_();
-                    list.appendChild(rowEl);
-                }
-            } catch (e) {
-                if (mine !== seq) return;
-                list.innerHTML = "";
-                const err = document.createElement("div");
-                err.style.cssText = "padding:6px 0;font-size:12.5px;color:var(--lv-danger)";
-                err.textContent = t("ledger.contactsError").replace("${msg}", e instanceof Error ? e.message : String(e));
-                list.appendChild(err);
-            }
-        };
-        kw.oninput = () => void runSearch();
-        void runSearch();
+        openContactPicker({
+            t: (key, vars) => {
+                let out = t(key);
+                if (vars) for (const [k, v] of Object.entries(vars)) out = out.replace(`\${${k}}`, v);
+                return out;
+            },
+            showMessage: (msg, timeout, type) => showMessage(msg, timeout, type),
+        }, onPicked);
     }
 
     // C4b：行点击 → 详情抽屉（全列 kv；DOM 构建用户内容，不走 HTML 模板——19 组安全）

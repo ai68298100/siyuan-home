@@ -606,5 +606,9 @@
     "ledger.pickContact": "从人脉选择",
     "ledger.contactsMissing": "未检测到小驴人脉（需 v0.4.1+ 并已完成初始化）",
     "ledger.contactsEmpty": "没有匹配的联系人",
-    "ledger.contactsError": "人脉搜索失败：${msg}"
+    "ledger.contactsError": "人脉搜索失败：${msg}",
+    "members.contactLink": "关联联系人",
+    "members.contactUnlink": "解除关联",
+    "members.contactLinked": "已关联人脉联系人",
+    "members.contactUnlinked": "已解除关联"
 }
