@@ -237,6 +237,17 @@
             <!-- C8e：关于区仓库链接（SDK 无 open 导出，走浏览器新窗口） -->
             <button class="b3-button b3-button--outline" style="margin-top:8px;margin-left:6px"
                 onclick={() => window.open("https://github.com/ai68298100/siyuan-home", "_blank")}>{t("about.repo")}</button>
+            <!-- C8d：生态分区占位（v0.3 接线；开关仅展示，不可用） -->
+            <div style="margin-top:14px;border-top:1px solid var(--b3-border-color);padding-top:10px">
+                <p class="lv-caption">{t("settings.ecoTitle")}</p>
+                <p class="lv-caption ft__on-surface">{t("settings.ecoHint")}</p>
+                {#each ["qiandao", "contacts", "glean", "exam", "flashcard", "leiqie"] as eco (eco)}
+                    <div class="fn__flex lv-settings__row">
+                        <input type="checkbox" class="b3-switch" disabled />
+                        <span class="fn__flex-1">{t(`eco.${eco}`)} <span class="b3-chip b3-chip--small">{t("settings.ecoPlanned")}</span></span>
+                    </div>
+                {/each}
+            </div>
             <div style="margin-top:10px;border-top:1px solid var(--b3-border-color);padding-top:8px">
                 <p class="lv-caption">⌨ {t("faq.shortcuts")}</p>
                 <p class="lv-caption">· {t("openButler")}：{t("faq.topbarOrCommand")}</p>

@@ -14,6 +14,7 @@ import {
 import { runScan, deriveVisible } from "@/core/hub/scanner";
 import { snooze, mute, complete, restore, withRuntime, renew } from "@/core/hub/actions";
 import { CertsProvider, leadFor } from "@/core/hub/providers";
+import { inSilentHours, dailyDigest } from "@/core/hub/notify";
 import { setTransport } from "@/core/siyuan";
 import type { DataProvider } from "@/core/hub/providers";
 import type { HomeSettings, Reminder, ReminderRuleSpec } from "@/types";
@@ -280,5 +281,35 @@ describe("H04 缺列报错 + H14 提前量校验", () => {
         expect(leadFor(s(-5), "certs", rule)).toBe(30);
         expect(leadFor(s(99999), "certs", rule)).toBe(3650);
         expect(leadFor(s(10), "certs", rule)).toBe(10);
+    });
+});
+
+describe("H12 静默时段（摘要与逾期提示共用）", () => {
+    const at = (h: number) => new Date(2026, 9, 1, h, 0, 0);
+
+    it("跨零点 22→8：23 点/2 点静默，12 点非静默；边界 8 点结束（不含）", () => {
+        const s = settings();
+        expect(inSilentHours(s, at(23))).toBe(true);
+        expect(inSilentHours(s, at(2))).toBe(true);
+        expect(inSilentHours(s, at(12))).toBe(false);
+        expect(inSilentHours(s, at(8))).toBe(false);
+        expect(inSilentHours(s, at(22))).toBe(true);
+    });
+
+    it("顺向 1→6：3 点静默，8 点非静默", () => {
+        const s = { ...settings(), silentFrom: 1, silentTo: 6 };
+        expect(inSilentHours(s, at(3))).toBe(true);
+        expect(inSilentHours(s, at(8))).toBe(false);
+    });
+
+    it("摘要：静默时段不弹且不标记已发（结束后补发）", () => {
+        const scan = { reminders: [], counts: { overdue: 1, soon: 1, lead: 0 }, scannedAt: "", errors: [], stale: false, derived: [], byModule: {} } as any;
+        const s = { ...settings(), notifyHour: 8 };
+        // 23 点（静默）→ 不弹；lastNotifiedDate 未写 → 之后的非静默扫描可补发
+        const rt: HubRuntime = { ...defaultRuntime() };
+        expect(dailyDigest(scan, s, rt, at(23)).shouldNotify).toBe(false);
+        expect(rt.lastNotifiedDate).toBeUndefined();
+        // 12 点（非静默，已过 notifyHour）→ 弹
+        expect(dailyDigest(scan, s, rt, at(12)).shouldNotify).toBe(true);
     });
 });

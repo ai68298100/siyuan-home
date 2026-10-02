@@ -15,6 +15,15 @@
         return plugin.scan?.reminders ?? [];
     });
     const alertsFor = (id: string) => reminders.filter((r: any) => r.memberId === id);
+    // C5a 统计 chips：该成员待办按模块聚类的 top-3（数据来自当前扫描，不做全库聚合查询）
+    function statChips(id: string): { label: string; n: number }[] {
+        const byModule = new Map<string, number>();
+        for (const r of alertsFor(id)) byModule.set(r.moduleId, (byModule.get(r.moduleId) ?? 0) + 1);
+        return [...byModule.entries()]
+            .sort((a, b) => b[1] - a[1])
+            .slice(0, 3)
+            .map(([mid, n]) => ({ label: t(`module.${mid}`) !== `module.${mid}` ? t(`module.${mid}`) : mid, n }));
+    }
     // C5b：卡片点击展开该成员提醒明细（含日期与动作）
     let expandedId = $state<string | null>(null);
     function toggleExpand(id: string) {
@@ -113,6 +122,13 @@
         </div>
         {#if m.syncError}
             <div class="lv-caption" role="alert" style="color:var(--lv-danger)">⚠ {t("members.syncError")}: {m.syncError}</div>
+        {/if}
+        {#if statChips(m.id).length > 0}
+            <div style="display:flex;gap:6px;flex-wrap:wrap;padding-top:6px">
+                {#each statChips(m.id) as c (c.label)}
+                    <span class="b3-chip b3-chip--small b3-chip--secondary">{c.label} {c.n}</span>
+                {/each}
+            </div>
         {/if}
         {#if alertsFor(m.id).length > 0}
             <div class="person-alert" style="font-size:12px;color:var(--lv-warn)">⚠ {alertsFor(m.id).length} {t("dash.needAttention")}</div>

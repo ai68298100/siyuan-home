@@ -8,10 +8,18 @@ import type { HubRuntime } from "./runtime";
 import type { ScanResult } from "./scanner";
 
 export interface DigestInfo {
-    /** 今日是否应发（notifyHour 已过 + 今日未发 + 有事项） */
+    /** 今日是否应发（notifyHour 已过 + 今日未发 + 有事项 + 非静默时段） */
     shouldNotify: boolean;
     overdue: number;
     soon: number;
+}
+
+/** 静默时段判断（H12：摘要与逾期提示共用同一规则；跨零点用 from>to 表示，如 22→8） */
+export function inSilentHours(settings: HomeSettings, now: Date = new Date()): boolean {
+    const h = now.getHours();
+    const from = settings.silentFrom ?? 22;
+    const to = settings.silentTo ?? 8;
+    return from > to ? h >= from || h < to : h >= from && h < to;
 }
 
 export function dailyDigest(scan: ScanResult, settings: HomeSettings, rt: HubRuntime, now: Date = new Date()): DigestInfo {
@@ -19,8 +27,9 @@ export function dailyDigest(scan: ScanResult, settings: HomeSettings, rt: HubRun
     const already = rt.lastNotifiedDate === today;
     const afterHour = now.getHours() >= (settings.notifyHour ?? 8);
     const hasItems = scan.counts.overdue > 0 || scan.counts.soon > 0;
+    // H12：静默时段不弹；lastNotifiedDate 未标记 → 静默结束后的下一次扫描自然补发
     return {
-        shouldNotify: !already && afterHour && hasItems,
+        shouldNotify: !already && afterHour && hasItems && !inSilentHours(settings, now),
         overdue: scan.counts.overdue,
         soon: scan.counts.soon,
     };

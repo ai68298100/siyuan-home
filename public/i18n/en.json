@@ -525,5 +525,20 @@
     "rule.next_visit": "Next visit",
     "rule.date": "Date",
     "rule.low_stock": "Low stock",
-    "ledger.unnamed": "(Untitled)"
+    "ledger.unnamed": "(Untitled)",
+    "hub.dueAll": "Any time",
+    "hub.dueToday": "Today",
+    "hub.due7": "Within 7 days",
+    "hub.due30": "Within 30 days",
+    "ledger.detail": "Record detail",
+    "ledger.savedTo": "Saved to \"${module}\"",
+    "settings.ecoTitle": "Lv plugin family (ecosystem)",
+    "settings.ecoHint": "Cross-plugin integrations land from v0.3; placeholders shown here.",
+    "settings.ecoPlanned": "Planned",
+    "eco.qiandao": "Lv Check-in (habits)",
+    "eco.contacts": "Lv Contacts (people)",
+    "eco.glean": "Lv Glean (clippings)",
+    "eco.exam": "Lv Exam (study plans)",
+    "eco.flashcard": "Lv Flashcard (spaced repetition)",
+    "eco.leiqie": "LeiQie (quick inject)"
 }

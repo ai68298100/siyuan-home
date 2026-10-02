@@ -48,6 +48,8 @@ export interface HubRuntime {
     hubMemberId?: string;
     /** 提醒中枢模块筛选（C3a） */
     hubModuleId?: string;
+    /** 提醒中枢时间窗筛选（C3a，天）：all=不限 / 0=今天 / 7 / 30（含逾期） */
+    hubDueWithin?: string;
     /** 上次扫描摘要缓存（通知与总览首屏直读，扫描失败时保留 stale 数据） */
     cache?: {
         reminders: Reminder[];

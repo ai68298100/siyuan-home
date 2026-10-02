@@ -15,6 +15,9 @@
     let filterMember = $state<string | undefined>(plugin.runtime.hubMemberId);
     // svelte-ignore state_referenced_locally
     let filterModule = $state<string | undefined>(plugin.runtime.hubModuleId);
+    // C3a 时间窗：all=不限 / 0=今天 / 7 / 30（含逾期）
+    // svelte-ignore state_referenced_locally
+    let dueWithin = $state<string>(plugin.runtime.hubDueWithin ?? "all");
     const memberOptions = $derived.by(() => {
         void version;
         return plugin.settings.members ?? [];
@@ -27,6 +30,7 @@
         plugin.runtime.hubFilter = filter;
         plugin.runtime.hubMemberId = filterMember;
         plugin.runtime.hubModuleId = filterModule;
+        plugin.runtime.hubDueWithin = dueWithin;
         const { saveRuntime } = await import("@/core/hub/runtime");
         await saveRuntime(plugin, plugin.runtime);
     }
@@ -35,6 +39,13 @@
         let list = level === "all" ? all : level === "handled" ? [] : all.filter((r: any) => r.level === level);
         if (filterMember) list = list.filter((r: any) => !r.memberId || r.memberId === filterMember);
         if (filterModule) list = list.filter((r: any) => r.moduleId === filterModule);
+        if (dueWithin !== "all") {
+            // 时间窗含逾期：dueDate ≤ 今天+N（yyyy-MM-dd 字符串比较安全；逾期恒在窗内）
+            const today = new Date();
+            const end = new Date(today.getFullYear(), today.getMonth(), today.getDate() + Number(dueWithin));
+            const endKey = `${end.getFullYear()}-${String(end.getMonth() + 1).padStart(2, "0")}-${String(end.getDate()).padStart(2, "0")}`;
+            list = list.filter((r: any) => r.dueDate <= endKey);
+        }
         return list;
     });
     const levelBadge: Record<string, string> = { overdue: "red", soon: "orange", lead: "yellow" };
@@ -53,15 +64,19 @@
     }
 
     // B4b 续期：思源 Dialog 小窗（H10：失败保留 Dialog 与输入、错误就地显示，不提前销毁）
+    // 19 组安全：HTML 模板不插值任何用户内容——标题/条目名经 textContent 挂载，防台账文本注入
     function renewDialog(r: any) {
         const dlg = new Dialog({
-            title: `${t("act.renew")} · ${r.title}`,
-            content: `<div class="b3-dialog__content"><input class="b3-text-field fn__block" id="lv-renew-date" type="date" value="${r.dueDate}"><div class="lv-caption" id="lv-renew-err" role="alert" style="color:var(--b3-card-error-color);display:none"></div></div>
+            title: t("act.renew"),
+            content: `<div class="b3-dialog__content"><div class="b3-dialog__content" id="lv-renew-sub" style="margin-bottom:8px"></div><input class="b3-text-field fn__block" id="lv-renew-date" type="date"><div class="lv-caption" id="lv-renew-err" role="alert" style="color:var(--b3-card-error-color);display:none"></div></div>
 <div class="b3-dialog__action"><button class="b3-button b3-button--cancel" id="lv-renew-cancel">${t("cancel")}</button><button class="b3-button b3-button--text" id="lv-renew-ok">${t("save")}</button></div>`,
             width: "380px",
         });
         // 33.4 弹层契约：初始焦点落在日期输入
         const dateInput = dlg.element.querySelector("#lv-renew-date") as HTMLInputElement;
+        dateInput.value = r.dueDate; // 内部格式 yyyy-MM-dd，属性赋值不走 HTML 解析
+        const sub = dlg.element.querySelector("#lv-renew-sub") as HTMLElement;
+        sub.textContent = r.title; // textContent：用户内容不经 HTML 解析
         dateInput?.focus();
         dlg.element.querySelector("#lv-renew-cancel")?.addEventListener("click", () => dlg.destroy());
         dlg.element.querySelector("#lv-renew-ok")?.addEventListener("click", async () => {
@@ -117,6 +132,12 @@
         {#each moduleOptions as mid (mid)}
             <option value={mid}>{mid === "adhoc" ? t("adhoc.name") : (t(`module.${mid}`) !== `module.${mid}` ? t(`module.${mid}`) : mid)}</option>
         {/each}
+    </select>
+    <select class="b3-select" value={dueWithin} onchange={(e) => { dueWithin = (e.target as HTMLSelectElement).value; persistFilter(); }}>
+        <option value="all">{t("hub.dueAll")}</option>
+        <option value="0">{t("hub.dueToday")}</option>
+        <option value="7">{t("hub.due7")}</option>
+        <option value="30">{t("hub.due30")}</option>
     </select>
     <span class="fn__flex-1"></span>
     <button class="b3-button b3-button--outline" onclick={() => plugin.refreshHub()}>{t("hub.rescan")}</button>

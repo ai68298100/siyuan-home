@@ -1,7 +1,7 @@
 <script lang="ts">
     import { renderLedger, addDetachedRow, setCell, RowIdentityPendingError } from "@/core/siyuan";
     import { localDateKey } from "@/core/hub/rule";
-    import { showMessage } from "siyuan";
+    import { showMessage, Dialog } from "siyuan";
 
     let { plugin, t, version }: { plugin: any; t: (k: string) => string; version?: number } = $props();
 
@@ -65,6 +65,7 @@
     let saving = $state(false);
     let saveError = $state("");
     let identityPending = $state(false); // 行已提交但身份未确认（D02）：禁止自动重试，防重复建行
+    let savedModule = $state(""); // C6b：保存成功回执（"保存并查看"入口，8 秒自动消失）
     let pendingItemID: string | null = null;
 
     function cellValue(type: string, v: any): unknown | null {
@@ -86,6 +87,54 @@
     function resetForm() {
         form = {};
         saveError = ""; identityPending = false; pendingItemID = null;
+    }
+
+    /** 单元格值 → 显示文本（详情抽屉/表格共用；日期走本地时区） */
+    function cellText(v: any): string {
+        if (!v) return "—";
+        switch (v.type) {
+            case "text": return v.text?.content ?? "—";
+            case "date": return v.date?.isNotEmpty ? localDateKey(new Date(v.date.content)) : "—";
+            case "select": return v.select?.content ?? "—";
+            case "mSelect": return v.mSelect?.length ? v.mSelect.map((o: any) => o.content).join("、") : "—";
+            case "number": return v.number?.isNotEmpty ? String(v.number.content) : "—";
+            case "url": return v.url?.content ?? "—";
+            case "checkbox": return v.checkbox?.checked ? "✓" : "—";
+            case "block": return v.block?.content ?? "—";
+            case "relation": return (v.relation?.contents ?? []).map((c: any) => c.block?.content ?? "").join("、") || "—";
+            default: return "—";
+        }
+    }
+
+    // C4b：行点击 → 详情抽屉（全列 kv；DOM 构建用户内容，不走 HTML 模板——19 组安全）
+    function openDetail(row: any) {
+        if (!ref?.columns) return;
+        const dlg = new Dialog({
+            title: t("ledger.detail"),
+            content: `<div class="b3-dialog__content b3-dialog__content--wrap" id="lv-detail-body" style="max-height:60vh;overflow:auto"></div>
+<div class="b3-dialog__action"><button class="b3-button b3-button--cancel" id="lv-detail-close">${t("cancel")}</button><button class="b3-button b3-button--text" id="lv-detail-open">${t("ledger.openDoc")} ↗</button></div>`,
+            width: "520px",
+        });
+        const body = dlg.element.querySelector("#lv-detail-body") as HTMLElement;
+        const schemaCols: any[] = plugin.schemaCatalog?.[active]?.columns ?? [];
+        for (const col of schemaCols) {
+            const keyID = ref.columns[col.key];
+            if (!keyID) continue;
+            const line = document.createElement("div");
+            line.className = "fn__flex";
+            line.style.cssText = "gap:10px;padding:4px 0;font-size:13px";
+            const k = document.createElement("span");
+            k.className = "ft__on-surface";
+            k.style.cssText = "min-width:96px;flex-shrink:0";
+            k.textContent = t(`field.${col.key}`) !== `field.${col.key}` ? t(`field.${col.key}`) : col.key;
+            const v = document.createElement("span");
+            v.style.cssText = "word-break:break-all";
+            v.textContent = cellText(row.cells[keyID]);
+            line.append(k, v);
+            body.appendChild(line);
+        }
+        (dlg.element.querySelector("#lv-detail-close") as HTMLButtonElement).onclick = () => dlg.destroy();
+        (dlg.element.querySelector("#lv-detail-open") as HTMLButtonElement).onclick = () => { dlg.destroy(); plugin.showTabDocs(ref?.docId); };
     }
 
     async function createRow() {
@@ -122,6 +171,9 @@
                 showMessage(saveError, 6000, "error");
             } else {
                 resetForm();
+                // C6b 保存回执：模块去向 + "保存并查看"入口（短暂展示，不打断录入）
+                savedModule = active;
+                setTimeout(() => { savedModule = ""; }, 8000);
             }
             await load();
             await plugin.refreshHub();
@@ -193,6 +245,12 @@
     {#if unsupportedCount > 0}
         <span class="lv-caption" title={t("ledger.unsupportedInForm")}>ⓘ {t("ledger.unsupportedInForm")}</span>
     {/if}
+    {#if savedModule}
+        <div class="lv-caption" role="status" style="color:var(--lv-accent);flex-basis:100%">
+            ✓ {t("ledger.savedTo").replace("${module}", t(`module.${savedModule}`) !== `module.${savedModule}` ? t(`module.${savedModule}`) : savedModule)}
+            <button class="b3-button b3-button--text" style="padding:0 4px" onclick={() => plugin.showTabDocs(ref?.docId)}>{t("ledger.openDoc")} ↗</button>
+        </div>
+    {/if}
     {#if saveError}
         <div class="lv-caption" role="alert" style="color:var(--lv-danger);flex-basis:100%">⚠ {saveError}</div>
         <button class="b3-button b3-button--text" onclick={resetForm}>{t("ledger.reset")}</button>
@@ -220,15 +278,13 @@
             </tr></thead>
             <tbody>
                 {#each rows as r (r.itemID)}
-                    <tr>
+                    <tr class="lv-row-link" role="button" tabindex="0"
+                        onkeydown={(e: KeyboardEvent) => e.key === "Enter" && openDetail(r)}
+                        onclick={() => openDetail(r)} title={t("ledger.detail")}>
                         {#each schemaKeys.filter((k) => ["name", "status", "expiry", "due"].includes(k)) as k (k)}
                             {@const v = r.cells[ref.columns[k]]}
                             <td class="lv-num">
-                                {v?.type === "text" ? (v.text?.content ?? "—")
-                                    : v?.type === "date" ? (v.date?.isNotEmpty ? localDateKey(new Date(v.date.content)) : "—")
-                                    : v?.type === "select" ? (v.select?.content ?? "—")
-                                    : v?.type === "block" ? (v.block?.content ?? "—")
-                                    : "—"}
+                                {cellText(v)}
                             </td>
                         {/each}
                     </tr>

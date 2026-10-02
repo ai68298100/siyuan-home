@@ -525,5 +525,20 @@
     "rule.next_visit": "下次就诊",
     "rule.date": "日期",
     "rule.low_stock": "低库存",
-    "ledger.unnamed": "（未命名）"
+    "ledger.unnamed": "（未命名）",
+    "hub.dueAll": "全部时间",
+    "hub.dueToday": "今天",
+    "hub.due7": "7 天内",
+    "hub.due30": "30 天内",
+    "ledger.detail": "记录详情",
+    "ledger.savedTo": "已保存到「${module}」",
+    "settings.ecoTitle": "小驴系列联动（生态）",
+    "settings.ecoHint": "与系列插件的联动能力，v0.3 起按模块接线；此处为占位展示。",
+    "settings.ecoPlanned": "规划中",
+    "eco.qiandao": "小驴打卡（习惯打卡联动）",
+    "eco.contacts": "小驴人脉（联系人关联）",
+    "eco.glean": "小驴拾遗（剪藏归档）",
+    "eco.exam": "小驴考试（备考计划）",
+    "eco.flashcard": "小驴闪卡（记忆卡片）",
+    "eco.leiqie": "雷切（快速注入）"
 }

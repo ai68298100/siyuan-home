@@ -215,15 +215,11 @@ export default class LvHomePlugin extends Plugin {
                 .replace("${soon}", String(digest.soon));
             showMessage(text, 6000, "info");
         }
-        // B3b：逾期事项每日首次发现立即提示（静默判断同摘要）
+        // B3b：逾期事项每日首次发现立即提示（H12：与摘要共用静默判断）
         const { localDateKey } = await import("@/core/hub/rule");
+        const { inSilentHours } = await import("@/core/hub/notify");
         const today = localDateKey(new Date());
-        const inSilent = (() => {
-            const h = new Date().getHours();
-            const [from, to] = [this.settings.silentFrom ?? 22, this.settings.silentTo ?? 8];
-            return from > to ? h >= from || h < to : h >= from && h < to;
-        })();
-        if (scan.counts.overdue > 0 && !inSilent && this.runtime.lastOverdueAlertDate !== today) {
+        if (scan.counts.overdue > 0 && !inSilentHours(this.settings) && this.runtime.lastOverdueAlertDate !== today) {
             this.runtime.lastOverdueAlertDate = today;
             showMessage(this.i18nText("notify.overdue").replace("${n}", String(scan.counts.overdue)), 6000, "error");
         }
@@ -356,5 +352,9 @@ export default class LvHomePlugin extends Plugin {
     onunload() {
         if (this.heartbeat) window.clearInterval(this.heartbeat);
         this.heartbeat = undefined;
+        // 18 组清理审计：面板 destroy 时自行移除 listener，此处兜底清空；
+        // scanSeq 自增使在途扫描结果失效（H11：卸载后不落盘/不通知/不更新 UI）
+        this.hubListeners.clear();
+        this.scanSeq++;
     }
 }
