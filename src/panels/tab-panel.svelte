@@ -8,7 +8,7 @@
     import type { ScanResult } from "@/core/hub/scanner";
 
     interface IHomePluginLike {
-        i18n: Record<string, string>;
+        i18n: Record<string, unknown>;
         name: string;
         settings: HomeSettings;
         runtime: HubRuntime;
@@ -24,7 +24,8 @@
     }
 
     let { plugin }: { plugin: IHomePluginLike } = $props();
-    const t = (key: string) => plugin.i18n[key] ?? key;
+    // i18n 取值统一转 string（1.2.8 起 JSONValue；screens 以 props 接收 string 返回的 t）
+    const t = (key: string) => String(plugin.i18n[key] ?? key);
 
     type ScreenId = "overview" | "reminders" | "ledger" | "members";
     let screen: ScreenId = $state("overview");

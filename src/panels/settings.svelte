@@ -5,7 +5,7 @@
     import type { HomeSettings, MemberRole } from "@/types";
 
     interface IHomePluginLike {
-        i18n: Record<string, string>;
+        i18n: Record<string, unknown>;
         settings: HomeSettings;
         getDiagnostics?: () => any;
     }
@@ -15,7 +15,8 @@
         settings: HomeSettings;
     } = $props();
 
-    const t = (key: string) => plugin.i18n[key] ?? key;
+    // i18n 取值统一转 string（1.2.8 起 JSONValue）
+    const t = (key: string) => String(plugin.i18n[key] ?? key);
 
     let tab: "modules" | "members" | "about" = $state("modules");
     let saving = $state(false);
