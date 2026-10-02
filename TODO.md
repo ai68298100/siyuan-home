@@ -30,6 +30,9 @@
 | 2026-10-03 | 主线 | 第二十六轮：EC13 v1 落地（人脉联系人选人） | 四 schema（contracts/insurance/schooling/exams）增 contact 文本列（D08 补列续跑自动迁移+快照 -u）；详情抽屉「从人脉选择」——window.LvContacts.searchPeople 实时搜索（旧请求丢弃 PF07）、快照存 `名称 [docId]`、未装/未初始化/失败三态降级；D08 补列续跑首次实战（既有台账自动获新列）；单测 121 持平、i18n 603→608、gzip 48.8KB |
 | 2026-10-03 | 循环A | 第二十六波走查 | 快照 diff 仅 contact 列；搜索竞态守卫（seq 计数）；快照格式在抽屉/思源原生 UI 双侧可读 |
 | 2026-10-03 | 循环B | ③信源=兄弟仓源码（第四轮） | EC13 完成「身份→契约→落地」全链路（第二十三轮摘录 §1 → 本轮实现）；EC17 同路径待复制 |
+| 2026-10-03 | 主线 | 第二十八轮：EC03/v0.3 服务桥 window.LvHome 落地 | src/bridge/external-bridge.ts（protocol 1/capabilities 五项/whenReady/openButler/openReminders/addMemo 校验/summary 仅计数）+ docs/BRIDGE.md 契约文档（对齐人脉 BRIDGE 纪律：只提供服务不读他库/挂载卸载语义/版本策略）；重复挂载守卫；5 项单测；单测 121→126、i18n 608 持平、gzip 49.5KB |
+| 2026-10-03 | 循环A | 第二十八波走查 | 未用参数即修；summary 计数断言修正（today=daysLeft≤0 含逾期，测试初值写错）；重复挂载守卫（多实例不覆盖首桥） |
+| 2026-10-03 | 循环B | ③信源=兄弟仓 BRIDGE 模式（人脉 external-bridge 直读） | 管家桥的挂载/卸载/纪律三段对人脉同构复刻；EC 组「摘录→落地」第二例（EC16→EC13→EC03） |
 | 2026-10-03 | 循环A | 契约摘录复核 | 全部签名来自源码直读非文档转述；未初始化抛错/卸载注销/重复注册保护三处运行时语义已登记；EC12 owner 定案点未越界 |
 | 2026-10-03 | 循环B | ①研究产出即待办资产 ③信源=兄弟仓库源码（零网络） | 摘录 §4 登记 3 项待下轮深读；EC10 触发源修正（checkin:* 优于 ws-main）反向注记本轮 ws-main 实现为兜底 |
 | 2026-10-03 | 循环A | 兜底循环深化：全仓九项终审 | ①调试残留 0/TODO 注释仅 1 处文档性引用；②面板 any 存量 43 处（32 组追踪中，本轮零新增）；③120 测试覆盖新逻辑；④新 UI 全走 b3/lv token；⑤43 个 md 相对链接零失效（README 新增链接即修 1 处路径）；⑥i18n 600 键对齐；⑦新交互 aria/键盘齐备；⑧gzip 46.8KB<100KB；⑨日志脱敏复核（批量失败 warn 仅记错误不记标题）；README 能力表与 CHANGELOG Unreleased 对齐十七轮真实能力（R06 事实边界：待实测项明确标注） |
@@ -173,7 +176,7 @@
 - [x] 🟡 memberships schema（计费周期/试用期/自动续费/储值余额） ✅ 2026-10-02（SchemaLedgerProvider 通用派生，schema 驱动建库+提醒；低库存双规则留 v0.3 后段）
 - [x] 🟡 insurance schema（缴费日+保障到期双提醒） ✅ 2026-10-02（SchemaLedgerProvider 通用派生，schema 驱动建库+提醒；低库存双规则留 v0.3 后段）
 - [ ] 🟡 提醒中枢规则清单 UI 完善（按模块列出 rules）
-- [ ] 🟡 生态 RPC server 首批：home.capabilities / getSnippets / getBookmarks
+- [ ] 🟡 生态 RPC server 首批：home.capabilities / getSnippets / getBookmarks（2026-10-03 第二十八轮进度：**window 版先行落地**——`window.LvHome` 服务桥 v1（protocol 1，capabilities=[whenReady,openButler,openReminders,addMemo,summary]，summary 只含计数），模式对齐人脉 window.LvContacts；契约文档 docs/BRIDGE.md；5 项单测。getSnippets/getBookmarks 数据读取待 snippets/bookmarks 面板成型；kernel 私有路由版随实例验证）
 - [ ] 🟡 生态开关接线（设置·生态 → rpc 权限）
 - [x] 🟡 多端同步信号：台账变更 broadcast → 他端"刷新"角标 ✅ 2026-10-03 第二十一轮（ws-main websocket 消息 → 60 秒节流补扫——变更直接进提醒与计数，未做角标形态；事件名/频度 [待实测]；两设备冲突实测仍属 S7）
 - [ ] 🟡 移动端提醒降级实测（角标+开面板刷新）
