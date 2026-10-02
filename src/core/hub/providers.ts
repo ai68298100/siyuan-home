@@ -13,11 +13,20 @@ export interface DataProvider {
     collect(today: Date): Promise<Reminder[]>;
 }
 
-/** 提前量合并（33.3 语义）：行级 remind_before > 用户 leadOverrides > schema 默认（行级由表单层写入 overrides，此处只合并用户级） */
+/** 提前量合并（33.3 语义）：行级 remind_before > 用户 leadOverrides > schema 默认（行级由表单层写入 overrides，此处只合并用户级）。
+ * H14：无效值（NaN/Infinity/负数）回退 schema 默认，上限 3650 天。 */
 export function leadFor(settings: HomeSettings, moduleId: string, rule: ReminderRuleSpec): number {
     const key = `${moduleId}.${rule.key}`;
     const v = settings.leadOverrides?.[key];
-    return typeof v === "number" ? v : rule.leadDays;
+    return typeof v === "number" && Number.isFinite(v) && v >= 0 ? Math.min(v, 3650) : rule.leadDays;
+}
+
+/** H04：提醒规则依赖的列缺失 → 显式报错（进诊断+保留快照），不得静默跳过规则装作无事项 */
+export function requireReminderColumns(columns: Record<string, string>, schema: ModuleSchema): void {
+    const missing = (schema.reminders ?? [])
+        .filter((rule) => !columns[rule.field])
+        .map((rule) => `${rule.field}(${rule.key})`);
+    if (missing.length) throw new Error(`missing reminder column(s): ${missing.join(", ")}`);
 }
 
 /** 从 av 行 value 提取日期（date 列 content 为 ms 时间戳） */
@@ -57,6 +66,7 @@ export class CertsProvider implements DataProvider {
         const out: Reminder[] = [];
         const read = await renderLedger(ref.avId);
         if (!read.complete) throw new Error(`ledger read incomplete (${read.rows.length}/${read.rowCount} rows)`);
+        requireReminderColumns(ref.columns!, CERTS_SCHEMA);
         const { rows } = read;
         // relation 列（成员）→ 行 itemID → settings.members（avItemId 反查，成员过滤键）
         const members = this.deps.settings.members ?? [];
@@ -106,6 +116,7 @@ export class SchemaLedgerProvider implements DataProvider {
         const out: Reminder[] = [];
         const read = await renderLedger(ref.avId);
         if (!read.complete) throw new Error(`ledger read incomplete (${read.rows.length}/${read.rowCount} rows)`);
+        requireReminderColumns(ref.columns!, this.schema);
         const { rows } = read;
         const members = this.deps.settings.members ?? [];
         // 通用终态过滤：状态命中即跳过（字典 status 枚举的非活跃值）
@@ -145,6 +156,7 @@ export class MembersProvider implements DataProvider {
         const out: Reminder[] = [];
         const read = await renderLedger(ref.avId);
         if (!read.complete) throw new Error(`ledger read incomplete (${read.rows.length}/${read.rowCount} rows)`);
+        requireReminderColumns(ref.columns!, schema);
         const { rows } = read;
         for (const row of rows) {
             const cell = (key: string) => row.cells[ref.columns![key]];
