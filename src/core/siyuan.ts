@@ -77,6 +77,11 @@ export function createNotebook(name: string): Promise<string> {
     return post<string>("/api/notebook/createNotebook", { name });
 }
 
+/** 重新打开已关闭的笔记本（D07：笔记本被用户关闭 → 恢复而非新建。[待实测] payload 以 3.8.x 实例为准） */
+export function openNotebook(notebookId: string): Promise<void> {
+    return post("/api/notebook/openNotebook", { notebook: notebookId }).then(() => undefined);
+}
+
 /** path 为 hpath；返回 docID */
 export function createDocWithMd(notebook: string, hpath: string, markdown: string): Promise<string> {
     return post<string>("/api/filetree/createDocWithMd", { notebook, path: hpath, markdown });
