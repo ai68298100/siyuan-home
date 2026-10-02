@@ -332,6 +332,9 @@ export default class LvHomePlugin extends Plugin {
      * 20 组：非强制全量扫描 30 秒内去抖（Tab 快速开关不重复全量），force 用于手动重扫/设置变更 */
     async refreshHub(only?: string | string[], force = false): Promise<ScanResult> {
         const seq = ++this.scanSeq;
+        // PF01/PF02：性能标记（PerformanceObserver / DevTools 可读取）
+        const perfMark = `lvhome-scan-${seq}`;
+        performance.mark(`${perfMark}-start`);
         const onlySet = only ? new Set(Array.isArray(only) ? only : [only]) : undefined;
         if (!onlySet && !force && this.lastScanAt && Date.now() - this.lastScanAt < LvHomePlugin.FULL_SCAN_MIN_MS) {
             const cached = this.scan;
@@ -384,6 +387,8 @@ export default class LvHomePlugin extends Plugin {
         purgeHandled(this.runtime, new Date());
         await saveRuntime(this, this.runtime);
         this.lastScanAt = Date.now();
+        performance.mark(`${perfMark}-end`);
+        try { performance.measure(perfMark, `${perfMark}-start`, `${perfMark}-end`); } catch { /* PF01 测量标记 */ }
         const todayDue = scan.reminders.filter((r) => r.daysLeft <= 0).length;
         this.updateStatusbar(todayDue);
         this.hubListeners.forEach((fn) => fn());

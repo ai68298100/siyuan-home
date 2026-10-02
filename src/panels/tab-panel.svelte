@@ -3,6 +3,7 @@
     import Reminders from "./screens/reminders.svelte";
     import Ledger from "./screens/ledger.svelte";
     import Members from "./screens/members.svelte";
+    import ErrorBoundary from "./error-boundary.svelte";
     import type { HomePluginLike } from "@/types/plugin";
 
     let { plugin }: { plugin: HomePluginLike } = $props();
@@ -65,15 +66,17 @@
 
     {#key screen}
         <main class="lv-screen lv-anim">
-            {#if screen === "overview"}
-                <Overview {plugin} {t} {version} onGoto={(s: ScreenId) => (screen = s)} />
-            {:else if screen === "reminders"}
-                <Reminders {plugin} {t} {version} />
-            {:else if screen === "ledger"}
-                <Ledger {plugin} {t} {version} />
-            {:else}
-                <Members {plugin} {t} {version} />
-            {/if}
+            <ErrorBoundary onretry={() => { /* screen switch resets naturally via {#key} */ }}>
+                {#if screen === "overview"}
+                    <Overview {plugin} {t} {version} onGoto={(s: ScreenId) => (screen = s)} />
+                {:else if screen === "reminders"}
+                    <Reminders {plugin} {t} {version} />
+                {:else if screen === "ledger"}
+                    <Ledger {plugin} {t} {version} />
+                {:else}
+                    <Members {plugin} {t} {version} />
+                {/if}
+            </ErrorBoundary>
         </main>
     {/key}
 </div>
