@@ -5,8 +5,8 @@
  */
 import { describe, it, expect, afterEach } from "vitest";
 import { setTransport } from "@/core/siyuan";
-import { NumericRuleProvider, MembersProvider } from "@/core/hub/providers";
-import { MEDICINE_SCHEMA, STOCK_SCHEMA, validateSchema } from "@/core/schema";
+import { CertsProvider, NumericRuleProvider, MembersProvider, rowLeadDays } from "@/core/hub/providers";
+import { MEDICINE_SCHEMA, STOCK_SCHEMA, CERTS_SCHEMA, validateSchema } from "@/core/schema";
 import { defaultSettings } from "@/core/settings";
 import type { DbRef, FamilyMember, HomeSettings } from "@/types";
 
@@ -117,6 +117,35 @@ describe("NumericRuleProvider（H15 低库存）", () => {
         const p = new NumericRuleProvider("certs", { columns: [], capture: [] } as any, deps({}));
         expect(await p.collect(TODAY)).toEqual([]);
         expect(called).toBe(false);
+    });
+});
+
+describe("H14 行级提前量（remind_before）", () => {
+    it("rowLeadDays：有效值 clamp 0–3650；缺值/NaN 回退 undefined", () => {
+        expect(rowLeadDays({ type: "number", number: { content: 3, isNotEmpty: true } })).toBe(3);
+        expect(rowLeadDays({ type: "number", number: { content: -2, isNotEmpty: true } })).toBe(0);
+        expect(rowLeadDays({ type: "number", number: { content: 99999, isNotEmpty: true } })).toBe(3650);
+        expect(rowLeadDays({ type: "number", number: { content: NaN, isNotEmpty: true } })).toBeUndefined();
+        expect(rowLeadDays({ type: "number", number: { isNotEmpty: false } })).toBeUndefined();
+        expect(rowLeadDays(undefined)).toBeUndefined();
+    });
+
+    it("行级 remind_before 覆盖用户 leadOverrides 与 schema 默认；无行级值回退用户级", async () => {
+        // 证件 10-11 到期（今天 10-01，10 天后，落在 7 天 soon 窗外——可见性完全由提前量决定）：
+        // 行级 30 → 放宽提前量 → 显示；行级 3 → 收紧 → later 隐藏；无行级 → 用户级 90 → 显示
+        avMock([
+            { id: "r-row30", cells: { "k-name": txt("证件A"), "k-status": sel("valid"), "k-expiry": { type: "date", date: { content: new Date(2026, 9, 11).getTime(), isNotEmpty: true } }, "k-rb": num(30) } },
+            { id: "r-row3", cells: { "k-name": txt("证件B"), "k-status": sel("valid"), "k-expiry": { type: "date", date: { content: new Date(2026, 9, 11).getTime(), isNotEmpty: true } }, "k-rb": num(3) } },
+            { id: "r-norb", cells: { "k-name": txt("证件C"), "k-status": sel("valid"), "k-expiry": { type: "date", date: { content: new Date(2026, 9, 11).getTime(), isNotEmpty: true } } } },
+        ]);
+        const s: HomeSettings = { ...defaultSettings(), leadOverrides: { "certs.expiry": 90 } };
+        const p = new CertsProvider({
+            settings: s,
+            getDbRef: () => ({ avId: "av-1", columns: { name: "k-name", status: "k-status", expiry: "k-expiry", due: "k-due", remind_before: "k-rb" } }),
+        });
+        const out = await p.collect(new Date(2026, 9, 1));
+        expect(out.map((r) => r.rowId).sort()).toEqual(["r-norb", "r-row30"]);
+        expect(out.every((r) => r.dueDate === "2026-10-11")).toBe(true);
     });
 });
 

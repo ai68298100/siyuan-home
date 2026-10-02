@@ -17,6 +17,17 @@
     let rows: any[] = $state([]);
     let loading = $state(false);
     let rebuilding = $state(false);
+    // 17 组：台账内搜索（标题/备注 contains，与成员过滤不叠加——本页无成员过滤）
+    let searchText = $state("");
+    const filteredRows = $derived.by(() => {
+        const q = searchText.trim().toLowerCase();
+        if (!q) return rows;
+        return rows.filter((r) => {
+            const nameCol = ref?.columns?.name ? (r.cells[ref.columns.name]?.text?.content ?? r.cells[ref.columns.name]?.block?.content ?? "") : "";
+            const noteCol = ref?.columns?.note ? (r.cells[ref.columns.note]?.text?.content ?? "") : "";
+            return nameCol.toLowerCase().includes(q) || noteCol.toLowerCase().includes(q);
+        });
+    });
 
     const ref = $derived(plugin.settings.dbRefs[active]);
     const schemaKeys = $derived<string[]>(ref?.columns ? Object.keys(ref.columns) : []);
@@ -133,6 +144,21 @@
             line.append(k, v);
             body.appendChild(line);
         }
+        // 续期/换证历史（29 组：runtime.renewHistory 留痕；无记录不显示该段）
+        const history = (plugin.runtime?.renewHistory?.[row.itemID] ?? []) as { from: string; to: string; at: string }[];
+        if (history.length > 0) {
+            const head = document.createElement("div");
+            head.className = "ft__on-surface";
+            head.style.cssText = "margin-top:10px;padding-top:8px;border-top:1px solid var(--b3-border-color);font-size:12px";
+            head.textContent = t("ledger.renewHistory");
+            body.appendChild(head);
+            for (const h of history) {
+                const line = document.createElement("div");
+                line.style.cssText = "padding:2px 0;font-size:12.5px";
+                line.textContent = `${h.from} → ${h.to} · ${h.at.slice(0, 10)}`;
+                body.appendChild(line);
+            }
+        }
         (dlg.element.querySelector("#lv-detail-close") as HTMLButtonElement).onclick = () => dlg.destroy();
         (dlg.element.querySelector("#lv-detail-open") as HTMLButtonElement).onclick = () => { dlg.destroy(); plugin.showTabDocs(ref?.docId); };
     }
@@ -206,6 +232,8 @@
     {:else if !ref?.avId}
         <button class="b3-button" onclick={rebuildLedger}>{t("ledger.rebuild")}</button>
     {:else}
+        <input class="b3-text-field" style="width:150px" type="search" placeholder={t("ledger.search")}
+            bind:value={searchText} title={t("ledger.search")} />
         <button class="b3-button b3-button--outline" onclick={() => plugin.showTabDocs(ref?.docId)}>{t("ledger.openDoc")} ↗</button>
     {/if}
 </div>
@@ -262,9 +290,12 @@
 
 {#if loading}
     <div class="lv-card" style="padding:20px"><div class="lv-skel" style="height:16px;width:60%"></div></div>
-{:else if rows.length === 0}
+{:else if filteredRows.length === 0}
     {#if !ref?.avId}
         <div class="lv-card"><div class="lv-empty" role="status"><div class="eic">🚧</div><b>{t("ledger.notProvisioned")}</b><span>{t("ledger.notProvisionedHint")}</span></div></div>
+    {:else if rows.length > 0}
+        <!-- 搜索无命中 ≠ 台账为空（UI16/34 组空态语义） -->
+        <div class="lv-card"><div class="lv-empty" role="status"><div class="eic">🔍</div><b>{t("ledger.searchEmpty")}</b><span>{t("ledger.searchEmptyHint").replace("${q}", searchText.trim())}</span></div></div>
     {:else}
         <div class="lv-card"><div class="lv-empty" role="status"><div class="eic">🗂</div><b>{t("ledger.empty")}</b><span>{t("ledger.emptyHint")}</span></div></div>
     {/if}
@@ -277,7 +308,7 @@
                 {/each}
             </tr></thead>
             <tbody>
-                {#each rows as r (r.itemID)}
+                {#each filteredRows as r (r.itemID)}
                     <tr class="lv-row-link" role="button" tabindex="0"
                         onkeydown={(e: KeyboardEvent) => e.key === "Enter" && openDetail(r)}
                         onclick={() => openDetail(r)} title={t("ledger.detail")}>

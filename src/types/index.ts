@@ -127,4 +127,8 @@ export interface HomeSettings {
     household?: { roles: MemberRole[]; children: number };
     /** 首次运行引导是否已完成 */
     onboarded?: boolean;
+    /** 示例数据生成清单（24 组：moduleId → 行 itemID；一键清除用） */
+    demoRows?: Record<string, string[]>;
+    /** 示例成员 id 清单（一键清除移除引用） */
+    demoMemberIds?: string[];
 }

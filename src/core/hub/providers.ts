@@ -29,6 +29,12 @@ export function requireReminderColumns(columns: Record<string, string>, schema: 
     if (missing.length) throw new Error(`missing reminder column(s): ${missing.join(", ")}`);
 }
 
+/** H14 行级提前量：remind_before 列值 > 用户 leadOverrides > schema 默认。无效值（NaN/负数/超大）回退，clamp 0–3650 */
+export function rowLeadDays(v: any): number | undefined {
+    const n = numberFromValue(v);
+    return n === undefined ? undefined : Math.min(3650, Math.max(0, n));
+}
+
 /** 从 av 行 value 提取日期（date 列 content 为 ms 时间戳） */
 function dateFromValue(v: any): string | undefined {
     const d = v?.date;
@@ -97,7 +103,7 @@ export class CertsProvider implements DataProvider {
                 if (!fieldValue) continue;
                 const r = await buildReminder(rule, this.moduleId, { ...rowDates, fieldValue }, {
                     today,
-                    leadOverride: leadFor(this.deps.settings, this.moduleId, rule),
+                    leadOverride: rowLeadDays(cell("remind_before")) ?? leadFor(this.deps.settings, this.moduleId, rule),
                 });
                 if (r) out.push(r);
             }
@@ -182,7 +188,7 @@ export class MembersProvider implements DataProvider {
             for (const rule of schema.reminders ?? []) {
                 const r = await buildReminder(rule, this.moduleId, { rowId: row.itemID, title: name, fieldValue, lunar, memberId }, {
                     today,
-                    leadOverride: leadFor(this.deps.settings, this.moduleId, rule),
+                    leadOverride: rowLeadDays(cell("remind_before")) ?? leadFor(this.deps.settings, this.moduleId, rule),
                 });
                 if (r) out.push(r);
             }

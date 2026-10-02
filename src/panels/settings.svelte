@@ -285,6 +285,29 @@
                         bind:this={importInput} onchange={(e) => importSettings(e)} />
                 </div>
             </div>
+            <!-- 24 组/CM07：示例数据一键生成/清除（新用户体验与截图；【示例】前缀可识别可回滚） -->
+            <div style="margin-top:14px;border-top:1px solid var(--b3-border-color);padding-top:10px">
+                <p class="lv-caption">{t("settings.demoTitle")}</p>
+                <p class="lv-caption ft__on-surface">{t("settings.demoHint")}</p>
+                <div style="display:flex;gap:8px;margin-top:6px;flex-wrap:wrap">
+                    <button class="b3-button b3-button--outline" onclick={async () => {
+                        const { generateDemoData } = await import("@/core/demo");
+                        const res = await generateDemoData(plugin as any, plugin.settings, plugin.schemaCatalog ?? {});
+                        await plugin.refreshHub?.();
+                        showMessage(res.errors.length ? t("settings.demoPartial").replace("${n}", String(res.errors.length)) : t("settings.demoDone").replace("${n}", String(res.created)), 5000, res.errors.length ? "error" : "info");
+                    }}>{t("settings.demoGenerate")}</button>
+                    <button class="b3-button b3-button--outline" onclick={async () => {
+                        confirm(t("settings.demoClearTitle"), t("settings.demoClearBody"), async () => {
+                            const { clearDemoData } = await import("@/core/demo");
+                            const res = await clearDemoData(plugin as any, plugin.settings);
+                            await plugin.refreshHub?.();
+                            showMessage(res.errors.length
+                                ? t("settings.demoClearPartial").replace("${n}", String(res.cleared)).replace("${m}", String(res.errors.length))
+                                : t("settings.demoClearDone").replace("${n}", String(res.cleared)), 6000, res.errors.length ? "error" : "info");
+                        });
+                    }}>{t("settings.demoClear")}</button>
+                </div>
+            </div>
             <!-- C8d：生态分区占位（v0.3 接线；开关仅展示，不可用） -->
             <div style="margin-top:14px;border-top:1px solid var(--b3-border-color);padding-top:10px">
                 <p class="lv-caption">{t("settings.ecoTitle")}</p>

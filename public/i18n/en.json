@@ -553,5 +553,19 @@
     "settings.importTitle": "Import settings",
     "settings.importBody": "This replaces ALL current settings (modules/members/lead overrides/ledger refs) with \"${file}\"; missing ledgers are provisioned and a rescan runs after import. Ledger data itself is untouched. Continue?",
     "settings.importDone": "Settings imported and applied",
-    "settings.importBad": "Import failed: not a valid Lv Home settings file"
+    "settings.importBad": "Import failed: not a valid Lv Home settings file",
+    "ledger.renewHistory": "Renewal history",
+    "ledger.search": "Search name / note",
+    "ledger.searchEmpty": "No matching records",
+    "ledger.searchEmptyHint": "No name or note contains \"${q}\"; clear the search to see all records.",
+    "settings.demoTitle": "Sample data",
+    "settings.demoHint": "Creates demo-prefixed members and a few ledger rows (enabled modules only) for trying things out; one-click cleanup included.",
+    "settings.demoGenerate": "Generate sample data",
+    "settings.demoDone": "Created ${n} sample records",
+    "settings.demoPartial": "Created, but ${n} step(s) failed (see error toast)",
+    "settings.demoClear": "Clear sample data",
+    "settings.demoClearTitle": "Clear sample data",
+    "settings.demoClearBody": "Removes all sample-prefixed rows and demo member references created earlier; manually entered data is untouched. Continue?",
+    "settings.demoClearDone": "Cleared ${n} sample records",
+    "settings.demoClearPartial": "Cleared ${n}; ${m} deletion(s) failed (if the endpoint is unavailable, delete them in the ledger document)"
 }

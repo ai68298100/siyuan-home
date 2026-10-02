@@ -553,5 +553,19 @@
     "settings.importTitle": "导入设置",
     "settings.importBody": "将用「${file}」覆盖当前全部设置（模块开关/成员/提前量/台账落点），导入后自动补建缺失台账并重新扫描。台账数据本身不受影响。确定继续？",
     "settings.importDone": "设置已导入并应用",
-    "settings.importBad": "导入失败：文件不是有效的小驴管家设置"
+    "settings.importBad": "导入失败：文件不是有效的小驴管家设置",
+    "ledger.renewHistory": "续期 / 换证历史",
+    "ledger.search": "搜索名称 / 备注",
+    "ledger.searchEmpty": "没有匹配的记录",
+    "ledger.searchEmptyHint": "没有包含「${q}」的名称或备注；清除搜索可查看全部记录。",
+    "settings.demoTitle": "示例数据",
+    "settings.demoHint": "生成带【示例】前缀的成员与少量台账行（仅已启用模块），供体验与演示；可一键清除。",
+    "settings.demoGenerate": "生成示例数据",
+    "settings.demoDone": "已生成 ${n} 条示例数据",
+    "settings.demoPartial": "已生成，但 ${n} 项失败（详见错误提示）",
+    "settings.demoClear": "清除示例数据",
+    "settings.demoClearTitle": "清除示例数据",
+    "settings.demoClearBody": "将删除此前生成的全部【示例】行与示例成员引用；手动录入的数据不受影响。继续？",
+    "settings.demoClearDone": "已清除 ${n} 条示例数据",
+    "settings.demoClearPartial": "已清除 ${n} 条；${m} 条删除失败（端点受限时请到台账文档手动删除）"
 }
