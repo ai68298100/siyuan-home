@@ -94,7 +94,7 @@
         saveError = "";
         try {
             // 重试路径：部分字段失败时复用已建行（补写同一行，不重复建行）
-            const itemID = pendingItemID ?? await addDetachedRow(ref.avId, String(form.name ?? "").trim() || "（未命名）");
+            const itemID = pendingItemID ?? await addDetachedRow(ref.avId, String(form.name ?? "").trim() || t("ledger.unnamed"));
             pendingItemID = itemID;
             const cols = ref.columns ?? {};
             const failed: string[] = [];

@@ -524,5 +524,6 @@
     "rule.pay_day": "缴费日",
     "rule.next_visit": "下次就诊",
     "rule.date": "日期",
-    "rule.low_stock": "低库存"
+    "rule.low_stock": "低库存",
+    "ledger.unnamed": "（未命名）"
 }

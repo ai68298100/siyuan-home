@@ -524,5 +524,6 @@
     "rule.pay_day": "Pay day",
     "rule.next_visit": "Next visit",
     "rule.date": "Date",
-    "rule.low_stock": "Low stock"
+    "rule.low_stock": "Low stock",
+    "ledger.unnamed": "(Untitled)"
 }
