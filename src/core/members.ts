@@ -1,45 +1,80 @@
 /**
- * 成员数据访问（A4）：settings.members（插件引用，轻量）与 members 台账行（思源 av）双写。
- * v0.2：av 侧先建行（name 主键 + role/birthday/lunar 列），设置侧保留引用与编辑入口。
- * 成员删除仅移除引用（台账行保留，33 引用完整性：悬空引用显示"未指定成员"）。
+ * 成员数据访问层（A4/D04/D05/D06）：settings.members 为主数据引用，members 台账行为思源侧档案。
+ * 所有 av 写入经本 DAL：设置页保存走 syncMembersToAv、成员页走 add/update/remove。
+ * - 按 avItemId 精确写回（同名不误写他人）；无关联行时补建或回填；
+ * - 支持清空生日等字段；AV 写失败记入 member.syncError（可见可重试，不阻断其他成员）；
+ * - 成员删除仅移除引用（台账行保留，33 引用完整性：悬空引用显示"未指定成员"）。
  */
 import type { Plugin } from "siyuan";
-import type { FamilyMember, HomeSettings } from "@/types";
-import { addDetachedRow, setCell } from "./siyuan";
+import type { FamilyMember, HomeSettings, DbRef } from "@/types";
+import { addDetachedRow, setCell, renderLedger } from "./siyuan";
 import { saveSettings } from "./settings";
-import type { DbRef } from "@/types";
 
-function colMsToLocalDate(ms?: number): string | undefined {
+export function colMsToLocalDate(ms?: number): string | undefined {
     if (!ms) return undefined;
     const d = new Date(ms);
     return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 }
 
-export async function addMember(plugin: Plugin, settings: HomeSettings, member: FamilyMember): Promise<void> {
-    settings.members = [...settings.members, member];
-    await saveSettings(plugin, settings);
-    // av 侧（可失败不阻断：provisional 或未建库时仅设置侧生效，诊断区可见）
+function errText(e: unknown): string {
+    return e instanceof Error ? e.message : String(e);
+}
+
+/** 行级写入：主键 name + role/birthday/lunar；生日可清空（D05：清空字段） */
+async function writeMemberCells(ref: DbRef, itemID: string, m: FamilyMember): Promise<void> {
+    const c = ref.columns ?? {};
+    if (c.name) await setCell(ref.avId!, c.name, itemID, { type: "text", text: { content: m.name } });
+    if (c.role) await setCell(ref.avId!, c.role, itemID, { type: "select", select: { content: m.role } });
+    if (c.birthday) {
+        await setCell(ref.avId!, c.birthday, itemID, m.birthday
+            ? { type: "date", date: { content: new Date(`${m.birthday}T00:00:00`).getTime(), isNotEmpty: true, isNotTime: true } }
+            : { type: "date", date: { isNotEmpty: false } });
+    }
+    if (c.lunar) await setCell(ref.avId!, c.lunar, itemID, { type: "checkbox", checkbox: { checked: !!m.lunarBirthday } });
+}
+
+/** 建行并回填 avItemId；失败记 syncError（身份未确认时防重试建行语义由调用方呈现，D02/D05） */
+async function createMemberRow(ref: DbRef, m: FamilyMember): Promise<boolean> {
     try {
-        const ref = settings.dbRefs.members;
-        if (ref?.avId && ref.columns) {
-            const itemID = await addDetachedRow(ref.avId, member.name);
-            member.avItemId = itemID; // 回填关联键（成员过滤/下钻依赖）
-            await saveSettings(plugin, settings);
-            await writeMemberCells(ref, itemID, member);
-        }
+        const itemID = await addDetachedRow(ref.avId!, m.name);
+        m.avItemId = itemID;
+        await writeMemberCells(ref, itemID, m);
+        m.syncError = undefined;
+        return true;
     } catch (e) {
-        console.warn("[siyuan-home] member ledger row deferred:", e instanceof Error ? e.message : e);
+        m.syncError = errText(e);
+        return false;
     }
 }
 
-async function writeMemberCells(ref: DbRef, itemID: string, m: FamilyMember): Promise<void> {
-    const c = ref.columns ?? {};
-    if (c.role) await setCell(ref.avId!, c.role, itemID, { type: "select", select: { content: m.role } });
-    if (c.birthday && m.birthday) {
-        const ms = new Date(`${m.birthday}T00:00:00`).getTime();
-        await setCell(ref.avId!, c.birthday, itemID, { type: "date", date: { content: ms, isNotEmpty: true, isNotTime: true } });
+export async function addMember(plugin: Plugin, settings: HomeSettings, member: FamilyMember): Promise<void> {
+    settings.members = [...settings.members, member];
+    await saveSettings(plugin, settings);
+    const ref = settings.dbRefs.members;
+    if (ref?.avId && ref.columns) {
+        await createMemberRow(ref, member); // 失败不阻断：设置侧已生效，syncError 可见可重试
+        await saveSettings(plugin, settings);
     }
-    if (c.lunar) await setCell(ref.avId!, c.lunar, itemID, { type: "checkbox", checkbox: { checked: !!m.lunarBirthday } });
+}
+
+/** 编辑成员（D05）：设置侧为准；有 avItemId → 精确写回（含改名）；无 → 补建关联行 */
+export async function updateMember(plugin: Plugin, settings: HomeSettings, member: FamilyMember): Promise<void> {
+    settings.members = settings.members.map((m) => (m.id === member.id ? member : m));
+    await saveSettings(plugin, settings);
+    const ref = settings.dbRefs.members;
+    if (!ref?.avId || !ref.columns) return;
+    const target = settings.members.find((m) => m.id === member.id)!;
+    if (target.avItemId) {
+        try {
+            await writeMemberCells(ref, target.avItemId, target);
+            target.syncError = undefined;
+        } catch (e) {
+            target.syncError = errText(e);
+        }
+    } else {
+        await createMemberRow(ref, target);
+    }
+    await saveSettings(plugin, settings);
 }
 
 /** 删除成员：仅移除设置侧引用（台账行保留） */
@@ -48,54 +83,116 @@ export async function removeMember(plugin: Plugin, settings: HomeSettings, id: s
     await saveSettings(plugin, settings);
 }
 
+function memberChanged(a: FamilyMember, b: FamilyMember): boolean {
+    return a.name !== b.name
+        || a.role !== b.role
+        || (a.birthday ?? "") !== (b.birthday ?? "")
+        || !!a.lunarBirthday !== !!b.lunarBirthday;
+}
+
+export interface MemberSyncReport {
+    created: number;
+    updated: number;
+    failed: string[];
+}
+
 /**
- * 老成员关联回填（诊断区工具）：按姓名主键匹配 members 库行，回填 avItemId。
- * 仅处理缺 avItemId 的成员；同名多行取第一行并在结果中报告。
+ * 设置页保存后的差异同步（D05 统一双写）：与保存前的成员快照比对，
+ * 新增建行、变更写回、删除仅设置侧（行保留）。逐成员容错，失败进报告与 syncError。
+ */
+export async function syncMembersToAv(
+    plugin: Plugin,
+    settings: HomeSettings,
+    prev: FamilyMember[],
+): Promise<MemberSyncReport> {
+    const ref = settings.dbRefs.members;
+    const report: MemberSyncReport = { created: 0, updated: 0, failed: [] };
+    if (!ref?.avId || !ref.columns) return report; // 未建库：仅设置侧生效（原语义）
+    const prevById = new Map(prev.map((m) => [m.id, m]));
+    let dirty = false;
+    for (const m of settings.members) {
+        const before = prevById.get(m.id);
+        try {
+            if (!before) {
+                if (!m.avItemId && (await createMemberRow(ref, m))) report.created++;
+                else if (!m.avItemId) report.failed.push(m.name);
+            } else if (memberChanged(before, m)) {
+                if (m.avItemId) {
+                    await writeMemberCells(ref, m.avItemId, m);
+                    m.syncError = undefined;
+                    report.updated++;
+                } else if (await createMemberRow(ref, m)) {
+                    report.created++;
+                } else {
+                    report.failed.push(m.name);
+                }
+            }
+        } catch (e) {
+            m.syncError = errText(e);
+            report.failed.push(m.name);
+        }
+        if ((m.syncError ?? undefined) !== (before?.syncError ?? undefined)) dirty = true;
+    }
+    if (report.created > 0 || report.updated > 0 || dirty) await saveSettings(plugin, settings);
+    return report;
+}
+
+export interface BackfillResult {
+    linked: string[];
+    unmatched: string[];
+    /** 同名多候选：不自动回填，留人工选择（D06） */
+    ambiguous: string[];
+    /** 已有 avItemId 但台账行已不存在：清除关联并报告（D06） */
+    stale: string[];
+}
+
+/**
+ * 老成员关联回填（诊断区工具，D06）：按姓名主键匹配 members 库行。
+ * - 唯一候选才自动回填；同名多候选进 ambiguous 不静默共用行；
+ * - 已有 avItemId 也验证行存在，失效则清除关联（stale）；
+ * - 重复运行不新增成员、不产生重复关联。
  */
 export async function backfillMemberLinks(
     plugin: Plugin,
     settings: HomeSettings,
-): Promise<{ linked: string[]; unmatched: string[] }> {
+): Promise<BackfillResult> {
     const ref = settings.dbRefs.members;
-    const linked: string[] = [];
-    const unmatched: string[] = [];
-    if (!ref?.avId || !ref.columns?.name) return { linked, unmatched };
-    const { renderLedger } = await import("./siyuan");
+    const empty: BackfillResult = { linked: [], unmatched: [], ambiguous: [], stale: [] };
+    if (!ref?.avId || !ref.columns?.name) return empty;
     const { rows } = await renderLedger(ref.avId);
     const nameKey = ref.columns.name;
-    const pending = settings.members.filter((m) => !m.avItemId);
-    for (const m of pending) {
-        const hit = rows.find((r) => {
-            const v = r.cells[nameKey];
-            return (v?.text?.content ?? v?.block?.content ?? "").trim() === m.name.trim();
-        });
-        if (hit) {
-            m.avItemId = hit.itemID;
-            linked.push(m.name);
-        } else {
-            unmatched.push(m.name);
-        }
+    const byName = new Map<string, string[]>();
+    const rowIds = new Set(rows.map((r) => r.itemID));
+    for (const r of rows) {
+        const v = r.cells[nameKey];
+        const name = (v?.text?.content ?? v?.block?.content ?? "").trim();
+        if (!name) continue;
+        byName.set(name, [...(byName.get(name) ?? []), r.itemID]);
     }
-    if (linked.length > 0) await saveSettings(plugin, settings);
-    return { linked, unmatched };
-}
-
-/** 编辑成员（设置侧为准；av 侧行值尽力同步——按 avItemId 精确写回，无关联行时仅设置侧生效） */
-export async function updateMember(plugin: Plugin, settings: HomeSettings, member: FamilyMember): Promise<void> {
-    settings.members = settings.members.map((m) => (m.id === member.id ? member : m));
-    await saveSettings(plugin, settings);
-    try {
-        const ref = settings.dbRefs.members;
-        if (ref?.avId && ref.columns && member.avItemId) {
-            // 主键 name 列 + 其余列按 avItemId 精确更新（不按姓名匹配，避免同名误写他人，D05）
-            if (ref.columns.name) {
-                await setCell(ref.avId, ref.columns.name, member.avItemId, { type: "text", text: { content: member.name } });
+    const result: BackfillResult = empty;
+    let dirty = false;
+    for (const m of settings.members) {
+        if (m.avItemId) {
+            if (!rowIds.has(m.avItemId)) {
+                m.avItemId = undefined;
+                m.syncError = "ledger row missing";
+                result.stale.push(m.name);
+                dirty = true;
             }
-            await writeMemberCells(ref, member.avItemId, member);
+            continue;
         }
-    } catch (e) {
-        console.warn("[siyuan-home] member ledger sync deferred:", e instanceof Error ? e.message : e);
+        const cands = byName.get(m.name.trim()) ?? [];
+        if (cands.length === 1) {
+            m.avItemId = cands[0];
+            m.syncError = undefined;
+            result.linked.push(m.name);
+            dirty = true;
+        } else if (cands.length > 1) {
+            result.ambiguous.push(m.name);
+        } else {
+            result.unmatched.push(m.name);
+        }
     }
+    if (dirty) await saveSettings(plugin, settings);
+    return result;
 }
-
-export { colMsToLocalDate };

@@ -65,6 +65,8 @@ export interface HubRuntime {
     handledUntil: Record<string, string>;
     /** oneoff 已办记录（可在已处理视图恢复） */
     handled: Record<string, HandledRecord>;
+    /** 续期历史（H10）：台账行 rowId → 续期流水（from→to）；换证历史链视图见 16 组 */
+    renewHistory: Record<string, { from: string; to: string; at: string }[]>;
     /** 快速备忘 */
     memos: AdhocMemo[];
     /** 每日摘要去重：最后通知日期 */
@@ -74,7 +76,7 @@ export interface HubRuntime {
 }
 
 export function defaultRuntime(): HubRuntime {
-    return { schemaVersion: 1, snoozed: {}, muted: {}, handledYear: {}, handledUntil: {}, handled: {}, memos: [] };
+    return { schemaVersion: 1, snoozed: {}, muted: {}, handledYear: {}, handledUntil: {}, handled: {}, renewHistory: {}, memos: [] };
 }
 
 /** 旧缓存迁移（33.3）：缺字段补默认值；byModule/derived 为 H02/H04 新增 */
@@ -90,6 +92,7 @@ export async function loadRuntime(plugin: Plugin): Promise<HubRuntime> {
         handledYear: data.handledYear ?? {},
         handledUntil: data.handledUntil ?? {},
         handled: data.handled ?? {},
+        renewHistory: data.renewHistory ?? {},
         memos: data.memos ?? [],
     };
     if (merged.cache) {
