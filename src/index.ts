@@ -325,7 +325,9 @@ export default class LvHomePlugin extends Plugin {
             showMessage(this.i18nText("capture.saved").replace("${module}", this.i18nText(`module.${moduleId}`)), 3000, "info");
             await this.refreshHub();
         } catch (e) {
-            showMessage(this.i18nText("capture.failed").replace("${msg}", e instanceof Error ? e.message : String(e)), 5000, "error");
+            const { coalescedNotify } = await import("@/libs/notify-queue");
+            coalescedNotify("capture-failed", () =>
+                showMessage(this.i18nText("capture.failed").replace("${msg}", e instanceof Error ? e.message : String(e)), 5000, "error"));
         }
     }
 
