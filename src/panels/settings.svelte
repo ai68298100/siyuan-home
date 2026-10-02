@@ -72,6 +72,8 @@
             plugin.settings.enabledModules = [...draftEnabled];
             plugin.settings.members = draftMembers.map((m) => ({ ...m, name: m.name.trim() || "?" }));
             await saveSettings(plugin as any, plugin.settings);
+            // H02：设置变更（模块开关/成员）广播到全部页签（重扫收敛提醒与计数）
+            await plugin.refreshHub?.();
             showMessage(t("saved"), 2000, "info");
         } finally {
             saving = false;
