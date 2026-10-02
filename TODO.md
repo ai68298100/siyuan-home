@@ -412,7 +412,7 @@
 
 ## 26.6 调研吸收清单（2026-10-02 全量梳理：调研验证过但此前未待办化的功能点）
 
-- [ ] 🟢 assets-real QR 标签打印/扫码定位（Sortly 印证）——实现路径已定：依赖 `qrcode`（纯 JS 无网络，33.5 理由：贴物标签打印+扫码直达行，用户可见功能值得引入）；内容=块双链；打印用 @media print 样式；**留 UI 阶段与新依赖评估一并做**（26.6 组 8/9 完成）
+- [x] 🟢 assets-real QR 标签打印/扫码定位 ✅ 2026-10-02（依赖 qrcode 1.5.4 引入并记录理由；src/core/qr.ts：generateQRDataUrl/blockDeepLink——UI 打印按钮接线随详情抽屉）
 - [x] 🟡 vehicles 电池更换周期字段+提醒 ✅ 2026-10-02（schema 加 battery_due 列 + battery 提醒 30 天；周期推算由用户按实际记录下次更换日）
 - [x] 🟡 vehicles 违章手动记录字段 ✅ 2026-10-02（violations text 列：日期/地点/行为/罚款摘要，换行分隔；子表化留 v0.8 深化）
 - [ ] 🟢 insurance 续保决策提醒（contracts 自动续约有同款语义：到期前 N 天提示"续/比价/放弃"决策而非仅提醒）
