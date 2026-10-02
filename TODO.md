@@ -33,6 +33,9 @@
 | 2026-10-03 | 主线 | 第二十九轮：EC14 落地 + 考试线源码挖掘 | openContactPicker 抽取共享（ledger 复用零行为差）；FamilyMember.contactSnapshot + 成员卡关联/解除（EC14 ✅）；考试线源码挖掘——lv-exam:stats PublicStats v1 载荷全量（attempts/accuracy/eliminated/activeWrong/streak/hours 24/daily 56 天，脱敏无题目内容）+ lv-exam:open-question{qid} + 闪卡 ExamPlan 形状确认；摘录 §6 新增；单测 126 持平、i18n 612 键、gzip 49.8KB |
 | 2026-10-03 | 循环A | 第二十九波走查 | 重复 import 即修；成员卡按钮 stopPropagation 防误触展开；快照列省略号+title 全文 |
 | 2026-10-03 | 循环B | ③信源=兄弟仓源码（第五轮） | EC20 契约候选记录（exams.expiry ↔ ExamPlan.examDate）；EC23 绑定 id 需闪卡方暴露——不抢跑 |
+| 2026-10-03 | 主线 | 第三十轮：EC21 v1 落地（lv-exam:stats 消费） | window CustomEvent 监听（非 eventBus）——校验后缓存 latest-only 子集进 runtime；考试模块卡备考行（连续天数+正确率+更新日期 tooltip）；卸载移除监听；摘录 §6 收敛（广播时机/无消费方现状/AttemptEvent 边界/ExamPlan 契约候选）；单测 126 持平、i18n 612→614、gzip 50.1KB |
+| 2026-10-03 | 循环A | 第三十波走查 | 载荷校验（非数字整体拒绝）；runtime 子集 latest-only 防无界增长；监听器卸载移除 |
+| 2026-10-03 | 循环B | ③信源=兄弟仓源码（第六轮） | 考试线研究收敛（EC21 v1 落地；EC20 待闪卡暴露）；EC26-28 维持供方依赖 |
 | 2026-10-03 | 主线 | 第二十八轮：EC03/v0.3 服务桥 window.LvHome 落地 | src/bridge/external-bridge.ts（protocol 1/capabilities 五项/whenReady/openButler/openReminders/addMemo 校验/summary 仅计数）+ docs/BRIDGE.md 契约文档（对齐人脉 BRIDGE 纪律：只提供服务不读他库/挂载卸载语义/版本策略）；重复挂载守卫；5 项单测；单测 121→126、i18n 608 持平、gzip 49.5KB |
 | 2026-10-03 | 循环A | 第二十八波走查 | 未用参数即修；summary 计数断言修正（today=daysLeft≤0 含逾期，测试初值写错）；重复挂载守卫（多实例不覆盖首桥） |
 | 2026-10-03 | 循环B | ③信源=兄弟仓 BRIDGE 模式（人脉 external-bridge 直读） | 管家桥的挂载/卸载/纪律三段对人脉同构复刻；EC 组「摘录→落地」第二例（EC16→EC13→EC03） |
@@ -1019,7 +1022,7 @@
 - [ ] 🟢 **EC18 雷切书签入口**：拟定只读 `home.getBookmarks` 的字段、限量和授权，URL 仅 http(s)，点击才打开；非法/缺失目标及关闭模块有提示，账号备注不默认共享。
 - [ ] 🟢 **EC19 雷切常用语承接**：管家纯文本 snippets 与雷切 HTML/CSS/JS 片段严格分开；复制/插入由用户选择，不把家庭文本变成可执行代码。
 - [ ] 🟡 **EC20 考试计划关联**（依赖 EC03/EC04/EC05/MD06）：区分报名/考试日期和证书到期/复审日期；稳定绑定计划/题库 ID，考试当前无公开计划服务，先定最小契约再实现。（2026-10-03 源码挖掘：闪卡侧 **ExamPlan 形状确认**——{id,name,examDate YYYY-MM-DD,scopeKind all|deck|notebook,scopeId,scopeName,cramDays,totalCards?,enabled,archived?}，存于闪卡内部无对外桥；EC23 最小契约候选=管家 exams.expiry ↔ ExamPlan.examDate 日期互查，绑定 id 需闪卡方暴露）
-- [ ] 🟡 **EC21 考试统计快照**（依赖 EC02/EC03/EC08）：消费 `lv-exam:stats` 聚合数据，不读题目/答案；明确当前仅见首发事件，先设计快照查询、重放或持续更新依赖，不能宣称实时。
+- [x] 🟡 **EC21 考试统计快照**（依赖 EC02/EC03/EC08）：消费 `lv-exam:stats` 聚合数据，不读题目/答案；明确当前仅见首发事件，先设计快照查询、重放或持续更新依赖，不能宣称实时。 ✅ 2026-10-03 第三十轮 v1 落地（window CustomEvent 监听——校验后缓存 latest-only 子集 {streak,accuracy,attempts,generatedAt} 进 runtime；考试模块卡展示"备考连续 N 天 · 正确率 M%"带更新日期 tooltip；**不读题目/答案、不宣称实时**——广播时机为考试启动/刷新后，已在模块卡与契约摘录 §6.2 如实标注；卸载移除监听）
 - [ ] 🟡 **EC22 考试成果归档**（依赖 D03/D09/EC05）：用户选择成绩单/错题总结文档关联考证台账，保留源文档和日期；重复归档不复制文档，撤销关联不删除原文。
 - [ ] 🟡 **EC23 闪卡考试计划协同**（依赖 EC03/EC04/EC05/MD06）：关联 Cards ExamPlan 与考证事项，保留范围和类型；日期变更预览双方影响，提醒唯一发送者，避免 30/7/1 天重复轰炸。
 - [ ] 🟡 **EC24 管家资料到闪卡**（依赖 D03/D09/P12/EC05）：用户选择资料后打开制卡或绑定牌组；绑定块与 detached 台账行分开，原文不覆盖，创建失败可重试。
