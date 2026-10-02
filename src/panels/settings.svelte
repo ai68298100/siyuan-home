@@ -71,12 +71,20 @@
     async function save() {
         saving = true;
         try {
+            const prevMembers = plugin.settings.members;
             plugin.settings.enabledModules = [...draftEnabled];
             plugin.settings.members = draftMembers.map((m) => ({ ...m, name: m.name.trim() || "?" }));
             await saveSettings(plugin as any, plugin.settings);
+            // D05：设置页与成员页同走成员 DAL——差异同步到 members 台账行（新增建行/变更写回）
+            const { syncMembersToAv } = await import("@/core/members");
+            const rep = await syncMembersToAv(plugin as any, plugin.settings, prevMembers);
             // H02：设置变更（模块开关/成员）广播到全部页签（重扫收敛提醒与计数）
             await plugin.refreshHub?.();
-            showMessage(t("saved"), 2000, "info");
+            if (rep.failed.length > 0) {
+                showMessage(t("members.syncPartial").replace("${n}", String(rep.failed.length)), 5000, "error");
+            } else {
+                showMessage(t("saved"), 2000, "info");
+            }
         } finally {
             saving = false;
         }
@@ -186,12 +194,16 @@
                                 <p class="lv-caption" style="color:var(--lv-danger)">{c}</p>
                             {/each}
                         {/if}
-                        {#if (plugin.settings.members ?? []).some((m: any) => !m.avItemId)}
+                        {#if (plugin.settings.members ?? []).some((m: any) => !m.avItemId || m.syncError)}
                             <button class="b3-button b3-button--outline" style="margin-top:6px"
                                 onclick={async () => {
                                     const { backfillMemberLinks } = await import("@/core/members");
                                     const res = await backfillMemberLinks(plugin as any, plugin.settings);
-                                    showMessage(t("diag.backfillDone").replace("${n}", String(res.linked.length)), 3000, "info");
+                                    // D06：回填结果四态——唯一回填 / 同名歧义待人工 / 无匹配 / 失效关联已清除
+                                    showMessage(t("diag.backfillResult")
+                                        .replace("${n}", String(res.linked.length))
+                                        .replace("${amb}", String(res.ambiguous.length))
+                                        .replace("${stale}", String(res.stale.length)), 6000, res.ambiguous.length ? "info" : "info");
                                 }}>{t("diag.backfill")}</button>
                         {/if}
                         <button class="b3-button b3-button--outline" style="margin-top:6px"

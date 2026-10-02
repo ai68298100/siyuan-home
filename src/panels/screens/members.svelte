@@ -1,6 +1,6 @@
 <script lang="ts">
     import { confirm } from "siyuan";
-    import { addMember, removeMember } from "@/core/members";
+    import { addMember, updateMember, removeMember } from "@/core/members";
     import { newSiYuanId } from "@/core/siyuan";
 
     let { plugin, t, version }: { plugin: any; t: (k: string) => string; version?: number } = $props();
@@ -27,20 +27,44 @@
         });
     }
 
+    // D05 成员编辑：点"编辑"填入顶部表单，保存走 updateMember（av 行按 avItemId 精确写回）
     let name = $state("");
     let role = $state<import("@/types").MemberRole>("self");
     let birthday = $state("");
     let lunar = $state(false);
+    let editId = $state<string | null>(null);
     const roles = ["self", "spouse", "partner", "child", "elder", "kin", "other"];
 
-    async function add() {
+    function startEdit(m: any) {
+        editId = m.id;
+        name = m.name;
+        role = m.role;
+        birthday = m.birthday ?? "";
+        lunar = !!m.lunarBirthday;
+        expandedId = null;
+    }
+    function cancelEdit() {
+        editId = null; name = ""; role = "self"; birthday = ""; lunar = false;
+    }
+
+    async function save() {
         if (!name.trim()) return;
-        await addMember(plugin, plugin.settings, {
-            id: newSiYuanId(),
-            name: name.trim(), role, birthday: birthday || undefined,
-            lunarBirthday: lunar, createdAt: new Date().toISOString(),
-        });
-        name = ""; role = "self"; birthday = ""; lunar = false;
+        if (editId) {
+            const target = (plugin.settings.members ?? []).find((m: any) => m.id === editId);
+            if (target) {
+                await updateMember(plugin, plugin.settings, {
+                    ...target, name: name.trim(), role, birthday: birthday || undefined, lunarBirthday: lunar,
+                });
+            }
+            cancelEdit();
+        } else {
+            await addMember(plugin, plugin.settings, {
+                id: newSiYuanId(),
+                name: name.trim(), role, birthday: birthday || undefined,
+                lunarBirthday: lunar, createdAt: new Date().toISOString(),
+            });
+            name = ""; role = "self"; birthday = ""; lunar = false;
+        }
         await plugin.refreshHub();
     }
 </script>
@@ -56,7 +80,13 @@
     <label style="display:flex;gap:5px;align-items:center;font-size:12.5px;cursor:pointer">
         <input type="checkbox" bind:checked={lunar} />{t("members.lunar")}
     </label>
-    <button class="b3-button b3-button--text" onclick={add}>＋ {t("add")}</button>
+    {#if editId}<span class="lv-caption" style="color:var(--lv-accent)">{t("members.editing")}</span>{/if}
+    <button class="b3-button b3-button--text" onclick={save} disabled={!name.trim()}>
+        {editId ? t("save") : `＋ ${t("add")}`}
+    </button>
+    {#if editId}
+        <button class="b3-button b3-button--outline" onclick={cancelEdit}>{t("cancel")}</button>
+    {/if}
 </div>
 
 {#if members.length === 0}
@@ -71,8 +101,12 @@
             <span class="lv-avatar lg" style="background:linear-gradient(135deg,var(--lv-accent),var(--lv-accent-2))">{m.name.slice(0, 1)}</span>
             <div><b>{m.name}</b><div class="lv-caption">{t(`role.${m.role}`)}{m.lunarBirthday ? " 🌙" : ""} {m.birthday ?? ""}</div></div>
             <span style="flex:1"></span>
+            <button class="b3-button b3-button--text" onclick={(e) => { e.stopPropagation(); startEdit(m); }}>{t("members.edit")}</button>
             <button class="b3-button b3-button--text" onclick={(e) => { e.stopPropagation(); confirmRemove(m); }}>{t("delete")}</button>
         </div>
+        {#if m.syncError}
+            <div class="lv-caption" role="alert" style="color:var(--lv-danger)">⚠ {t("members.syncError")}: {m.syncError}</div>
+        {/if}
         {#if alertsFor(m.id).length > 0}
             <div class="person-alert" style="font-size:12px;color:var(--lv-warn)">⚠ {alertsFor(m.id).length} {t("dash.needAttention")}</div>
         {/if}

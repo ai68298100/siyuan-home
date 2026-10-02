@@ -34,23 +34,34 @@
         showMessage(t("hub.restoreDone"), 3000, "info");
     }
 
-    // B4b 续期：思源 Dialog 小窗（B4e 正规化，替换 window.prompt）
+    // B4b 续期：思源 Dialog 小窗（H10：失败保留 Dialog 与输入、错误就地显示，不提前销毁）
     function renewDialog(r: any) {
         const dlg = new Dialog({
             title: `${t("act.renew")} · ${r.title}`,
-            content: `<div class="b3-dialog__content"><input class="b3-text-field fn__block" id="lv-renew-date" type="date" value="${r.dueDate}"></div>
+            content: `<div class="b3-dialog__content"><input class="b3-text-field fn__block" id="lv-renew-date" type="date" value="${r.dueDate}"><div class="lv-caption" id="lv-renew-err" role="alert" style="color:var(--b3-card-error-color);display:none"></div></div>
 <div class="b3-dialog__action"><button class="b3-button b3-button--cancel" id="lv-renew-cancel">${t("cancel")}</button><button class="b3-button b3-button--text" id="lv-renew-ok">${t("save")}</button></div>`,
             width: "380px",
         });
         // 33.4 弹层契约：初始焦点落在日期输入
-        (dlg.element.querySelector("#lv-renew-date") as HTMLInputElement)?.focus();
+        const dateInput = dlg.element.querySelector("#lv-renew-date") as HTMLInputElement;
+        dateInput?.focus();
         dlg.element.querySelector("#lv-renew-cancel")?.addEventListener("click", () => dlg.destroy());
         dlg.element.querySelector("#lv-renew-ok")?.addEventListener("click", async () => {
-            const v = (dlg.element.querySelector("#lv-renew-date") as HTMLInputElement)?.value;
-            dlg.destroy();
+            const v = dateInput?.value;
             if (!v) return;
-            // plugin.renew 内部写回后触发 refreshHub（行数据已变，不走 notifyHubChanged）
-            await plugin.renew(r, v);
+            const okBtn = dlg.element.querySelector("#lv-renew-ok") as HTMLButtonElement;
+            const err = dlg.element.querySelector("#lv-renew-err") as HTMLElement;
+            try {
+                okBtn.disabled = true;
+                // plugin.renew 内部写回后触发 refreshHub（行数据已变，不走 notifyHubChanged）
+                await plugin.renew(r, v);
+                dlg.destroy();
+            } catch (e) {
+                // 写回失败：保留 Dialog 与已填值，可重试
+                err.textContent = t("ledger.saveFailed").replace("${msg}", e instanceof Error ? e.message : String(e));
+                err.style.display = "block";
+                okBtn.disabled = false;
+            }
         });
     }
 
