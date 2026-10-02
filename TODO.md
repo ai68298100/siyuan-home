@@ -12,7 +12,7 @@
 - [x] 🔴 `git init` 并建立首个提交（当前项目无版本控制） ✅ 2026-10-01（09 决策记录 / commit 168dcae）
 - [ ] 🟡 创建 GitHub 仓库 `ai68298100/siyuan-home`（仓库名必须等于插件 name，main 分支）——**触发条件：v0.2 纵向切片完成且回归全绿，公开前审查（第 25 组）通过**
 - [ ] 🟡 推送骨架 + 设计文档（README/MODULES/docs/design/prototype）——同上触发条件
-- [ ] 🟡 配置 GitHub Actions：PR 时跑 `pnpm run check + build`（模板自带 workflow 改造）
+- [x] 🟡 配置 GitHub Actions：.github/workflows/ci.yml（check 五重门禁+test+build+smoke+gzip 包体门禁+产物上传）
 - [ ] 🟢 分支保护：main 禁直推
 - [ ] 🟢 `plugin.json` 的 `author`/`url` 从占位 lvdaoguan 改为 ai68298100
 - [ ] 🔴 替换 `icon.png`（160×160，≤64KiB，禁止 SVG）
@@ -559,7 +559,7 @@
 - [ ] 🟡 多窗口状态一致性：settings 与 `hub.updated` 事件带版本/时间戳，覆盖乱序、重复、丢失事件并提供手动刷新提示
 - [x] 🟡 发布包 smoke test：解压 `package.zip` 检查 manifest、双语 i18n、图标、`LICENSE`、`MODULES.md` 和 README 链接；处理 `dist` 未包含 docs/design、prototype 导致的失链 ✅ 2026-10-02（首轮抓到 2 真问题并修复：docs 泄漏入包已禁、LICENSE 补入；D12 落实 vite 配置）
 - [x] 🟡 元数据一致性门禁：`package.json` repository/homepage、作者、版本、license、`plugin.json`、README 和 release tag 在 CI 中交叉校验 ✅ 2026-10-02（scripts/check-meta.mjs + check:meta；name/version 交叉+关键文件存在性；repository 已填）
-- [ ] 🟡 PR CI：除 tag release 外补充 PR 的 `check + build + 包体/产物检查`，并记录 zip 体积与关键文件哈希
+- [x] 🟡 PR CI：ci.yml 覆盖 PR 与 main push（含 smoke 与 gzip 门禁；文件哈希留按需）
 - [ ] 🟡 README / MODULES / TODO 发布策略统一：明确当前 v0.1 实现边界、GitHub Release 与集市暂缓状态，避免把路线图写成已交付能力
 - [ ] 🟢 卸载/重装/工作区切换测试：确认台账保留、设置恢复、插件 reload 不复用旧内存，`onunload` 清理事件、计时器和 observer
 

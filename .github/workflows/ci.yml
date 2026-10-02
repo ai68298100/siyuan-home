@@ -1,0 +1,53 @@
+# CI：PR 与 push 的质量门禁（TODO 25：check + build + smoke/包体检查）
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  quality:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Check (types + svelte + i18n + meta)
+        run: pnpm run check
+
+      - name: Unit tests
+        run: pnpm test
+
+      - name: Build
+        run: pnpm run build
+
+      - name: Package smoke test
+        run: pnpm run smoke
+
+      - name: Bundle size gate (index.js gzip < 100KB)
+        run: |
+          SIZE=$(gzip -c dist/index.js | wc -c)
+          echo "index.js gzip: $SIZE bytes"
+          if [ "$SIZE" -gt 102400 ]; then
+            echo "::error::index.js gzip exceeds 100KB budget"
+            exit 1
+          fi
+
+      - name: Upload package artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: package
+          path: package.zip
+          retention-days: 14
