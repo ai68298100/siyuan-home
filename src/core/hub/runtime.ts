@@ -84,6 +84,8 @@ export interface HubRuntime {
     lastOverdueAlertDate?: string;
     /** 每周预告摘要去重：ISO 周键（29 组，如 2026-W40） */
     lastWeeklyDigest?: string;
+    /** EC21：最近一次 lv-exam:stats 聚合缓存（只存子集，latest-only；不读题目内容） */
+    lastExamStats?: { streak: number; accuracy: number; attempts: number; generatedAt: number };
 }
 
 export function defaultRuntime(): HubRuntime {

@@ -610,5 +610,7 @@
     "members.contactLink": "Link contact",
     "members.contactUnlink": "Unlink",
     "members.contactLinked": "Lv Contacts contact linked",
-    "members.contactUnlinked": "Contact unlinked"
+    "members.contactUnlinked": "Contact unlinked",
+    "mod.examStreak": "📝 ${n}-day study streak · ${p}% accuracy",
+    "mod.examStatsTip": "Data from Lv Exam (updated ${d}; aggregates only)"
 }

@@ -51,6 +51,8 @@ export default class LvHomePlugin extends Plugin {
     private scanSeq = 0;
     /** EC03/v0.3：服务桥卸载函数 */
     private disposeLvHomeBridge?: () => void;
+    /** EC21：lv-exam:stats 监听（window CustomEvent，非 eventBus） */
+    private examStatsHandler?: (e: Event) => void;
     /** 下次面板挂载的目标页签（状态栏/通知入口预选） */
     pendingScreen?: string;
     private statusbarEl?: HTMLElement;
@@ -200,6 +202,21 @@ export default class LvHomePlugin extends Plugin {
             addMemo: (title, due) => self.addMemo(title, due),
             onBridgeDisposed: () => { self.disposeLvHomeBridge = undefined; },
         });
+
+        // EC21：消费 lv-exam:stats 聚合（脱敏 PublicStats v1，无题目内容）——仅缓存子集供考试模块卡展示
+        this.examStatsHandler = (e: Event) => {
+            const detail = (e as CustomEvent).detail as {streak?: unknown; accuracy?: unknown; attempts?: unknown; generatedAt?: unknown} | undefined;
+            if (!detail || typeof detail !== "object") return;
+            const streak = Number(detail.streak);
+            const accuracy = Number(detail.accuracy);
+            const attempts = Number(detail.attempts);
+            const generatedAt = Number(detail.generatedAt);
+            if (![streak, accuracy, attempts, generatedAt].every((n) => Number.isFinite(n))) return;
+            this.runtime.lastExamStats = {streak, accuracy, attempts, generatedAt};
+            import("@/core/hub/runtime").then((m) => m.saveRuntime(this, this.runtime)).catch(() => undefined);
+            this.hubListeners.forEach((fn) => fn());
+        };
+        window.addEventListener("lv-exam:stats", this.examStatsHandler);
     }
 
     /**
@@ -551,6 +568,9 @@ export default class LvHomePlugin extends Plugin {
         this.visibilityHandler = undefined;
         if (this.wsHandler) this.eventBus.off("ws-main", this.wsHandler);
         this.wsHandler = undefined;
+        // EC21：lv-exam:stats 监听移除
+        if (this.examStatsHandler) window.removeEventListener("lv-exam:stats", this.examStatsHandler);
+        this.examStatsHandler = undefined;
         // EC03/v0.3：服务桥卸载（delete window.LvHome）
         if (this.disposeLvHomeBridge) this.disposeLvHomeBridge();
         this.disposeLvHomeBridge = undefined;

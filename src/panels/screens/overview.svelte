@@ -122,6 +122,12 @@
                     <span>{t("mod.inLedger")}</span>
                 {/if}
             </div>
+            {#if mid === "exams" && plugin.runtime?.lastExamStats?.generatedAt}
+                <!-- EC21：lv-exam:stats 聚合展示（只读子集，标注更新日期；不读题目内容） -->
+                <div class="lv-caption" title={t("mod.examStatsTip").replace("${d}", new Date(plugin.runtime.lastExamStats.generatedAt).toLocaleDateString())}>
+                    📝 {t("mod.examStreak").replace("${n}", String(plugin.runtime.lastExamStats.streak)).replace("${p}", String(plugin.runtime.lastExamStats.accuracy))}
+                </div>
+            {/if}
         </div>
     {/each}
 </div>

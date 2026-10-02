@@ -610,5 +610,7 @@
     "members.contactLink": "关联联系人",
     "members.contactUnlink": "解除关联",
     "members.contactLinked": "已关联人脉联系人",
-    "members.contactUnlinked": "已解除关联"
+    "members.contactUnlinked": "已解除关联",
+    "mod.examStreak": "📝 备考连续 ${n} 天 · 正确率 ${p}%",
+    "mod.examStatsTip": "来自小驴考试的数据（${d} 更新；仅聚合统计）"
 }
