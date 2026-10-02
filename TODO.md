@@ -690,6 +690,7 @@
 | 2026-10-02 | 循环A | 第 7 项无障碍终查（快速） | 新 UI 非按钮交互仅模块卡（已有 role/tabindex/onkeydown）；dashboard.svelte 为 LEGACY 待 C1c 删除；33.4 无障碍剩余仅剩抽屉 focus trap/aria-live |
 | 2026-10-02 | 主线 | 33.2 journal 最小版 | DbRef.provisionError 记录建库/补列失败摘要（成功清除）；诊断区红色显示；完整 journal（多步恢复）留实测后按需 |
 | 2026-10-02 | 主线 | 33.5 元数据一致性校验脚本 | scripts/check-meta.mjs（name/version 交叉+文件存在性+上架开关提示）；check:meta script |
+| 2026-10-02 | 主线 | 33.5 smoke test 脚本化 | scripts/smoke-test.mjs（必要/禁入文件+JSON+体积）纳入 check 链（check=四重门禁+meta）；pnpm run smoke 独立可跑 |
 | 2026-10-02 | 主线 | 23 组 zip 体积门禁 | check:meta 内置（<10MB） |
 | 2026-10-02 | 主线 | 25 组 issue/PR 模板落盘 .github/ | bug/feature 模板 + PR 自查清单 |
 | 2026-10-02 | 主线 | Releases 流程演练（beta 通道实操） | v0.1.0-alpha.1 prerelease 发布成功（zip 附件+notes）；发布通道全程验证 |

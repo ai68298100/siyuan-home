@@ -1,0 +1,66 @@
+// 发布包 smoke test（33.5）—— node scripts/smoke-test.mjs
+// 检查 package.zip：必要文件齐全、禁入文件未泄漏、manifest/i18n JSON 有效、体积门禁。
+import { readFileSync, existsSync, rmSync, mkdirSync } from "node:fs";
+import { execSync } from "node:child_process";
+import path from "node:path";
+
+const zip = path.resolve("package.zip");
+const tmp = path.resolve("tmp/smoke-test");
+const errors = [];
+const warnings = [];
+
+if (!existsSync(zip)) {
+    console.error("package.zip not found — run `pnpm run build` first");
+    process.exit(1);
+}
+
+// 解压（跨平台：用系统 unzip 或 PowerShell；Git Bash 环境下 unzip 可用）
+try {
+    rmSync(tmp, { recursive: true, force: true });
+    mkdirSync(tmp, { recursive: true });
+    execSync(`unzip -o -q "${zip}" -d "${tmp}"`, { stdio: "pipe" });
+} catch (e) {
+    console.error("unzip failed:", e.message);
+    process.exit(1);
+}
+
+// 1. 必要文件（集市与运行要求）
+const required = [
+    "index.js", "index.css", "plugin.json", "icon.png", "preview.png",
+    "README.md", "README.zh-CN.md", "LICENSE", "kernel.js",
+    "i18n/zh-CN.json", "i18n/en.json",
+];
+for (const f of required) {
+    if (!existsSync(path.join(tmp, f))) errors.push(`missing required file: ${f}`);
+}
+
+// 2. 禁入文件（D12：发布产物仅运行必需）
+const forbidden = ["TODO.md", "MODULES.md", "docs", "prototype", "tests", "scripts", "ROADMAP.md", "CONTRIBUTING.md"];
+for (const f of forbidden) {
+    if (existsSync(path.join(tmp, f))) errors.push(`forbidden file leaked: ${f}`);
+}
+
+// 3. JSON 有效性 + i18n 键位对齐（包内副本）
+try {
+    const manifest = JSON.parse(readFileSync(path.join(tmp, "plugin.json"), "utf8"));
+    if (manifest.name !== "siyuan-home") errors.push("manifest name mismatch");
+    const zh = Object.keys(JSON.parse(readFileSync(path.join(tmp, "i18n/zh-CN.json"), "utf8"))).sort();
+    const en = Object.keys(JSON.parse(readFileSync(path.join(tmp, "i18n/en.json"), "utf8"))).sort();
+    if (zh.join() !== en.join()) errors.push("packaged i18n key mismatch");
+    if (zh.length < 400) warnings.push(`packaged i18n keys suspiciously few: ${zh.length}`);
+} catch (e) {
+    errors.push("packaged JSON parse error: " + e.message);
+}
+
+// 4. 体积门禁（<10MB）
+const mb = readFileSync(zip).length / 1024 / 1024;
+if (mb > 10) errors.push(`package.zip too large: ${mb.toFixed(2)} MB`);
+
+// 汇总
+if (warnings.length) console.log("warnings:\n" + warnings.map((w) => " ⚠ " + w).join("\n"));
+if (errors.length) {
+    console.error("SMOKE TEST FAILED:\n" + errors.map((e) => " ✗ " + e).join("\n"));
+    process.exit(1);
+}
+console.log(`smoke test OK: zip ${mb.toFixed(2)} MB, all required files present, no leaks`);
+rmSync(tmp, { recursive: true, force: true });
