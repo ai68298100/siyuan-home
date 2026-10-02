@@ -8,10 +8,12 @@
         i18n: Record<string, unknown>;
         settings: HomeSettings;
         getDiagnostics?: () => any;
-        /** moduleId → schema 目录（D12 深度健康检查用） */
-        schemaCatalog?: Record<string, { columns?: { key: string }[] }>;
+        /** moduleId → schema 目录（D12 深度健康检查 / C8c leadOverrides 枚举用） */
+        schemaCatalog?: Record<string, { columns?: { key: string }[]; reminders?: { key: string; field: string; kind: string; leadDays: number }[] }>;
         /** 保存后广播到全部页签（H02） */
         refreshHub?: () => Promise<unknown>;
+        /** C8b：新启用模块立即建库 */
+        ensureCoreLedgers?: () => Promise<void>;
     }
 
     let { plugin, settings }: {
@@ -22,7 +24,7 @@
     // i18n 取值统一转 string（1.2.8 起 JSONValue）
     const t = (key: string) => String(plugin.i18n[key] ?? key);
 
-    let tab: "modules" | "members" | "about" = $state("modules");
+    let tab: "modules" | "members" | "reminders" | "about" = $state("modules");
     let saving = $state(false);
     // 33.4 编辑事务：draft 副本，保存才落盘（取消/关闭不污染 settings）。
     // 此处捕获初始快照是设计意图，抑制 svelte 的 locally-referenced 提示。
@@ -30,14 +32,39 @@
     let draftEnabled: string[] = $state([...settings.enabledModules]);
     // svelte-ignore state_referenced_locally
     let draftMembers: any[] = $state(settings.members.map((m: any) => ({ ...m })));
+    // C8c 提醒分区 draft：摘要时段/静默时段 + 提前量覆盖（key → 空串=用默认）
+    // svelte-ignore state_referenced_locally
+    let draftNotifyHour = $state(settings.notifyHour);
+    // svelte-ignore state_referenced_locally
+    let draftSilentFrom = $state(settings.silentFrom);
+    // svelte-ignore state_referenced_locally
+    let draftSilentTo = $state(settings.silentTo);
+    // svelte-ignore state_referenced_locally
+    let draftLeads = $state<Record<string, string>>(
+        Object.fromEntries(Object.entries(settings.leadOverrides ?? {}).map(([k, v]) => [k, String(v)])),
+    );
+    /** C8c：枚举所有模块的提醒规则（leadOverrides 编辑行） */
+    const leadRules = $derived.by(() => {
+        const catalog = plugin.schemaCatalog ?? {};
+        const rows: { key: string; moduleId: string; ruleKey: string; def: number }[] = [];
+        for (const [moduleId, schema] of Object.entries(catalog) as [string, any][]) {
+            for (const rule of schema?.reminders ?? []) {
+                rows.push({ key: `${moduleId}.${rule.key}`, moduleId, ruleKey: rule.key, def: rule.leadDays });
+            }
+        }
+        return rows.sort((a, b) => a.key.localeCompare(b.key));
+    });
 
     const ROLES: MemberRole[] = ["self", "spouse", "partner", "child", "elder", "kin", "other"];
     const enabledIds = $derived(new Set(draftEnabled));
 
+    // C8b：禁用模块需确认（数据保留语义：只隐藏入口与提醒，台账行不动）
     function toggleModule(id: string, alwaysOn?: boolean) {
         if (alwaysOn) return;
         if (enabledIds.has(id)) {
-            draftEnabled = draftEnabled.filter((x) => x !== id);
+            confirm(t("settings.disableTitle"), t("settings.disableBody").replace("${name}", t(`module.${id}`)), () => {
+                draftEnabled = draftEnabled.filter((x) => x !== id);
+            });
         } else {
             draftEnabled = [...draftEnabled, id];
             const mod = modulesByGroup("kids").find((m) => m.id === id);
@@ -72,9 +99,24 @@
         saving = true;
         try {
             const prevMembers = plugin.settings.members;
+            const prevModules = new Set(plugin.settings.enabledModules);
+            const modulesChanged = draftEnabled.length !== prevModules.size || draftEnabled.some((id) => !prevModules.has(id));
             plugin.settings.enabledModules = [...draftEnabled];
             plugin.settings.members = draftMembers.map((m) => ({ ...m, name: m.name.trim() || "?" }));
+            // C8c：提醒设置落盘（无效时段值忽略，保持 0-23 界内）
+            const clampHour = (v: number, fallback: number) => (Number.isFinite(v) ? Math.min(23, Math.max(0, Math.round(v))) : fallback);
+            plugin.settings.notifyHour = clampHour(draftNotifyHour, 8);
+            plugin.settings.silentFrom = clampHour(draftSilentFrom, 22);
+            plugin.settings.silentTo = clampHour(draftSilentTo, 8);
+            plugin.settings.leadOverrides = Object.fromEntries(
+                Object.entries(draftLeads)
+                    .map(([k, v]) => [k, v.trim() === "" ? null : Number(v)] as [string, number | null])
+                    .filter(([, v]) => v !== null && Number.isFinite(v as number) && (v as number) >= 0)
+                    .map(([k, v]) => [k, Math.min(3650, v as number)]),
+            );
             await saveSettings(plugin as any, plugin.settings);
+            // C8b：模块开关接线——新启用模块立即建库（禁用只隐藏保留数据）
+            if (modulesChanged) await plugin.ensureCoreLedgers?.();
             // D05：设置页与成员页同走成员 DAL——差异同步到 members 台账行（新增建行/变更写回）
             const { syncMembersToAv } = await import("@/core/members");
             const rep = await syncMembersToAv(plugin as any, plugin.settings, prevMembers);
@@ -95,6 +137,7 @@
     <div class="fn__flex b3-tab-bar">
         <button class="b3-button {tab === 'modules' ? 'b3-button--text' : ''}" onclick={() => (tab = "modules")}>{t("tabModules")}</button>
         <button class="b3-button {tab === 'members' ? 'b3-button--text' : ''}" onclick={() => (tab = "members")}>{t("tabMembers")}</button>
+        <button class="b3-button {tab === 'reminders' ? 'b3-button--text' : ''}" onclick={() => (tab = "reminders")}>{t("tabReminders")}</button>
         <button class="b3-button {tab === 'about' ? 'b3-button--text' : ''}" onclick={() => (tab = "about")}>{t("tabAbout")}</button>
     </div>
 
@@ -153,6 +196,33 @@
             </div>
         {/each}
         <button class="b3-button b3-button--outline" onclick={addMember}>＋ {t("add")}</button>
+    {:else if tab === "reminders"}
+        <div class="lv-settings__hint">{t("settings.remindersHint")}</div>
+        <div class="fn__flex lv-settings__row">
+            <span style="min-width:180px">{t("settings.notifyHour")}</span>
+            <input class="b3-text-field" style="width:90px" type="number" min="0" max="23" bind:value={draftNotifyHour} />
+            <span class="lv-caption fn__flex-1">{t("settings.notifyHourHint")}</span>
+        </div>
+        <div class="fn__flex lv-settings__row">
+            <span style="min-width:180px">{t("settings.silentHours")}</span>
+            <input class="b3-text-field" style="width:70px" type="number" min="0" max="23" bind:value={draftSilentFrom} />
+            <span class="lv-caption" style="margin:0 6px">→</span>
+            <input class="b3-text-field" style="width:70px" type="number" min="0" max="23" bind:value={draftSilentTo} />
+            <span class="lv-caption fn__flex-1">{t("settings.silentHoursHint")}</span>
+        </div>
+        <div style="margin-top:12px;border-top:1px solid var(--b3-border-color);padding-top:8px">
+            <p class="lv-caption">{t("settings.leadsTitle")}</p>
+            <p class="lv-caption ft__on-surface">{t("settings.leadsHint")}</p>
+        </div>
+        {#each leadRules as lr (lr.key)}
+            <div class="fn__flex lv-settings__row">
+                <span style="min-width:220px">{t(`module.${lr.moduleId}`)} · {t(`rule.${lr.ruleKey}`) !== `rule.${lr.ruleKey}` ? t(`rule.${lr.ruleKey}`) : lr.ruleKey}</span>
+                <input class="b3-text-field" style="width:90px" type="number" min="0" max="3650"
+                    placeholder={String(lr.def)}
+                    bind:value={draftLeads[lr.key]} />
+                <span class="lv-caption fn__flex-1">{t("settings.leadDefault").replace("${n}", String(lr.def))}</span>
+            </div>
+        {/each}
     {:else}
         <div class="lv-settings__about">
             <p>{t("about.line1")}</p>
@@ -164,6 +234,9 @@
                     await import("@/core/settings").then((m) => m.saveSettings(plugin as any, plugin.settings));
                     showMessage(t("wiz.rerunHint"), 3000, "info");
                 }}>{t("wiz.rerun")}</button>
+            <!-- C8e：关于区仓库链接（SDK 无 open 导出，走浏览器新窗口） -->
+            <button class="b3-button b3-button--outline" style="margin-top:8px;margin-left:6px"
+                onclick={() => window.open("https://github.com/ai68298100/siyuan-home", "_blank")}>{t("about.repo")}</button>
             <div style="margin-top:10px;border-top:1px solid var(--b3-border-color);padding-top:8px">
                 <p class="lv-caption">⌨ {t("faq.shortcuts")}</p>
                 <p class="lv-caption">· {t("openButler")}：{t("faq.topbarOrCommand")}</p>
