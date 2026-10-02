@@ -86,6 +86,8 @@ export interface HubRuntime {
     lastWeeklyDigest?: string;
     /** EC21：最近一次 lv-exam:stats 聚合缓存（只存子集，latest-only；不读题目内容） */
     lastExamStats?: { streak: number; accuracy: number; attempts: number; generatedAt: number };
+    /** EC09/EC10：打卡强度摘要缓存（top 5 项目；latest-only） */
+    lastCheckinSummary?: { items: { itemId: string; name: string; score: number }[]; windowDays: number; pulledAt: number };
     /** EC15：人情往来已同步到人脉的行（favor 行 itemID → {docId, at}） */
     favorSyncs?: Record<string, { docId: string; at: string }>;
     /** 29 组月度完成率：月键 "YYYY-MM" → 当月完成计数（跨月自动归零由读取方处理） */

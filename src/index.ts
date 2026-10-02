@@ -53,6 +53,8 @@ export default class LvHomePlugin extends Plugin {
     private disposeLvHomeBridge?: () => void;
     /** EC21：lv-exam:stats 监听（window CustomEvent，非 eventBus） */
     private examStatsHandler?: (e: Event) => void;
+    /** EC09/EC10：打卡集成事件监听（window CustomEvent） */
+    private checkinEventHandler?: (e: Event) => void;
     /** 下次面板挂载的目标页签（状态栏/通知入口预选） */
     pendingScreen?: string;
     private statusbarEl?: HTMLElement;
@@ -62,6 +64,8 @@ export default class LvHomePlugin extends Plugin {
     private wsHandler?: (...args: any[]) => void;
     private lastWsRescan = 0;
     private static WS_RESCAN_MIN_MS = 60 * 1000;
+    /** EC09/EC10：打卡摘要节流 */
+    private lastCheckinPull = 0;
     /** EC16：向雷切注册管家动作（disposer 收集；重试计时器上限 10 次） */
     private speedSwitchDisposers: Array<() => void> = [];
     private speedSwitchRetry?: number;
@@ -217,6 +221,41 @@ export default class LvHomePlugin extends Plugin {
             this.hubListeners.forEach((fn) => fn());
         };
         window.addEventListener("lv-exam:stats", this.examStatsHandler);
+
+        // EC09/EC10：打卡集成事件（checkin:*）→ 节流刷新健康模块卡打卡摘要
+        this.checkinEventHandler = () => {
+            // checkin 事件频繁（每次打卡触发）；60 秒节流后拉取强度摘要
+            if (Date.now() - this.lastCheckinPull < LvHomePlugin.WS_RESCAN_MIN_MS) return;
+            this.lastCheckinPull = Date.now();
+            this.pullCheckinSummary();
+        };
+        for (const evt of ["checkin:event-recorded", "checkin:event-deleted", "checkin:item-updated"]) {
+            window.addEventListener(evt, this.checkinEventHandler);
+        }
+        // 启动时拉取一次（打卡可能先于管家加载）
+        window.addEventListener("load", () => this.pullCheckinSummary());
+    }
+
+    /** EC09/EC10：拉取打卡强度摘要（只读；写入 runtime 供模块卡展示）[待实测] */
+    private async pullCheckinSummary(): Promise<void> {
+        try {
+            const checkin = (window as {siyuanCheckin?: {whenReady: () => Promise<boolean>; getStrengthSummary: (o?: {windowDays?: number}) => {items: {itemId: string; name: string; score: number}[]; windowDays: number}}}).siyuanCheckin;
+            if (!checkin?.whenReady || !checkin.getStrengthSummary) return;
+            const ready = await checkin.whenReady();
+            if (!ready) return;
+            const summary = checkin.getStrengthSummary({windowDays: 30});
+            if (!summary?.items?.length) return;
+            this.runtime.lastCheckinSummary = {
+                items: summary.items.slice(0, 5), // 有界：top 5
+                windowDays: summary.windowDays,
+                pulledAt: Date.now(),
+            };
+            const { saveRuntime } = await import("@/core/hub/runtime");
+            await saveRuntime(this, this.runtime);
+            this.hubListeners.forEach((fn) => fn());
+        } catch (e) {
+            console.warn("[siyuan-home] checkin summary pull failed:", e instanceof Error ? e.message : e);
+        }
     }
 
     /**
@@ -576,6 +615,13 @@ export default class LvHomePlugin extends Plugin {
         // EC21：lv-exam:stats 监听移除
         if (this.examStatsHandler) window.removeEventListener("lv-exam:stats", this.examStatsHandler);
         this.examStatsHandler = undefined;
+        // EC09/EC10：打卡集成事件移除
+        if (this.checkinEventHandler) {
+            for (const evt of ["checkin:event-recorded", "checkin:event-deleted", "checkin:item-updated"]) {
+                window.removeEventListener(evt, this.checkinEventHandler);
+            }
+            this.checkinEventHandler = undefined;
+        }
         // EC03/v0.3：服务桥卸载（delete window.LvHome）
         if (this.disposeLvHomeBridge) this.disposeLvHomeBridge();
         this.disposeLvHomeBridge = undefined;
