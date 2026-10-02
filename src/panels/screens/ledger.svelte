@@ -48,6 +48,7 @@
     let newMember = $state(""); // members av itemID
     let newAmount: number | undefined = $state();
     let newUrl = $state("");
+    let newNote = $state("");
     const memberOptions = $derived(plugin.settings.members ?? []);
     const memberAvId = $derived(plugin.settings.dbRefs.members?.avId);
     const categoryOptions = $derived<string[]>(
@@ -80,6 +81,12 @@
                 type: "relation", relation: { blockIDs: [newMember], contents: null },
             });
         }
+        // C6a 增量 5：note 备注列（几乎所有模块 capture 通用补充）
+        if (newNote && cols.note) {
+            await setCell(ref.avId, cols.note, itemID, {
+                type: "text", text: { content: newNote },
+            });
+        }
         // C6a 增量 4：URL 列（shopping/bookmarks/media 等 capture 常见列）
         if (newUrl && cols.url) {
             await setCell(ref.avId, cols.url, itemID, {
@@ -91,7 +98,7 @@
                 type: "number", number: { content: newAmount, isNotEmpty: true },
             });
         }
-        newName = ""; newCategory = ""; newExpiry = ""; newMember = ""; newAmount = undefined; newUrl = "";
+        newName = ""; newCategory = ""; newExpiry = ""; newMember = ""; newAmount = undefined; newUrl = ""; newNote = "";
         await load();
         await plugin.refreshHub();
     }
@@ -140,6 +147,9 @@
         <input class="b3-text-field" type="number" style="width:90px" placeholder={t("field.amount")} bind:value={newAmount} />
     {/if}
     <input class="b3-text-field" style="min-width:140px" placeholder={t("field.url")} bind:value={newUrl} />
+    {#if ref?.columns?.note}
+        <input class="b3-text-field fn__flex-1" style="min-width:140px" placeholder={t("field.note")} bind:value={newNote} />
+    {/if}
     <button class="b3-button b3-button--text" onclick={createRow} disabled={!ref?.avId}>＋ {t("ledger.add")}</button>
 </div>
 
