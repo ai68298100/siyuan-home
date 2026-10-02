@@ -51,6 +51,9 @@
 | 2026-10-03 | 主线 | 第三十五轮：favorSyncs 孤儿数据修复 | 行删除时同步清理 favorSyncs（与第 30 轮 renewHistory 同模式—— EC15 新代码引入时 renewHistory 修了但 favorSyncs 遗漏，自查发现）；单测 126 持平、gzip 51.3KB |
 | 2026-10-03 | 循环A | 第三十五波走查 | favorSyncs/renewHistory/dirty 标志合并为单次 saveRuntime（避免双重写盘） |
 | 2026-10-03 | 循环B | ③轮休（延续） | 兜底循环静默待命（延续） |
+| 2026-10-03 | 主线 | 第三十六轮：代码卫生 + EC18/19 确认 | 死代码 safe-mount.ts 移除（ErrorBoundary 取代）；monthlyCompletions 24 个月保留期入 purgeHandled；LeiQie 无 bookmarks/snippets 消费 API（EC18/19 供方依赖确认）；单测 126 持平、gzip 51.4KB |
+| 2026-10-03 | 循环A | 第三十六波走查 | 死代码移除零引用验证；purgeHandled 月度清理边界（24 个月 cutoffKey）逻辑复核 |
+| 2026-10-03 | 循环B | ③信源=兄弟仓源码（第六轮） | LeiQie 无 getBookmarks/getSnippets 对外暴露——EC18/19 维持供方依赖注记 |
 | 2026-10-03 | 主线 | 第二十八轮：EC03/v0.3 服务桥 window.LvHome 落地 | src/bridge/external-bridge.ts（protocol 1/capabilities 五项/whenReady/openButler/openReminders/addMemo 校验/summary 仅计数）+ docs/BRIDGE.md 契约文档（对齐人脉 BRIDGE 纪律：只提供服务不读他库/挂载卸载语义/版本策略）；重复挂载守卫；5 项单测；单测 121→126、i18n 608 持平、gzip 49.5KB |
 | 2026-10-03 | 循环A | 第二十八波走查 | 未用参数即修；summary 计数断言修正（today=daysLeft≤0 含逾期，测试初值写错）；重复挂载守卫（多实例不覆盖首桥） |
 | 2026-10-03 | 循环B | ③信源=兄弟仓 BRIDGE 模式（人脉 external-bridge 直读） | 管家桥的挂载/卸载/纪律三段对人脉同构复刻；EC 组「摘录→落地」第二例（EC16→EC13→EC03） |
