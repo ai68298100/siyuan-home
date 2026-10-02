@@ -5,7 +5,7 @@
 import type { Reminder, ReminderRuleSpec } from "@/types";
 import { buildReminder, localDateKey, type LedgerRowDates } from "./rule";
 import { renderLedger } from "../siyuan";
-import { CERTS_SCHEMA, MEMBERS_SCHEMA, type ModuleSchema } from "../schema";
+import { CERTS_SCHEMA, MEMBERS_SCHEMA, type ModuleSchema, type NumericRuleSpec } from "../schema";
 import type { DbRef, HomeSettings } from "@/types";
 
 export interface DataProvider {
@@ -46,6 +46,13 @@ function textFromValue(v: any): string | undefined {
 /** select 单选值（certs status 过滤用） */
 function selectFromValue(v: any): string | undefined {
     return v?.select?.content ?? v?.mSelect?.[0]?.content ?? undefined;
+}
+
+/** number 列值（H15）：0 算有值；缺列/缺值（isNotEmpty false）返回 undefined */
+function numberFromValue(v: any): number | undefined {
+    const n = v?.number;
+    if (!n || !n.isNotEmpty || typeof n.content !== "number" || isNaN(n.content)) return undefined;
+    return n.content;
 }
 
 interface ProviderDeps {
@@ -144,7 +151,9 @@ export class SchemaLedgerProvider implements DataProvider {
     }
 }
 
-/** members 家庭成员：生日周年（lunar 列参与农历判定）；archived 成员不提醒 */
+/** members 家庭成员：生日周年（lunar 列参与农历判定）；archived 成员不提醒。
+ * H08：memberId 按 avItemId 反查 settings.members——成员过滤能选中其生日；
+ * 农历标记读独立 lunar 列（与 members.ts 写入一致；旧数据 birthday 复选框形态兜底）。 */
 export class MembersProvider implements DataProvider {
     readonly moduleId = "members";
     constructor(private deps: ProviderDeps) {}
@@ -158,6 +167,7 @@ export class MembersProvider implements DataProvider {
         if (!read.complete) throw new Error(`ledger read incomplete (${read.rows.length}/${read.rowCount} rows)`);
         requireReminderColumns(ref.columns!, schema);
         const { rows } = read;
+        const members = this.deps.settings.members ?? [];
         for (const row of rows) {
             const cell = (key: string) => row.cells[ref.columns![key]];
             const status = selectFromValue(cell("status"));
@@ -166,13 +176,72 @@ export class MembersProvider implements DataProvider {
             const birthday = cell("birthday");
             const fieldValue = dateFromValue(birthday);
             if (!fieldValue) continue;
-            const lunar = !!birthday?.checkbox?.checked;
+            const lunar = !!cell("lunar")?.checkbox?.checked || !!birthday?.checkbox?.checked;
+            // H08：生日行 = 成员行本身，按 avItemId 关联 settings 成员 id（成员过滤键）
+            const memberId = members.find((m) => m.avItemId === row.itemID)?.id;
             for (const rule of schema.reminders ?? []) {
-                const r = await buildReminder(rule, this.moduleId, { rowId: row.itemID, title: name, fieldValue, lunar }, {
+                const r = await buildReminder(rule, this.moduleId, { rowId: row.itemID, title: name, fieldValue, lunar, memberId }, {
                     today,
                     leadOverride: leadFor(this.deps.settings, this.moduleId, rule),
                 });
                 if (r) out.push(r);
+            }
+        }
+        return out;
+    }
+}
+
+/**
+ * 数值阈值规则 provider（H15）：值列 ≤ 逐行阈值列 → 即时提醒（due=今天，level=soon）。
+ * 语义：缺值/缺列不提醒；0 算有值；补货到阈值之上自动解除（扫描重算）；
+ * 终态行（status 命中 skip 集）不提醒；行级规则列缺失抛错（同 H04）。
+ */
+export class NumericRuleProvider implements DataProvider {
+    readonly moduleId: string;
+    constructor(
+        moduleId: string,
+        private schema: ModuleSchema,
+        private deps: ProviderDeps,
+    ) {
+        this.moduleId = moduleId;
+    }
+
+    async collect(today: Date): Promise<Reminder[]> {
+        const ref = this.deps.getDbRef(this.moduleId);
+        if (!ref?.avId || !ref.columns) return [];
+        const rules = this.schema.numericRules ?? [];
+        if (rules.length === 0) return [];
+        const missing = rules.flatMap((r) => [r.field, r.thresholdField]).filter((f) => !ref.columns![f]);
+        if (missing.length) throw new Error(`missing numeric rule column(s): ${[...new Set(missing)].join(", ")}`);
+        const read = await renderLedger(ref.avId);
+        if (!read.complete) throw new Error(`ledger read incomplete (${read.rows.length}/${read.rowCount} rows)`);
+        const out: Reminder[] = [];
+        const members = this.deps.settings.members ?? [];
+        const skip = new Set(["archived", "void", "expired", "renewed", "refunded", "discarded", "surrendered", "ins_expired", "med_expired", "m_expired"]);
+        const todayKey = localDateKey(today);
+        for (const row of read.rows) {
+            const cell = (key: string) => row.cells[ref.columns![key]];
+            if (skip.has(selectFromValue(cell("status")) ?? "")) continue;
+            const name = textFromValue(cell("name")) ?? this.moduleId;
+            const rel: string[] | undefined = cell("member")?.relation?.blockIDs ?? undefined;
+            const memberId = rel?.[0] ? members.find((m) => m.avItemId === rel[0])?.id : undefined;
+            for (const rule of rules as NumericRuleSpec[]) {
+                const qty = numberFromValue(cell(rule.field));
+                const threshold = numberFromValue(cell(rule.thresholdField));
+                if (qty === undefined || threshold === undefined) continue; // 缺值不评估（0 算有值）
+                if (qty > threshold) continue; // 高于阈值：无事项（补货自动解除）
+                out.push({
+                    id: `${row.itemID}::${this.moduleId}.${rule.key}`,
+                    moduleId: this.moduleId,
+                    ruleKey: rule.key,
+                    rowId: row.itemID,
+                    memberId,
+                    title: `${name} · ${qty}/${threshold}`,
+                    dueDate: todayKey,
+                    daysLeft: 0,
+                    level: "soon",
+                    kind: "oneoff",
+                });
             }
         }
         return out;

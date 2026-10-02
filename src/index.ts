@@ -8,7 +8,7 @@ import { svelteDialog } from "@/libs/dialog";
 import { loadSettings, saveSettings } from "@/core/settings";
 import { loadRuntime, saveRuntime, purgeHandled, listHandled, type HubRuntime } from "@/core/hub/runtime";
 import { runScan, deriveVisible, type ScanResult } from "@/core/hub/scanner";
-import { CertsProvider, MembersProvider, SchemaLedgerProvider } from "@/core/hub/providers";
+import { CertsProvider, MembersProvider, SchemaLedgerProvider, NumericRuleProvider } from "@/core/hub/providers";
 import { dailyDigest, markNotified } from "@/core/hub/notify";
 import { complete, snooze, mute, unmute, renew, restore, addMemo, removeMemo } from "@/core/hub/actions";
 import { provisionModule } from "@/core/provisioner";
@@ -180,11 +180,13 @@ export default class LvHomePlugin extends Plugin {
             new SchemaLedgerProvider("assets-real", ASSETS_REAL_SCHEMA, deps),
             new SchemaLedgerProvider("health", HEALTH_SCHEMA, deps),
             new SchemaLedgerProvider("medicine", MEDICINE_SCHEMA, deps),
+            new NumericRuleProvider("medicine", MEDICINE_SCHEMA, deps), // H15 低库存（数值侧）
             new SchemaLedgerProvider("memberships", MEMBERSHIPS_SCHEMA, deps),
             new SchemaLedgerProvider("insurance", INSURANCE_SCHEMA, deps),
             new SchemaLedgerProvider("contracts", CONTRACTS_SCHEMA, deps),
             new SchemaLedgerProvider("exams", EXAMS_SCHEMA, deps),
             new SchemaLedgerProvider("stock", STOCK_SCHEMA, deps),
+            new NumericRuleProvider("stock", STOCK_SCHEMA, deps), // H15 囤货低库存
             new SchemaLedgerProvider("chores", CHORES_SCHEMA, deps),
             new SchemaLedgerProvider("house", HOUSE_SCHEMA, deps),
             new SchemaLedgerProvider("pets", PETS_SCHEMA, deps),

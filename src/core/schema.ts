@@ -52,6 +52,17 @@ export interface ModuleSchema {
     templates?: DocTemplate[];
     /** 参与提醒中枢的日期列声明（docs/design/03 §2） */
     reminders?: ReminderRuleSpec[];
+    /** 数值阈值规则（H15）：值列 ≤ 阈值列时生成即时提醒（如药品/囤货低库存）。
+     * 语义定案：值 ≤ 阈值触发（降到阈值即提醒）；值或阈值缺列/缺值不提醒（0 算有值）；
+     * 补货到阈值之上自动解除（每次扫描重算）；忽略/恢复由运行态 mute/restore 管理。 */
+    numericRules?: NumericRuleSpec[];
+}
+
+/** 数值阈值规则声明（H15）：field=数量列，thresholdField=逐行阈值列 */
+export interface NumericRuleSpec {
+    key: string;
+    field: string;
+    thresholdField: string;
 }
 
 // ── 字段字典（02 §2）────────────────────────────────────────
@@ -152,6 +163,8 @@ export const MEDICINE_SCHEMA: ModuleSchema = {
     capture: ["name", "category", "expiry", "stock_qty", "location"],
     views: [{ key: "expiring", type: "table", sortBy: { key: "expiry", asc: true } }],
     reminders: [{ key: "expiry", field: "expiry", kind: "oneoff", leadDays: 30 }],
+    // H15：低库存双规则之数值侧（效期侧由 expiry 规则承担；阈值逐行 low_stock_at）
+    numericRules: [{ key: "low_stock", field: "stock_qty", thresholdField: "low_stock_at" }],
 };
 
 export const MEMBERSHIPS_SCHEMA: ModuleSchema = {
@@ -305,6 +318,8 @@ export const STOCK_SCHEMA: ModuleSchema = {
         { key: "expiring", type: "table", sortBy: { key: "expiry", asc: true } },
     ],
     reminders: [{ key: "expiry", field: "expiry", kind: "oneoff", leadDays: 30 }],
+    // H15：囤货低库存（阈值逐行 low_stock_at）
+    numericRules: [{ key: "low_stock", field: "qty", thresholdField: "low_stock_at" }],
 };
 
 export const CHORES_SCHEMA: ModuleSchema = {
@@ -555,6 +570,10 @@ export function validateSchema(id: string, schema: ModuleSchema): string[] {
         if (!keys.has(r.field)) errors.push(`[${id}] reminder ${r.key} field 未知列 "${r.field}"`);
         if (r.cycleField && !keys.has(r.cycleField)) errors.push(`[${id}] reminder ${r.key} cycleField 未知列`);
         if (r.lunarField && !keys.has(r.lunarField)) errors.push(`[${id}] reminder ${r.key} lunarField 未知列`);
+    }
+    for (const n of schema.numericRules ?? []) {
+        if (!keys.has(n.field)) errors.push(`[${id}] numericRule ${n.key} field 未知列 "${n.field}"`);
+        if (!keys.has(n.thresholdField)) errors.push(`[${id}] numericRule ${n.key} thresholdField 未知列 "${n.thresholdField}"`);
     }
     return errors;
 }
