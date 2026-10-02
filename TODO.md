@@ -24,6 +24,9 @@
 | 2026-10-03 | 主线 | 第二十五轮：EC16 落地（管家→雷切动作注册） | 按打卡已验证模式实现：app.plugins 探测 + 方法存在性 + 1200ms×10 重试 + disposer 收集；注册「打开管家/打开提醒中枢」两动作（提醒预选）；卸载全注销；单测 121 持平、gzip 48.2KB；[待实测] 同实例联调随 EC30 |
 | 2026-10-03 | 循环A | 第二十五波走查 | 未用字段即修；动作 label 全走 i18n 现有键；重复注册守卫（disposers 非空即返回）复核 |
 | 2026-10-03 | 循环B | ③信源=兄弟仓源码（第三轮） | 契约摘录→落地代码的完整闭环首次达成（EC16：摘录 §3 → index.ts 实现）；EC13/17 同路径可复制 |
+| 2026-10-03 | 主线 | 第二十六轮：EC13 v1 落地（人脉联系人选人） | 四 schema（contracts/insurance/schooling/exams）增 contact 文本列（D08 补列续跑自动迁移+快照 -u）；详情抽屉「从人脉选择」——window.LvContacts.searchPeople 实时搜索（旧请求丢弃 PF07）、快照存 `名称 [docId]`、未装/未初始化/失败三态降级；D08 补列续跑首次实战（既有台账自动获新列）；单测 121 持平、i18n 603→608、gzip 48.8KB |
+| 2026-10-03 | 循环A | 第二十六波走查 | 快照 diff 仅 contact 列；搜索竞态守卫（seq 计数）；快照格式在抽屉/思源原生 UI 双侧可读 |
+| 2026-10-03 | 循环B | ③信源=兄弟仓源码（第四轮） | EC13 完成「身份→契约→落地」全链路（第二十三轮摘录 §1 → 本轮实现）；EC17 同路径待复制 |
 | 2026-10-03 | 循环A | 契约摘录复核 | 全部签名来自源码直读非文档转述；未初始化抛错/卸载注销/重复注册保护三处运行时语义已登记；EC12 owner 定案点未越界 |
 | 2026-10-03 | 循环B | ①研究产出即待办资产 ③信源=兄弟仓库源码（零网络） | 摘录 §4 登记 3 项待下轮深读；EC10 触发源修正（checkin:* 优于 ws-main）反向注记本轮 ws-main 实现为兜底 |
 | 2026-10-03 | 循环A | 兜底循环深化：全仓九项终审 | ①调试残留 0/TODO 注释仅 1 处文档性引用；②面板 any 存量 43 处（32 组追踪中，本轮零新增）；③120 测试覆盖新逻辑；④新 UI 全走 b3/lv token；⑤43 个 md 相对链接零失效（README 新增链接即修 1 处路径）；⑥i18n 600 键对齐；⑦新交互 aria/键盘齐备；⑧gzip 46.8KB<100KB；⑨日志脱敏复核（批量失败 warn 仅记错误不记标题）；README 能力表与 CHANGELOG Unreleased 对齐十七轮真实能力（R06 事实边界：待实测项明确标注） |
@@ -999,7 +1002,7 @@
 - [ ] 🟡 **EC10 打卡数值承接**（依赖 EC06/EC09/D01/D03）：先定只读趋势还是写入管家指标；用 `getEventsInRange` 有界读取，保存源事件 ID/日期/单位；删除/修改按所有者对账，不复制私有存储。
 - [ ] 🟡 **EC11 家务/备考绑定已有习惯**（依赖 EC03/EC04/D09）：展示已有项目和绑定效果；一键新建仅在提供方公开能力存在时启用，否则引导到打卡创建后返回，不使用不存在的 `habits.list`。
 - [ ] 🟡 **EC12 生日/纪念日提醒归属**（依赖 H08/H09/H12/EC03）：先验证打卡 v5 的 `occasions.read/occasions.complete` 能力及其所有者，生日来源另定；无生日写入契约时只引用，不生成双份提醒。（2026-10-03 契约摘录：occasions.read/complete **v4 即存在、localOnly、effect read/write**；打卡 v5 形式化契约含 20 能力 since 矩阵+8 种集成事件+硬限制——EC10 触发源用 checkin:* 事件比 ws-main 更精准；owner 定案点保持）
-- [ ] 🟡 **EC13 人脉办理者选择**：通过 `LvContacts.searchPeople/getPerson` 选择合同、保单、学校等联系人；保存公开 docId/itemId/名称快照，v1 不假定电话邮箱生日可取。（2026-10-03 契约摘录：**源码签名确认**——`window.LvContacts` protocol 1，capabilities=[searchPeople,getPerson,ensurePerson,recordInteraction]；未初始化时全部方法抛错须引导；另有 ensurePerson 按名建人（幂等）；见 docs/research/2026-10-03-EC-源码契约摘录.md §1）
+- [ ] 🟡 **EC13 人脉办理者选择**：通过 `LvContacts.searchPeople/getPerson` 选择合同、保单、学校等联系人；保存公开 docId/itemId/名称快照，v1 不假定电话邮箱生日可取。（2026-10-03 契约摘录：**源码签名确认**——`window.LvContacts` protocol 1，capabilities=[searchPeople,getPerson,ensurePerson,recordInteraction]；未初始化时全部方法抛错须引导；另有 ensurePerson 按名建人（幂等）；见 docs/research/2026-10-03-EC-源码契约摘录.md §1） ✅ 2026-10-03 第二十六轮 v1 落地（contracts/insurance/schooling/exams 四 schema 增 contact 文本列（D08 补列续跑自动迁移）；详情抽屉编辑模式加「从人脉选择」——searchPeople 关键字实时搜索+旧请求丢弃+键盘可选；快照存 `名称 [docId]`；人脉未装/未初始化/搜索失败三态降级；schema 快照 -u 更新（仅 contact 列））
 - [ ] 🟡 **EC14 家庭成员与人脉映射**：显式绑定/解绑家庭成员和联系人，处理同名候选；双向回链需提供方新契约，不直接改人脉数据库。
 - [ ] 🟡 **EC15 人情/旅行交互记录**：用户确认人物后调用 `recordInteraction`，使用稳定事务 ref、日期、地点和最小备注；重试幂等，不因打开台账自动记会面。
 - [x] 🟡 **EC16 雷切管家动作入口**：用真实实例 `registerQuickAction/Adapter` 注册打开面板、提醒、备忘等动作；重复加载不重复注册，返回函数可注销，不模拟 DOM 点击。 ✅ 2026-10-03 第二十五轮（管家侧代码落地：app.plugins 探测 siyuan-speed-switch + registerQuickAction 方法存在性校验（打卡同款已验证模式）；注册"打开管家/打开提醒中枢"两动作（提醒预选 pendingScreen）；disposer 收集 + 卸载全注销 + 重试上限 10 次防泄漏；[待实测] 与雷切同实例联调随 EC30）
