@@ -140,7 +140,11 @@
 {#if loading}
     <div class="lv-card" style="padding:20px"><div class="lv-skel" style="height:16px;width:60%"></div></div>
 {:else if rows.length === 0}
-    <div class="lv-card"><div class="lv-empty"><div class="eic">🗂</div><b>{t("ledger.empty")}</b><span>{t("ledger.emptyHint")}</span></div></div>
+    {#if !ref?.avId}
+        <div class="lv-card"><div class="lv-empty" role="status"><div class="eic">🚧</div><b>{t("ledger.notProvisioned")}</b><span>{t("ledger.notProvisionedHint")}</span></div></div>
+    {:else}
+        <div class="lv-card"><div class="lv-empty" role="status"><div class="eic">🗂</div><b>{t("ledger.empty")}</b><span>{t("ledger.emptyHint")}</span></div></div>
+    {/if}
 {:else}
     <div class="lv-card lv-table-wrap lv-table" style="margin-top:12px">
         <table>

@@ -466,5 +466,7 @@
     "wiz.finishAndCapture": "完成并录第一条证件",
     "wiz.finishCta": "建库后直达证件快速录入",
     "members.deleteTitle": "删除成员",
-    "members.deleteBody": "将移除「${name}」的成员引用（证件/提醒等台账行会保留，之后可在对应模块重新指派）。确定删除？"
+    "members.deleteBody": "将移除「${name}」的成员引用（证件/提醒等台账行会保留，之后可在对应模块重新指派）。确定删除？",
+    "ledger.notProvisioned": "此模块台账尚未建库",
+    "ledger.notProvisionedHint": "点上方\"重建台账\"即可创建空台账（不会影响已有数据）。"
 }
