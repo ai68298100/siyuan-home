@@ -51,6 +51,9 @@
 | 2026-10-03 | 主线 | 第三十五轮：favorSyncs 孤儿数据修复 | 行删除时同步清理 favorSyncs（与第 30 轮 renewHistory 同模式—— EC15 新代码引入时 renewHistory 修了但 favorSyncs 遗漏，自查发现）；单测 126 持平、gzip 51.3KB |
 | 2026-10-03 | 循环A | 第三十五波走查 | favorSyncs/renewHistory/dirty 标志合并为单次 saveRuntime（避免双重写盘） |
 | 2026-10-03 | 循环B | ③轮休（延续） | 兜底循环静默待命（延续） |
+| 2026-10-03 | 主线 | 第三十七轮：onboarding skip 错误处理修复 | skip() 无 try/catch——kernel 不可达时 finishOnboarding 的 Promise rejection 被静默吞掉（真实 bug）；修复后弹 error toast；单测 126 持平、gzip 51.5KB |
+| 2026-10-03 | 循环A | 第三十七波走查 | showError 复用 provisionIssues 键 |
+| 2026-10-03 | 循环B | ③轮休（延续） | 兜底循环静默待命（延续） |
 | 2026-10-03 | 主线 | 第三十六轮：代码卫生 + EC18/19 确认 | 死代码 safe-mount.ts 移除（ErrorBoundary 取代）；monthlyCompletions 24 个月保留期入 purgeHandled；LeiQie 无 bookmarks/snippets 消费 API（EC18/19 供方依赖确认）；单测 126 持平、gzip 51.4KB |
 | 2026-10-03 | 循环A | 第三十六波走查 | 死代码移除零引用验证；purgeHandled 月度清理边界（24 个月 cutoffKey）逻辑复核 |
 | 2026-10-03 | 循环B | ③信源=兄弟仓源码（第六轮） | LeiQie 无 getBookmarks/getSnippets 对外暴露——EC18/19 维持供方依赖注记 |
