@@ -448,9 +448,17 @@
                 try {
                     const { removeLedgerRows } = await import("@/core/siyuan");
                     await removeLedgerRows(ref!.avId!, [row.itemID]);
-                    // 行删除后清理其续期流水（孤儿运行态数据）
+                    // 行删除后清理孤儿运行态数据（renewHistory + favorSyncs）
+                    let dirty = false;
                     if (plugin.runtime?.renewHistory?.[row.itemID]) {
                         delete plugin.runtime.renewHistory[row.itemID];
+                        dirty = true;
+                    }
+                    if (plugin.runtime?.favorSyncs?.[row.itemID]) {
+                        delete plugin.runtime.favorSyncs[row.itemID];
+                        dirty = true;
+                    }
+                    if (dirty) {
                         const { saveRuntime } = await import("@/core/hub/runtime");
                         await saveRuntime(plugin, plugin.runtime);
                     }
