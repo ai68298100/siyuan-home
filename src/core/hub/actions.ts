@@ -71,6 +71,9 @@ export function complete(plugin: Plugin, r: Reminder, year = new Date().getFullY
         } else {
             rt.handled[r.id] = rec;
         }
+        // 29 组月度完成率：按月计数（restore 不递减——"恢复 ≠ 取消完成事实"）
+        const monthKey = rec.at.slice(0, 7);
+        rt.monthlyCompletions = { ...(rt.monthlyCompletions ?? {}), [monthKey]: (rt.monthlyCompletions?.[monthKey] ?? 0) + 1 };
     });
 }
 

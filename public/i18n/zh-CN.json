@@ -621,5 +621,6 @@
     "ec15.failed": "人脉记录失败：${msg}",
     "ec15.received": "收礼",
     "ec15.given": "送礼",
-    "wiz.provisioningShort": "建库中…"
+    "wiz.provisioningShort": "建库中…",
+    "dash.monthlyDone": "本月已完成 ${n} 件"
 }

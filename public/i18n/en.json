@@ -621,5 +621,6 @@
     "ec15.failed": "Lv Contacts recording failed: ${msg}",
     "ec15.received": "Received",
     "ec15.given": "Given",
-    "wiz.provisioningShort": "Setting up…"
+    "wiz.provisioningShort": "Setting up…",
+    "dash.monthlyDone": "${n} completed this month"
 }

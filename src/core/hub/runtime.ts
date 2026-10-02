@@ -88,6 +88,8 @@ export interface HubRuntime {
     lastExamStats?: { streak: number; accuracy: number; attempts: number; generatedAt: number };
     /** EC15：人情往来已同步到人脉的行（favor 行 itemID → {docId, at}） */
     favorSyncs?: Record<string, { docId: string; at: string }>;
+    /** 29 组月度完成率：月键 "YYYY-MM" → 当月完成计数（跨月自动归零由读取方处理） */
+    monthlyCompletions?: Record<string, number>;
 }
 
 export function defaultRuntime(): HubRuntime {

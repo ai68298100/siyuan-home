@@ -25,6 +25,12 @@
             : allReminders,
     );
     const top = $derived(reminders.slice(0, 4));
+    // 29 组月度完成率：当月完成数（从 runtime.monthlyCompletions 读取）
+    const monthlyDone = $derived.by(() => {
+        const now = new Date();
+        const monthKey = now.getFullYear() + "-" + String(now.getMonth() + 1).padStart(2, "0");
+        return plugin.runtime?.monthlyCompletions?.[monthKey] ?? 0;
+    });
 
     async function setMemberFilter(id: string | undefined) {
         memberFilter = id;
@@ -50,7 +56,12 @@
 
 <div class="lv-hero">
     <div><h1>{t("dash.hello")}</h1><p>{t("dash.sub")}</p></div>
-    <div class="lv-hero-count"><b class="lv-num">{reminders.length}</b><span>{t("dash.needAttention")}</span></div>
+    <div class="lv-hero-count">
+        <b class="lv-num">{reminders.length}</b><span>{t("dash.needAttention")}</span>
+        {#if monthlyDone > 0}
+            <span class="lv-caption" style="display:block;margin-top:2px">✓ {t("dash.monthlyDone").replace("${n}", String(monthlyDone))}</span>
+        {/if}
+    </div>
 </div>
 
 <div class="lv-members" style="margin-bottom:4px">
