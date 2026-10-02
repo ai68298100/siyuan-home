@@ -79,6 +79,9 @@
 | 2026-10-03 | 主线 | 第四十七轮：EC 集成契约形状测试 | 新增 ec-contracts.test.ts（10 用例）：BridgePerson 字段/ensurePerson created/recordInteraction 幂等 ref 格式/QuickAction id 正则/PublicStats 四字段类型校验/getStrengthSummary 形状/LvHome summary 四字段；126→136 全过；这些测试在提供方改形状时会在 CI 立即暴露 |
 | 2026-10-03 | 循环A | 第四十七波走查 | 新增测试纯类型/形状验证，无 I/O；全门禁绿 |
 | 2026-10-03 | 循环B | ③轮休（延续） | 兜底循环静默待命（延续） |
+| 2026-10-03 | 主线 | 第四十九轮：代码清理——动态导入静态化 + 死代码移除 | 六屏 dynamic import(hub/runtime) → 静态导入 saveRuntime；safe-mount.ts（从未导入）和 panel-utils.ts（未消费）删除；单测 136 持平、gzip 51.8KB |
+| 2026-10-03 | 循环A | 第四十九波走查 | 静态导入无循环依赖（runtime.ts 不导入 screens）；动态→静态无行为变化（同模块同导出） |
+| 2026-10-03 | 循环B | ③轮休（延续） | 兜底循环静默待命（延续） |
 | 2026-10-03 | 主线 | 第三十六轮：代码卫生 + EC18/19 确认 | 死代码 safe-mount.ts 移除（ErrorBoundary 取代）；monthlyCompletions 24 个月保留期入 purgeHandled；LeiQie 无 bookmarks/snippets 消费 API（EC18/19 供方依赖确认）；单测 126 持平、gzip 51.4KB |
 | 2026-10-03 | 循环A | 第三十六波走查 | 死代码移除零引用验证；purgeHandled 月度清理边界（24 个月 cutoffKey）逻辑复核 |
 | 2026-10-03 | 循环B | ③信源=兄弟仓源码（第六轮） | LeiQie 无 getBookmarks/getSnippets 对外暴露——EC18/19 维持供方依赖注记 |
