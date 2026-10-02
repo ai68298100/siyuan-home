@@ -1,5 +1,5 @@
 <script lang="ts">
-    import { Dialog, Menu, showMessage } from "siyuan";
+    import { Dialog, Menu, showMessage, confirm } from "siyuan";
     let { plugin, t, version }: { plugin: any; t: (k: string) => string; version?: number } = $props();
 
     // version（H02）：hub 变更时递增，驱动派生重算（plugin.* 为普通对象引用）
@@ -61,6 +61,14 @@
     async function restoreEntry(id: string) {
         await plugin.restore(id);
         showMessage(t("hub.restoreDone"), 3000, "info");
+    }
+
+    // H03：未处理备忘的显式删除（确认后物理删除；这是备忘唯一的物理删除路径）
+    function confirmDeleteMemo(r: any) {
+        confirm(t("delete"), t("hub.memoDeleteBody").replace("${title}", r.title), async () => {
+            await plugin.removeMemo(r.id);
+            showMessage(t("hub.memoDeleted"), 2500, "info");
+        });
     }
 
     // B4b 续期：思源 Dialog 小窗（H10：失败保留 Dialog 与输入、错误就地显示，不提前销毁）
@@ -196,6 +204,10 @@
                         {/if}
                         <button class="b3-button b3-button--text" onclick={(e) => snoozeMenu(r, e)}>{t("act.snooze")} ▾</button>
                         <button class="b3-button b3-button--text" onclick={() => plugin.mute(r.id)}>{t("act.mute")}</button>
+                        {#if r.moduleId === "adhoc"}
+                            <!-- H03：备忘的显式删除（唯一物理删除路径；未处理项不自动清理） -->
+                            <button class="b3-button b3-button--text" onclick={() => confirmDeleteMemo(r)}>{t("delete")}</button>
+                        {/if}
                     </div>
                 </div>
             {/each}

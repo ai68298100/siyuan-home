@@ -1,7 +1,7 @@
 <script lang="ts">
     import { renderLedger, addDetachedRow, setCell, RowIdentityPendingError } from "@/core/siyuan";
     import { localDateKey } from "@/core/hub/rule";
-    import { showMessage, Dialog } from "siyuan";
+    import { showMessage, Dialog, confirm } from "siyuan";
 
     let { plugin, t, version }: { plugin: any; t: (k: string) => string; version?: number } = $props();
 
@@ -123,7 +123,7 @@
         const dlg = new Dialog({
             title: t("ledger.detail"),
             content: `<div class="b3-dialog__content b3-dialog__content--wrap" id="lv-detail-body" style="max-height:60vh;overflow:auto"></div>
-<div class="b3-dialog__action"><button class="b3-button b3-button--cancel" id="lv-detail-close">${t("cancel")}</button><button class="b3-button b3-button--text" id="lv-detail-open">${t("ledger.openDoc")} ↗</button></div>`,
+<div class="b3-dialog__action"><button class="b3-button b3-button--cancel" id="lv-detail-del">${t("delete")}</button><span style="flex:1"></span><button class="b3-button b3-button--cancel" id="lv-detail-close">${t("cancel")}</button><button class="b3-button b3-button--text" id="lv-detail-open">${t("ledger.openDoc")} ↗</button></div>`,
             width: "520px",
         });
         const body = dlg.element.querySelector("#lv-detail-body") as HTMLElement;
@@ -161,6 +161,22 @@
         }
         (dlg.element.querySelector("#lv-detail-close") as HTMLButtonElement).onclick = () => dlg.destroy();
         (dlg.element.querySelector("#lv-detail-open") as HTMLButtonElement).onclick = () => { dlg.destroy(); plugin.showTabDocs(ref?.docId); };
+        // 17 组：行删除（detached 行走内核 av 删除端点 [待实测]；删除是显式用户动作，双确认说明影响范围）
+        (dlg.element.querySelector("#lv-detail-del") as HTMLButtonElement).onclick = () => {
+            confirm(t("ledger.delTitle"), t("ledger.delBody").replace("${name}", cellText(row.cells[ref.columns.name])), async () => {
+                try {
+                    const { removeLedgerRows } = await import("@/core/siyuan");
+                    await removeLedgerRows(ref!.avId!, [row.itemID]);
+                    showMessage(t("ledger.delDone"), 2500, "info");
+                    dlg.destroy();
+                    await load();
+                    await plugin.refreshHub();
+                } catch (e) {
+                    // 端点不可用等失败：给出人工路径，不静默假删
+                    showMessage(t("ledger.delFailed").replace("${msg}", e instanceof Error ? e.message : String(e)), 6000, "error");
+                }
+            });
+        };
     }
 
     async function createRow() {

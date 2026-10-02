@@ -567,5 +567,11 @@
     "settings.demoClearTitle": "清除示例数据",
     "settings.demoClearBody": "将删除此前生成的全部【示例】行与示例成员引用；手动录入的数据不受影响。继续？",
     "settings.demoClearDone": "已清除 ${n} 条示例数据",
-    "settings.demoClearPartial": "已清除 ${n} 条；${m} 条删除失败（端点受限时请到台账文档手动删除）"
+    "settings.demoClearPartial": "已清除 ${n} 条；${m} 条删除失败（端点受限时请到台账文档手动删除）",
+    "hub.memoDeleteBody": "删除备忘「${title}」？这是物理删除，不可恢复（完成备忘会保留 30 天可恢复）。",
+    "hub.memoDeleted": "备忘已删除",
+    "ledger.delTitle": "删除台账行",
+    "ledger.delBody": "删除「${name}」这一行？仅删除该行数据，不影响文档与其他行。",
+    "ledger.delDone": "已删除",
+    "ledger.delFailed": "删除失败：${msg}。请到台账文档中手动删除该行。"
 }
