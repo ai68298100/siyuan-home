@@ -315,5 +315,14 @@
   @media (max-width: 760px) {
     .lv-hero h1 { font-size: 21px; }
     .lv-rem .lv-rem-ops { display: none; }
+    // 26.7 窄屏 tabbar：标题隐藏，页签横向滚动
+    .lv-tabbar { flex-wrap: wrap; }
+    .lv-tabbar__title { display: none; }
+    .lv-tabbar__meta { display: none; }
+  }
+  // 26.7 超窄屏（<400px）：页签等分收窄
+  @media (max-width: 400px) {
+    .lv-tabs { width: 100%; }
+    .lv-tabs__item { padding: 5px 8px; font-size: 12px; flex: 1; text-align: center; }
   }
 }
