@@ -317,17 +317,17 @@ describe("H12 静默时段（摘要与逾期提示共用）", () => {
 
     it("跨零点 22→8：23 点/2 点静默，12 点非静默；边界 8 点结束（不含）", () => {
         const s = settings();
-        expect(inSilentHours(s, at(23))).toBe(true);
-        expect(inSilentHours(s, at(2))).toBe(true);
-        expect(inSilentHours(s, at(12))).toBe(false);
-        expect(inSilentHours(s, at(8))).toBe(false);
-        expect(inSilentHours(s, at(22))).toBe(true);
+        expect(inSilentHours(s, undefined, at(23))).toBe(true);
+        expect(inSilentHours(s, undefined, at(2))).toBe(true);
+        expect(inSilentHours(s, undefined, at(12))).toBe(false);
+        expect(inSilentHours(s, undefined, at(8))).toBe(false);
+        expect(inSilentHours(s, undefined, at(22))).toBe(true);
     });
 
     it("顺向 1→6：3 点静默，8 点非静默", () => {
         const s = { ...settings(), silentFrom: 1, silentTo: 6 };
-        expect(inSilentHours(s, at(3))).toBe(true);
-        expect(inSilentHours(s, at(8))).toBe(false);
+        expect(inSilentHours(s, undefined, at(3))).toBe(true);
+        expect(inSilentHours(s, undefined, at(8))).toBe(false);
     });
 
     it("摘要：静默时段不弹且不标记已发（结束后补发）", () => {
