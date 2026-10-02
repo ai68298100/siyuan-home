@@ -60,6 +60,9 @@
 | 2026-10-03 | 主线 | 第四十轮：0 组元数据修正（plugin.json/package.json/LICENSE） | author/url 从模板占位 lvdaoguan → ai68298100；LICENSE 追加二次开发版权；0 组两项 ✅；R05 根因=模板占位符未替换——check-meta 应加 url 一致性校验（记 TODO） |
 | 2026-10-03 | 循环A | 第四十波走查 | 全门禁绿；plugin.json JSON 语法确认 |
 | 2026-10-03 | 循环B | ③轮休（延续） | 兜底循环静默待命（延续） |
+| 2026-10-03 | 主线 | 第四十一轮：check-meta 增加 author/url 校验 + i18n 未用键审计 | check-meta 新增 4 条规则（author 占位符/url 含 lvdaoguan/pkg-plugin 不一致/非 GitHub URL）——R05 根因闭合；i18n 未用键扫描——287 个"未用"绝大多数为动态模板构造（t(`module.${id}`) 等）非真未用；单测 126 持平、gzip 51.5KB |
+| 2026-10-03 | 循环A | 第四十一波走查 | check-meta 新规则通过现有合法数据；i18n 扫描器局限记录（动态构造误报——不删键） |
+| 2026-10-03 | 循环B | ③轮休（延续） | 兜底循环静默待命（延续） |
 | 2026-10-03 | 主线 | 第三十六轮：代码卫生 + EC18/19 确认 | 死代码 safe-mount.ts 移除（ErrorBoundary 取代）；monthlyCompletions 24 个月保留期入 purgeHandled；LeiQie 无 bookmarks/snippets 消费 API（EC18/19 供方依赖确认）；单测 126 持平、gzip 51.4KB |
 | 2026-10-03 | 循环A | 第三十六波走查 | 死代码移除零引用验证；purgeHandled 月度清理边界（24 个月 cutoffKey）逻辑复核 |
 | 2026-10-03 | 循环B | ③信源=兄弟仓源码（第六轮） | LeiQie 无 getBookmarks/getSnippets 对外暴露——EC18/19 维持供方依赖注记 |
