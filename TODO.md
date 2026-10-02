@@ -48,6 +48,9 @@
 | 2026-10-03 | 主线 | 第三十四轮：Svelte 5 错误边界 + 性能标记 | ErrorBoundary.svelte（svelte:boundary 四屏包裹+重试按钮）；refreshHub performance.mark/measure（PF01 打点基线）；safeMount.ts 备用；单测 126 持平、gzip 51.3KB |
 | 2026-10-03 | 循环A | 第三十四波走查 | boundary 仅捕获渲染期错误（Svelte 5 设计）；事件处理器异常不在此范围 |
 | 2026-10-03 | 循环B | ③轮休 | 兜底循环静默待命 |
+| 2026-10-03 | 主线 | 第三十五轮：favorSyncs 孤儿数据修复 | 行删除时同步清理 favorSyncs（与第 30 轮 renewHistory 同模式—— EC15 新代码引入时 renewHistory 修了但 favorSyncs 遗漏，自查发现）；单测 126 持平、gzip 51.3KB |
+| 2026-10-03 | 循环A | 第三十五波走查 | favorSyncs/renewHistory/dirty 标志合并为单次 saveRuntime（避免双重写盘） |
+| 2026-10-03 | 循环B | ③轮休（延续） | 兜底循环静默待命（延续） |
 | 2026-10-03 | 主线 | 第二十八轮：EC03/v0.3 服务桥 window.LvHome 落地 | src/bridge/external-bridge.ts（protocol 1/capabilities 五项/whenReady/openButler/openReminders/addMemo 校验/summary 仅计数）+ docs/BRIDGE.md 契约文档（对齐人脉 BRIDGE 纪律：只提供服务不读他库/挂载卸载语义/版本策略）；重复挂载守卫；5 项单测；单测 121→126、i18n 608 持平、gzip 49.5KB |
 | 2026-10-03 | 循环A | 第二十八波走查 | 未用参数即修；summary 计数断言修正（today=daysLeft≤0 含逾期，测试初值写错）；重复挂载守卫（多实例不覆盖首桥） |
 | 2026-10-03 | 循环B | ③信源=兄弟仓 BRIDGE 模式（人脉 external-bridge 直读） | 管家桥的挂载/卸载/纪律三段对人脉同构复刻；EC 组「摘录→落地」第二例（EC16→EC13→EC03） |
