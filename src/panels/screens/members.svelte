@@ -12,6 +12,12 @@
     function toggleExpand(id: string) {
         expandedId = expandedId === id ? null : id;
     }
+    // 26.7 删除文案升级：说明数据保留语义（仅移除引用，台账行保留）
+    function confirmRemove(m: any) {
+        confirm(t("members.deleteTitle"), t("members.deleteBody").replace("${name}", m.name), () => {
+            removeMember(plugin, plugin.settings, m.id).then(() => plugin.refreshHub());
+        });
+    }
 
     let name = $state("");
     let role = $state<import("@/types").MemberRole>("self");
@@ -57,7 +63,7 @@
             <span class="lv-avatar lg" style="background:linear-gradient(135deg,var(--lv-accent),var(--lv-accent-2))">{m.name.slice(0, 1)}</span>
             <div><b>{m.name}</b><div class="lv-caption">{t(`role.${m.role}`)}{m.lunarBirthday ? " 🌙" : ""} {m.birthday ?? ""}</div></div>
             <span style="flex:1"></span>
-            <button class="b3-button b3-button--text" onclick={(e) => { e.stopPropagation(); removeMember(plugin, plugin.settings, m.id).then(() => plugin.refreshHub()); }}>{t("delete")}</button>
+            <button class="b3-button b3-button--text" onclick={(e) => { e.stopPropagation(); confirmRemove(m); }}>{t("delete")}</button>
         </div>
         {#if alertsFor(m.id).length > 0}
             <div class="person-alert" style="font-size:12px;color:var(--lv-warn)">⚠ {alertsFor(m.id).length} {t("dash.needAttention")}</div>
