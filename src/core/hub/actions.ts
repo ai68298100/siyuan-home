@@ -1,17 +1,29 @@
 /**
  * 提醒处理动作（03 §5）：完成/延后/忽略/备忘增删 —— 只改台账行或运行态，不产生影子数据。
  * 续期（renew）依赖 certs 行写回（setCell），v0.2 提供 oneoff 场景。
+ *
+ * 语义定案（H01/H05/H07，2026-10-02）：
+ * - 运行态写操作经模块级 promise 链串行执行：读-改-写不互相覆盖，连续动作全部落盘。
+ * - 完成按规则类型分派（完成≠永久忽略）：anniversary 记当年已办、recurring 记本期已办、
+ *   oneoff 记已办条目、备忘标记 doneAt；均可经 restore 恢复。
  */
 import type { Plugin } from "siyuan";
 import type { Reminder } from "@/types";
 import { setCell } from "../siyuan";
-import { loadRuntime, saveRuntime, type HubRuntime } from "./runtime";
+import { loadRuntime, saveRuntime, reminderKind, type HubRuntime, type HandledRecord } from "./runtime";
 
-export async function withRuntime(plugin: Plugin, fn: (rt: HubRuntime) => void | Promise<void>): Promise<HubRuntime> {
-    const rt = await loadRuntime(plugin);
-    await fn(rt);
-    await saveRuntime(plugin, rt);
-    return rt;
+/** 运行态写队列（H01）：同一页面内所有动作串行；队列内失败不断链（吞掉让调用方各自的 promise 报错） */
+let runtimeChain: Promise<unknown> = Promise.resolve();
+
+export function withRuntime(plugin: Plugin, fn: (rt: HubRuntime) => void | Promise<void>): Promise<HubRuntime> {
+    const run = runtimeChain.then(async () => {
+        const rt = await loadRuntime(plugin);
+        await fn(rt);
+        await saveRuntime(plugin, rt);
+        return rt;
+    });
+    runtimeChain = run.catch(() => undefined);
+    return run;
 }
 
 function ymd(d: Date): string {
@@ -36,24 +48,48 @@ export function unmute(plugin: Plugin, reminderId: string) {
 }
 
 /**
- * 完成：
- * - anniversary（生日）→ 记「今年已办」，明年自动重现
- * - adhoc → 删除备忘
- * - oneoff/recurring → v0.2 记 mute（台账行的归档/last_done 写回在 A5 行编辑 API 中补）
+ * 完成（H05：完成那一期/那一次，不是永久 mute）：
+ * - anniversary → 记「今年已办」，当年隐藏、明年自动重现
+ * - recurring → 记本期已办（dueDate ≤ 已办期隐藏；台账 due 滚动后下一期自动重现）
+ * - adhoc 备忘 → 标记 doneAt（保留在运行态可恢复，不物理删除，H03）
+ * - oneoff → 记已办条目（可在已处理视图恢复）
  */
 export function complete(plugin: Plugin, r: Reminder, year = new Date().getFullYear()) {
-    return withRuntime(plugin, async (rt) => {
-        if (r.ruleKey === "birthday") {
+    return withRuntime(plugin, (rt) => {
+        const rec: HandledRecord = {
+            title: r.title, moduleId: r.moduleId, ruleKey: r.ruleKey,
+            dueDate: r.dueDate, at: new Date().toISOString(),
+        };
+        if (r.moduleId === "adhoc") {
+            const m = rt.memos.find((m) => `adhoc::${m.id}` === r.id);
+            if (m) m.doneAt = rec.at;
+            else rt.handled[r.id] = rec;
+        } else if (reminderKind(r) === "anniversary") {
             rt.handledYear[r.id] = year;
-        } else if (r.moduleId === "adhoc") {
-            rt.memos = rt.memos.filter((m) => `adhoc::${m.id}` !== r.id);
+        } else if (reminderKind(r) === "recurring") {
+            rt.handledUntil[r.id] = r.dueDate;
         } else {
-            rt.muted[r.id] = true;
+            rt.handled[r.id] = rec;
         }
     });
 }
 
-/** 续期（certs oneoff）：写回台账行到期日；成功后清除该提醒的 snooze/mute（历史链见 TODO 16 组） */
+/** 恢复（H07）：清掉该提醒的所有运行态隐藏标记（已办/已办期/当年已办/忽略/备忘完成） */
+export function restore(plugin: Plugin, reminderId: string) {
+    return withRuntime(plugin, (rt) => {
+        delete rt.muted[reminderId];
+        delete rt.handled[reminderId];
+        delete rt.handledYear[reminderId];
+        delete rt.handledUntil[reminderId];
+        const memoId = reminderId.startsWith("adhoc::") ? reminderId.slice("adhoc::".length) : undefined;
+        if (memoId) {
+            const m = rt.memos.find((m) => m.id === memoId);
+            if (m) delete m.doneAt;
+        }
+    });
+}
+
+/** 续期（certs oneoff）：写回台账行到期日；成功后清除该提醒的 snooze/mute/已办（历史链见 TODO 16 组） */
 export async function renew(plugin: Plugin, r: Reminder, newDueISO: string, dbRef: { avId?: string; columns?: Record<string, string> }) {
     const expiryKey = dbRef.columns?.expiry;
     if (!dbRef.avId || !expiryKey) throw new Error("ledger not provisioned");
@@ -64,12 +100,21 @@ export async function renew(plugin: Plugin, r: Reminder, newDueISO: string, dbRe
     return withRuntime(plugin, (rt) => {
         delete rt.snoozed[r.id];
         delete rt.muted[r.id];
+        delete rt.handled[r.id];
     });
 }
 
 /** 快速备忘（D1） */
 export function addMemo(plugin: Plugin, title: string, dueDate: string) {
     return withRuntime(plugin, (rt) => {
-        rt.memos.push({ id: `m-${Date.now().toString(36)}`, title, dueDate, createdAt: new Date().toISOString() });
+        rt.memos.push({ id: `m-${Date.now().toString(36)}${Math.random().toString(36).slice(2, 5)}`, title, dueDate, createdAt: new Date().toISOString() });
+    });
+}
+
+/** 删除备忘（显式用户动作；未处理备忘永不自动删除，H03） */
+export function removeMemo(plugin: Plugin, reminderId: string) {
+    return withRuntime(plugin, (rt) => {
+        const memoId = reminderId.startsWith("adhoc::") ? reminderId.slice("adhoc::".length) : reminderId;
+        rt.memos = rt.memos.filter((m) => m.id !== memoId);
     });
 }

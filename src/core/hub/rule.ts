@@ -124,5 +124,6 @@ export async function buildReminder(
         dueDate: localDateKey(due),
         daysLeft,
         level,
+        kind: rule.kind,
     };
 }

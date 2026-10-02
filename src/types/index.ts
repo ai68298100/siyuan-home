@@ -81,6 +81,8 @@ export interface Reminder {
     dueDate: string;
     daysLeft: number;
     level: ReminderLevel;
+    /** 规则类型（H05 完成语义分派；adhoc 备忘视为 oneoff。旧缓存可能缺失） */
+    kind?: ReminderKind;
 }
 
 /** 扫描结果聚合（内存 + kernel storage 缓存） */
