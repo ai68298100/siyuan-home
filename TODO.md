@@ -993,11 +993,11 @@
 - [ ] 🟡 **EC10 打卡数值承接**（依赖 EC06/EC09/D01/D03）：先定只读趋势还是写入管家指标；用 `getEventsInRange` 有界读取，保存源事件 ID/日期/单位；删除/修改按所有者对账，不复制私有存储。
 - [ ] 🟡 **EC11 家务/备考绑定已有习惯**（依赖 EC03/EC04/D09）：展示已有项目和绑定效果；一键新建仅在提供方公开能力存在时启用，否则引导到打卡创建后返回，不使用不存在的 `habits.list`。
 - [ ] 🟡 **EC12 生日/纪念日提醒归属**（依赖 H08/H09/H12/EC03）：先验证打卡 v5 的 `occasions.read/occasions.complete` 能力及其所有者，生日来源另定；无生日写入契约时只引用，不生成双份提醒。（2026-10-03 契约摘录：occasions.read/complete **v4 即存在、localOnly、effect read/write**；打卡 v5 形式化契约含 20 能力 since 矩阵+8 种集成事件+硬限制——EC10 触发源用 checkin:* 事件比 ws-main 更精准；owner 定案点保持）
-- [ ] 🟡 **EC13 人脉办理者选择**：通过 `LvContacts.searchPeople/getPerson` 选择合同、保单、学校等联系人；保存公开 docId/itemId/名称快照，v1 不假定电话邮箱生日可取。
+- [ ] 🟡 **EC13 人脉办理者选择**：通过 `LvContacts.searchPeople/getPerson` 选择合同、保单、学校等联系人；保存公开 docId/itemId/名称快照，v1 不假定电话邮箱生日可取。（2026-10-03 契约摘录：**源码签名确认**——`window.LvContacts` protocol 1，capabilities=[searchPeople,getPerson,ensurePerson,recordInteraction]；未初始化时全部方法抛错须引导；另有 ensurePerson 按名建人（幂等）；见 docs/research/2026-10-03-EC-源码契约摘录.md §1）
 - [ ] 🟡 **EC14 家庭成员与人脉映射**：显式绑定/解绑家庭成员和联系人，处理同名候选；双向回链需提供方新契约，不直接改人脉数据库。
 - [ ] 🟡 **EC15 人情/旅行交互记录**：用户确认人物后调用 `recordInteraction`，使用稳定事务 ref、日期、地点和最小备注；重试幂等，不因打开台账自动记会面。
 - [ ] 🟡 **EC16 雷切管家动作入口**：用真实实例 `registerQuickAction/Adapter` 注册打开面板、提醒、备忘等动作；重复加载不重复注册，返回函数可注销，不模拟 DOM 点击。（2026-10-03 契约摘录：**完整签名确认**——id 限 [A-Za-z0-9._:-]、token 防覆盖、返回幂等 disposer；见摘录 §3；对接=registerQuickAction({id:"lvhome.open-reminders",...})）
-- [ ] 🟡 **EC17 雷切家庭摘要组件**：用 `registerHomeModule` 提供有界计数/标题/更新时间；loading、error、stale 分开，默认不共享生日/金额/证件，点击落到真实管家位置。
+- [ ] 🟡 **EC17 雷切家庭摘要组件**：用 `registerHomeModule` 提供有界计数/标题/更新时间；loading、error、stale 分开，默认不共享生日/金额/证件，点击落到真实管家位置。（2026-10-03 契约摘录：**完整 options 签名确认**——含 configSchema/refreshOn/readOnly/read(config,device)/source 元数据；read 返回 shape 需再读 home-model.js——摘录 §4 待办；见 docs/research/2026-10-03-EC-源码契约摘录.md §3）
 - [ ] 🟢 **EC18 雷切书签入口**：拟定只读 `home.getBookmarks` 的字段、限量和授权，URL 仅 http(s)，点击才打开；非法/缺失目标及关闭模块有提示，账号备注不默认共享。
 - [ ] 🟢 **EC19 雷切常用语承接**：管家纯文本 snippets 与雷切 HTML/CSS/JS 片段严格分开；复制/插入由用户选择，不把家庭文本变成可执行代码。
 - [ ] 🟡 **EC20 考试计划关联**（依赖 EC03/EC04/EC05/MD06）：区分报名/考试日期和证书到期/复审日期；稳定绑定计划/题库 ID，考试当前无公开计划服务，先定最小契约再实现。
