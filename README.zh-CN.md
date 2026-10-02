@@ -2,7 +2,17 @@
 
 **一本会主动提醒你的家庭档案** —— 思源笔记的家庭与生活管家插件。
 
+[![CI](https://github.com/ai68298100/siyuan-home/actions/workflows/ci.yml/badge.svg)](https://github.com/ai68298100/siyuan-home/actions) [![Release](https://img.shields.io/github/v/release/ai68298100/siyuan-home?include_prereleases)](https://github.com/ai68298100/siyuan-home/releases) [![License](https://img.shields.io/github/license/ai68298100/siyuan-home)](./LICENSE)
+
 家庭私有档案库 · 全家到期提醒中枢 · 家庭事务工作台
+
+## 安装（v0.2.0）
+
+1. 从 [Releases](https://github.com/ai68298100/siyuan-home/releases/latest) 下载 `package.zip`
+2. 思源笔记 → 设置 → 集市 → 下载页 → 顶部"导入安装"选择 zip
+3. 启用插件 → 首次引导三步完成建库
+
+> 本地优先，无遥测；详见[隐私声明](./docs/privacy.md)与 [FAQ](./docs/FAQ.md)。
 
 ## 定位
 
@@ -25,7 +35,7 @@
 | 出行旅行 | 车辆 · 交通卡证 · 旅行计划 · 预订单据 · 行前清单 · 行中行后足迹 |
 | 影音书库 | 电影 / 电视剧 / 综艺 / 书籍 / 漫画 / 小说统一收藏 |
 
-详细功能清单、路线图与市场调研见 [MODULES.md](./MODULES.md)；完整设计（架构 / 数据模型 / 提醒中枢 / 交互与 UI 原型 / 扩展设计）见 [docs/design/](./docs/design/)：
+详细功能清单与市场调研见 [MODULES.md](./MODULES.md)，用户视角路线图见 [ROADMAP.md](./ROADMAP.md)；完整设计（架构 / 数据模型 / 提醒中枢 / 交互与 UI 原型 / 扩展设计 / 视觉设计语言）见 [docs/design/](./docs/design/)：
 [01 架构总览](./docs/design/01-架构总览.md) · [02 数据模型与模块规格](./docs/design/02-数据模型与模块规格.md) · [03 提醒中枢](./docs/design/03-提醒中枢.md) · [04 交互与UI原型](./docs/design/04-交互与UI原型.md) · [05 扩展设计](./docs/design/05-扩展设计.md) · [07 视觉设计语言](./docs/design/07-视觉设计语言.md)。
 高保真交互原型：[prototype/index.html](./prototype/index.html)（浏览器直接打开，明暗主题 + 七屏切换，含「组件库」活体样式指南）。
 UI 设计成套：`docs/design/07` 视觉设计语言（token/动效/禁止清单）→ `docs/design/08` 组件契约 → `src/styles/design-system.scss` 可编译设计系统，C1-C8 开发按此实现。

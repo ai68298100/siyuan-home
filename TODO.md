@@ -187,8 +187,8 @@
 - [ ] 🟡 31 模块全开性能回归（05 §4.5 预算复核）
 - [ ] 🟡 隐私终审：脱敏显示/无密码确认/导出脱敏提示/通知脱敏
 - [ ] 🟡 `v1.0.0` tag + GitHub Release（附 package.zip；siyuan-plugin-release skill 调整为只发 Release 不推集市）
-- [ ] 🟡 README 双语终稿（截图/GIF/功能表/隐私声明链接）
-- [ ] 🟡 migration notes 汇总（0.x → 1.0 用户升级说明）
+- [x] 🟡 README 双语终稿（CI/Release/LICENSE 徽章 + 安装节 + ROADMAP/FAQ/privacy 链接） ✅ 2026-10-02（截图/GIF 待真机）
+- [ ] 🟡 migration notes 汇总（0.x → 1.0 用户升级说明；v0.2.0 notes 已在 CHANGELOG 草稿）
 - [ ] 🟢 公告帖：ld246 / 少数派（是否随 1.0 公开同步发布，另定）
 - [ ] 🟢 1.0 后维护节奏：每两周 issue 清扫 + 月度小版本
 - [x] 🟢 ROADMAP.md（从 TODO.md 提炼用户视角的路线图） ✅ 2026-10-02（现已可用/进行中/近期/远期四段；README 可链接）

@@ -2,7 +2,17 @@
 
 **A family archive that reminds you before things expire** — the family & life butler plugin for SiYuan.
 
+[![CI](https://github.com/ai68298100/siyuan-home/actions/workflows/ci.yml/badge.svg)](https://github.com/ai68298100/siyuan-home/actions) [![Release](https://img.shields.io/github/v/release/ai68298100/siyuan-home?include_prereleases)](https://github.com/ai68298100/siyuan-home/releases) [![License](https://img.shields.io/github/license/ai68298100/siyuan-home)](./LICENSE)
+
 [中文文档](./README.zh-CN.md)
+
+## Install (v0.2.0)
+
+1. Download `package.zip` from [Releases](https://github.com/ai68298100/siyuan-home/releases/latest)
+2. SiYuan → Settings → Marketplace → Download → "Import" the zip
+3. Enable the plugin → complete the 3-step onboarding
+
+> Local-first, zero telemetry — see [privacy](./docs/privacy.md) & [FAQ](./docs/FAQ.md).
 
 ## Positioning
 
