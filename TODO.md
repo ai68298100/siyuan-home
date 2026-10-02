@@ -660,6 +660,7 @@
 | 2026-10-02 | 循环B | 外部调研 Google Tasks | 到期自动同步日历印证台账日历呈现（原生路线再确认）；Gmail 侧栏捕捉=顶栏⚡同位设计；来源 Google Workspace |
 | 2026-10-02 | 循环B | 外部调研 Wunderlist 停服教训 | 云服务消亡=数据永久丢失+官方迁移工具静默丢数据——强化本地优先/标准导出/逐字段核对三原则；迁移指南（24 组）设计原则落定；来源 The Verge/Taskade |
 | 2026-10-02 | 循环B | 外部调研 Todoist | Quick Add 输入即解析+Filter Queries+Assist 自然语言生成查询——智能解析与命名视图两待办的规格参照再强化；来源 todoist.com/help |
+| 2026-10-02 | 主线 | 🏁 v0.2.0 发版 | 版本号 0.2.0（package/plugin/CHANGELOG 转正）；README 双语徽章+安装节；GitHub topics/homepage 设置完成；正式 Release 发布 |
 | 2026-10-02 | 循环B | 外部调研 Any.do Family | 协作智能杂货清单印证品类分区；任务内聊天/@提及/指派=v2.x kernel broadcast 交互设计参照；来源 support.any.do |
 | 2026-10-02 | 主线 | 22 组快捷键速查表 | 设置·关于区落地；策略=仅 2 命令可配避免冲突 |
 | 2026-10-02 | 主线 | C1c 真正收尾 | settings 面板类名统一 lv-settings 命名空间（脱离 LEGACY 段）；index.scss 仅剩 settings 现役类 |
