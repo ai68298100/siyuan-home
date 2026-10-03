@@ -56,8 +56,9 @@ AV=$(node -e "try{const d=JSON.parse(require('fs').readFileSync(0,'utf8'));const
 echo "av=$AV" >> "$LOG"
 "$sy" /api/av/renderAttributeView -d "{\"id\":\"$AV\",\"createIfNotExist\":true}" >> "$LOG" 2>&1
 
-# 4) 加一列 text（端点实名 addAttributeViewKey；keyID 留空由内核生成）
-"$sy" /api/av/addAttributeViewKey -d "{\"avID\":\"$AV\",\"keyID\":\"\",\"keyIcon\":\"\",\"keyName\":\"备注\",\"keyType\":\"text\",\"previousKeyID\":\"\"}" >> "$LOG" 2>&1
+# 4) 加一列 text（端点实名 addAttributeViewKey）。
+#    [81 波修正] keyID 必须自造（YYYYMMDDHHMMSS-xxxxxx 形态）——留空会建出 id 为空串的不可用列（E4'）
+"$sy" /api/av/addAttributeViewKey -d "{\"avID\":\"$AV\",\"keyID\":\"$(date +%Y%m%d%H%M%S)-wpkey1\",\"keyIcon\":\"\",\"keyName\":\"备注\",\"keyType\":\"text\",\"previousKeyID\":\"\"}" >> "$LOG" 2>&1
 
 # 5) 加 250 行（5 批 × 50 detached）——超过 PK 单页上限，验证翻页循环终止条件；
 #    addAttributeViewBlocks 的响应被包装器吞掉（大 payload）→ 行数以最终 render rowCount 为准
