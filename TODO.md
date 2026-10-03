@@ -94,6 +94,9 @@
 | 2026-10-03 | 主线 | 第五十六轮：onboarding 建库超时 30s→120s + normalizeImportedSettings 角色校验确认 | 建库超时放宽（31 模块串行可超 30s）；导入归一化角色校验确认已有（第二十二轮已实现）；单测 138 持平、gzip 52.0KB |
 | 2026-10-03 | 循环A | 第五十六波走查 | 超时 120s 足够（每模块 ~1s × 最多 31 = 31s，两倍余量）；normalizeImportedSettings 已有角色校验无需重复 |
 | 2026-10-03 | 循环B | ③轮休（延续） | 兜底循环静默待命（延续） |
+| 2026-10-03 | 主线 | 第五十七轮：checkin 初始拉取 load→setTimeout 修复 | window load 事件在 SPA 中不触发（页面已加载后才挂插件）→ setTimeout 5s 替代；无需清理（一次性触发）；单测 138 持平、gzip 52.0KB |
+| 2026-10-03 | 循环A | 第五十七波走查 | 事件监听器审计完成：4 add + 4 remove 全配对；spa 语义理解修正 |
+| 2026-10-03 | 循环B | ③轮休（延续） | 兜底循环静默待命（延续） |
 | 2026-10-03 | 主线 | 第三十六轮：代码卫生 + EC18/19 确认 | 死代码 safe-mount.ts 移除（ErrorBoundary 取代）；monthlyCompletions 24 个月保留期入 purgeHandled；LeiQie 无 bookmarks/snippets 消费 API（EC18/19 供方依赖确认）；单测 126 持平、gzip 51.4KB |
 | 2026-10-03 | 循环A | 第三十六波走查 | 死代码移除零引用验证；purgeHandled 月度清理边界（24 个月 cutoffKey）逻辑复核 |
 | 2026-10-03 | 循环B | ③信源=兄弟仓源码（第六轮） | LeiQie 无 getBookmarks/getSnippets 对外暴露——EC18/19 维持供方依赖注记 |
