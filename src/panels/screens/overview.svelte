@@ -48,6 +48,17 @@
         return plugin.runtime?.monthlyDueTotals?.[monthKey] ?? 0;
     });
 
+    // B2（94 波走查）：模块图标——提醒行与模块卡共用；未映射回退 🗂
+    const MODULE_ICONS: Record<string, string> = {
+        certs: "🪪", health: "🩺", insurance: "🛡️", exams: "📝", pets: "🐾", social: "👥",
+        "assets-real": "🏠", "assets-virtual": "🏦", shopping: "🛒", memberships: "🔁", contracts: "📄",
+        medicine: "💊", stock: "📦", favors: "🧧", chores: "🧹", food: "🍚", address: "📍",
+        snippets: "📎", house: "🏡", parenting: "🧸", schooling: "🎒", allowance: "💰",
+        vehicles: "🚗", transit: "🚌", "travel-plan": "✈️", "travel-booking": "🎫",
+        "travel-packing": "🧳", "travel-log": "📷", media: "🎬",
+    };
+    const moduleIcon = (mid: string) => MODULE_ICONS[mid] ?? "🗂";
+
     async function setMemberFilter(id: string | undefined) {
         memberFilter = id;
         plugin.runtime.filterMemberId = id;
@@ -98,7 +109,7 @@
     <div class="lv-card lv-rems">
         {#each top as r (r.id)}
             <div class="lv-rem {r.level}">
-                <div class="lv-rem-ic">{r.moduleId === "adhoc" ? "📝" : "🪪"}</div>
+                <div class="lv-rem-ic">{r.moduleId === "adhoc" ? "📝" : moduleIcon(r.moduleId)}</div>
                 <div class="lv-rem-t"><b>{r.title}</b><span>{t(`module.${r.moduleId}`) !== `module.${r.moduleId}` ? t(`module.${r.moduleId}`) : t("adhoc.name")}{r.lunar ? " 🌙" : ""}{r.autoRenew ? " 🔄" : ""}</span></div>
                 <div class="lv-rem-when"><b class="lv-num" style="color:var(--lv-{r.level === 'overdue' ? 'danger' : r.level === 'soon' ? 'warn' : 'amber'})">
                     {r.daysLeft < 0 ? t("days.overdue").replace("${n}", String(-r.daysLeft)) : r.daysLeft === 0 ? t("days.today") : t("days.after").replace("${n}", String(r.daysLeft))}
@@ -137,13 +148,17 @@
             class="lv-card lv-card--hover lv-mod"
             role="button"
             tabindex="0"
-            onkeydown={(e: KeyboardEvent) => e.key === "Enter" && onGoto("ledger")}
+            onkeydown={(e: KeyboardEvent) => { if (e.key === "Enter") { plugin.setActiveLedger(mid); onGoto("ledger"); } }}
             onclick={() => { plugin.setActiveLedger(mid); onGoto("ledger"); }}
         >
-            <div class="lv-mi t-blue">🗂</div><b>{t(`module.${mid}`)}</b>
+            <div class="lv-mi t-blue">{moduleIcon(mid)}</div><b>{t(`module.${mid}`)}</b>
             <div class="lv-stat">
                 {#if pending > 0}
                     <b class="lv-num">{pending}</b><span style="color:var(--lv-warn)">{t("mod.pending")}</span>
+                {:else if plugin.settings.dbRefs?.[mid] && !plugin.settings.dbRefs[mid].docId}
+                    <span style="color:var(--lv-warn)">{t("diag.missing")}</span>
+                {:else if plugin.settings.dbRefs?.[mid]?.provisional}
+                    <span>{t("diag.provisional")}</span>
                 {:else}
                     <span>{t("mod.inLedger")}</span>
                 {/if}
