@@ -59,13 +59,13 @@ echo "av=$AV" >> "$LOG"
 # 4) 加一列 text（端点实名 addAttributeViewKey；keyID 留空由内核生成）
 "$sy" /api/av/addAttributeViewKey -d "{\"avID\":\"$AV\",\"keyID\":\"\",\"keyIcon\":\"\",\"keyName\":\"备注\",\"keyType\":\"text\",\"previousKeyID\":\"\"}" >> "$LOG" 2>&1
 
-# 5) 加 150 行（5 批 × 30 detached）；stderr 入 LOG 防静默失败。
-#    注意：addAttributeViewBlocks 的响应同样被包装器吞掉（大 payload）→ added 以最终 render rowCount 为准
+# 5) 加 250 行（5 批 × 50 detached）——超过 PK 单页上限，验证翻页循环终止条件；
+#    addAttributeViewBlocks 的响应被包装器吞掉（大 payload）→ 行数以最终 render rowCount 为准
 ADDED=0
 for batch in 0 1 2 3 4; do
   SRCS=""
-  for j in $(seq 1 30); do
-    n=$((batch*30+j))
+  for j in $(seq 1 50); do
+    n=$((batch*50+j))
     SRCS="$SRCS{\"content\":\"行$n\",\"isDetached\":true},"
   done
   SRCS=${SRCS%,}
@@ -82,12 +82,12 @@ RCOUNT=$(grep -o '"rowCount":[0-9]*' "$ROUT" | head -1)
 RLEN=$(node -e "try{const d=JSON.parse(require('fs').readFileSync(process.argv[1],'utf8'));const r=(d.data&&d.data.view&&d.data.view.rows)||[];console.log('rows.len='+r.length+' (pageSize='+d.data.view.pageSize+')')}catch(e){console.log('rows.len=parse-fail')}" "$ROUT" 2>/dev/null)
 echo "render: $RCOUNT $RLEN" >> "$LOG"
 
-# 7) PK 分页验证（[已实测]：pageSize 封顶语义——100→恰 100，200→全量；page 翻页无重叠）
+# 7) PK 分页验证（[已实测]：pageSize 封顶语义；250 行 @pageSize200 → 200+50 且无重叠 = 循环"返回数<pageSize 即止"成立）
 P1=$(cygpath -m /tmp/lvh-pk1.json)
-curl -s -m 60 -X POST "$BASE/api/av/getAttributeViewPrimaryKeyValues" -H "Authorization: Token $TOKEN" -H "Content-Type: application/json" -d "{\"id\":\"$AV\",\"page\":1,\"pageSize\":100}" -o "$P1"
+curl -s -m 60 -X POST "$BASE/api/av/getAttributeViewPrimaryKeyValues" -H "Authorization: Token $TOKEN" -H "Content-Type: application/json" -d "{\"id\":\"$AV\",\"page\":1,\"pageSize\":200}" -o "$P1"
 PK1=$(node -e "try{const d=JSON.parse(require('fs').readFileSync(process.argv[1],'utf8'));console.log('pk1.len='+(((d.data||{}).rows||{}).values||[]).length)}catch(e){console.log('pk1.len=parse-fail')}" "$P1" 2>/dev/null)
 P2=$(cygpath -m /tmp/lvh-pk2.json)
-curl -s -m 60 -X POST "$BASE/api/av/getAttributeViewPrimaryKeyValues" -H "Authorization: Token $TOKEN" -H "Content-Type: application/json" -d "{\"id\":\"$AV\",\"page\":2,\"pageSize\":100}" -o "$P2"
+curl -s -m 60 -X POST "$BASE/api/av/getAttributeViewPrimaryKeyValues" -H "Authorization: Token $TOKEN" -H "Content-Type: application/json" -d "{\"id\":\"$AV\",\"page\":2,\"pageSize\":200}" -o "$P2"
 PK2=$(node -e "try{const d=JSON.parse(require('fs').readFileSync(process.argv[1],'utf8'));const a=(((d.data||{}).rows||{}).values||[]).map(v=>v.id);console.log('pk2.len='+a.length)}catch(e){console.log('pk2.len=parse-fail')}" "$P2" 2>/dev/null)
 OVERLAP=$(node -e "try{const f=p=>JSON.parse(require('fs').readFileSync(p,'utf8')).data.rows.values.map(v=>v.id);const a=f(process.argv[1]),b=f(process.argv[2]);console.log('overlap='+a.filter(x=>b.includes(x)).length)}catch(e){console.log('overlap=?')}" "$P1" "$P2" 2>/dev/null)
 echo "pk: $PK1 $PK2 $OVERLAP" >> "$LOG"
@@ -103,4 +103,4 @@ echo "upload: $(echo "$UP" | grep -o '"code":[0-9-]*' | head -1) $(echo "$UP" | 
 sleep 3
 "$sy" /api/filetree/removeDocByID -y -d "{\"id\":\"$DOC\"}" >> "$LOG" 2>&1
 echo "=== $(date '+%H:%M:%S') done" >> "$LOG"
-echo "RESULT: render 行 rowCount vs rows.len——不相等即默认分页成立（150 行只回 50）；pk 行应 =150 且 overlap=0" >> "$LOG"
+echo "RESULT: render 行 rowCount vs rows.len——不相等即默认分页成立（250 行只回 50）；pk 应 200+50 且 overlap=0（循环终止条件成立）" >> "$LOG"
