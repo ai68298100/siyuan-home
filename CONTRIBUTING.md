@@ -34,6 +34,44 @@ pnpm run make-link   # 软链到思源工作空间 data/plugins/
 7. **隐私红线**：console 不输出用户数据；证件号等字段脱敏；不引入网络依赖
 8. **测试**：新逻辑带单测（`tests/`，vitest）；内核 API 改动同步更新 mock
 
+## 常用命令
+
+| 命令 | 说明 |
+|---|---|
+| `pnpm run dev` | 开发（app + kernel 双目标 watch + livereload） |
+| `pnpm run check` | TypeScript + Svelte + i18n 键位对齐 + 元数据校验 + **pnpm audit**（五合一，必须零错） |
+| `pnpm test` | 单元测试（**138 个**：规则引擎/读写层/成员 DAL/建库器/注册表/schema 快照/迁移/容错/EC 契约形状/桥/月历） |
+| `pnpm run build` | 生产构建 + package.zip |
+| `pnpm run check:meta` | 元数据交叉校验 + zip 体积门禁 |
+| `pnpm run check:audit` | pnpm audit（prod 依赖，moderate+ 级别拦截） |
+
+## 开发约定
+
+1. **Conventional Commits**：`feat/fix/docs/refactor/test/chore:` 前缀，一个逻辑变更一个提交
+2. **事实源**：`TODO.md`（35 组待办）——完成任务必须勾选并在 34 组"循环执行记录"表加行
+3. **设计遵循**：UI 见 `docs/design/07`（token 禁硬编码色值）与 `08`（组件契约/类名）；架构变更先改对应 ADR
+4. **i18n**：所有用户可见文案进 `public/i18n/zh-CN.json` 与 `en.json` 两份（`check:i18n` 会拦不一致）
+5. **内核 API**：一切 `/api` 调用收口在 `src/core/siyuan.ts`（transport 可注入，测试用 mock）
+6. **数据边界**：业务数据只进思源侧（数据库/文档）；插件存储只放设置与运行态（ADR-7）
+7. **隐私红线**：console 不输出用户数据；证件号等字段脱敏；不引入网络依赖
+8. **测试**：新逻辑带单测（`tests/`，vitest）；内核 API 改动同步更新 mock
+9. **EC 集成契约测试**：跨插件数据交换形状必须有测试锁定（`tests/core/ec-contracts.test.ts`）——提供方改字段时 CI 立即暴露
+10. **schema 变更**：`pnpm test -- -u` 更新黄金快照 + CHANGELOG 记录原因；契约门禁（`validateSchema`）自动校验
+11. **面板类型**：面板组件使用 `HomePluginLike`（`src/types/plugin.ts`）——插件类结构性满足，禁 `plugin: any`
+12. **错误处理**：所有 async 路径（`await plugin.xxx` / `await setCell` / `await saveRuntime`）必须有 try/catch + 用户可见反馈
+
+## EC 生态集成模式
+
+管家与其他小驴系列插件（人脉/打卡/考试/闪卡/拾遗/雷切）通过以下方式集成：
+
+| 模式 | 说明 | 已落地 |
+|---|---|---|
+| **window 全局桥** | 提供方挂 `window.<PluginName>`，消费方探测存在性后调用 | 人脉 `window.LvContacts`、管家 `window.LvHome`、打卡 `window.siyuanCheckin` |
+| **app.plugins 探测** | 通过思源 `app.plugins` 查找插件实例，调用其公开方法 | 雷切 `registerQuickAction/registerHomeModule`（EC16/17） |
+| **window CustomEvent** | 提供方 `dispatchEvent`，消费方 `addEventListener` | 考试 `lv-exam:stats`（EC21）、打卡 `checkin:*`（EC10） |
+
+新增集成前先读提供方源码确认签名（参考 `docs/research/2026-10-03-EC-源码契约摘录.md`），实现后写契约形状测试锁定。
+
 ## 发布
 
 - **版本策略（semver）**：
