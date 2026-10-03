@@ -204,6 +204,11 @@ exports[`31 模块 schema 契约快照（21 组） > 每个 schema 的结构快�
       "labelKey": "field.note",
       "type": "text",
     },
+    {
+      "key": "copy_location",
+      "labelKey": "field.copy_location",
+      "type": "text",
+    },
   ],
   "reminders": [
     {
@@ -645,9 +650,20 @@ exports[`31 模块 schema 契约快照（21 组） > 每个 schema 的结构快�
       "labelKey": "field.credentials_note",
       "type": "text",
     },
+    {
+      "default": "holder",
+      "key": "seat_role",
+      "labelKey": "field.seat_role",
+      "options": [
+        "holder",
+        "member",
+      ],
+      "type": "select",
+    },
   ],
   "reminders": [
     {
+      "autoRenewField": "auto_renew",
       "cycleField": "cycle",
       "field": "next_pay",
       "key": "next_pay",
@@ -2227,6 +2243,11 @@ exports[`31 模块 schema 契约快照（21 组） > 每个 schema 的结构快�
       "type": "date",
     },
     {
+      "key": "due",
+      "labelKey": "field.due",
+      "type": "date",
+    },
+    {
       "key": "attachments",
       "labelKey": "field.attachments",
       "type": "mAsset",
@@ -2245,6 +2266,16 @@ exports[`31 模块 schema 契约快照（21 组） > 每个 schema 的结构快�
       "key": "dose_no",
       "labelKey": "field.dose_no",
       "type": "number",
+    },
+    {
+      "key": "vaccine_batch",
+      "labelKey": "field.vaccine_batch",
+      "type": "text",
+    },
+    {
+      "key": "vaccine_site",
+      "labelKey": "field.vaccine_site",
+      "type": "text",
     },
     {
       "key": "metric_value",

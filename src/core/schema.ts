@@ -109,6 +109,7 @@ export const CERTS_SCHEMA: ModuleSchema = {
         ...d("date"),
         ...CERT_PRIVATE,
         ...d("expiry", "due", "remind_before", "location", "attachments", "note"),
+        { key: "copy_location", type: "text", labelKey: "field.copy_location" }, // 16 组：复印件/电子版存放位置
     ],
     capture: ["name", "member", "category", "expiry", "attachments"],
     views: [
@@ -181,11 +182,12 @@ export const MEMBERSHIPS_SCHEMA: ModuleSchema = {
         { key: "trial_end", type: "date", labelKey: "field.trial_end" },
         { key: "auto_renew", type: "checkbox", labelKey: "field.auto_renew" },
         { key: "credentials_note", type: "text", labelKey: "field.credentials_note" },
+        { key: "seat_role", type: "select", labelKey: "field.seat_role", options: ["holder", "member"], default: "holder" }, // 16 组：家庭共享账号主卡/成员位
     ],
     capture: ["name", "category", "amount", "cycle", "next_pay"],
     views: [{ key: "renewing", type: "table", sortBy: { key: "next_pay", asc: true } }],
     reminders: [
-        { key: "next_pay", field: "next_pay", kind: "recurring", leadDays: 14, cycleField: "cycle" },
+        { key: "next_pay", field: "next_pay", kind: "recurring", leadDays: 14, cycleField: "cycle", autoRenewField: "auto_renew" },
         { key: "trial_end", field: "trial_end", kind: "oneoff", leadDays: 3 },
         { key: "expiry", field: "expiry", kind: "oneoff", leadDays: 14 },
     ],
@@ -403,9 +405,12 @@ export const PARENTING_SCHEMA: ModuleSchema = {
     columns: [
         ...d("name", "member"),
         { ...FIELD_DICT.category, options: ["vaccine_p", "growth", "feeding", "milestone"] },
-        ...d("date", "attachments", "note"),
+        // due 必备：next_visit 规则引用此列（缺列会令 requireReminderColumns 抛错——第六十五轮修复）
+        ...d("date", "due", "attachments", "note"),
         { key: "vaccine_name", type: "text", labelKey: "field.vaccine_name" },
         { key: "dose_no", type: "number", labelKey: "field.dose_no" },
+        { key: "vaccine_batch", type: "text", labelKey: "field.vaccine_batch" }, // 16 组：接种追溯
+        { key: "vaccine_site", type: "text", labelKey: "field.vaccine_site" }, // 16 组：接种点
         { key: "metric_value", type: "number", labelKey: "field.metric_value" },
     ],
     capture: ["name", "member", "category", "date"],

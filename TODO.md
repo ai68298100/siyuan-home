@@ -1,5 +1,6 @@
 # 小驴管家（Lv Home）· 项目待办总清单
 | 2026-10-04 | 主线 | 第六十五轮：D13–D22 决策登记 + contracts 续约决策提醒 + 真机后台部署通道 | ①用户授权代拍全部决策 → docs/design/09 新增 D13–D22（disabledInPublish 保持/农历 🌙 定案落 D14 推翻 D10/name 必填落 D15/CSV 全列/搜索范围/上架触发/icon/EC09 绑定模型=settings 映射 v1/斜杠维持关闭/状态管理三分边界落 08 §8），C 类收口到 ~6；②contracts 新增 auto_renew 列 + autoRenewField 规则声明 → Reminder.autoRenew 透传（rule/providers/types）→ 提醒卡+总览卡 🔄 + title 提示（hub.autoRenew），快照 -u，单测 140（+1）；③真机部署通道打通：putFile 逐文件后台部署（cp 被 hook 拦/make-install 401/符号链接无权限，方法落 CONTRIBUTING）+ setPetalEnabled 热重载，14 文件验证一致；④e2e 受阻记录：并发会话切换工作区（token 瞬时 401/429）+ IAB web 壳启动失败（点击刷新循环，与本插件无关）——UI 行为验证（nameRequired/🌙/🔄）按用户指示转后台策略，列入 §7 待实测；单测 140、i18n 626、gzip ~52KB |
+| 2026-10-04 | 主线 | 第六十五轮·增量：16 组三字段 + parenting 缺列隐患修复 | certs+copy_location／parenting+vaccine_batch/vaccine_site／memberships+seat_role(holder/member 默认 holder)；**parenting next_visit 规则引用 due 列但 schema 未声明（启用即扫描报错）——补 due 列修复**；memberships next_pay 顺带挂 autoRenewField（🔄 复用）；i18n 626→632；快照 -u；全门禁绿后 putFile 后台部署+热重载 |
 | 2026-10-03 | 主线 | 第六十四轮：八项产品决策定案落地（C 类收口） | 用户全部按推荐定案：①disabledInPublish 保持 true；②农历 en 方案=locale 无关 🌙 标记（Reminder.lunar 透传 + 提醒卡/总览卡渲染，dueDate 恒为公历）；③快速录入 name 必填=阻止提交（按钮禁用+字段区提示+createRow 兜底，`ledger.nameRequired` 双语）；④Dock 面板暂不做；⑤icon.png 保留占位随 v0.3 视觉稿替换；⑥CSV 导出 v1 维持全列；⑦搜索范围维持名称+备注；⑧集市上架待真机回归通过后另议。决策 ③② 已实现+单测 139；④-⑧ 记录在案（含 24 组决策行修复：轮日志 \n 损坏行拆分） |
 | 2026-10-03 | 主线 | 第十五轮：20 组去抖 + 29 组合并卡 + 30 组两项决策 | refreshHub force 分流（30s 去抖+四处强制入口）；同人同日折叠卡（snippet 重构，键盘可达）；en 复数与日期格式记录为设计决策（中性形式/ISO 同形）；单测 118 持平、i18n 589→591、gzip 46.4KB |
 | 2026-10-03 | 循环A | 第十五波走查 | 合并卡键盘可达（role=button+Enter）；settings 面板 IHomePluginLike 签名同步（即修 svelte-check）；snippet 重构后单条路径无行为差异 |
@@ -389,14 +390,14 @@
 ## 16. 模块功能深化（按模块细化，v0.3+ 逐版吸收进 schema）
 
 - [ ] 🟡 certs：换证历史链（旧证→新证 relation + 历史视图）
-- [ ] 🟡 certs：复印件/电子版存放位置字段
+- [x] 🟡 certs：复印件/电子版存放位置字段 ✅ 2026-10-04 第六十五轮（copy_location text 列 + 双语 i18n + 快照 -u）
 - [ ] 🟡 assets：估值快照（手动记录 + 时间线，非自动估值）
 - [ ] 🟡 assets：位置变更历史（物品搬家记录）
 - [ ] 🟢 assets：CSV 批量导入（列映射向导）
 - [ ] 🟡 shopping：退货/退款记录字段与状态
 - [ ] 🟢 shopping：同商品价格历史（复购比价参考）
 - [ ] 🟡 shopping：购入联动 stock（囤货品自动加库存）
-- [ ] 🟡 memberships：家庭共享账号（主卡人/成员位标注）
+- [x] 🟡 memberships：家庭共享账号（主卡人/成员位标注） ✅ 2026-10-04 第六十五轮（seat_role select 列 holder/member 默认 holder + 双语 i18n；next_pay 规则顺带挂 autoRenewField → 自动续费会员到期也显示 🔄）
 - [ ] 🟢 memberships：取消自动续费指引链接字段
 - [x] 🟡 contracts：自动续约条款标记 → 到期提醒升级为「续约决策提醒」 ✅ 2026-10-03 第六十五轮（schema 新增 auto_renew checkbox 列 + 规则 autoRenewField 声明；Reminder.autoRenew 透传（rule/providers）；提醒卡/总览卡 🔄 标记 + title 提示（hub.autoRenew 双语）；快照 -u；真机验收见 §7.1）
 - [ ] 🟢 contracts：押金退还记录
@@ -406,7 +407,7 @@
 - [ ] 🟡 social：缴费基数年度调整提醒
 - [ ] 🟡 schooling：作业/考试日程（recurring）+ 家长会记录文档模板
 - [ ] 🟢 schooling：转学/插班历史
-- [ ] 🟡 parenting：疫苗批号与接种点字段（接种追溯）
+- [x] 🟡 parenting：疫苗批号与接种点字段（接种追溯） ✅ 2026-10-04 第六十五轮（vaccine_batch/vaccine_site text 列 + 双语 i18n；**同轮修复隐患**：next_visit 规则引用 due 列但 schema 缺列——启用即扫描必错，已补 due 列）
 - [ ] 🟡 parenting：生长曲线图（身高体重 WHO 百分位 SVG 渲染）
 - [ ] 🟡 parenting：辅食新食材 3 天观察期 → 联动 health 过敏史
 - [ ] 🟡 allowance：孩子愿望清单（目标金额 + 存钱进度条）
