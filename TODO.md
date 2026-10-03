@@ -1,4 +1,5 @@
 # 小驴管家（Lv Home）· 项目待办总清单
+| 2026-10-04 | 主线 | 第六十七轮：16 组"列+规则"类三连清 + 模板基建立项 | insurance 理赔状态机（claim_status 四态报案/材料/到账+报案日+金额）；social 基数年度调整（base_adjust_date + **anniversary 规则**年复一年滚动）；schooling 考试日程（exam_date + oneoff leadDays 3；作业 recurring 归 exams 模块不重复）；**发现并立项：DocTemplate 模板基建自声明以来无消费者**（无 .tpl/无渲染路径/无入口）——单独立项含落地范围；i18n 654→664、快照 -u；16 组剩时间线类（assets 估值/位置历史、shopping 价格历史需子记录模型）与跨模块联动（health→药箱、shopping→stock） |
 | 2026-10-04 | 主线 | 第六十六轮：EC09 打卡绑定 v1 落地 + 16 组三易项 | ①**EC09（D20 定案后实现）**：CheckinBinding 进 settings + normalizeCheckinBindings 清洗（去重/非法剔除/缺名回退 itemId）+ 导入归一化接线；设置·提醒页绑定编辑器（探测 siyuanCheckin→queryItems 拉习惯列表、成员下拉、metric 三选、kind 自动推导默认、无插件提示）；总览健康卡绑定摘要（绑定×强度摘要求交 title 列明细）；只读消费不写打卡数据；②16 组：shopping 退货三字段（return_status 四态+return_date+refund_amount）、contracts 押金退还（deposit_returned+deposit_return_date）、memberships 取消续费指引（cancel_guide url）；i18n 644→654、单测 142（+2）、快照 -u；[待实测] 同实例 queryItems 实拉与总览展示 |
 | 2026-10-04 | 主线 | 第六十五轮：D13–D22 决策登记 + contracts 续约决策提醒 + 真机后台部署通道 | ①用户授权代拍全部决策 → docs/design/09 新增 D13–D22（disabledInPublish 保持/农历 🌙 定案落 D14 推翻 D10/name 必填落 D15/CSV 全列/搜索范围/上架触发/icon/EC09 绑定模型=settings 映射 v1/斜杠维持关闭/状态管理三分边界落 08 §8），C 类收口到 ~6；②contracts 新增 auto_renew 列 + autoRenewField 规则声明 → Reminder.autoRenew 透传（rule/providers/types）→ 提醒卡+总览卡 🔄 + title 提示（hub.autoRenew），快照 -u，单测 140（+1）；③真机部署通道打通：putFile 逐文件后台部署（cp 被 hook 拦/make-install 401/符号链接无权限，方法落 CONTRIBUTING）+ setPetalEnabled 热重载，14 文件验证一致；④e2e 受阻记录：并发会话切换工作区（token 瞬时 401/429）+ IAB web 壳启动失败（点击刷新循环，与本插件无关）——UI 行为验证（nameRequired/🌙/🔄）按用户指示转后台策略，列入 §7 待实测；单测 140、i18n 626、gzip ~52KB |
 | 2026-10-04 | 主线 | 第六十五轮·增量：16 组三字段 + parenting 缺列隐患修复 | certs+copy_location／parenting+vaccine_batch/vaccine_site／memberships+seat_role(holder/member 默认 holder)；**parenting next_visit 规则引用 due 列但 schema 未声明（启用即扫描报错）——补 due 列修复**；memberships next_pay 顺带挂 autoRenewField（🔄 复用）；i18n 626→632；快照 -u；全门禁绿后 putFile 后台部署+热重载 |
@@ -404,9 +405,10 @@
 - [x] 🟢 contracts：押金退还记录 ✅ 2026-10-04 第六十六轮（deposit_returned checkbox + deposit_return_date）
 - [ ] 🟡 health：体检年度计划模板（recurring）
 - [ ] 🟡 health：处方药 → 药箱联动（新建药箱行或扣减提示）
-- [ ] 🟡 insurance：理赔记录状态机（报案/材料/到账）
-- [ ] 🟡 social：缴费基数年度调整提醒
-- [ ] 🟡 schooling：作业/考试日程（recurring）+ 家长会记录文档模板
+- [x] 🟡 insurance：理赔记录状态机（报案/材料/到账） ✅ 2026-10-04 第六十七轮（claim_status 四态 select + claim_date + claim_amount；无日期驱动 v1 仅记录）
+- [x] 🟡 social：缴费基数年度调整提醒 ✅ 2026-10-04 第六十七轮（base_adjust_date 列 + anniversary 规则 leadDays 14——年复一年自动滚动）
+- [x] 🟡 schooling：作业/考试日程（recurring）+ 家长会记录文档模板 ✅ 2026-10-04 第六十七轮部分（exam_date 列 + oneoff 规则 leadDays 3；作业 recurring 由 exams 模块承担不重复建规则；**家长会模板未做**——模板基建未实现，见下方新立项）
+- [ ] 🟡 模板基建（第六十七轮立项）：`DocTemplate` 类型自 schema.ts 声明以来无任何消费者（无 .tpl 文件、无渲染/建文档路径、无入口）——落地范围：模板文件加载、变量替换（行字段注入）、从台账行/详情抽屉创建文档、 schooling 家长会记录等首批模板；完成后补 16 组 schooling 模板项
 - [ ] 🟢 schooling：转学/插班历史
 - [x] 🟡 parenting：疫苗批号与接种点字段（接种追溯） ✅ 2026-10-04 第六十五轮（vaccine_batch/vaccine_site text 列 + 双语 i18n；**同轮修复隐患**：next_visit 规则引用 due 列但 schema 缺列——启用即扫描必错，已补 due 列）
 - [ ] 🟡 parenting：生长曲线图（身高体重 WHO 百分位 SVG 渲染）

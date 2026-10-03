@@ -788,6 +788,28 @@ exports[`31 模块 schema 契约快照（21 组） > 每个 schema 的结构快�
       "type": "number",
     },
     {
+      "default": "none",
+      "key": "claim_status",
+      "labelKey": "field.claim_status",
+      "options": [
+        "none",
+        "filing",
+        "docs",
+        "paid",
+      ],
+      "type": "select",
+    },
+    {
+      "key": "claim_date",
+      "labelKey": "field.claim_date",
+      "type": "date",
+    },
+    {
+      "key": "claim_amount",
+      "labelKey": "field.claim_amount",
+      "type": "number",
+    },
+    {
       "key": "expiry",
       "labelKey": "field.expiry",
       "type": "date",
@@ -2416,6 +2438,11 @@ exports[`31 模块 schema 契约快照（21 组） > 每个 schema 的结构快�
       "labelKey": "field.enroll_year",
       "type": "number",
     },
+    {
+      "key": "exam_date",
+      "labelKey": "field.exam_date",
+      "type": "date",
+    },
   ],
   "reminders": [
     {
@@ -2423,6 +2450,12 @@ exports[`31 模块 schema 契约快照（21 组） > 每个 schema 的结构快�
       "key": "tuition",
       "kind": "oneoff",
       "leadDays": 14,
+    },
+    {
+      "field": "exam_date",
+      "key": "exam_date",
+      "kind": "oneoff",
+      "leadDays": 3,
     },
   ],
 }
@@ -2488,6 +2521,19 @@ exports[`31 模块 schema 契约快照（21 组） > 每个 schema 的结构快�
       "key": "snapshot_date",
       "labelKey": "field.snapshot_date",
       "type": "date",
+    },
+    {
+      "key": "base_adjust_date",
+      "labelKey": "field.base_adjust_date",
+      "type": "date",
+    },
+  ],
+  "reminders": [
+    {
+      "field": "base_adjust_date",
+      "key": "base_adjust",
+      "kind": "anniversary",
+      "leadDays": 14,
     },
   ],
 }

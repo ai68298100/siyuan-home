@@ -206,6 +206,10 @@ export const INSURANCE_SCHEMA: ModuleSchema = {
         { key: "pay_cycle", type: "select", labelKey: "field.cycle", options: ["month", "quarter", "year"] },
         { key: "next_pay", type: "date", labelKey: "field.next_pay" },
         { key: "coverage", type: "number", labelKey: "field.coverage" },
+        // 16 组：理赔记录状态机（报案→材料→到账；无日期驱动，v1 仅记录）
+        { key: "claim_status", type: "select", labelKey: "field.claim_status", options: ["none", "filing", "docs", "paid"], default: "none" },
+        { key: "claim_date", type: "date", labelKey: "field.claim_date" },
+        { key: "claim_amount", type: "number", labelKey: "field.claim_amount" },
         ...d("expiry", "attachments", "note"),
     ],
     capture: ["name", "category", "insurer", "premium", "next_pay"],
@@ -435,10 +439,12 @@ export const SCHOOLING_SCHEMA: ModuleSchema = {
         { key: "contact", type: "text", labelKey: "field.contact" }, // EC13：对接人（人脉快照）
         ...d("amount", "due", "note"),
         { key: "enroll_year", type: "number", labelKey: "field.enroll_year" },
+        { key: "exam_date", type: "date", labelKey: "field.exam_date" }, // 16 组：考试/重要日程（exams 模块管备考，这里管校内日程）
     ],
     capture: ["name", "school", "category", "amount", "due"],
     reminders: [
         { key: "tuition", field: "due", kind: "oneoff", leadDays: 14 },
+        { key: "exam_date", field: "exam_date", kind: "oneoff", leadDays: 3 },
     ],
 };
 
@@ -452,8 +458,10 @@ export const SOCIAL_SCHEMA: ModuleSchema = {
         { key: "retire_age", type: "number", labelKey: "field.retire_age" },
         { key: "balance_snapshot", type: "number", labelKey: "field.balance_snapshot" },
         { key: "snapshot_date", type: "date", labelKey: "field.snapshot_date" },
+        { key: "base_adjust_date", type: "date", labelKey: "field.base_adjust_date" }, // 16 组：缴费基数年度调整
     ],
     capture: ["name", "member", "category", "account_no"],
+    reminders: [{ key: "base_adjust", field: "base_adjust_date", kind: "anniversary", leadDays: 14 }],
 };
 
 export const MEDIA_SCHEMA: ModuleSchema = {
