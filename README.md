@@ -27,9 +27,13 @@ Certificates expire, medicine expires, insurance needs renewal, subscriptions au
 | ⏰ **Unified expiry reminders** | Certificates, medicine, policies, subscriptions, inspections, birthdays (lunar supported) — all derived automatically, lead time configurable per type (passport 1 year, medicine 30 days), overdue shown in red on top |
 | 👥 **Members as first-class citizens** | Self / spouse / partner / children / elders / kin — every ledger is organized per member, filter "everything about my son" in one click |
 | 🗃 **31 life modules** | People & records · assets & shopping · daily living · parenting & school · travel · media (details below) |
+| 📋 **Rich detail drawer** | View all fields, edit inline, upload attachments, renewal history, delete with double-confirm |
+| 📊 **Check-in & exam integration** | Display study streaks and accuracy from 小驴考试, check-in strength summaries from 小驴打卡 |
+| 📤 **Data portability** | CSV export per module, settings JSON export/import with auto-backup, sample data generator |
 | 🔒 **Local-first** | Everything lives in your SiYuan workspace; no telemetry, no network calls; share the ledger notebook with your family |
 | 🔗 **Native databases** | Ledgers are SiYuan attribute-view databases inside a dedicated notebook — open any ledger doc to edit, link or embed it in daily notes ("mom's passport" inside your journal) |
 | 🧩 **Modules on demand** | Disabled modules create no data and stay out of the UI; parenting/school only suggested when you have kids |
+| 🔌 **Ecosystem ready** | Block menu quick capture, statusbar badge, service bridge (`window.LvHome`), contacts picker via 小驴人脉 |
 
 ## 📦 Install (v0.2.0)
 
