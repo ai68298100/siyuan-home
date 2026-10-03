@@ -2,6 +2,7 @@
  * 生长曲线数据层（第七十四轮）：从 parenting 台账行收集身高/体重时间线序列。
  * 纯逻辑可单测。第七十七轮：WHO 0–60 月参考带插值（数据来自官方 LMS 参数表，
  * 构建期由 scripts/fetch-who-data.mjs 生成 who-refs.ts，含署名与 CC BY-NC 3.0 约束）。
+ * 第七十八轮：精确小数月龄 + 新生儿期（0–13 周）周粒度参考带。
  */
 import type { FamilyMember } from "@/types";
 import { WHO_REFS } from "@/core/data/who-refs";
@@ -13,7 +14,7 @@ export interface GrowthPoint {
     /** ISO 日期（ yyyy-MM-dd） */
     date: string;
     value: number;
-    /** 距成员生日的月龄（生日缺失 → null，图上退化为日期轴） */
+    /** 距成员生日的月龄（WHO 月定义 30.4375 天，小数精确；生日缺失 → null，图上退化为日期轴） */
     ageMonths: number | null;
 }
 
@@ -30,15 +31,24 @@ interface GrowthRowLike {
     cells: Record<string, any>;
 }
 
-/** 月龄：按日历差（不满整月截断）；生日缺失/晚于测量日 → null */
+/** 整数月龄 = floor(精确月龄)（WHO 30.4375 天月）；生日缺失/早于测量日 → null。
+ * 第七十八轮起图表数据走 exactAgeMonthsAt（小数精确）；本函数保留给需要整数月的场景。 */
 export function ageMonthsAt(birthday: string | undefined, date: string): number | null {
+    const exact = exactAgeMonthsAt(birthday, date);
+    return exact === null ? null : Math.floor(exact);
+}
+
+export const DAYS_PER_MONTH = 30.4375; // WHO 月定义（平均年 365.2425 天 / 12）
+
+/** 精确月龄（小数）：整日差 / 30.4375；生日缺失/早于测量日 → null。
+ * 小数月龄让新生儿期测量点在周粒度参考带上不再坍缩到月 0。 */
+export function exactAgeMonthsAt(birthday: string | undefined, date: string): number | null {
     if (!birthday || birthday.length < 10 || !date || date.length < 10) return null;
     const b = new Date(`${birthday.slice(0, 10)}T00:00:00`);
     const d = new Date(`${date.slice(0, 10)}T00:00:00`);
     if (isNaN(b.getTime()) || isNaN(d.getTime()) || d < b) return null;
-    let months = (d.getFullYear() - b.getFullYear()) * 12 + (d.getMonth() - b.getMonth());
-    if (d.getDate() < b.getDate()) months -= 1;
-    return Math.max(0, months);
+    const days = Math.floor((d.getTime() - b.getTime()) / 86400000);
+    return Math.max(0, days / DAYS_PER_MONTH);
 }
 
 /**
@@ -82,7 +92,7 @@ export function collectGrowthSeries(
             series = { memberId, memberName, metric, points: [] };
             acc.set(key, series);
         }
-        series.points.push({ date, value, ageMonths: ageMonthsAt(m?.birthday, date) });
+        series.points.push({ date, value, ageMonths: exactAgeMonthsAt(m?.birthday, date) });
     }
     const out = [...acc.values()];
     for (const s of out) s.points.sort((a, b) => a.date.localeCompare(b.date));
@@ -97,13 +107,19 @@ function localKey(d: Date): string {
 
 export interface WhoBandPoint { p3: number; p15: number; p50: number; p85: number; p97: number }
 
-/** WHO 参考带按月龄线性插值；性别未知或超出 0–60 月 → null（参考带不外推） */
+/** WHO 参考带线性插值；性别未知或超出 0–60 月 → null（参考带不外推）。
+ * 新生儿期（≤13 周）优先取周粒度带，位置换算：周 = 月龄 × 30.4375 / 7。 */
 export function whoBand(sex: WhoSex | undefined, metric: GrowthMetric, ageMonths: number): WhoBandPoint | null {
     const table = sex ? WHO_REFS[sex]?.[metric] : undefined;
     if (!table || !Number.isFinite(ageMonths) || ageMonths < 0 || ageMonths > 60) return null;
-    const lo = Math.floor(ageMonths);
-    const hi = Math.min(lo + 1, 60);
-    const frac = ageMonths - lo;
+    const weeklyMaxMonths = (13 * 7) / DAYS_PER_MONTH;
+    const useWeekly = table.weekly !== undefined && ageMonths <= weeklyMaxMonths;
+    const src = useWeekly ? table.weekly! : table;
+    const pos = useWeekly ? (ageMonths * DAYS_PER_MONTH) / 7 : ageMonths;
+    const max = useWeekly ? 13 : 60;
+    const lo = Math.floor(pos);
+    const hi = Math.min(lo + 1, max);
+    const frac = pos - lo;
     const at = (arr: number[]) => arr[lo] + (arr[hi] - arr[lo]) * frac;
-    return { p3: at(table.p3), p15: at(table.p15), p50: at(table.p50), p85: at(table.p85), p97: at(table.p97) };
+    return { p3: at(src.p3), p15: at(src.p15), p50: at(src.p50), p85: at(src.p85), p97: at(src.p97) };
 }

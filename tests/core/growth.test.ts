@@ -3,7 +3,7 @@
  * 第七十七轮：WHO 参考带插值（锚点对照 WHO 公布值、月龄线性、越界与未知性别、带内单调性）。
  */
 import { describe, it, expect } from "vitest";
-import { ageMonthsAt, collectGrowthSeries, whoBand, type GrowthRowLike } from "@/core/growth";
+import { ageMonthsAt, exactAgeMonthsAt, collectGrowthSeries, whoBand, type GrowthRowLike } from "@/core/growth";
 import { WHO_REFS } from "@/core/data/who-refs";
 import type { FamilyMember } from "@/types";
 
@@ -13,13 +13,21 @@ const member: FamilyMember = {
 
 const row = (cells: Record<string, any>): GrowthRowLike => ({ itemID: "r", cells });
 
-describe("growth.ageMonthsAt", () => {
-    it("日历月差；不满整月截断；早于生日 → null", () => {
-        expect(ageMonthsAt("2025-01-15", "2025-07-15")).toBe(6);
-        expect(ageMonthsAt("2025-01-15", "2025-07-14")).toBe(5);
+describe("growth.ageMonthsAt / exactAgeMonthsAt", () => {
+    it("整数月 = floor(精确月龄)；早于生日/坏输入 → null", () => {
+        expect(ageMonthsAt("2025-01-15", "2025-07-15")).toBe(5); // 181 天 / 30.4375 = 5.95
+        expect(ageMonthsAt("2025-01-15", "2025-07-14")).toBe(5); // 180 / 30.4375 = 5.91
         expect(ageMonthsAt("2025-01-15", "2024-06-01")).toBeNull();
         expect(ageMonthsAt(undefined, "2025-07-15")).toBeNull();
         expect(ageMonthsAt("bad", "2025-07-15")).toBeNull();
+    });
+
+    it("精确月龄（第七十八轮）：整日差 / 30.4375，小数保留；同日为 0", () => {
+        // 2025-01-15 → 2025-07-15 = 181 天
+        expect(exactAgeMonthsAt("2025-01-15", "2025-07-15")).toBeCloseTo(181 / 30.4375, 6);
+        expect(exactAgeMonthsAt("2025-01-15", "2025-01-15")).toBe(0);
+        expect(exactAgeMonthsAt("2025-01-15", "2024-06-01")).toBeNull();
+        expect(exactAgeMonthsAt(undefined, "2025-07-15")).toBeNull();
     });
 });
 
@@ -36,7 +44,7 @@ describe("growth.collectGrowthSeries", () => {
             "k-val": { number: { isNotEmpty: true, content: value } },
         });
 
-    it("按成员×指标聚合；日期升序；月龄由生日计算", () => {
+    it("按成员×指标聚合；日期升序；月龄由生日精确计算", () => {
         const series = collectGrowthSeries(
             [growthRow("2025-07-15", 70), growthRow("2025-04-15", 65), growthRow("2025-10-15", 11, "weight")],
             cols, [member],
@@ -45,7 +53,7 @@ describe("growth.collectGrowthSeries", () => {
         const h = series.find((s) => s.metric === "height")!;
         expect(h.memberName).toBe("宝宝");
         expect(h.points.map((p) => p.value)).toEqual([65, 70]);
-        expect(h.points[1].ageMonths).toBe(6);
+        expect(h.points[1].ageMonths).toBeCloseTo(181 / 30.4375, 6); // 2025-01-15 → 07-15
         const w = series.find((s) => s.metric === "weight")!;
         expect(w.points[0].value).toBe(11);
     });
@@ -94,16 +102,37 @@ describe("growth.whoBand（WHO 参考带）", () => {
         expect(whoBand("male", "weight", NaN)).toBeNull();
     });
 
-    it("全表不变式：p3 ≤ p15 ≤ p50 ≤ p85 ≤ p97（2 性别 × 2 指标 × 61 月）", () => {
+    it("新生儿期（≤13 周）优先周粒度带；之后切回月表", () => {
+        const w = WHO_REFS.male.weight.weekly!;
+        // 出生：周表 w0 = 月表 m0（同为出生值）
+        expect(whoBand("male", "weight", 0)!.p50).toBe(w.p50[0]);
+        // 0.5 月 ≈ 2.17 周 → 在 w2–w3 间线性插值
+        const weeks = 0.5 * 30.4375 / 7;
+        const expectP50 = w.p50[2] + (w.p50[3] - w.p50[2]) * (weeks - 2);
+        expect(whoBand("male", "weight", 0.5)!.p50).toBeCloseTo(expectP50, 9);
+        // 2.9 月（≈12.6 周）仍走周表；3.5 月走月表
+        expect(whoBand("male", "weight", 2.9)!.p50).toBeCloseTo(w.p50[12] + (w.p50[13] - w.p50[12]) * ((2.9 * 30.4375 / 7) - 12), 9);
+        const m = WHO_REFS.male.weight;
+        expect(whoBand("male", "weight", 3.5)!.p50).toBe(m.p50[3] + (m.p50[4] - m.p50[3]) * 0.5);
+        // 边界：恰好 13 周（=13*7/30.4375 月）取周表末端
+        expect(whoBand("male", "weight", 13 * 7 / 30.4375)!.p50).toBe(w.p50[13]);
+    });
+
+    it("全表不变式：p3 ≤ p15 ≤ p50 ≤ p85 ≤ p97（月表 61 + 周表 14，2 性别 × 2 指标）", () => {
+        const check = (t: { p3: number[]; p15: number[]; p50: number[]; p85: number[]; p97: number[] }, n: number) => {
+            for (let m = 0; m < n; m++) {
+                expect(t.p3[m]).toBeLessThanOrEqual(t.p15[m]);
+                expect(t.p15[m]).toBeLessThanOrEqual(t.p50[m]);
+                expect(t.p50[m]).toBeLessThanOrEqual(t.p85[m]);
+                expect(t.p85[m]).toBeLessThanOrEqual(t.p97[m]);
+            }
+        };
         for (const sex of ["male", "female"] as const) {
             for (const metric of ["height", "weight"] as const) {
                 const t = WHO_REFS[sex][metric];
-                for (let m = 0; m <= 60; m++) {
-                    expect(t.p3[m]).toBeLessThanOrEqual(t.p15[m]);
-                    expect(t.p15[m]).toBeLessThanOrEqual(t.p50[m]);
-                    expect(t.p50[m]).toBeLessThanOrEqual(t.p85[m]);
-                    expect(t.p85[m]).toBeLessThanOrEqual(t.p97[m]);
-                }
+                check(t, 61);
+                expect(t.weekly).toBeDefined();
+                check(t.weekly!, 14);
             }
         }
     });
