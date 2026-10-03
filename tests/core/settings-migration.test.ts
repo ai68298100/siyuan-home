@@ -118,6 +118,36 @@ describe("导入归一化（16 轮：未知模块剔除 + 成员字段修复）"
         expect(settings.members[2].role).toBe("other");
         expect(settings.members[3].role).toBe("elder");
     });
+
+    it("导出↔导入往返（101 波）：合法设置经 JSON 序列化 + 归一化，字段零丢失零修复", () => {
+        const original = {
+            enabledModules: ["certs", "members", "health", "parenting"],
+            members: [
+                { id: "m1", name: "张三", role: "self", sex: "male", birthday: "1990-01-02", createdAt: "2026-09-01T00:00:00Z" },
+                { id: "m2", name: "女儿", role: "child", birthday: "2020-06-01", lunarBirthday: true, createdAt: "2026-09-01T00:00:00Z" },
+            ],
+            leadOverrides: { "certs.expiry": 21 },
+            dbRefs: { certs: { avId: "av-1", docId: "doc-1", columns: { name: "k1" } } },
+            checkinBindings: [{ itemId: "i1", itemName: "跑步", memberId: "m1", metric: "count" }],
+            notifyHour: 7,
+            silentFrom: 23,
+            someFutureField: "forward-compat", // 前向兼容：未知字段透传
+        };
+        // 模拟真实导出→导入：JSON 序列化（exportSettings 即 JSON.stringify(plugin.settings)）
+        const { settings, droppedModules, repairedMembers } = normalizeImportedSettings(
+            JSON.parse(JSON.stringify(original)),
+        );
+        expect(droppedModules).toEqual([]);
+        expect(repairedMembers).toBe(0);
+        expect(settings.enabledModules).toEqual(original.enabledModules);
+        expect(settings.members).toEqual(original.members);
+        expect(settings.leadOverrides).toEqual(original.leadOverrides);
+        expect(settings.dbRefs).toEqual(original.dbRefs);
+        expect(settings.checkinBindings).toEqual(original.checkinBindings);
+        expect(settings.notifyHour).toBe(7);
+        expect(settings.silentFrom).toBe(23);
+        expect((settings as any).someFutureField).toBe("forward-compat");
+    });
 });
 
 describe("打卡绑定归一化（EC09/D20，第六十六轮）", () => {
