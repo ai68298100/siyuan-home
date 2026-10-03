@@ -312,6 +312,36 @@ describe("H04 缺列报错 + H14 提前量校验", () => {
     });
 });
 
+describe("purgeHandled 扩展（handledYear/monthlyCompletions/favorSyncs）", () => {
+    it("handledYear 旧年份清理（当年保留，跨年清除）", () => {
+        const rt: HubRuntime = {
+            ...defaultRuntime(),
+            handledYear: {
+                "r1::members.birthday": 2025,
+                "r2::members.birthday": 2026,
+            },
+            monthlyCompletions: {
+                "2024-01": 5,
+                "2026-10": 3,
+            },
+        };
+        purgeHandled(rt, TODAY);
+        expect(rt.handledYear["r1::members.birthday"]).toBeUndefined();
+        expect(rt.handledYear["r2::members.birthday"]).toBe(2026);
+        expect(rt.monthlyCompletions["2024-01"]).toBeUndefined();
+        expect(rt.monthlyCompletions["2026-10"]).toBe(3);
+    });
+
+    it("favorSyncs 不受影响（由行删除时按需清理）", () => {
+        const rt: HubRuntime = {
+            ...defaultRuntime(),
+            favorSyncs: { "row-1": { docId: "d1", at: "2026-10-01" } },
+        };
+        purgeHandled(rt, TODAY);
+        expect(rt.favorSyncs["row-1"]).toBeDefined();
+    });
+});
+
 describe("H12 静默时段（摘要与逾期提示共用）", () => {
     const at = (h: number) => new Date(2026, 9, 1, h, 0, 0);
 
