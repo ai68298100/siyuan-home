@@ -513,6 +513,8 @@
     "ledger.savePartial": "Row created, but some fields failed to write: ${fields}. Input kept — press save again to retry the same row.",
     "ledger.saveFailed": "Save failed: ${msg}. Input kept.",
     "ledger.nameRequired": "Name is required — fill the name/title field first.",
+    "ledger.dupTitle": "Duplicate name detected",
+    "ledger.dupBody": "${n} loaded row(s) already named \"${name}\". This may be a duplicate entry — create another row anyway? (Same-name rows can be legitimate, e.g. same medicine in different strengths.)",
     "ledger.savePending": "Row committed but its identity could not be confirmed. Check the ledger document before continuing; auto-retry skipped to avoid duplicates.",
     "diag.health": "Deep health check",
     "diag.healthSummary": "Health check: all ${total} enabled modules readable",

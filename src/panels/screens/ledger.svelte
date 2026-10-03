@@ -982,6 +982,25 @@
             showMessage(saveError, 4000, "error");
             return;
         }
+        // D24（UG04 数据质量）：同名行确认——对照已加载行（render 窗口）提示同名数，确认可继续；D06 成员同名确认同款交互
+        const dupName = String(form.name ?? "").trim();
+        const nameKey = ref.columns?.name;
+        if (dupName && !pendingItemID && nameKey) {
+            const dupCount = rows.filter((r) => cellText(r.cells[nameKey]) === dupName).length;
+            if (dupCount > 0) {
+                confirm(
+                    t("ledger.dupTitle"),
+                    t("ledger.dupBody").replace("${name}", dupName).replace("${n}", String(dupCount)),
+                    () => { void doCreateRow(); },
+                );
+                return;
+            }
+        }
+        await doCreateRow();
+    }
+
+    async function doCreateRow() {
+        if (!ref?.avId || saving || identityPending) return;
         saving = true;
         saveError = "";
         try {

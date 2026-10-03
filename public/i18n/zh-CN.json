@@ -513,6 +513,8 @@
     "ledger.savePartial": "行已创建，但部分字段写入失败：${fields}。输入已保留，再次点击保存将补写同一行。",
     "ledger.saveFailed": "保存失败：${msg}。输入已保留。",
     "ledger.nameRequired": "请先填写名称（姓名/名称列为必填）。",
+    "ledger.dupTitle": "已存在同名行",
+    "ledger.dupBody": "当前可见行中已有 ${n} 行「${name}」。可能是重复录入——仍要新建一行吗？（同名行也允许合法存在，如同名药品不同规格）",
     "ledger.savePending": "行已提交但无法确认新行身份，请在台账文档中核对后再继续；为避免重复创建，未自动重试。",
     "diag.health": "深度健康检查",
     "diag.healthSummary": "健康检查：${total} 个启用模块全部可读",
