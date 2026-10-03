@@ -220,7 +220,7 @@ pnpm test
 
 ## License
 
-[MIT](./LICENSE)
+[MIT](./LICENSE) · 第三方数据与声明：[NOTICE.md](./NOTICE.md)（WHO 儿童生长标准，CC BY-NC 3.0 IGO）
 
 <div align="center">
 

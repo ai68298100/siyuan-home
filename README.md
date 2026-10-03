@@ -129,7 +129,7 @@ pnpm test         # unit tests (33)
 
 ## License
 
-[MIT](./LICENSE)
+[MIT](./LICENSE) · Third-party data & notices: [NOTICE.md](./NOTICE.md) (WHO Child Growth Standards, CC BY-NC 3.0 IGO)
 
 <div align="center">
 
