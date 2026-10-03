@@ -1,4 +1,5 @@
 # 小驴管家（Lv Home）· 项目待办总清单
+| 2026-10-04 | 巡检 | 第一百一十七波：GitHub CI 运行史核对 | gh run list 最近 8 次全部 success（27–43s/次）：更严的 check-i18n 使用面审计、199 项测试（含 WHO/lunar/immunization/health 新测）、五重门禁在 CI 侧与本机同样通过——本地门禁与 CI 无分叉；纯巡检波零变更 |
 | 2026-10-04 | 巡检 | 第一百一十六波：包体预算复查 | 首屏 index.js gzip **57.3KB / 100KB 预算**（余量 43%；v0.2.0 时 52KB，50 波功能净增 5KB）；WHO 参考带数据在懒加载 growth chunk（gzip 6.3KB）；**lunar-typescript 懒加载 chunk gzip 99.7KB**（425KB 原始，lunar-lazy 拆包整改产物，仅农历生日场景按需加载——CI 门禁只测 index.js，chunk 体积记录备查，若未来超预期可评估换更轻的农历库）；实例探活 ✓；纯巡检波零变更 |
 | 2026-10-04 | 巡检 | 第一百一十五波：插件运行时自证——真机批起点确认 | getFile 探测 `/data/storage/petal/siyuan-home/settings.json` → **不存在**（202 未创建）：插件已部署+启用，但此工作区从未有前端会话启动它——与"真机批挂起"判断自洽；**批前情报**：真机批首次启动将直接进入 onboarding 向导（onboarded=false），恰为 §7 第一个测试项，执行者无需清场；纯巡检波零变更 |
 | 2026-10-04 | 兜底 | 第一百一十四波：CONTRIBUTING 补端点实战教训 | 部署节停在 65 波教训——补 79–82 波四条：①sy 包装器大响应静默截断（大响应原始 curl + cygpath + 显式 source 环境）；②端点实名坑（addAttributeViewKey/keyID 自造、removeDocByID 替代 removeDoc、SQL 无 notebooks 表）；③多实例工作区鉴权门（lsNotebooks 探测，version 免鉴权不可判据）；④指向 e2e 脚本头注与 §8 十条结论——接手写脚本的人不必再踩一遍；纯文档波零代码变更 |
