@@ -26,11 +26,16 @@
             : allReminders,
     );
     const top = $derived(reminders.slice(0, 4));
-    // 29 组月度完成率：当月完成数（从 runtime.monthlyCompletions 读取）
+    // 29 组月度完成率：当月完成数 / 当月应到基数（从 runtime.monthlyCompletions / monthlyDueTotals 读取）
     const monthlyDone = $derived.by(() => {
         const now = new Date();
         const monthKey = now.getFullYear() + "-" + String(now.getMonth() + 1).padStart(2, "0");
         return plugin.runtime?.monthlyCompletions?.[monthKey] ?? 0;
+    });
+    const monthlyDueTotal = $derived.by(() => {
+        const now = new Date();
+        const monthKey = now.getFullYear() + "-" + String(now.getMonth() + 1).padStart(2, "0");
+        return plugin.runtime?.monthlyDueTotals?.[monthKey] ?? 0;
     });
 
     async function setMemberFilter(id: string | undefined) {
@@ -59,7 +64,7 @@
     <div class="lv-hero-count">
         <b class="lv-num">{reminders.length}</b><span>{t("dash.needAttention")}</span>
         {#if monthlyDone > 0}
-            <span class="lv-caption" style="display:block;margin-top:2px">✓ {t("dash.monthlyDone").replace("${n}", String(monthlyDone))}</span>
+            <span class="lv-caption" style="display:block;margin-top:2px">✓ {t("dash.monthlyDone").replace("${n}", monthlyDueTotal > 0 ? `${monthlyDone}/${monthlyDueTotal}` : String(monthlyDone))}</span>
         {/if}
     </div>
 </div>

@@ -427,6 +427,13 @@ export default class LvHomePlugin extends Plugin {
         }
         // H03：显式清理已完成运行态记录（未处理项永不自动删），清理结果随本次落盘
         purgeHandled(this.runtime, new Date());
+        // 29 组月度应到基数：全量扫描时统计当月去重后到期提醒总数（增量扫描不更新，避免少报）
+        if (!onlySet) {
+            const now = new Date();
+            const monthKey = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
+            const dueIds = new Set(scan.reminders.filter((r) => r.daysLeft <= 0).map((r) => r.id));
+            this.runtime.monthlyDueTotals = { ...(this.runtime.monthlyDueTotals ?? {}), [monthKey]: dueIds.size };
+        }
         await saveRuntime(this, this.runtime);
         this.lastScanAt = Date.now();
         performance.mark(`${perfMark}-end`);

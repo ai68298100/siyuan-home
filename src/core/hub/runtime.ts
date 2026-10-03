@@ -94,6 +94,8 @@ export interface HubRuntime {
     favorSyncs?: Record<string, { docId: string; at: string }>;
     /** 29 组月度完成率：月键 "YYYY-MM" → 当月完成计数（跨月自动归零由读取方处理） */
     monthlyCompletions?: Record<string, number>;
+    /** 29 组月度应到基数：月键 → 当月去重后到期提醒总数（全量扫描时更新） */
+    monthlyDueTotals?: Record<string, number>;
 }
 
 export function defaultRuntime(): HubRuntime {
