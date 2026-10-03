@@ -20,14 +20,17 @@
         if (!picked.includes("child")) children = 0;
     }
 
-    // C7 向导 CTA：完成后直达证件快速录入（预选 certs）；C7c：建库 loading/error 反馈
+    // C7 向导 CTA：完成后直达证件快速录入（预选 certs）；C7c：建库 loading/error/超时反馈
     async function finishAndCapture() {
         if (provisioning) return;
         provisioning = true;
         provisionError = "";
         try {
             const roles = ["self", ...picked];
-            await plugin.finishOnboarding({ roles, children }, recommended);
+            const timeout = new Promise<never>((_, reject) =>
+                window.setTimeout(() => reject(new Error("建库超时（120 秒），请检查思源内核是否正常运行")), 120_000)
+            );
+            await Promise.race([plugin.finishOnboarding({ roles, children }, recommended), timeout]);
             plugin.setActiveLedger("certs");
             onGoto?.("ledger");
         } catch (e) {
