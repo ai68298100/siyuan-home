@@ -23,6 +23,17 @@ pnpm run make-link   # 软链到思源工作空间 data/plugins/
 | `pnpm run build` | 生产构建 + package.zip |
 | `pnpm run check:meta` | 元数据交叉校验 + zip 体积门禁 |
 
+### 后台部署到运行中的思源实例（免可见浏览器、免 make-install 认证）
+
+多插件并行开发时优先后台操作（API/磁盘），不开可见浏览器面板：
+
+1. `pnpm run build` 后，用 `curl -F` 逐文件调 `/api/file/putFile`（token 在 `%APPDATA%/siyuan/env`；Git Bash 必须 `MSYS2_ARG_CONV_EXCL="*"` 防 `/data/...` 被改写成 Git 安装路径）；
+2. **注意 chunk 哈希**：代码一变 `chunks/*.js` 文件名就变，先 `grep -o 'require("./chunks/[^"]*")' dist/index.js` 列出全部依赖，逐个上传，缺一个插件就白屏；
+3. 热重载：`/api/petal/setPetalEnabled` off→on（桌面端前端随即重载新代码）；
+4. 凭据：工作区 `conf/conf.json` 的 `api.token`；锁屏授权码在 `accessAuthCode`（仅 web 端登录用）。
+
+已验证（2026-10-03，真机 3.8.6）：cp 直拷会被安全 hook 拦截；`make-install` 走的 getWorkspaces 在开锁屏的实例上 401；符号链接需 Developer Mode（本机无）——putFile 是当前唯一后台通路。
+
 ## 开发约定
 
 1. **Conventional Commits**：`feat/fix/docs/refactor/test/chore:` 前缀，一个逻辑变更一个提交

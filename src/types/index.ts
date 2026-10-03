@@ -66,6 +66,8 @@ export interface ReminderRuleSpec {
     cycleField?: string;
     /** anniversary：农历标记列 key */
     lunarField?: string;
+    /** 合同等：自动续约条款标记列 key（有标记的到期提醒升级为「续约决策提醒」，D19/16 组） */
+    autoRenewField?: string;
 }
 
 /** 紧急级别：🔴 已逾期 / 🟠 7 天内 / 🟡 提前量内 / ⚪ 更远 */
@@ -89,6 +91,8 @@ export interface Reminder {
     kind?: ReminderKind;
     /** anniversary 农历标记（dueDate 为下次农历对应的公历日期；卡片显示 🌙） */
     lunar?: boolean;
+    /** 自动续约条款标记（合同：到期前需做续/不续决策；卡片显示 🔄） */
+    autoRenew?: boolean;
 }
 
 /** 扫描结果聚合（内存 + kernel storage 缓存） */

@@ -142,6 +142,12 @@ describe("分级与降噪", async () => {
         const solarR = await buildReminder(oneoff, "members", row({ fieldValue: "2026-10-05" }), { today: TODAY });
         expect(solarR?.lunar).toBeUndefined();
     });
+    it("autoRenew 标记透传：row.autoRenew → reminder.autoRenew（合同续约决策 🔄）", async () => {
+        const ar = await buildReminder(oneoff, "contracts", row({ fieldValue: "2026-10-05", autoRenew: true }), { today: TODAY });
+        expect(ar?.autoRenew).toBe(true);
+        const plain = await buildReminder(oneoff, "contracts", row({ fieldValue: "2026-10-05" }), { today: TODAY });
+        expect(plain?.autoRenew).toBeUndefined();
+    });
 });
 
 describe("工具函数", async () => {

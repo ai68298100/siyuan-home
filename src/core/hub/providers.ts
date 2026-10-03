@@ -149,6 +149,7 @@ export class SchemaLedgerProvider implements DataProvider {
                     rowId: row.itemID, title: name, memberId: member?.id, fieldValue,
                     cycle: rule.kind === "recurring" ? (selectFromValue(cell(cycleKey)) ?? textFromValue(cell(cycleKey))) : undefined,
                     lunar: !!cell(rule.lunarField ?? "lunar")?.checkbox?.checked,
+                    ...(rule.autoRenewField ? { autoRenew: !!cell(rule.autoRenewField)?.checkbox?.checked } : {}),
                 }, { today, leadOverride: leadFor(this.deps.settings, this.moduleId, rule) });
                 if (r) out.push(r);
             }

@@ -215,7 +215,7 @@
                 checked={selected.has(r.id)} onchange={() => toggleSelect(r.id)} style="flex-shrink:0" />
         {/if}
         <div class="lv-rem-ic">{r.moduleId === "adhoc" ? "📝" : "🗂"}</div>
-        <div class="lv-rem-t"><b>{r.title}</b><span class="lv-num">{r.dueDate}{r.lunar ? " 🌙" : ""}</span></div>
+        <div class="lv-rem-t" title={r.autoRenew ? t("hub.autoRenew") : undefined}><b>{r.title}</b><span class="lv-num">{r.dueDate}{r.lunar ? " 🌙" : ""}{r.autoRenew ? " 🔄" : ""}</span></div>
         <span class="lv-badge {levelBadge[r.level]}">
             {r.level === "overdue" ? t("level.overdue") : r.level === "soon" ? t("level.soon") : t("level.lead")}
         </span>

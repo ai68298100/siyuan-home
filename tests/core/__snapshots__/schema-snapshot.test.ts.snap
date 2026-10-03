@@ -960,9 +960,15 @@ exports[`31 模块 schema 契约快照（21 组） > 每个 schema 的结构快�
       "labelKey": "field.deposit",
       "type": "number",
     },
+    {
+      "key": "auto_renew",
+      "labelKey": "field.auto_renew",
+      "type": "checkbox",
+    },
   ],
   "reminders": [
     {
+      "autoRenewField": "auto_renew",
       "field": "expiry",
       "key": "expiry",
       "kind": "oneoff",

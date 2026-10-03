@@ -267,9 +267,10 @@ export const CONTRACTS_SCHEMA: ModuleSchema = {
         { key: "party", type: "text", labelKey: "field.party" },
         { key: "contact", type: "text", labelKey: "field.contact" }, // EC13：对接人（人脉快照）
         { key: "deposit", type: "number", labelKey: "field.deposit" },
+        { key: "auto_renew", type: "checkbox", labelKey: "field.auto_renew" }, // 16 组：自动续约条款 → 到期升级为续约决策提醒
     ],
     capture: ["name", "category", "expiry", "attachments"],
-    reminders: [{ key: "expiry", field: "expiry", kind: "oneoff", leadDays: 30 }],
+    reminders: [{ key: "expiry", field: "expiry", kind: "oneoff", leadDays: 30, autoRenewField: "auto_renew" }],
 };
 
 export const EXAMS_SCHEMA: ModuleSchema = {

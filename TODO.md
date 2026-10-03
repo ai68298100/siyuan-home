@@ -1,4 +1,5 @@
 # 小驴管家（Lv Home）· 项目待办总清单
+| 2026-10-04 | 主线 | 第六十五轮：D13–D22 决策登记 + contracts 续约决策提醒 + 真机后台部署通道 | ①用户授权代拍全部决策 → docs/design/09 新增 D13–D22（disabledInPublish 保持/农历 🌙 定案落 D14 推翻 D10/name 必填落 D15/CSV 全列/搜索范围/上架触发/icon/EC09 绑定模型=settings 映射 v1/斜杠维持关闭/状态管理三分边界落 08 §8），C 类收口到 ~6；②contracts 新增 auto_renew 列 + autoRenewField 规则声明 → Reminder.autoRenew 透传（rule/providers/types）→ 提醒卡+总览卡 🔄 + title 提示（hub.autoRenew），快照 -u，单测 140（+1）；③真机部署通道打通：putFile 逐文件后台部署（cp 被 hook 拦/make-install 401/符号链接无权限，方法落 CONTRIBUTING）+ setPetalEnabled 热重载，14 文件验证一致；④e2e 受阻记录：并发会话切换工作区（token 瞬时 401/429）+ IAB web 壳启动失败（点击刷新循环，与本插件无关）——UI 行为验证（nameRequired/🌙/🔄）按用户指示转后台策略，列入 §7 待实测；单测 140、i18n 626、gzip ~52KB |
 | 2026-10-03 | 主线 | 第六十四轮：八项产品决策定案落地（C 类收口） | 用户全部按推荐定案：①disabledInPublish 保持 true；②农历 en 方案=locale 无关 🌙 标记（Reminder.lunar 透传 + 提醒卡/总览卡渲染，dueDate 恒为公历）；③快速录入 name 必填=阻止提交（按钮禁用+字段区提示+createRow 兜底，`ledger.nameRequired` 双语）；④Dock 面板暂不做；⑤icon.png 保留占位随 v0.3 视觉稿替换；⑥CSV 导出 v1 维持全列；⑦搜索范围维持名称+备注；⑧集市上架待真机回归通过后另议。决策 ③② 已实现+单测 139；④-⑧ 记录在案（含 24 组决策行修复：轮日志 \n 损坏行拆分） |
 | 2026-10-03 | 主线 | 第十五轮：20 组去抖 + 29 组合并卡 + 30 组两项决策 | refreshHub force 分流（30s 去抖+四处强制入口）；同人同日折叠卡（snippet 重构，键盘可达）；en 复数与日期格式记录为设计决策（中性形式/ISO 同形）；单测 118 持平、i18n 589→591、gzip 46.4KB |
 | 2026-10-03 | 循环A | 第十五波走查 | 合并卡键盘可达（role=button+Enter）；settings 面板 IHomePluginLike 签名同步（即修 svelte-check）；snippet 重构后单条路径无行为差异 |
@@ -132,7 +133,7 @@
 > |---|---|---|---|
 > | **A. 需真机实例** | ~53 | 回归§7+§8、端点实测、性能预算、走查、内测 | **启动思源** |
 > | **B. 需其他插件配合** | ~65 | EC02-08 运输/授权/映射/幂等/回路/恢复、EC30 组合验收、EC09 绑定 UI、EC20-25 闪卡考试、EC26-28 拾遗 | **同实例安装兄弟插件 + 互测** |
-> | **C. 需产品决策** | ~16 | 剩余细分决策（斜杠命令重开、EC09 绑定模型、UI 细节取舍等）；**首批 8 项已定案（2026-10-03）**：disabledInPublish 保持 true／农历=🌙 标记／快速录入 name 必填阻止提交／Dock 不做／icon 随 v0.3 视觉稿／CSV v1 全列／搜索=名称+备注／上架待真机回归 | **用户/维护者定案** |
+> | **C. 需产品决策** | ~6 | 剩余为 v0.3+ 功能形态取舍（OP01/AF13 等远期规格，不阻塞当前开发）；**两批已定案（2026-10-03）**：首批 8 项（disabledInPublish／农历 🌙／name 必填／Dock／icon／CSV 全列／搜索范围／上架触发）+ 第二批 10 项 D13–D22（EC09 绑定模型、斜杠命令维持关闭、状态管理三分边界等），全量登记 docs/design/09 | ~~用户/维护者定案~~ **已授权维护者代拍（2026-10-03）** |
 > | **D. 需官方能力** | ~12 | 斜杠命令 API、addAgentCapability、addBreadcrumbButton、addFloatLayer、思源 Agent 接入（SA 组全部 24 条） | **思源官方发布新 API** |
 > | **E. 纯研究（可离线做）** | ~33 | V01 疫苗校核、R06 证据矩阵余项、33.1 能力矩阵、33.4 兼容矩阵、OR 组治理 | **读文档+写文档** |
 > | **F. 可现在做（代码/文档）** | ~742 | 但细分后：核心功能已全部实现，剩余主要是 v0.3+ 模块深化（schema 已有但 UI 待补）、模块功能深化（16 组 31 条）、UI 增强（17 组 17 条） | **可做但多为增量功能** |
@@ -397,7 +398,7 @@
 - [ ] 🟡 shopping：购入联动 stock（囤货品自动加库存）
 - [ ] 🟡 memberships：家庭共享账号（主卡人/成员位标注）
 - [ ] 🟢 memberships：取消自动续费指引链接字段
-- [ ] 🟡 contracts：自动续约条款标记 → 到期提醒升级为「续约决策提醒」
+- [x] 🟡 contracts：自动续约条款标记 → 到期提醒升级为「续约决策提醒」 ✅ 2026-10-03 第六十五轮（schema 新增 auto_renew checkbox 列 + 规则 autoRenewField 声明；Reminder.autoRenew 透传（rule/providers）；提醒卡/总览卡 🔄 标记 + title 提示（hub.autoRenew 双语）；快照 -u；真机验收见 §7.1）
 - [ ] 🟢 contracts：押金退还记录
 - [ ] 🟡 health：体检年度计划模板（recurring）
 - [ ] 🟡 health：处方药 → 药箱联动（新建药箱行或扣减提示）
@@ -642,7 +643,7 @@
 ## 32. Svelte / 前端工程规范
 
 - [ ] 🟡 组件目录规范：`src/panels/<screen>/`（index.svelte + 子组件拆分原则，禁止单文件超 300 行）
-- [ ] 🟡 状态管理定案：svelte 5 runes 单例 store 三分（settings / hub / ui），边界写进 08 文档
+- [x] 🟡 状态管理定案：svelte 5 runes 单例 store 三分（settings / hub / ui），边界写进 08 文档 ✅ 2026-10-03 定案 D22：**否决全局单例 store**，维持三分现状（持久层 settings / 领域态 HubRuntime / 视图态 $state+version prop），边界表落 docs/design/08 §8
 - [ ] 🟡 SQL 结果类型化（query 泛型封装 + 每模块手写 Row 类型，禁 any）
 - [x] 🟡 面板 props any 清零：tab-panel 接口已具体类型化（HomeSettings/HubRuntime/ScanResult）；四屏组件的 IHomePluginLike any 字段（28 处）随 C 阶段细化逐屏类型化（循环A 第 2 项剩余） ✅ 2026-10-03 第十九轮（共享 HomePluginLike 契约覆盖六屏+onboarding；面板 ": any" 43→13，剩余为台账行 cells 的内核 JSON 边界，归 21 组 SQL 结果类型化追踪）
 - [x] 🟡 Svelte 错误边界：面板崩溃不拖垮思源主界面（顶层 error boundary + 降级 UI） ✅ 2026-10-03 第三十四轮（Svelte 5.57 svelte:boundary——四屏各包一层 ErrorBoundary，渲染期错误降级为带错误摘要+重试按钮的卡片；事件处理器异常不在此范围内（Svelte 5 设计）；safeMount.ts 备用挂载守卫）
@@ -1103,7 +1104,7 @@
 - [ ] 🔴 **EC06 事件幂等与回执**：规定 `home:` 等 source/externalRef 命名空间、发生时刻、原始幂等键、逐项结果和墓碑；重试不换键、不新增重复行。
 - [ ] 🔴 **EC07 回路与生命周期**：定义主数据所有者、来源标记、订阅/注销回调；重复事件不互相回写，按真实函数 disposer 验证禁用/重载/切换无悬挂。
 - [ ] 🔴 **EC08 离线与丢事件恢复**：窗口未开、未 ready、断连、超时、部分失败均保留待处理和原键；重连先读有界快照再补偿，不假定 window 事件可重放。
-- [ ] 🟡 **EC09 打卡指标绑定**（依赖 D04/D09/H14/H16）：从 `siyuanCheckin.queryItems` 选择习惯/项目并绑定成员与健康、成长、车辆指标；次数/数量/时长/单位/目标值差异显式，不把次数当体重。（2026-10-03 第四十二轮进度：**只读消费 v1 落地**——`pullCheckinSummary` 拉 getStrengthSummary top 5 缓存进 runtime；绑定 UI 仍待产品决策）
+- [ ] 🟡 **EC09 打卡指标绑定**（依赖 D04/D09/H14/H16）：从 `siyuanCheckin.queryItems` 选择习惯/项目并绑定成员与健康、成长、车辆指标；次数/数量/时长/单位/目标值差异显式，不把次数当体重。（2026-10-03 第四十二轮进度：**只读消费 v1 落地**——`pullCheckinSummary` 拉 getStrengthSummary top 5 缓存进 runtime；绑定 UI 仍待产品决策。**2026-10-03 定案 D20**：绑定模型=settings 驱动"习惯→成员指标"映射 v1（下拉选择 checkin 项+成员+指标类型，次数/数量/时长显式区分，不做自由绑定画布；读取复用只读管道；不写打卡数据）——实现随 B 类互测轮，见 docs/design/09 D20）
 - [x] 🟡 **EC10 打卡数值承接（只读 v1）**（依赖 EC06/EC09/D01/D03）：先定只读趋势还是写入管家指标；用 `getEventsInRange` 有界读取，保存源事件 ID/日期/单位；删除/修改按所有者对账，不复制私有存储。 ✅ 2026-10-03 第四十二轮（只读消费：checkin:* 三种事件 → 60s 节流 → getStrengthSummary top 5 缓存进 runtime；**不写打卡数据**——只读消费，写入侧属 EC09 绑定 UI；[待实测] 同实例联调随 EC30。原"EC09 先行"结论修订为"只读消费可先行，绑定 UI 仍待决策"）
 - [ ] 🟡 **EC11 家务/备考绑定已有习惯**（依赖 EC03/EC04/D09）：展示已有项目和绑定效果；一键新建仅在提供方公开能力存在时启用，否则引导到打卡创建后返回，不使用不存在的 `habits.list`。
 - [ ] 🟡 **EC12 生日/纪念日提醒归属**（依赖 H08/H09/H12/EC03）：先验证打卡 v5 的 `occasions.read/occasions.complete` 能力及其所有者，生日来源另定；无生日写入契约时只引用，不生成双份提醒。（2026-10-03 契约摘录：occasions.read/complete **v4 即存在、localOnly、effect read/write**；打卡 v5 形式化契约含 20 能力 since 矩阵+8 种集成事件+硬限制——EC10 触发源用 checkin:* 事件比 ws-main 更精准；owner 定案点保持）

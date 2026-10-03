@@ -24,6 +24,8 @@ export interface LedgerRowDates {
     cycle?: string;
     /** anniversary 的农历标记 */
     lunar?: boolean;
+    /** 自动续约条款标记（合同：升级为续约决策提醒） */
+    autoRenew?: boolean;
 }
 
 const CYCLE_MONTHS: Record<string, number> = {
@@ -126,5 +128,6 @@ export async function buildReminder(
         level,
         kind: rule.kind,
         ...(row.lunar ? { lunar: true } : {}),
+        ...(row.autoRenew ? { autoRenew: true } : {}),
     };
 }
