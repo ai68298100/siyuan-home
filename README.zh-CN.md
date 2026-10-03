@@ -4,7 +4,7 @@
 
 **思源笔记里的家庭事实、到期提醒与事务跟进层**
 
-[![CI](https://github.com/ai68298100/siyuan-home/actions/workflows/ci.yml/badge.svg)](https://github.com/ai68298100/siyuan-home/actions/workflows/ci.yml) [![Release](https://img.shields.io/github/v/release/ai68298100/siyuan-home)](https://github.com/ai68298100/siyuan-home/releases/latest) [![License](https://img.shields.io/github/license/ai68298100/siyuan-home)](./LICENSE) [![Tests](https://img.shields.io/badge/tests-33%20passing-brightgreen)](./tests)
+[![CI](https://github.com/ai68298100/siyuan-home/actions/workflows/ci.yml/badge.svg)](https://github.com/ai68298100/siyuan-home/actions/workflows/ci.yml) [![Release](https://img.shields.io/github/v/release/ai68298100/siyuan-home)](https://github.com/ai68298100/siyuan-home/releases/latest) [![License](https://img.shields.io/github/license/ai68298100/siyuan-home)](./LICENSE) [![Tests](https://img.shields.io/badge/tests-passing-brightgreen)](./tests)
 
 家庭私有资料 · 成员视角 · 到期提醒 · 可继续办理
 
