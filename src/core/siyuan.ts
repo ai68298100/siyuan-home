@@ -206,21 +206,35 @@ function rowIDsFromAddResponse(d: any): string[] {
 
 /**
  * 加 detached 行，返回新行 itemID（D02）：
+ * 真机发现（2026-10-03）：getAttributeViewPrimaryKeyValues 与 renderAttributeView 返回
+ * **不同的行 ID 空间**。batchSetAttributeViewBlockAttrs 期望 renderAttributeView 的 row.id。
+ * 因此此函数改为从 renderAttributeView 的 diff 获取 ID（而非 PK values diff）。
+ *
  * 1) 响应直接携带且不在加行前集合中的 ID 唯一 → 确认；
- * 2) 否则加行前后全量集合 diff 唯一 → 确认；
+ * 2) 否则加行前后 render row 集合 diff 唯一 → 确认；
  * 3) 多候选（如并发加行）→ RowIdentityPendingError，不猜。
  */
 export async function addDetachedRow(avID: string, content: string): Promise<string> {
-    const before = new Set(await primaryRowItemIDs(avID));
+    const before = new Set(await renderRowIDs(avID));
     const d = await post<any>("/api/av/addAttributeViewBlocks", {
         avID, blockID: "", srcs: [{ blockID: "", content, isDetached: true }],
     });
     const fromResponse = rowIDsFromAddResponse(d).filter((id) => !before.has(id));
     await new Promise((r) => setTimeout(r, 300)); // 块索引异步重建
-    const added = (await primaryRowItemIDs(avID)).filter((id) => !before.has(id));
+    const added = (await renderRowIDs(avID)).filter((id) => !before.has(id));
     const confirmed = fromResponse.length === 1 ? fromResponse[0] : added.length === 1 ? added[0] : undefined;
     if (confirmed) return confirmed;
     throw new RowIdentityPendingError(added.length ? Array.from(new Set(added)) : fromResponse);
+}
+
+/**
+ * 从 renderAttributeView 获取行 ID 列表（D01/D02 真机修正）：
+ * batchSetAttributeViewBlockAttrs 期望 renderAttributeView 返回的 row.id，
+ * 而非 getAttributeViewPrimaryKeyValues 返回的 PK value ID（两者是不同 ID 空间）。
+ */
+async function renderRowIDs(avID: string): Promise<string[]> {
+    const d = await post<any>("/api/av/renderAttributeView", { id: avID });
+    return (d?.view?.rows ?? []).map((r: any) => r.id);
 }
 
 /** 删除 av 行（detached 行删除路径；[待实测] 端点/payload 以 3.8.x 实例为准，接线 UI 前必须实测并配确认框） */
