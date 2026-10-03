@@ -1,4 +1,5 @@
 # 小驴管家（Lv Home）· 项目待办总清单
+| 2026-10-04 | 巡检 | 第一百三十六波：例行巡检（预检 11/11 + 199 测试） | 全绿；纯巡检波零变更 |
 | 2026-10-04 | 巡检 | 第一百三十五波：预检巡检 11/11 PASS（无陈旧 chunk 报告） | 六面全绿含新增的陈旧 chunk 检测（清理后零堆积）；runbook 随时可跑；纯巡检波零变更 |
 | 2026-10-04 | 巡检 | 第一百三十四波：合并潮后 CI 核对 | PR 2/3/7/8 的合并提交在 main 上 CI 全部 success（新 Actions v7 组件下的完整门禁链验证通过）——升级后 CI 体系健康；实例探活 ✓；纯巡检波零变更 |
 | 2026-10-04 | 兜底 | 第一百三十三波：PR 清理收官——8/8 全并 + 依赖同步验证 | PR 3（checkout v7）rebase 后绿即并；PR 2（setup-node v7）/7（js-yaml）/8（sass 1.105.1，dependabot rebase 时顺带升级）相继全绿全并——**仓库 PR/Issues 双清零**；本地 pull --rebase + pnpm install 同步依赖后 199 测试/tsc/完整构建/smoke 全绿；重建产物与真机**字节级零差异**（21 文件核对）——devDep 升级输出中性，无需重部署；CI 组件自此为 checkout v7/setup-node v7/pnpm-action v6 |
