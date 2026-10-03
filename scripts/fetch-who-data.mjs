@@ -139,6 +139,12 @@ async function main() {
         for (const r of rows) for (const k of Object.keys(bandObj)) bandObj[k].push(round1(bandFrom(r)[k]));
         return bandObj;
     };
+    // LMS 原参数入库（供运行时百分位反推 z）：L/S 5 位小数、M 4 位（推导精度足够，体积可控）
+    const fillLms = (rows) => ({
+        l: rows.map((r) => Math.round(r.L * 1e5) / 1e5),
+        m: rows.map((r) => Math.round(r.M * 1e4) / 1e4),
+        s: rows.map((r) => Math.round(r.S * 1e5) / 1e5),
+    });
 
     const out = {};
     for (const sex of ["male", "female"]) {
@@ -153,7 +159,7 @@ async function main() {
             const diff = Math.abs(weeklyRows[13].M - monthlyRows[3].M);
             if (diff > tol) throw new Error(`${sex}/${metric}: weekly w13 M ${weeklyRows[13].M} vs monthly m3 M ${monthlyRows[3].M} beyond ${tol}`);
             out[sex] ??= {};
-            out[sex][metric] = { ...fillBand(band(), monthlyRows), weekly: fillBand(band(), weeklyRows) };
+            out[sex][metric] = { ...fillBand(band(), monthlyRows), lms: fillLms(monthlyRows), weekly: { ...fillBand(band(), weeklyRows), lms: fillLms(weeklyRows) } };
         }
     }
 
@@ -165,8 +171,15 @@ async function main() {
 export const WHO_REFS_VERSION = "WHO-CGS-2006";
 export const WHO_REFS_ATTRIBUTION = "WHO Child Growth Standards (2006), CC BY-NC 3.0 IGO";
 
+export interface WhoLms {
+    /** L/M/S 原参数（下标=月龄或周龄）；供 whoPercentile 反解 z */
+    l: number[]; m: number[]; s: number[];
+}
+
 export interface WhoBandTable {
     p3: number[]; p15: number[]; p50: number[]; p85: number[]; p97: number[];
+    /** L/M/S 原参数（百分位反推用） */
+    lms?: WhoLms;
     /** 0–13 周周粒度带（新生儿期）；存在时运行时按周龄优先取用 */
     weekly?: WhoBandTable;
 }

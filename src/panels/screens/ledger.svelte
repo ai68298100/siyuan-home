@@ -76,7 +76,7 @@
 
     // 第七十四轮：生长曲线（parenting）——身高/体重时间线 SVG；WHO 参考带待核实数据源后加入
     function openGrowthChart() {
-        import("@/core/growth").then(({ collectGrowthSeries, whoBand }) => {
+        import("@/core/growth").then(({ collectGrowthSeries, whoBand, whoPercentile }) => {
             const members = plugin.settings.members ?? [];
             const series = collectGrowthSeries(rows, (ref?.columns ?? {}) as Record<string, string | undefined>, members);
             const dlg = new Dialog({
@@ -170,14 +170,24 @@
                     ss.forEach((s, i) => {
                         const color = COLORS[i % COLORS.length];
                         const pts = s.points;
+                        const memberSex = sexById.get(s.memberId);
+                        const pointEl = (x: number, y: number, p: { date: string; value: number; ageMonths: number | null }) => {
+                            const dot = el("circle", { cx: sx(x), cy: sy(y), r: pts.length === 1 ? 3 : 2.5, fill: color });
+                            // 原生悬停标注：有性别+月龄 → WHO 百分位；否则日期+数值（textContent 安全）
+                            const pct = memberSex && p.ageMonths !== null ? whoPercentile(memberSex, metric, p.ageMonths, p.value) : null;
+                            const label = document.createElementNS(NS, "title");
+                            label.textContent = pct !== null ? `P${Math.round(pct)} · ${p.date} ${p.value}` : `${p.date} ${p.value}`;
+                            dot.appendChild(label);
+                            return dot;
+                        };
                         if (pts.length === 1) {
-                            svg.appendChild(el("circle", { cx: sx(pts[0].ageMonths ?? 0), cy: sy(pts[0].value), r: 3, fill: color }));
+                            svg.appendChild(pointEl(sx(pts[0].ageMonths ?? 0), sy(pts[0].value), pts[0]));
                         } else {
                             svg.appendChild(el("polyline", {
                                 points: pts.map((p) => `${sx(p.ageMonths ?? 0)},${sy(p.value)}`).join(" "),
                                 fill: "none", stroke: color, "stroke-width": 2,
                             }));
-                            for (const p of pts) svg.appendChild(el("circle", { cx: sx(p.ageMonths ?? 0), cy: sy(p.value), r: 2.5, fill: color }));
+                            for (const p of pts) svg.appendChild(pointEl(p.ageMonths ?? 0, p.value, p));
                         }
                         const legend = el("text", { x: PAD + 4, y: PAD / 2 + 16 + i * 14, "font-size": 11, fill: color });
                         legend.textContent = s.memberName; // 用户内容走 textContent（19 组安全）

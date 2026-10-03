@@ -3,7 +3,7 @@
  * 第七十七轮：WHO 参考带插值（锚点对照 WHO 公布值、月龄线性、越界与未知性别、带内单调性）。
  */
 import { describe, it, expect } from "vitest";
-import { ageMonthsAt, exactAgeMonthsAt, collectGrowthSeries, whoBand, type GrowthRowLike } from "@/core/growth";
+import { ageMonthsAt, exactAgeMonthsAt, collectGrowthSeries, whoBand, whoPercentile, type GrowthRowLike } from "@/core/growth";
 import { WHO_REFS } from "@/core/data/who-refs";
 import type { FamilyMember } from "@/types";
 
@@ -135,5 +135,35 @@ describe("growth.whoBand（WHO 参考带）", () => {
                 check(t.weekly!, 14);
             }
         }
+    });
+
+    it("whoPercentile：带值反推锚点（表值 0.1 舍入 → 容差 3 个百分点）", () => {
+        // p50/p3/p97 表值代回应落在 50/3/97 附近（舍入损失 <0.05kg → <3 个百分点）
+        const p50m12 = WHO_REFS.male.weight.p50[12];
+        expect(whoPercentile("male", "weight", 12, p50m12)!).toBeGreaterThan(47);
+        expect(whoPercentile("male", "weight", 12, p50m12)!).toBeLessThan(53);
+        const p3m12 = WHO_REFS.male.weight.p3[12];
+        expect(whoPercentile("male", "weight", 12, p3m12)!).toBeLessThan(6);
+        const p97m12 = WHO_REFS.male.weight.p97[12];
+        expect(whoPercentile("male", "weight", 12, p97m12)!).toBeGreaterThan(94);
+        // 两值间单调：p50 < 中间值 < p97 的百分位严格递增
+        const mid = (p50m12 + p97m12) / 2;
+        expect(whoPercentile("male", "weight", 12, mid)!).toBeGreaterThan(whoPercentile("male", "weight", 12, p50m12)!);
+    });
+
+    it("whoPercentile：周表路径 + 截断 + 非法输入", () => {
+        // 新生儿期走周表 LMS：出生 p50 → ~50（出生段分布陡峭，0.1kg 舍入≈4 个百分点 → 容差 5）
+        const w0 = WHO_REFS.male.weight.weekly!.p50[0];
+        expect(whoPercentile("male", "weight", 0, w0)!).toBeGreaterThan(45);
+        expect(whoPercentile("male", "weight", 0, w0)!).toBeLessThan(55);
+        // 极端值截到 0.1 / 99.9
+        expect(whoPercentile("male", "weight", 12, 0.001)).toBe(0.1);
+        expect(whoPercentile("male", "weight", 12, 999)).toBe(99.9);
+        // 非法输入
+        expect(whoPercentile(undefined, "weight", 6, 8)).toBeNull();
+        expect(whoPercentile("male", "weight", 6, 0)).toBeNull();
+        expect(whoPercentile("male", "weight", 6, -1)).toBeNull();
+        expect(whoPercentile("male", "weight", 61, 8)).toBeNull();
+        expect(whoPercentile("male", "weight", NaN, 8)).toBeNull();
     });
 });

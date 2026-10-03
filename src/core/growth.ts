@@ -5,7 +5,7 @@
  * 第七十八轮：精确小数月龄 + 新生儿期（0–13 周）周粒度参考带。
  */
 import type { FamilyMember } from "@/types";
-import { WHO_REFS } from "@/core/data/who-refs";
+import { WHO_REFS, type WhoBandTable } from "@/core/data/who-refs";
 
 export type GrowthMetric = "height" | "weight";
 export type WhoSex = keyof typeof WHO_REFS;
@@ -107,19 +107,55 @@ function localKey(d: Date): string {
 
 export interface WhoBandPoint { p3: number; p15: number; p50: number; p85: number; p97: number }
 
+/** 按月龄选表：≤13 周优先周表（位置换算 周 = 月龄 × 30.4375 / 7）；返回数据源、插值位置与上界 */
+function selectWhoTable(table: WhoBandTable, ageMonths: number) {
+    const weeklyMaxMonths = (13 * 7) / DAYS_PER_MONTH;
+    const useWeekly = table.weekly?.lms !== undefined && ageMonths <= weeklyMaxMonths;
+    const src = useWeekly ? table.weekly! : table;
+    const pos = useWeekly ? (ageMonths * DAYS_PER_MONTH) / 7 : ageMonths;
+    return { src, pos, max: useWeekly ? 13 : 60 };
+}
+
+function whoTable(sex: WhoSex | undefined, metric: GrowthMetric): WhoBandTable | null {
+    return (sex ? WHO_REFS[sex]?.[metric] : undefined) ?? null;
+}
+
+function lerpAt(arr: number[], pos: number, max: number): number {
+    const lo = Math.floor(pos);
+    const hi = Math.min(lo + 1, max);
+    return arr[lo] + (arr[hi] - arr[lo]) * (pos - lo);
+}
+
 /** WHO 参考带线性插值；性别未知或超出 0–60 月 → null（参考带不外推）。
  * 新生儿期（≤13 周）优先取周粒度带，位置换算：周 = 月龄 × 30.4375 / 7。 */
 export function whoBand(sex: WhoSex | undefined, metric: GrowthMetric, ageMonths: number): WhoBandPoint | null {
-    const table = sex ? WHO_REFS[sex]?.[metric] : undefined;
+    const table = whoTable(sex, metric);
     if (!table || !Number.isFinite(ageMonths) || ageMonths < 0 || ageMonths > 60) return null;
-    const weeklyMaxMonths = (13 * 7) / DAYS_PER_MONTH;
-    const useWeekly = table.weekly !== undefined && ageMonths <= weeklyMaxMonths;
-    const src = useWeekly ? table.weekly! : table;
-    const pos = useWeekly ? (ageMonths * DAYS_PER_MONTH) / 7 : ageMonths;
-    const max = useWeekly ? 13 : 60;
-    const lo = Math.floor(pos);
-    const hi = Math.min(lo + 1, max);
-    const frac = pos - lo;
-    const at = (arr: number[]) => arr[lo] + (arr[hi] - arr[lo]) * frac;
-    return { p3: at(src.p3), p15: at(src.p15), p50: at(src.p50), p85: at(src.p85), p97: at(src.p97) };
+    const { src, pos, max } = selectWhoTable(table, ageMonths);
+    return { p3: lerpAt(src.p3, pos, max), p15: lerpAt(src.p15, pos, max), p50: lerpAt(src.p50, pos, max), p85: lerpAt(src.p85, pos, max), p97: lerpAt(src.p97, pos, max) };
+}
+
+/** 标准正态 CDF（Abramowitz–Stegun erf 近似，误差 <1e-7） */
+function normCdf(z: number): number {
+    const t = 1 / (1 + 0.2316419 * Math.abs(z));
+    const d = 0.3989423 * Math.exp((-z * z) / 2);
+    const p = d * t * (0.3193815 + t * (-0.3565638 + t * (1.781478 + t * (-1.821256 + t * 1.330274))));
+    return z >= 0 ? 1 - p : p;
+}
+
+/** 值在 WHO 参考中的百分位（截到 0.1–99.9）；无参考/非正值/月龄超范围 → null。
+ * LMS 反解：z = ((v/M)^L − 1)/(L·S)，L=0 时 ln(v/M)/S；新生儿期走周表 LMS。 */
+export function whoPercentile(sex: WhoSex | undefined, metric: GrowthMetric, ageMonths: number, value: number): number | null {
+    const table = whoTable(sex, metric);
+    if (!table?.lms || !Number.isFinite(ageMonths) || ageMonths < 0 || ageMonths > 60) return null;
+    if (!Number.isFinite(value) || value <= 0) return null;
+    const { src, pos, max } = selectWhoTable(table, ageMonths);
+    const lms = src.lms;
+    if (!lms) return null;
+    const M = lerpAt(lms.m, pos, max);
+    if (!(M > 0)) return null;
+    const L = lerpAt(lms.l, pos, max);
+    const S = lerpAt(lms.s, pos, max);
+    const z = L === 0 ? Math.log(value / M) / S : (Math.pow(value / M, L) - 1) / (L * S);
+    return Math.min(99.9, Math.max(0.1, 100 * normCdf(z)));
 }
