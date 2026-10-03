@@ -51,6 +51,36 @@
         return list;
     });
     const levelBadge: Record<string, string> = { overdue: "red", soon: "orange", lead: "yellow" };
+
+    // UG11 v1：提醒导出 .ics（当前筛选为范围；G1 同款——含高后果模块先点名确认）
+    const HIGH_CONSEQUENCE_MODULES = new Set(["health", "parenting", "certs", "insurance", "assets-real", "assets-virtual", "contracts", "medicine", "schooling"]);
+    function exportIcs() {
+        const list = filtered;
+        if (list.length === 0) { showMessage(t("hub.icsEmpty"), 3000, "error"); return; }
+        const download = () => {
+            import("@/core/ics").then(({ buildIcs }) => {
+                const events = list.map((r: Reminder) => ({
+                    uid: `${r.id}@lvhome.local`,
+                    date: r.dueDate,
+                    summary: r.title, // 用户确认后才导出；文件保管责任由确认框声明
+                    description: r.moduleId === "adhoc" ? t("adhoc.name") : (t(`module.${r.moduleId}`) !== `module.${r.moduleId}` ? t(`module.${r.moduleId}`) : r.moduleId),
+                }));
+                const ics = buildIcs(t("hub.title"), events);
+                const blob = new Blob([ics], { type: "text/calendar;charset=utf-8" });
+                const a = document.createElement("a");
+                a.href = URL.createObjectURL(blob);
+                a.download = `lvhome-reminders-${new Date().toISOString().slice(0, 10)}.ics`;
+                a.click();
+                URL.revokeObjectURL(a.href);
+                showMessage(t("hub.icsDone").replace("${n}", String(list.length)), 3000, "info");
+            });
+        };
+        if (list.some((r: Reminder) => HIGH_CONSEQUENCE_MODULES.has(r.moduleId))) {
+            confirm(t("hub.icsTitle"), t("hub.icsBody").replace("${n}", String(list.length)), download);
+            return;
+        }
+        download();
+    }
     // H07：已处理视图真实数据源（runtime 留痕 + 缓存派生列表回查标题）
     const handledEntries = $derived.by(() => {
         void version;
@@ -266,6 +296,7 @@
         <option value="7">{t("hub.due7")}</option>
         <option value="30">{t("hub.due30")}</option>
     </select>
+    <button class="b3-button b3-button--outline" onclick={exportIcs}>{t("hub.icsExport")}</button>
     <span class="fn__flex-1"></span>
     <button class="b3-button b3-button--outline" class:b3-button--text={batchMode} onclick={() => (batchMode ? clearSelection() : (batchMode = true))}>{t("hub.batch")}</button>
     <button class="b3-button b3-button--outline" onclick={() => plugin.refreshHub(undefined, true)}>{t("hub.rescan")}</button>
