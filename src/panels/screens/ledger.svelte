@@ -456,6 +456,39 @@
                 });
             }
         })();
+
+        // 模板基建（第七十轮）：有模板的模块给"生成文档"按钮——行字段注入模板 → 台账笔记本内建文档
+        (async () => {
+            const tplList = ((plugin.schemaCatalog?.[active] as any)?.templates ?? []) as { key: string; nameKey: string; file: string }[];
+            for (const tp of tplList) {
+                const label = t(tp.nameKey) !== tp.nameKey ? t(tp.nameKey) : tp.key;
+                const btn = document.createElement("button");
+                btn.className = "b3-button b3-button--outline";
+                btn.style.cssText = "margin-top:8px;font-size:12px";
+                btn.textContent = `${t("ledger.genDoc")}：${label}`;
+                btn.onclick = async () => {
+                    try {
+                        const { getTemplate, renderTemplate } = await import("@/core/templates");
+                        const { sql, createDocWithMd } = await import("@/core/siyuan");
+                        const file = getTemplate(tp.file);
+                        if (!file) throw new Error("template missing: " + tp.file);
+                        const rows = await sql<{ box: string }>(`SELECT box FROM blocks WHERE id='${ref!.docId}' LIMIT 1`);
+                        const notebook = rows[0]?.box;
+                        if (!notebook) throw new Error("notebook not found for " + ref!.docId);
+                        const vars: Record<string, string> = { name: String(cellText(row.cells[ref!.columns.name])), date: localDateKey(new Date()) };
+                        for (const c of schemaCols) vars[c.key] = cellText(row.cells[ref!.columns[c.key]]);
+                        const title = `${vars.name} · ${label} · ${vars.date}`;
+                        const docId = await createDocWithMd(notebook, `/${title}`, renderTemplate(file, vars));
+                        showMessage(t("ledger.genDocDone").replace("${title}", title), 3000, "info");
+                        dlg.destroy();
+                        plugin.showTabDocs(docId);
+                    } catch (e) {
+                        showMessage(t("ledger.genDocFailed").replace("${msg}", e instanceof Error ? e.message : String(e)), 6000, "error");
+                    }
+                };
+                body.appendChild(btn);
+            }
+        })();
             addFavorsSyncSection();
         }
         // EC15：人情往来 → 人脉交集记录（ensurePerson + recordInteraction，externalRef 幂等；

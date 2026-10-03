@@ -1,4 +1,5 @@
 # 小驴管家（Lv Home）· 项目待办总清单
+| 2026-10-04 | 主线 | 第七十轮：模板基建落地（首批 schooling 家长会） | src/templates/ 模板文件（构建期 ?raw 打包离线可用）+ `core/templates.ts`（注册表+renderTemplate 纯函数：{{key}} 替换/缺失空串/非变量不误伤）+ schema DocTemplate 首个真实消费者（schooling parent_meeting）+ 详情抽屉"生成文档"按钮（sql 反查台账笔记本 → createDocWithMd → 直开新文档）；5 单测、单测 153、i18n 681→685、快照 -u；后续模块模板=只写 .tpl+schema 声明（health 体检计划已注记） |
 | 2026-10-04 | 主线 | 第六十九轮：时间线类批量清（位置/价格/转学）+ 跨类型误伤 bug 修复 | rowlog 泛化核心（getEntries/appendEntry/removeEntry：追加+完全重复去重，同日不同价合法并存）+ moves/prices/transfers 三类型；抽屉通用构造器 addRowLogSection（字段 spec 驱动，四分区共用：assets 估值+位置、shopping 价格、schooling 转学）；**新单测抓真 bug**：removeValuation/removeEntry 单类型删空时误删整行 key（跨类型数据丢失）——pruneKeyIfEmpty 修复（全类型皆空才清）；单测 148（+2）、i18n 669→681；16 组时间线类仅剩 certs 换证链（relation 行间引用设计） |
 | 2026-10-04 | 主线 | 第六十八轮：子记录模型定案+落地（assets 估值时间线） | **定案：时间线类数据不建新数据库**——`core/rowlog.ts` 行级日志（rowlogs.json 与 settings 同通道随思源同步，key=`avId|rowId`，类型分组可扩展 moves/prices），纯逻辑 append（同口径日覆盖快照语义）/remove（删空清 key）/removeRowLog（行删除联动）+ 坏文件容错复用 loadDataSafe；详情抽屉 assets 估值分区（时间线+记一笔+单条删除）；行删除清理接线；单测 146（+4）；i18n 664→669。**解锁**：位置历史/价格历史/换证链/转学历史可复用同通道（各加日志类型+抽屉分区） |
 | 2026-10-04 | 主线 | 第六十七轮：16 组"列+规则"类三连清 + 模板基建立项 | insurance 理赔状态机（claim_status 四态报案/材料/到账+报案日+金额）；social 基数年度调整（base_adjust_date + **anniversary 规则**年复一年滚动）；schooling 考试日程（exam_date + oneoff leadDays 3；作业 recurring 归 exams 模块不重复）；**发现并立项：DocTemplate 模板基建自声明以来无消费者**（无 .tpl/无渲染路径/无入口）——单独立项含落地范围；i18n 654→664、快照 -u；16 组剩时间线类（assets 估值/位置历史、shopping 价格历史需子记录模型）与跨模块联动（health→药箱、shopping→stock） |
@@ -406,12 +407,12 @@
 - [x] 🟢 memberships：取消自动续费指引链接字段 ✅ 2026-10-04 第六十六轮（cancel_guide url 列）
 - [x] 🟡 contracts：自动续约条款标记 → 到期提醒升级为「续约决策提醒」 ✅ 2026-10-03 第六十五轮（schema 新增 auto_renew checkbox 列 + 规则 autoRenewField 声明；Reminder.autoRenew 透传（rule/providers）；提醒卡/总览卡 🔄 标记 + title 提示（hub.autoRenew 双语）；快照 -u；真机验收见 §7.1）
 - [x] 🟢 contracts：押金退还记录 ✅ 2026-10-04 第六十六轮（deposit_returned checkbox + deposit_return_date）
-- [ ] 🟡 health：体检年度计划模板（recurring）
+- [ ] 🟡 health：体检年度计划模板（recurring）（2026-10-04 注：模板基建已落地（见 414 区），本项=体检计划 .tpl + health schema templates 声明，随下一轮）
 - [ ] 🟡 health：处方药 → 药箱联动（新建药箱行或扣减提示）
 - [x] 🟡 insurance：理赔记录状态机（报案/材料/到账） ✅ 2026-10-04 第六十七轮（claim_status 四态 select + claim_date + claim_amount；无日期驱动 v1 仅记录）
 - [x] 🟡 social：缴费基数年度调整提醒 ✅ 2026-10-04 第六十七轮（base_adjust_date 列 + anniversary 规则 leadDays 14——年复一年自动滚动）
 - [x] 🟡 schooling：作业/考试日程（recurring）+ 家长会记录文档模板 ✅ 2026-10-04 第六十七轮部分（exam_date 列 + oneoff 规则 leadDays 3；作业 recurring 由 exams 模块承担不重复建规则；**家长会模板未做**——模板基建未实现，见下方新立项）
-- [ ] 🟡 模板基建（第六十七轮立项）：`DocTemplate` 类型自 schema.ts 声明以来无任何消费者（无 .tpl 文件、无渲染/建文档路径、无入口）——落地范围：模板文件加载、变量替换（行字段注入）、从台账行/详情抽屉创建文档、 schooling 家长会记录等首批模板；完成后补 16 组 schooling 模板项
+- [x] 🟡 模板基建（第六十七轮立项） ✅ 2026-10-04 第七十轮落地：src/templates/<module>/<key>.tpl 构建期 ?raw 打包（离线可用）；`core/templates.ts` 注册表 + renderTemplate 纯函数（{{key}} 替换、缺失空串）；详情抽屉"生成文档"按钮（SQL 反查台账笔记本 → createDocWithMd → 直开新文档）；首批模板 schooling 家长会记录；5 单测；后续模块模板只需 .tpl 文件 + schema templates 声明
 - [x] 🟢 schooling：转学/插班历史 ✅ 2026-10-04 第六十九轮（rowlog transfers 类型 + 抽屉转学历史分区）
 - [x] 🟡 parenting：疫苗批号与接种点字段（接种追溯） ✅ 2026-10-04 第六十五轮（vaccine_batch/vaccine_site text 列 + 双语 i18n；**同轮修复隐患**：next_visit 规则引用 due 列但 schema 缺列——启用即扫描必错，已补 due 列）
 - [ ] 🟡 parenting：生长曲线图（身高体重 WHO 百分位 SVG 渲染）

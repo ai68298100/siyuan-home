@@ -2458,6 +2458,13 @@ exports[`31 模块 schema 契约快照（21 组） > 每个 schema 的结构快�
       "leadDays": 3,
     },
   ],
+  "templates": [
+    {
+      "file": "schooling/parent-meeting.tpl",
+      "key": "parent_meeting",
+      "nameKey": "tpl.parentMeeting",
+    },
+  ],
 }
 `;
 

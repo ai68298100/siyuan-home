@@ -442,6 +442,7 @@ export const SCHOOLING_SCHEMA: ModuleSchema = {
         { key: "exam_date", type: "date", labelKey: "field.exam_date" }, // 16 组：考试/重要日程（exams 模块管备考，这里管校内日程）
     ],
     capture: ["name", "school", "category", "amount", "due"],
+    templates: [{ key: "parent_meeting", nameKey: "tpl.parentMeeting", file: "schooling/parent-meeting.tpl" }],
     reminders: [
         { key: "tuition", field: "due", kind: "oneoff", leadDays: 14 },
         { key: "exam_date", field: "exam_date", kind: "oneoff", leadDays: 3 },
