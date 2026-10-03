@@ -100,6 +100,9 @@
 | 2026-10-03 | 主线 | 第五十八轮：EC15 favorSyncs 对手方变更失效 | 编辑模式保存时检测 person 列变更 → 清除 favorSyncs[rowId]（新对手方的交集需重新记录）；单测 138 持平、gzip 52.1KB |
 | 2026-10-03 | 循环A | 第五十八波走查 | personChanged 追踪逻辑复核（仅当 person keyID 在 inputs 中且值变更时标记）；不影响其他列的编辑 |
 | 2026-10-03 | 循环B | ③轮休（延续） | 兜底循环静默待命（延续） |
+| 2026-10-03 | docs | 第五十九轮：集成测试清单（10 项 IT-01~IT-10） | 回归脚本新增 §8 集成测试节（编写方式/验证点表格）；尝试写集成测试桩但确认需要真实内核（fetchSyncPost 不可用外fra）——删除试探文件、保留清单文档；单测 138 持平 |
+| 2026-10-03 | 循环A | 第五十九波走查 | 集成测试编写方式（直调 HTTP API 非 fetchSyncPost）确认正确 |
+| 2026-10-03 | 循环B | ③轮休（延续） | 兜底循环静默待命（延续） |
 | 2026-10-03 | 主线 | 第三十六轮：代码卫生 + EC18/19 确认 | 死代码 safe-mount.ts 移除（ErrorBoundary 取代）；monthlyCompletions 24 个月保留期入 purgeHandled；LeiQie 无 bookmarks/snippets 消费 API（EC18/19 供方依赖确认）；单测 126 持平、gzip 51.4KB |
 | 2026-10-03 | 循环A | 第三十六波走查 | 死代码移除零引用验证；purgeHandled 月度清理边界（24 个月 cutoffKey）逻辑复核 |
 | 2026-10-03 | 循环B | ③信源=兄弟仓源码（第六轮） | LeiQie 无 getBookmarks/getSnippets 对外暴露——EC18/19 维持供方依赖注记 |
