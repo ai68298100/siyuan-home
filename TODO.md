@@ -1,4 +1,5 @@
 # 小驴管家（Lv Home）· 项目待办总清单
+| 2026-10-04 | 巡检 | 第一百一十六波：包体预算复查 | 首屏 index.js gzip **57.3KB / 100KB 预算**（余量 43%；v0.2.0 时 52KB，50 波功能净增 5KB）；WHO 参考带数据在懒加载 growth chunk（gzip 6.3KB）；**lunar-typescript 懒加载 chunk gzip 99.7KB**（425KB 原始，lunar-lazy 拆包整改产物，仅农历生日场景按需加载——CI 门禁只测 index.js，chunk 体积记录备查，若未来超预期可评估换更轻的农历库）；实例探活 ✓；纯巡检波零变更 |
 | 2026-10-04 | 巡检 | 第一百一十五波：插件运行时自证——真机批起点确认 | getFile 探测 `/data/storage/petal/siyuan-home/settings.json` → **不存在**（202 未创建）：插件已部署+启用，但此工作区从未有前端会话启动它——与"真机批挂起"判断自洽；**批前情报**：真机批首次启动将直接进入 onboarding 向导（onboarded=false），恰为 §7 第一个测试项，执行者无需清场；纯巡检波零变更 |
 | 2026-10-04 | 兜底 | 第一百一十四波：CONTRIBUTING 补端点实战教训 | 部署节停在 65 波教训——补 79–82 波四条：①sy 包装器大响应静默截断（大响应原始 curl + cygpath + 显式 source 环境）；②端点实名坑（addAttributeViewKey/keyID 自造、removeDocByID 替代 removeDoc、SQL 无 notebooks 表）；③多实例工作区鉴权门（lsNotebooks 探测，version 免鉴权不可判据）；④指向 e2e 脚本头注与 §8 十条结论——接手写脚本的人不必再踩一遍；纯文档波零代码变更 |
 | 2026-10-04 | 兜底 | 第一百一十三波：MODULES.md 进展注记 | 规划文档头部自带"不能作为已实现证据"免责（结构诚实），但复核注记停在 10-02——补 10-04 进展注记（65–112 波 16 组深化/四类导出/隐私警示/诊断包 → 指向 CHANGELOG Unreleased 与 testing 文档），并重申"本文其余部分仍为规划"；防止读者误读规划为实现；纯文档波零代码变更 |
