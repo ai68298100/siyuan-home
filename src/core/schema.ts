@@ -110,6 +110,7 @@ export const CERTS_SCHEMA: ModuleSchema = {
         ...CERT_PRIVATE,
         ...d("expiry", "due", "remind_before", "location", "attachments", "note"),
         { key: "copy_location", type: "text", labelKey: "field.copy_location" }, // 16 组：复印件/电子版存放位置
+        { key: "renewed_to", type: "relation", labelKey: "field.renewed_to" }, // 16 组：换证链——旧证行 → 新证行
     ],
     capture: ["name", "member", "category", "expiry", "attachments"],
     views: [

@@ -1,4 +1,5 @@
 # 小驴管家（Lv Home）· 项目待办总清单
+| 2026-10-04 | 主线 | 第七十三轮：certs 换证链（16 组联动收官项之一） | renewed_to relation 列（旧证行→新证行）；详情抽屉换证链分区：正向（→新证）/反向（←旧证，全表反查 relation 反向引用）双向展示 + "关联新证"行内选择器（Dialog 列出其他证件行，选中写 relation → 刷新重开抽屉）；与 renewHistory 日期历史互补；153 测试持平、i18n 694→703、快照 -u；16 组仅剩 parenting 生长曲线（数据源决策见待办） |
 | 2026-10-04 | 主线 | 第七十二轮：shopping→囤货联动（16 组联动第二项） | shopping 新增 qty 数量列；详情抽屉"入库到囤货"按钮：renderLedger 同名匹配（首个累加 stock_qty / 无匹配新建囤货行，数量缺省 1），确认框报匹配数，成功后按钮禁用 + `refreshHub(["medicine"])` 部分重扫（低库存提醒即时重算）；153 测试持平、i18n 690→694、快照 -u；16 组联动剩：certs 换证链 relation、购物比价入口（价格历史已有数据源） |
 | 2026-10-04 | 主线 | 第七十一轮：health 双项（体检模板+处方→药箱联动） | ①checkup-plan.tpl 体检年度计划（年度检查项清单模板，诊断/备注注入）——模板基建第二个消费者；②详情抽屉"转入药箱"按钮：确认后新建药箱行（同名、category=rx、成员 relation 复制、成功即禁用防重复；药箱未建库不出现）——16 组跨模块联动 v1；153 测试持平、i18n 685→690、快照 -u；剩余联动：shopping 购入→囤货（需先给 shopping 加 qty 列） |
 | 2026-10-04 | 主线 | 第七十轮：模板基建落地（首批 schooling 家长会） | src/templates/ 模板文件（构建期 ?raw 打包离线可用）+ `core/templates.ts`（注册表+renderTemplate 纯函数：{{key}} 替换/缺失空串/非变量不误伤）+ schema DocTemplate 首个真实消费者（schooling parent_meeting）+ 详情抽屉"生成文档"按钮（sql 反查台账笔记本 → createDocWithMd → 直开新文档）；5 单测、单测 153、i18n 681→685、快照 -u；后续模块模板=只写 .tpl+schema 声明（health 体检计划已注记） |
@@ -396,7 +397,7 @@
 
 ## 16. 模块功能深化（按模块细化，v0.3+ 逐版吸收进 schema）
 
-- [ ] 🟡 certs：换证历史链（旧证→新证 relation + 历史视图）（2026-10-04 注：子记录模型 rowlog.ts 已落地（rowlogs.json 行级日志），换证链可复用同通道；relation 部分仍需行间引用设计）
+- [x] 🟡 certs：换证历史链（旧证→新证 relation + 历史视图） ✅ 2026-10-04 第七十三轮（renewed_to relation 列 + 详情抽屉换证链分区：正向新证/反向旧证（全表反查）双向展示 + "关联新证"行内选择器（选完写 relation→刷新重开抽屉）；续期日期历史由 renewHistory 分区承担，两者互补）
 - [x] 🟡 assets：位置变更历史（物品搬家记录） ✅ 2026-10-04 第六十九轮（rowlog moves 类型 + 详情抽屉位置历史分区；通用构造器 addRowLogSection）
 - [x] 🟡 certs：复印件/电子版存放位置字段 ✅ 2026-10-04 第六十五轮（copy_location text 列 + 双语 i18n + 快照 -u）
 - [x] 🟡 assets：估值快照（手动记录 + 时间线，非自动估值） ✅ 2026-10-04 第六十八轮（**子记录模型落地首项**：rowlogs.json 行级日志 + 详情抽屉估值时间线分区——记一笔/删/行删除联动清理；纯逻辑 4 单测）

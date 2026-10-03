@@ -209,6 +209,11 @@ exports[`31 模块 schema 契约快照（21 组） > 每个 schema 的结构快�
       "labelKey": "field.copy_location",
       "type": "text",
     },
+    {
+      "key": "renewed_to",
+      "labelKey": "field.renewed_to",
+      "type": "relation",
+    },
   ],
   "reminders": [
     {

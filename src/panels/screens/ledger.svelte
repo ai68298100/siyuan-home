@@ -572,6 +572,81 @@
         }
         addStockInButton();
 
+        // 16 组：certs 换证链——renewed_to relation 正向（新证）/反向（旧证）展示 + 关联新证行内选择器
+        function addRenewChainSection() {
+            if (active !== "certs") return;
+            const relKey = ref!.columns.renewed_to;
+            if (!relKey) return;
+            const nameOf = (id: string) => {
+                const r = rows.find((x) => x.itemID === id);
+                return r ? String(cellText(r.cells[ref!.columns.name])) : "?";
+            };
+            const forward = (row.cells[relKey]?.relation?.blockIDs ?? []) as string[];
+            const backward = rows.filter((r) => ((r.cells[relKey]?.relation?.blockIDs ?? []) as string[]).includes(row.itemID));
+            const linkBtn = () => {
+                const btn = document.createElement("button");
+                btn.className = "b3-button b3-button--outline";
+                btn.style.cssText = "margin-top:6px;font-size:12px";
+                btn.textContent = t("ledger.linkNew");
+                btn.onclick = () => {
+                    const picker = new Dialog({
+                        title: t("ledger.pickNew"),
+                        content: `<div class="b3-dialog__content" id="lv-pick-body" style="max-height:50vh;overflow:auto"></div>`,
+                        width: "420px",
+                    });
+                    const list = picker.element.querySelector("#lv-pick-body") as HTMLElement;
+                    for (const r of rows) {
+                        if (r.itemID === row.itemID) continue;
+                        const b = document.createElement("button");
+                        b.className = "b3-button b3-button--text";
+                        b.style.cssText = "display:block;width:100%;text-align:left;font-size:13px";
+                        const exp = ref!.columns.expiry ? cellText(r.cells[ref!.columns.expiry]) : "";
+                        b.textContent = `${String(cellText(r.cells[ref!.columns.name]))}${exp && exp !== "—" ? ` · ${exp}` : ""}`;
+                        b.onclick = async () => {
+                            try {
+                                const { setCell } = await import("@/core/siyuan");
+                                await setCell(ref!.avId!, relKey, row.itemID, { type: "relation", relation: { blockIDs: [r.itemID], contents: null } });
+                                picker.destroy();
+                                dlg.destroy();
+                                showMessage(t("ledger.linked").replace("${name}", String(cellText(r.cells[ref!.columns.name]))), 2500, "info");
+                                await load();
+                                const fresh = rows.find((x) => x.itemID === row.itemID);
+                                if (fresh) openDetail(fresh);
+                            } catch (e) {
+                                showMessage(t("ledger.renewLinkFailed").replace("${msg}", e instanceof Error ? e.message : String(e)), 6000, "error");
+                            }
+                        };
+                        list.appendChild(b);
+                    }
+                    if (!list.children.length) list.innerHTML = `<div class="ft__on-surface" style="font-size:13px">${t("ledger.noOtherRows")}</div>`;
+                };
+                return btn;
+            };
+            if (forward.length === 0 && backward.length === 0) {
+                body.appendChild(linkBtn());
+                return;
+            }
+            const head = document.createElement("div");
+            head.className = "ft__on-surface";
+            head.style.cssText = "margin-top:10px;padding-top:8px;border-top:1px solid var(--b3-border-color);font-size:12px";
+            head.textContent = t("ledger.renewChain");
+            body.appendChild(head);
+            for (const id of forward) {
+                const line = document.createElement("div");
+                line.style.cssText = "padding:2px 0;font-size:12.5px";
+                line.textContent = `→ ${nameOf(id)}（${t("ledger.newCert")}）`;
+                body.appendChild(line);
+            }
+            for (const r of backward) {
+                const line = document.createElement("div");
+                line.style.cssText = "padding:2px 0;font-size:12.5px";
+                line.textContent = `← ${String(cellText(r.cells[ref!.columns.name]))}（${t("ledger.oldCert")}）`;
+                body.appendChild(line);
+            }
+            body.appendChild(linkBtn());
+        }
+        addRenewChainSection();
+
             addFavorsSyncSection();
         }
         // EC15：人情往来 → 人脉交集记录（ensurePerson + recordInteraction，externalRef 幂等；
