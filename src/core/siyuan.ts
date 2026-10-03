@@ -237,9 +237,9 @@ async function renderRowIDs(avID: string): Promise<string[]> {
     return (d?.view?.rows ?? []).map((r: any) => r.id);
 }
 
-/** 删除 av 行（detached 行删除路径；[待实测] 端点/payload 以 3.8.x 实例为准，接线 UI 前必须实测并配确认框） */
+/** 删除 av 行（detached 行删除路径；2026-10-03 真机确认参数名为 srcIDs） */
 export async function removeLedgerRows(avID: string, rowIDs: string[]): Promise<void> {
-    await post("/api/av/removeAttributeViewBlocks", { avID, rowIDs });
+    await post("/api/av/removeAttributeViewBlocks", { avID, srcIDs: rowIDs });
 }
 
 // ── 附件（asset，A2c）────────────────────────────────────────
