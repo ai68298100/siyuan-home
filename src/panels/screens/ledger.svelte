@@ -521,6 +521,57 @@
         }
         addRxToMedicineButton();
 
+        // 16 组联动：shopping 购入 → 囤货库存（同名药箱行 stock_qty 增量；无匹配新建囤货行；数量缺省 1）
+        function addStockInButton() {
+            if (active !== "shopping") return;
+            const medRef = plugin.settings.dbRefs?.["medicine"];
+            if (!medRef?.avId) return;
+            const name = String(cellText(row.cells[ref!.columns.name]));
+            if (!name || name === "—") return;
+            const qtyRaw = cellText(row.cells[ref!.columns.qty]);
+            const qty = qtyRaw !== "—" && qtyRaw !== "" && Number.isFinite(Number(qtyRaw)) ? Number(qtyRaw) : 1;
+            const btn = document.createElement("button");
+            btn.className = "b3-button b3-button--outline";
+            btn.style.cssText = "margin-top:8px;font-size:12px";
+            btn.textContent = t("ledger.stockIn");
+            btn.onclick = async () => {
+                try {
+                    const { renderLedger, addDetachedRow, setCell } = await import("@/core/siyuan");
+                    const read = await renderLedger(medRef.avId!);
+                    const nameKey = medRef.columns?.name;
+                    const stockKey = medRef.columns?.stock_qty;
+                    const matches = nameKey
+                        ? read.rows.filter((r) => String(r.cells[nameKey]?.text?.content ?? "").trim() === name)
+                        : [];
+                    confirm(
+                        t("ledger.stockIn"),
+                        t("ledger.stockInBody").replace("${name}", name).replace("${qty}", String(qty)).replace("${n}", String(matches.length)),
+                        async () => {
+                            try {
+                                if (matches[0] && stockKey) {
+                                    const cur = matches[0].cells[stockKey]?.number;
+                                    const curVal = cur?.isNotEmpty && typeof cur.content === "number" ? cur.content : 0;
+                                    await setCell(medRef.avId!, stockKey, matches[0].itemID, { type: "number", number: { content: curVal + qty, isNotEmpty: true } });
+                                } else {
+                                    const itemID = await addDetachedRow(medRef.avId!, name);
+                                    if (stockKey) await setCell(medRef.avId!, stockKey, itemID, { type: "number", number: { content: qty, isNotEmpty: true } });
+                                }
+                                showMessage(t("ledger.stockInDone").replace("${qty}", String(qty)).replace("${name}", name), 3000, "info");
+                                btn.disabled = true;
+                                await plugin.refreshHub?.(["medicine"]); // 低库存提醒即时重算
+                            } catch (e) {
+                                showMessage(t("ledger.stockInFailed").replace("${msg}", e instanceof Error ? e.message : String(e)), 6000, "error");
+                            }
+                        },
+                    );
+                } catch (e) {
+                    showMessage(t("ledger.stockInFailed").replace("${msg}", e instanceof Error ? e.message : String(e)), 6000, "error");
+                }
+            };
+            body.appendChild(btn);
+        }
+        addStockInButton();
+
             addFavorsSyncSection();
         }
         // EC15：人情往来 → 人脉交集记录（ensurePerson + recordInteraction，externalRef 幂等；

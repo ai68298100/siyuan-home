@@ -1,4 +1,5 @@
 # 小驴管家（Lv Home）· 项目待办总清单
+| 2026-10-04 | 主线 | 第七十二轮：shopping→囤货联动（16 组联动第二项） | shopping 新增 qty 数量列；详情抽屉"入库到囤货"按钮：renderLedger 同名匹配（首个累加 stock_qty / 无匹配新建囤货行，数量缺省 1），确认框报匹配数，成功后按钮禁用 + `refreshHub(["medicine"])` 部分重扫（低库存提醒即时重算）；153 测试持平、i18n 690→694、快照 -u；16 组联动剩：certs 换证链 relation、购物比价入口（价格历史已有数据源） |
 | 2026-10-04 | 主线 | 第七十一轮：health 双项（体检模板+处方→药箱联动） | ①checkup-plan.tpl 体检年度计划（年度检查项清单模板，诊断/备注注入）——模板基建第二个消费者；②详情抽屉"转入药箱"按钮：确认后新建药箱行（同名、category=rx、成员 relation 复制、成功即禁用防重复；药箱未建库不出现）——16 组跨模块联动 v1；153 测试持平、i18n 685→690、快照 -u；剩余联动：shopping 购入→囤货（需先给 shopping 加 qty 列） |
 | 2026-10-04 | 主线 | 第七十轮：模板基建落地（首批 schooling 家长会） | src/templates/ 模板文件（构建期 ?raw 打包离线可用）+ `core/templates.ts`（注册表+renderTemplate 纯函数：{{key}} 替换/缺失空串/非变量不误伤）+ schema DocTemplate 首个真实消费者（schooling parent_meeting）+ 详情抽屉"生成文档"按钮（sql 反查台账笔记本 → createDocWithMd → 直开新文档）；5 单测、单测 153、i18n 681→685、快照 -u；后续模块模板=只写 .tpl+schema 声明（health 体检计划已注记） |
 | 2026-10-04 | 主线 | 第六十九轮：时间线类批量清（位置/价格/转学）+ 跨类型误伤 bug 修复 | rowlog 泛化核心（getEntries/appendEntry/removeEntry：追加+完全重复去重，同日不同价合法并存）+ moves/prices/transfers 三类型；抽屉通用构造器 addRowLogSection（字段 spec 驱动，四分区共用：assets 估值+位置、shopping 价格、schooling 转学）；**新单测抓真 bug**：removeValuation/removeEntry 单类型删空时误删整行 key（跨类型数据丢失）——pruneKeyIfEmpty 修复（全类型皆空才清）；单测 148（+2）、i18n 669→681；16 组时间线类仅剩 certs 换证链（relation 行间引用设计） |
@@ -403,7 +404,7 @@
 - [ ] 🟢 assets：CSV 批量导入（列映射向导）
 - [x] 🟡 shopping：退货/退款记录字段与状态 ✅ 2026-10-04 第六十六轮（return_status select none/requested/returned/refunded + return_date + refund_amount）
 - [x] 🟢 shopping：同商品价格历史（复购比价参考） ✅ 2026-10-04 第六十九轮（rowlog prices 类型：同日多条合法——不同渠道价格并存 + 抽屉价格历史分区）
-- [ ] 🟡 shopping：购入联动 stock（囤货品自动加库存）
+- [x] 🟡 shopping：购入联动 stock（囤货品自动加库存） ✅ 2026-10-04 第七十二轮（shopping 新增 qty 数量列；详情抽屉"入库到囤货"：同名药箱行首个累加 stock_qty、无匹配新建囤货行（数量缺省 1），确认框报匹配数，成功后禁用防重复 + medicine 部分重扫（低库存即时重算））
 - [x] 🟡 memberships：家庭共享账号（主卡人/成员位标注） ✅ 2026-10-04 第六十五轮（seat_role select 列 holder/member 默认 holder + 双语 i18n；next_pay 规则顺带挂 autoRenewField → 自动续费会员到期也显示 🔄）
 - [x] 🟢 memberships：取消自动续费指引链接字段 ✅ 2026-10-04 第六十六轮（cancel_guide url 列）
 - [x] 🟡 contracts：自动续约条款标记 → 到期提醒升级为「续约决策提醒」 ✅ 2026-10-03 第六十五轮（schema 新增 auto_renew checkbox 列 + 规则 autoRenewField 声明；Reminder.autoRenew 透传（rule/providers）；提醒卡/总览卡 🔄 标记 + title 提示（hub.autoRenew 双语）；快照 -u；真机验收见 §7.1）

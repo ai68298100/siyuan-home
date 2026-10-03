@@ -262,6 +262,7 @@ export const SHOPPING_SCHEMA: ModuleSchema = {
         { key: "channel", type: "text", labelKey: "field.channel" },
         { key: "tracking_no", type: "text", labelKey: "field.tracking_no" },
         { key: "pickup_code", type: "text", labelKey: "field.pickup_code" },
+        { key: "qty", type: "number", labelKey: "field.qty" }, // 16 组：数量（购入→囤货联动用）
         // 16 组：退货/退款记录
         { key: "return_status", type: "select", labelKey: "field.return_status", options: ["none", "requested", "returned", "refunded"], default: "none" },
         { key: "return_date", type: "date", labelKey: "field.return_date" },
