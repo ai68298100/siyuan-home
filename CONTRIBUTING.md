@@ -34,6 +34,15 @@ pnpm run make-link   # 软链到思源工作空间 data/plugins/
 
 已验证（2026-10-03，真机 3.8.6）：cp 直拷会被安全 hook 拦截；`make-install` 走的 getWorkspaces 在开锁屏的实例上 401；符号链接需 Developer Mode（本机无）——putFile 是当前唯一后台通路。
 
+### 脚本/端点实战教训（2026-10-04，79–82 波真机实测）
+
+写运维/测试脚本前先读 `scripts/e2e-endpoints.sh` 头注与 [docs/testing/v0.2.md §8](docs/testing/v0.2.md)，要点：
+
+1. **sy 包装器对大响应（>~64KB）静默截断**——render/PK 等大响应用原始 curl 落盘再解析；MSYS 禁转换下 curl 的 `-o`/`-F` 文件参数要 `cygpath` 转 Windows 路径，且环境变量需显式 `source %APPDATA%/siyuan/env`（包装器配置不会导出到你的 shell）；
+2. **端点实名易踩坑**：加列是 `addAttributeViewKey`（keyID 必须自造，留空建出空 id 列）；`removeDoc(path)` 恒报 block not found → 用 `removeDocByID`；`/api/query/sql` **不暴露 notebooks 表**（笔记本 id 走 lsNotebooks）；
+3. **多实例工作区鉴权门**：token 只对本工作区有效——脚本稳定判定用带鉴权探测（lsNotebooks 连续通过），`version` 免鉴权不可作判据；
+4. 完整端点结论（render 默认分页、PK 封顶语义、写路径回读等 10 条）见 testing 文档 §8。
+
 ## 开发约定
 
 1. **Conventional Commits**：`feat/fix/docs/refactor/test/chore:` 前缀，一个逻辑变更一个提交
