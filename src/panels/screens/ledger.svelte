@@ -301,8 +301,79 @@
                 line.append(v);
                 body.appendChild(line);
             }
-            addHistorySection();
-            addAttachmentsSection();
+        // 子记录模型（2026-10-04 定案）：assets 行的估值时间线（rowlogs.json，行删除联动清理）
+        async function addValuationSection() {
+            if (active !== "assets") return;
+            const { loadRowLogs, saveRowLogs, getValuations, appendValuation, removeValuation } = await import("@/core/rowlog");
+            let logs = await loadRowLogs(plugin as any);
+            const render = () => {
+                section.replaceChildren();
+                const vals = getValuations(logs, ref!.avId!, row.itemID);
+                for (const v of vals) {
+                    const line = document.createElement("div");
+                    line.style.cssText = "padding:2px 0;font-size:12.5px;display:flex;gap:6px;align-items:center";
+                    const text = document.createElement("span");
+                    text.textContent = `${v.date} · ${v.value}`;
+                    const del = document.createElement("button");
+                    del.className = "b3-button b3-button--text";
+                    del.style.cssText = "padding:0 4px;font-size:12px";
+                    del.textContent = "✕";
+                    del.onclick = async () => {
+                        logs = removeValuation(logs, ref!.avId!, row.itemID, v.date);
+                        await saveRowLogs(plugin as any, logs);
+                        render();
+                    };
+                    line.append(text, del);
+                    section.appendChild(line);
+                }
+                if (vals.length === 0) {
+                    const none = document.createElement("div");
+                    none.className = "ft__on-surface";
+                    none.style.cssText = "font-size:12.5px";
+                    none.textContent = t("ledger.noValuations");
+                    section.appendChild(none);
+                }
+            };
+            const head = document.createElement("div");
+            head.className = "ft__on-surface";
+            head.style.cssText = "margin-top:10px;padding-top:8px;border-top:1px solid var(--b3-border-color);font-size:12px";
+            head.textContent = t("ledger.valuations");
+            body.appendChild(head);
+            const section = document.createElement("div");
+            body.appendChild(section);
+            const form = document.createElement("div");
+            form.style.cssText = "display:flex;gap:6px;margin-top:6px;align-items:center";
+            const dateInput = document.createElement("input");
+            dateInput.type = "date";
+            dateInput.className = "b3-text-field";
+            dateInput.style.cssText = "width:130px;font-size:12px";
+            const valInput = document.createElement("input");
+            valInput.type = "number";
+            valInput.className = "b3-text-field";
+            valInput.placeholder = t("ledger.valValue");
+            valInput.style.cssText = "width:100px;font-size:12px";
+            const addBtn = document.createElement("button");
+            addBtn.className = "b3-button b3-button--outline";
+            addBtn.style.cssText = "font-size:12px";
+            addBtn.textContent = t("ledger.valAdd");
+            addBtn.onclick = async () => {
+                if (!dateInput.value || valInput.value === "" || !Number.isFinite(Number(valInput.value))) {
+                    showMessage(t("ledger.valInvalid"), 3000, "error");
+                    return;
+                }
+                logs = appendValuation(logs, ref!.avId!, row.itemID, dateInput.value, Number(valInput.value), new Date().toISOString());
+                await saveRowLogs(plugin as any, logs);
+                valInput.value = "";
+                render();
+            };
+            form.append(dateInput, valInput, addBtn);
+            body.appendChild(form);
+            render();
+        }
+
+        addHistorySection();
+        addAttachmentsSection();
+        addValuationSection();
             addFavorsSyncSection();
         }
         // EC15：人情往来 → 人脉交集记录（ensurePerson + recordInteraction，externalRef 幂等；
@@ -464,6 +535,10 @@
                     if (dirty) {
                         await saveRuntime(plugin, plugin.runtime);
                     }
+                    // 子记录模型：行日志（估值时间线等）一并清理
+                    const { loadRowLogs, saveRowLogs, removeRowLog } = await import("@/core/rowlog");
+                    const logs = removeRowLog(await loadRowLogs(plugin as any), ref!.avId!, row.itemID);
+                    await saveRowLogs(plugin as any, logs);
                     showMessage(t("ledger.delDone"), 2500, "info");
                     dlg.destroy();
                     await load();
