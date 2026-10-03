@@ -1,4 +1,5 @@
 # 小驴管家（Lv Home）· 项目待办总清单
+| 2026-10-04 | 循环B | 第七十五波信源轮换：WHO 生长数据源调研（实测实例下线，转后台） | 实例探测：内核整个下线（并发会话切换/重启），A 类回归继续等窗口；转循环 B——WHO 儿童生长百分位数据源调研闭环（docs/research/2026-10-04-WHO生长数据源调研.md）：推荐 WHO 官方 expanded tables（署名条款与 MIT 兼容）、备选 CDC public domain；落地形态定案（构建期 fetch→压缩 JSON 离线内嵌 + LMS 插值参考带）；xlsx 直链动态化实测确认（枚举 404）；实现项已立项 🟢；纯调研轮零代码变更 |
 | 2026-10-04 | 循环A | 第七十四波兜底走查（主动队列清空后首轮） | 近十轮（65–74）新特性逐一对照源码复核：EC09 绑定编辑器 draft 生命周期（Tab 重挂即刷新，无陈旧态）；rowlog 并发窗口（单用户 last-write-wins，多端同时编辑同行日志可能丢更新——多端协同属 R07/EC02 条件，登记 §8 注记）；生长曲线 x 轴混合月龄/序号的退化可读性（生日缺失成员单点/短线正常渲染）；createDocWithMd 同名同日 hpath 行为未验证（§7.7 标注 [待实测]）；产出：§7.7 新特性验收 12 项补录进真机回归清单 |
 | 2026-10-04 | 主线 | 第七十四轮：生长曲线时间线视图（16 组最后一项） | parenting 新增 metric_type 身高/体重 select 列；`core/growth.ts` 纯逻辑（月龄日历差、category=growth 行收集、成员 relation 反查聚合、按指标分组升序）4 单测；台账页"生长曲线"按钮 → SVG 折线图（身高/体重两图、按成员着色、月龄轴 min/max 标注、图例 textContent 安全）；**WHO 百分位参考带单独立研究项**（数据源需核实：WHO official vs CDC public domain，未核实不上线）；157 测试（+4）、i18n 703→711、快照 -u；**16 组模块深化全部处理完毕**（剩余均带研究前置或已注记路径） |
 | 2026-10-04 | 主线 | 第七十三轮：certs 换证链（16 组联动收官项之一） | renewed_to relation 列（旧证行→新证行）；详情抽屉换证链分区：正向（→新证）/反向（←旧证，全表反查 relation 反向引用）双向展示 + "关联新证"行内选择器（Dialog 列出其他证件行，选中写 relation → 刷新重开抽屉）；与 renewHistory 日期历史互补；153 测试持平、i18n 694→703、快照 -u；16 组仅剩 parenting 生长曲线（数据源决策见待办） |
@@ -421,7 +422,8 @@
 - [x] 🟢 schooling：转学/插班历史 ✅ 2026-10-04 第六十九轮（rowlog transfers 类型 + 抽屉转学历史分区）
 - [x] 🟡 parenting：疫苗批号与接种点字段（接种追溯） ✅ 2026-10-04 第六十五轮（vaccine_batch/vaccine_site text 列 + 双语 i18n；**同轮修复隐患**：next_visit 规则引用 due 列但 schema 缺列——启用即扫描必错，已补 due 列）
 - [x] 🟡 parenting：生长曲线图（身高体重 WHO 百分位 SVG 渲染） ✅ 2026-10-04 第七十四轮部分落地（**时间线视图全量完成**：parenting 新增 metric_type 身高/体重列 + `core/growth.ts` 序列收集（成员×指标聚合、月龄计算、relation 反查）4 单测 + 台账页"生长曲线"按钮 → SVG 折线图（按成员着色、月龄轴、用户内容走 textContent）；**WHO 百分位参考带未做**——不凭记忆嵌医学参考值，见下方研究项）
-- [ ] 🟢 **WHO 儿童生长百分位数据源研究**（第七十四轮立项）：生长曲线参考带需要核实过的权威数据（WHO Child Growth Standards LMS 表：height/weight-for-age 0–60 月，P3/P15/P50/P85/P97，男女分表）——候选来源：WHO 官方 published tables（免许可使用需核对条款）、CDC 整理版（public domain）；落地形态：构建期数据文件 + growth.ts 参考带插值渲染；数据未核实前不上线参考带
+- [x] 🟢 **WHO 儿童生长百分位数据源研究**（第七十四轮立项） ✅ 2026-10-04 第七十四波循环 B 调研闭环（docs/research/2026-10-04-WHO生长数据源调研.md）：**推荐 WHO 官方 expanded tables**（署名即可商用/开发复用，条款与 MIT 兼容）；备选 CDC 改编版（public domain 零负担）；落地形态=构建期 fetch 脚本转压缩 JSON（~1100 数字离线内嵌）+ LMS→百分位插值渲染 P3/P15/P50/P85/P97；xlsx 直链动态化已实测（猜测枚举 404），实现期从页面解析精确文件名
+- [ ] 🟢 WHO 生长参考带实现（依赖上项调研结论）：scripts/fetch-who-data.mjs 构建期下载+转换 → 数据 JSON 入库 → growth.ts 参考带（P3/P15/P50/P85/P97 插值）+ 图注署名与"不构成医疗建议"
 - [ ] 🟡 parenting：辅食新食材 3 天观察期 → 联动 health 过敏史
 - [ ] 🟡 allowance：孩子愿望清单（目标金额 + 存钱进度条）
 - [ ] 🟢 allowance：利息/收益流水
