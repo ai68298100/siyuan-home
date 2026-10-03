@@ -15,6 +15,8 @@ export interface FamilyMember {
     birthday?: string;
     /** 生日是否按农历记 */
     lunarBirthday?: boolean;
+    /** D23：生理性别（WHO 生长参考带按性别匹配；未知则图上不显示参考带） */
+    sex?: "male" | "female";
     /** members 台账行的 itemID（addMember 建行后回填；成员过滤/下钻的关联键） */
     avItemId?: string;
     /** 最近一次台账行同步失败的摘要（D05：可见可重试；成功后清除） */

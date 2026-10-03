@@ -37,6 +37,21 @@ describe("settings 迁移（21 组：v0.1 → v0.2）", () => {
         expect(s.members).toEqual([]);
         expect(s.onboarded).toBe(false);
     });
+
+    it("成员 sex 清洗（D23）：合法保留，非法/缺失清除", async () => {
+        const legacy = {
+            enabledModules: ["members"],
+            members: [
+                { id: "m1", name: "哥哥", role: "child", sex: "male", createdAt: "2026-09-01T00:00:00Z" },
+                { id: "m2", name: "妹", role: "child", sex: "boy", createdAt: "2026-09-01T00:00:00Z" },
+                { id: "m3", name: "未填", role: "child", createdAt: "2026-09-01T00:00:00Z" },
+            ],
+        };
+        const s = await loadSettings(pluginWithSettings(legacy));
+        expect(s.members[0].sex).toBe("male");
+        expect(s.members[1].sex).toBeUndefined();
+        expect(s.members[2].sex).toBeUndefined();
+    });
 });
 
 describe("坏文件容错（15 组）", () => {

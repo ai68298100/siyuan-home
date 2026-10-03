@@ -1,8 +1,10 @@
 /**
  * 生长曲线数据层单测（第七十四轮）：月龄计算、行收集（category/类型/成员聚合、排序、缺值跳过）。
+ * 第七十七轮：WHO 参考带插值（锚点对照 WHO 公布值、月龄线性、越界与未知性别、带内单调性）。
  */
 import { describe, it, expect } from "vitest";
-import { ageMonthsAt, collectGrowthSeries, type GrowthRowLike } from "@/core/growth";
+import { ageMonthsAt, collectGrowthSeries, whoBand, type GrowthRowLike } from "@/core/growth";
+import { WHO_REFS } from "@/core/data/who-refs";
 import type { FamilyMember } from "@/types";
 
 const member: FamilyMember = {
@@ -66,5 +68,43 @@ describe("growth.collectGrowthSeries", () => {
         const orphan = collectGrowthSeries([growthRow("2025-07-15", 70)], cols, []);
         expect(orphan[0].memberId).toBe("unassigned");
         expect(collectGrowthSeries([growthRow("2025-07-15", 70)], { member: "k-member" }, [member])).toEqual([]);
+    });
+});
+
+describe("growth.whoBand（WHO 参考带）", () => {
+    it("锚点对照 WHO 公布值（出生/12 月）", () => {
+        expect(whoBand("male", "weight", 0)).toMatchObject({ p3: 2.5, p50: 3.3, p97: 4.3 });
+        expect(whoBand("male", "height", 0)!.p50).toBe(49.9);
+        expect(whoBand("female", "height", 12)!.p50).toBe(74);
+        expect(whoBand("female", "weight", 0)!.p50).toBe(3.2);
+        expect(whoBand("male", "weight", 12)).toMatchObject({ p3: 7.8, p50: 9.6, p97: 11.8 });
+    });
+
+    it("月龄线性插值：整月取表值，半月在相邻月间取中点", () => {
+        const t = WHO_REFS.male.weight;
+        expect(whoBand("male", "weight", 5.5)!.p50).toBe((t.p50[5] + t.p50[6]) / 2);
+        expect(whoBand("male", "weight", 5)!.p50).toBe(t.p50[5]);
+        expect(whoBand("male", "weight", 60)).not.toBeNull();
+    });
+
+    it("性别未知或超出 0–60 月 → null（不外推）", () => {
+        expect(whoBand(undefined, "weight", 6)).toBeNull();
+        expect(whoBand("male", "weight", -0.5)).toBeNull();
+        expect(whoBand("male", "weight", 60.5)).toBeNull();
+        expect(whoBand("male", "weight", NaN)).toBeNull();
+    });
+
+    it("全表不变式：p3 ≤ p15 ≤ p50 ≤ p85 ≤ p97（2 性别 × 2 指标 × 61 月）", () => {
+        for (const sex of ["male", "female"] as const) {
+            for (const metric of ["height", "weight"] as const) {
+                const t = WHO_REFS[sex][metric];
+                for (let m = 0; m <= 60; m++) {
+                    expect(t.p3[m]).toBeLessThanOrEqual(t.p15[m]);
+                    expect(t.p15[m]).toBeLessThanOrEqual(t.p50[m]);
+                    expect(t.p50[m]).toBeLessThanOrEqual(t.p85[m]);
+                    expect(t.p85[m]).toBeLessThanOrEqual(t.p97[m]);
+                }
+            }
+        }
     });
 });

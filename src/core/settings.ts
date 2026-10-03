@@ -47,6 +47,12 @@ async function backupCorruptMarker(plugin: Plugin, name: string, reason: string)
     }
 }
 
+/** D23：成员 sex 可选字段清洗——仅 male/female 合法，其余移除（加载迁移与导入归一化共用） */
+function sanitizeMemberSex(m: any): any {
+    if (m.sex !== "male" && m.sex !== "female") delete m.sex;
+    return m;
+}
+
 export async function loadSettings(plugin: Plugin): Promise<HomeSettings> {
     const { data, corrupted } = await loadDataSafe(plugin, SETTINGS_NAME);
     const defaults = defaultSettings();
@@ -64,7 +70,7 @@ export async function loadSettings(plugin: Plugin): Promise<HomeSettings> {
         ...defaults,
         ...data,
         enabledModules: enabled,
-        members: Array.isArray(data.members) ? data.members : [],
+        members: Array.isArray(data.members) ? data.members.map(sanitizeMemberSex) : [],
         leadOverrides: isPlainObject(data.leadOverrides) ? data.leadOverrides : defaults.leadOverrides,
         dbRefs: isPlainObject(data.dbRefs) ? data.dbRefs : defaults.dbRefs,
     };
@@ -101,7 +107,7 @@ export function normalizeImportedSettings(data: Record<string, any>): Normalized
         if (!fixed.id || typeof fixed.id !== "string") { fixed.id = `m-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 7)}`; repairedMembers++; }
         if (typeof fixed.name !== "string" || !fixed.name.trim()) { fixed.name = "?"; repairedMembers++; }
         if (!roles.has(fixed.role)) { fixed.role = "other"; repairedMembers++; }
-        return fixed;
+        return sanitizeMemberSex(fixed);
     });
 
     const settings: HomeSettings = {

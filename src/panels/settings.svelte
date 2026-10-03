@@ -316,6 +316,11 @@
                         <option value={r}>{t(`role.${r}`)}</option>
                     {/each}
                 </select>
+                <select class="b3-select" bind:value={draftMembers[i].sex} title={t("members.sex")}>
+                    <option value={undefined}>{t("members.sex.unknown")}</option>
+                    <option value="male">{t("members.sex.male")}</option>
+                    <option value="female">{t("members.sex.female")}</option>
+                </select>
                 <input class="b3-text-field" type="date" bind:value={draftMembers[i].birthday} title={t("members.birthday")} />
                 <label class="fn__flex">
                     <input type="checkbox" class="b3-switch" bind:checked={draftMembers[i].lunarBirthday} />

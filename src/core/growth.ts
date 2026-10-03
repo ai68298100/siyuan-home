@@ -1,10 +1,13 @@
 /**
  * 生长曲线数据层（第七十四轮）：从 parenting 台账行收集身高/体重时间线序列。
- * 纯逻辑可单测；WHO 百分位参考带另待核实数据源（不嵌未经验证的医学参考值）。
+ * 纯逻辑可单测。第七十七轮：WHO 0–60 月参考带插值（数据来自官方 LMS 参数表，
+ * 构建期由 scripts/fetch-who-data.mjs 生成 who-refs.ts，含署名与 CC BY-NC 3.0 约束）。
  */
 import type { FamilyMember } from "@/types";
+import { WHO_REFS } from "@/core/data/who-refs";
 
 export type GrowthMetric = "height" | "weight";
+export type WhoSex = keyof typeof WHO_REFS;
 
 export interface GrowthPoint {
     /** ISO 日期（ yyyy-MM-dd） */
@@ -90,4 +93,17 @@ function localKey(d: Date): string {
     const m = String(d.getMonth() + 1).padStart(2, "0");
     const day = String(d.getDate()).padStart(2, "0");
     return `${d.getFullYear()}-${m}-${day}`;
+}
+
+export interface WhoBandPoint { p3: number; p15: number; p50: number; p85: number; p97: number }
+
+/** WHO 参考带按月龄线性插值；性别未知或超出 0–60 月 → null（参考带不外推） */
+export function whoBand(sex: WhoSex | undefined, metric: GrowthMetric, ageMonths: number): WhoBandPoint | null {
+    const table = sex ? WHO_REFS[sex]?.[metric] : undefined;
+    if (!table || !Number.isFinite(ageMonths) || ageMonths < 0 || ageMonths > 60) return null;
+    const lo = Math.floor(ageMonths);
+    const hi = Math.min(lo + 1, 60);
+    const frac = ageMonths - lo;
+    const at = (arr: number[]) => arr[lo] + (arr[hi] - arr[lo]) * frac;
+    return { p3: at(table.p3), p15: at(table.p15), p50: at(table.p50), p85: at(table.p85), p97: at(table.p97) };
 }
