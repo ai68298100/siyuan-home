@@ -85,6 +85,9 @@
 | 2026-10-03 | 主线 | 第五十一轮：终审遗留四项收口 | EC15 favorSyncs 模块禁用清理 + handledYear 旧年份清理（purgeHandled 扩展）+ 初始打卡摘要拉取（onload 后 3s）+ onboarding skip 错误处理（上轮修复的 skip 路径补 showMessage 导入）；IHomePluginLike 补 runtime 类型；单测 136 持平、gzip 51.9KB |
 | 2026-10-03 | 循环A | 第五十一波走查 | IHomePluginLike 补 runtime 类型（即修 svelte-check）；全部改动无行为变更 |
 | 2026-10-03 | 循环B | ③轮休（延续） | 兜底循环静默待命（延续） |
+| 2026-10-03 | test | 第五十四轮：purgeHandled 扩展测试补全 + 残留重复代码清理 | handledYear 旧年/当年 + monthlyCompletions 旧月/当月 + favorSyncs 不受影响三用例；上轮编辑残留重复代码即修；单测 126→138、gzip 51.8KB |
+| 2026-10-03 | 循环A | 第五十四波走查 | 测试文件残留重复代码即修；新增 describe 包装正确 |
+| 2026-10-03 | 循环B | ③轮休（延续） | 兜底循环静默待命（延续） |
 | 2026-10-03 | 主线 | 第三十六轮：代码卫生 + EC18/19 确认 | 死代码 safe-mount.ts 移除（ErrorBoundary 取代）；monthlyCompletions 24 个月保留期入 purgeHandled；LeiQie 无 bookmarks/snippets 消费 API（EC18/19 供方依赖确认）；单测 126 持平、gzip 51.4KB |
 | 2026-10-03 | 循环A | 第三十六波走查 | 死代码移除零引用验证；purgeHandled 月度清理边界（24 个月 cutoffKey）逻辑复核 |
 | 2026-10-03 | 循环B | ③信源=兄弟仓源码（第六轮） | LeiQie 无 getBookmarks/getSnippets 对外暴露——EC18/19 维持供方依赖注记 |
