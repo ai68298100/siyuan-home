@@ -414,6 +414,8 @@
             save.onclick = async () => {
                 const failed: string[] = [];
                 let changed = 0;
+                let personChanged = false;
+                const personKeyID = ref!.columns.person;
                 for (const e of inputs) {
                     const v = e.get();
                     const orig = rawFromValue(e.type, row.cells[e.keyID]);
@@ -422,9 +424,16 @@
                     try {
                         await setCell(ref!.avId!, e.keyID, row.itemID, cellValue(e.type, v));
                         changed++;
+                        if (personKeyID && e.keyID === personKeyID) personChanged = true;
                     } catch {
                         failed.push(e.label); // D03 语义：失败字段聚合报告
                     }
+                }
+                // EC15：person 变更 → favorSyncs 失效（新对手方的交集需重新记录）
+                if (personChanged && plugin.runtime?.favorSyncs?.[row.itemID]) {
+                    delete plugin.runtime.favorSyncs[row.itemID];
+                    const { saveRuntime } = await import("@/core/hub/runtime");
+                    await saveRuntime(plugin, plugin.runtime);
                 }
                 dlg.destroy();
                 if (changed > 0) {
