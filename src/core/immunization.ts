@@ -41,13 +41,14 @@ export const IMMUNIZATION_SCHEDULE: VaccineDose[] = [
     { vaccine: "白破疫苗", dose: 1, monthAge: 72, note: "6 岁加强" },
 ];
 
-/** 由出生日期推算某剂的标准接种日（yyyy-MM-dd，本地时区） */
+/** 由出生日期推算某剂的标准接种日（yyyy-MM-dd，本地时区）；出生日期非法 → 空串 */
 export function doseDate(birthISO: string, d: VaccineDose): string {
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(birthISO) || !Number.isFinite(d.monthAge)) return "";
     const [y, m, day] = birthISO.split("-").map(Number);
-    const totalMonths = (y ?? 2026) * 12 + (m ?? 1) - 1 + d.monthAge;
+    const totalMonths = y * 12 + (m - 1) + d.monthAge;
     const yy = Math.floor(totalMonths / 12);
     const mm = (totalMonths % 12) + 1;
     // 日溢出收敛到月末（如 1/31 + 1 月 → 2/28）
     const last = new Date(yy, mm, 0).getDate();
-    return `${yy}-${String(mm).padStart(2, "0")}-${String(Math.min(day ?? 1, last)).padStart(2, "0")}`;
+    return `${yy}-${String(mm).padStart(2, "0")}-${String(Math.min(day, last)).padStart(2, "0")}`;
 }
