@@ -4,6 +4,7 @@
 import { describe, it, expect } from "vitest";
 import {
     logKey, getValuations, appendValuation, removeValuation, removeRowLog,
+    getEntries, appendEntry, removeEntry,
     type RowLogs,
 } from "@/core/rowlog";
 
@@ -52,5 +53,27 @@ describe("rowlog（行级子记录模型）", () => {
         expect(getValuations(logs, "av1", "r2")).toHaveLength(1);
         expect(getValuations(logs, "av2", "r1")).toHaveLength(1);
         expect(removeRowLog(logs, "av1", "ghost")).toBe(logs);
+    });
+
+    it("泛型 appendEntry：追加 + 完全重复去重（同日不同值合法并存）", () => {
+        let logs: RowLogs = {};
+        logs = appendEntry(logs, "av1", "r1", "prices", { date: "2026-01-01", price: 99, channel: "A", at: AT });
+        logs = appendEntry(logs, "av1", "r1", "prices", { date: "2026-01-01", price: 89, channel: "B", at: AT }); // 同日不同价并存
+        logs = appendEntry(logs, "av1", "r1", "prices", { date: "2026-01-01", price: 99, channel: "A", at: "其他时刻" }); // 完全重复（忽略 at）去重
+        const prices = getEntries<{ date: string; price: number }>(logs, "av1", "r1", "prices");
+        expect(prices).toHaveLength(2);
+        expect(prices.map((p) => p.price).sort()).toEqual([89, 99]);
+    });
+
+    it("泛型 removeEntry：删空清 key；类型间互不影响（moves/prices/transfers 隔离）", () => {
+        let logs: RowLogs = {};
+        logs = appendEntry(logs, "av1", "r1", "moves", { date: "2026-01-01", from: "A", to: "B", at: AT });
+        logs = appendEntry(logs, "av1", "r1", "transfers", { date: "2026-02-01", from: "甲", to: "乙", at: AT });
+        logs = removeEntry(logs, "av1", "r1", "moves", { date: "2026-01-01", from: "A", to: "B", at: "无所谓" });
+        expect(getEntries(logs, "av1", "r1", "moves")).toHaveLength(0);
+        expect(getEntries(logs, "av1", "r1", "transfers")).toHaveLength(1);
+        expect(logs[logKey("av1", "r1")]).toBeDefined(); // transfers 仍在，key 保留
+        logs = removeEntry(logs, "av1", "r1", "transfers", { date: "2026-02-01", from: "甲", to: "乙", at: AT });
+        expect(logs[logKey("av1", "r1")]).toBeUndefined(); // 全空清 key
     });
 });

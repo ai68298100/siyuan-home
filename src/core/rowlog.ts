@@ -17,20 +17,71 @@ export interface ValuationEntry {
     at: string;
 }
 
-/** 行日志集合：类型分组，后续时间线类（位置/价格/换证）在此扩展字段 */
+/** 位置变更（assets 物品搬家）/ 转学插班（schooling）：from→to 一条记录 */
+export interface MoveEntry {
+    date: string;
+    from: string;
+    to: string;
+    at: string;
+}
+
+/** 价格历史（shopping 复购比价；同日多条合法——不同渠道/批次价格并存） */
+export interface PriceEntry {
+    date: string;
+    price: number;
+    channel: string;
+    at: string;
+}
+
+/** 行日志集合：按类型分组（估值=口径日覆盖；其余=追加+完全重复去重） */
 export interface RowLog {
     valuations?: ValuationEntry[];
+    moves?: MoveEntry[];
+    prices?: PriceEntry[];
+    transfers?: MoveEntry[];
 }
 
 export type RowLogs = Record<string, RowLog>;
+
+export type LogKind = "valuations" | "moves" | "prices" | "transfers";
 
 export function logKey(avId: string, rowId: string): string {
     return `${avId}|${rowId}`;
 }
 
+/** 泛型读取：按日期升序 */
+export function getEntries<T>(logs: RowLogs, avId: string, rowId: string, kind: LogKind): T[] {
+    return [...((logs[logKey(avId, rowId)]?.[kind] as T[]) ?? [])].sort((a, b) =>
+        String((a as { date: string }).date).localeCompare(String((b as { date: string }).date)),
+    );
+}
+
+/** 泛型追加：完全相同的条目（除 at 外）去重；返回新对象 */
+export function appendEntry(logs: RowLogs, avId: string, rowId: string, kind: LogKind, entry: Record<string, unknown>): RowLogs {
+    const key = logKey(avId, rowId);
+    const log = logs[key] ?? {};
+    const list = (log[kind] as unknown as Record<string, unknown>[]) ?? [];
+    const sig = (e: Record<string, unknown>) => JSON.stringify({ ...e, at: "" });
+    if (list.some((e) => sig(e) === sig(entry))) return logs;
+    return { ...logs, [key]: { ...log, [kind]: [...list, entry] } };
+}
+
+/** 泛型删除：按条目全等（忽略 at）；行下全空时清 key */
+export function removeEntry(logs: RowLogs, avId: string, rowId: string, kind: LogKind, entry: Record<string, unknown>): RowLogs {
+    const key = logKey(avId, rowId);
+    const log = logs[key];
+    const list = log?.[kind] as unknown as Record<string, unknown>[] | undefined;
+    if (!list) return logs;
+    const sig = (e: Record<string, unknown>) => JSON.stringify({ ...e, at: "" });
+    const rest = list.filter((e) => sig(e) !== sig(entry));
+    const next = { ...logs, [key]: { ...log, [kind]: rest } };
+    pruneKeyIfEmpty(next, key);
+    return next;
+}
+
 /** 某行估值时间线：按日期升序（同日期去重由 append 保证） */
 export function getValuations(logs: RowLogs, avId: string, rowId: string): ValuationEntry[] {
-    return [...(logs[logKey(avId, rowId)]?.valuations ?? [])].sort((a, b) => a.date.localeCompare(b.date));
+    return getEntries<ValuationEntry>(logs, avId, rowId, "valuations");
 }
 
 /** 记一笔估值：同日期覆盖（快照语义——口径日只有一个值），其余追加；返回新对象（调用方持有保存） */
@@ -42,15 +93,21 @@ export function appendValuation(logs: RowLogs, avId: string, rowId: string, date
     return { ...logs, [key]: { ...log, valuations: [...rest, { date, value, at }] } };
 }
 
-/** 删除某口径日的估值；行无残留时清 key（防 rowlogs.json 无限膨胀） */
+/** key 下所有类型皆空时删除该 key（防 rowlogs.json 无限膨胀；单类型删空不误伤其他类型） */
+function pruneKeyIfEmpty(logs: RowLogs, key: string): void {
+    const log = logs[key];
+    if (!log) return;
+    if (Object.values(log).every((v) => !Array.isArray(v) || v.length === 0)) delete logs[key];
+}
+
+/** 删除某口径日的估值；行下全空时清 key */
 export function removeValuation(logs: RowLogs, avId: string, rowId: string, date: string): RowLogs {
     const key = logKey(avId, rowId);
     const log = logs[key];
     if (!log?.valuations) return logs;
     const rest = log.valuations.filter((v) => v.date !== date);
-    const next = { ...logs };
-    if (rest.length === 0) delete next[key];
-    else next[key] = { ...log, valuations: rest };
+    const next = { ...logs, [key]: { ...log, valuations: rest } };
+    pruneKeyIfEmpty(next, key);
     return next;
 }
 

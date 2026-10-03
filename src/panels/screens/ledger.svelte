@@ -301,79 +301,161 @@
                 line.append(v);
                 body.appendChild(line);
             }
-        // 子记录模型（2026-10-04 定案）：assets 行的估值时间线（rowlogs.json，行删除联动清理）
-        async function addValuationSection() {
-            if (active !== "assets") return;
-            const { loadRowLogs, saveRowLogs, getValuations, appendValuation, removeValuation } = await import("@/core/rowlog");
-            let logs = await loadRowLogs(plugin as any);
+        // 子记录模型（2026-10-04 定案）：行日志时间线分区通用构造器（rowlogs.json；行删除联动清理）
+        async function addRowLogSection(opts: {
+            title: string;
+            emptyText: string;
+            addLabel: string;
+            fields: { key: string; type: "date" | "number" | "text"; placeholder: string; width: number }[];
+            load: () => Promise<Record<string, any>[]>;
+            add: (vals: Record<string, string>) => Promise<boolean>;
+            remove: (entry: Record<string, any>) => Promise<void>;
+            format: (entry: Record<string, any>) => string;
+        }) {
+            const section = document.createElement("div");
+            let loaded: Record<string, any>[] = [];
             const render = () => {
                 section.replaceChildren();
-                const vals = getValuations(logs, ref!.avId!, row.itemID);
-                for (const v of vals) {
+                for (const e of loaded) {
                     const line = document.createElement("div");
                     line.style.cssText = "padding:2px 0;font-size:12.5px;display:flex;gap:6px;align-items:center";
                     const text = document.createElement("span");
-                    text.textContent = `${v.date} · ${v.value}`;
+                    text.textContent = opts.format(e);
                     const del = document.createElement("button");
                     del.className = "b3-button b3-button--text";
                     del.style.cssText = "padding:0 4px;font-size:12px";
                     del.textContent = "✕";
                     del.onclick = async () => {
-                        logs = removeValuation(logs, ref!.avId!, row.itemID, v.date);
-                        await saveRowLogs(plugin as any, logs);
+                        await opts.remove(e);
+                        loaded = await opts.load();
                         render();
                     };
                     line.append(text, del);
                     section.appendChild(line);
                 }
-                if (vals.length === 0) {
+                if (loaded.length === 0) {
                     const none = document.createElement("div");
                     none.className = "ft__on-surface";
                     none.style.cssText = "font-size:12.5px";
-                    none.textContent = t("ledger.noValuations");
+                    none.textContent = opts.emptyText;
                     section.appendChild(none);
                 }
             };
             const head = document.createElement("div");
             head.className = "ft__on-surface";
             head.style.cssText = "margin-top:10px;padding-top:8px;border-top:1px solid var(--b3-border-color);font-size:12px";
-            head.textContent = t("ledger.valuations");
+            head.textContent = opts.title;
             body.appendChild(head);
-            const section = document.createElement("div");
             body.appendChild(section);
             const form = document.createElement("div");
-            form.style.cssText = "display:flex;gap:6px;margin-top:6px;align-items:center";
-            const dateInput = document.createElement("input");
-            dateInput.type = "date";
-            dateInput.className = "b3-text-field";
-            dateInput.style.cssText = "width:130px;font-size:12px";
-            const valInput = document.createElement("input");
-            valInput.type = "number";
-            valInput.className = "b3-text-field";
-            valInput.placeholder = t("ledger.valValue");
-            valInput.style.cssText = "width:100px;font-size:12px";
+            form.style.cssText = "display:flex;gap:6px;margin-top:6px;align-items:center;flex-wrap:wrap";
+            const inputs: Record<string, HTMLInputElement> = {};
+            for (const f of opts.fields) {
+                const inp = document.createElement("input");
+                inp.type = f.type;
+                inp.className = "b3-text-field";
+                inp.placeholder = f.placeholder;
+                inp.style.cssText = `width:${f.width}px;font-size:12px`;
+                inputs[f.key] = inp;
+                form.appendChild(inp);
+            }
             const addBtn = document.createElement("button");
             addBtn.className = "b3-button b3-button--outline";
             addBtn.style.cssText = "font-size:12px";
-            addBtn.textContent = t("ledger.valAdd");
+            addBtn.textContent = opts.addLabel;
             addBtn.onclick = async () => {
-                if (!dateInput.value || valInput.value === "" || !Number.isFinite(Number(valInput.value))) {
-                    showMessage(t("ledger.valInvalid"), 3000, "error");
+                const vals = Object.fromEntries(Object.entries(inputs).map(([k, i]) => [k, i.value]));
+                if (!vals.date) {
+                    showMessage(t("ledger.logInvalid"), 3000, "error");
                     return;
                 }
-                logs = appendValuation(logs, ref!.avId!, row.itemID, dateInput.value, Number(valInput.value), new Date().toISOString());
-                await saveRowLogs(plugin as any, logs);
-                valInput.value = "";
-                render();
+                if (await opts.add(vals)) {
+                    for (const i of Object.values(inputs)) i.value = "";
+                    loaded = await opts.load();
+                    render();
+                }
             };
-            form.append(dateInput, valInput, addBtn);
+            form.appendChild(addBtn);
             body.appendChild(form);
+            loaded = await opts.load();
             render();
         }
 
         addHistorySection();
         addAttachmentsSection();
-        addValuationSection();
+        // 各模块时间线分区（只读通道共用 rowlogs.json；估值=口径日覆盖，其余=追加去重）
+        (async () => {
+            const rl = await import("@/core/rowlog");
+            const at = () => new Date().toISOString();
+            const fresh = () => rl.loadRowLogs(plugin as any);
+            if (active === "assets") {
+                await addRowLogSection({
+                    title: t("ledger.valuations"), emptyText: t("ledger.noValuations"), addLabel: t("ledger.valAdd"),
+                    fields: [
+                        { key: "date", type: "date", placeholder: "", width: 130 },
+                        { key: "value", type: "number", placeholder: t("ledger.valValue"), width: 100 },
+                    ],
+                    load: () => fresh().then((l) => rl.getValuations(l, ref!.avId!, row.itemID)),
+                    add: async (v) => {
+                        if (!Number.isFinite(Number(v.value))) { showMessage(t("ledger.logInvalid"), 3000, "error"); return false; }
+                        await rl.saveRowLogs(plugin as any, rl.appendValuation(await fresh(), ref!.avId!, row.itemID, v.date, Number(v.value), at()));
+                        return true;
+                    },
+                    remove: async (e) => { await rl.saveRowLogs(plugin as any, rl.removeValuation(await fresh(), ref!.avId!, row.itemID, e.date)); },
+                    format: (e) => `${e.date} · ${e.value}`,
+                });
+                await addRowLogSection({
+                    title: t("ledger.moves"), emptyText: t("ledger.noMoves"), addLabel: t("ledger.valAdd"),
+                    fields: [
+                        { key: "date", type: "date", placeholder: "", width: 130 },
+                        { key: "from", type: "text", placeholder: t("ledger.moveFrom"), width: 90 },
+                        { key: "to", type: "text", placeholder: t("ledger.moveTo"), width: 90 },
+                    ],
+                    load: () => fresh().then((l) => rl.getEntries<any>(l, ref!.avId!, row.itemID, "moves")),
+                    add: async (v) => {
+                        if (!v.from || !v.to) { showMessage(t("ledger.logInvalid"), 3000, "error"); return false; }
+                        await rl.saveRowLogs(plugin as any, rl.appendEntry(await fresh(), ref!.avId!, row.itemID, "moves", { date: v.date, from: v.from, to: v.to, at: at() }));
+                        return true;
+                    },
+                    remove: async (e) => { await rl.saveRowLogs(plugin as any, rl.removeEntry(await fresh(), ref!.avId!, row.itemID, "moves", e)); },
+                    format: (e) => `${e.date} · ${e.from} → ${e.to}`,
+                });
+            } else if (active === "shopping") {
+                await addRowLogSection({
+                    title: t("ledger.prices"), emptyText: t("ledger.noPrices"), addLabel: t("ledger.valAdd"),
+                    fields: [
+                        { key: "date", type: "date", placeholder: "", width: 130 },
+                        { key: "price", type: "number", placeholder: t("ledger.priceValue"), width: 90 },
+                        { key: "channel", type: "text", placeholder: t("ledger.priceChannel"), width: 100 },
+                    ],
+                    load: () => fresh().then((l) => rl.getEntries<any>(l, ref!.avId!, row.itemID, "prices")),
+                    add: async (v) => {
+                        if (!Number.isFinite(Number(v.price))) { showMessage(t("ledger.logInvalid"), 3000, "error"); return false; }
+                        await rl.saveRowLogs(plugin as any, rl.appendEntry(await fresh(), ref!.avId!, row.itemID, "prices", { date: v.date, price: Number(v.price), channel: v.channel, at: at() }));
+                        return true;
+                    },
+                    remove: async (e) => { await rl.saveRowLogs(plugin as any, rl.removeEntry(await fresh(), ref!.avId!, row.itemID, "prices", e)); },
+                    format: (e) => `${e.date} · ${e.price}${e.channel ? ` · ${e.channel}` : ""}`,
+                });
+            } else if (active === "schooling") {
+                await addRowLogSection({
+                    title: t("ledger.transfers"), emptyText: t("ledger.noTransfers"), addLabel: t("ledger.valAdd"),
+                    fields: [
+                        { key: "date", type: "date", placeholder: "", width: 130 },
+                        { key: "from", type: "text", placeholder: t("ledger.transferFrom"), width: 90 },
+                        { key: "to", type: "text", placeholder: t("ledger.transferTo"), width: 90 },
+                    ],
+                    load: () => fresh().then((l) => rl.getEntries<any>(l, ref!.avId!, row.itemID, "transfers")),
+                    add: async (v) => {
+                        if (!v.from || !v.to) { showMessage(t("ledger.logInvalid"), 3000, "error"); return false; }
+                        await rl.saveRowLogs(plugin as any, rl.appendEntry(await fresh(), ref!.avId!, row.itemID, "transfers", { date: v.date, from: v.from, to: v.to, at: at() }));
+                        return true;
+                    },
+                    remove: async (e) => { await rl.saveRowLogs(plugin as any, rl.removeEntry(await fresh(), ref!.avId!, row.itemID, "transfers", e)); },
+                    format: (e) => `${e.date} · ${e.from} → ${e.to}`,
+                });
+            }
+        })();
             addFavorsSyncSection();
         }
         // EC15：人情往来 → 人脉交集记录（ensurePerson + recordInteraction，externalRef 幂等；

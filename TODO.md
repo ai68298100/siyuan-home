@@ -1,4 +1,5 @@
 # 小驴管家（Lv Home）· 项目待办总清单
+| 2026-10-04 | 主线 | 第六十九轮：时间线类批量清（位置/价格/转学）+ 跨类型误伤 bug 修复 | rowlog 泛化核心（getEntries/appendEntry/removeEntry：追加+完全重复去重，同日不同价合法并存）+ moves/prices/transfers 三类型；抽屉通用构造器 addRowLogSection（字段 spec 驱动，四分区共用：assets 估值+位置、shopping 价格、schooling 转学）；**新单测抓真 bug**：removeValuation/removeEntry 单类型删空时误删整行 key（跨类型数据丢失）——pruneKeyIfEmpty 修复（全类型皆空才清）；单测 148（+2）、i18n 669→681；16 组时间线类仅剩 certs 换证链（relation 行间引用设计） |
 | 2026-10-04 | 主线 | 第六十八轮：子记录模型定案+落地（assets 估值时间线） | **定案：时间线类数据不建新数据库**——`core/rowlog.ts` 行级日志（rowlogs.json 与 settings 同通道随思源同步，key=`avId|rowId`，类型分组可扩展 moves/prices），纯逻辑 append（同口径日覆盖快照语义）/remove（删空清 key）/removeRowLog（行删除联动）+ 坏文件容错复用 loadDataSafe；详情抽屉 assets 估值分区（时间线+记一笔+单条删除）；行删除清理接线；单测 146（+4）；i18n 664→669。**解锁**：位置历史/价格历史/换证链/转学历史可复用同通道（各加日志类型+抽屉分区） |
 | 2026-10-04 | 主线 | 第六十七轮：16 组"列+规则"类三连清 + 模板基建立项 | insurance 理赔状态机（claim_status 四态报案/材料/到账+报案日+金额）；social 基数年度调整（base_adjust_date + **anniversary 规则**年复一年滚动）；schooling 考试日程（exam_date + oneoff leadDays 3；作业 recurring 归 exams 模块不重复）；**发现并立项：DocTemplate 模板基建自声明以来无消费者**（无 .tpl/无渲染路径/无入口）——单独立项含落地范围；i18n 654→664、快照 -u；16 组剩时间线类（assets 估值/位置历史、shopping 价格历史需子记录模型）与跨模块联动（health→药箱、shopping→stock） |
 | 2026-10-04 | 主线 | 第六十六轮：EC09 打卡绑定 v1 落地 + 16 组三易项 | ①**EC09（D20 定案后实现）**：CheckinBinding 进 settings + normalizeCheckinBindings 清洗（去重/非法剔除/缺名回退 itemId）+ 导入归一化接线；设置·提醒页绑定编辑器（探测 siyuanCheckin→queryItems 拉习惯列表、成员下拉、metric 三选、kind 自动推导默认、无插件提示）；总览健康卡绑定摘要（绑定×强度摘要求交 title 列明细）；只读消费不写打卡数据；②16 组：shopping 退货三字段（return_status 四态+return_date+refund_amount）、contracts 押金退还（deposit_returned+deposit_return_date）、memberships 取消续费指引（cancel_guide url）；i18n 644→654、单测 142（+2）、快照 -u；[待实测] 同实例 queryItems 实拉与总览展示 |
@@ -393,13 +394,13 @@
 ## 16. 模块功能深化（按模块细化，v0.3+ 逐版吸收进 schema）
 
 - [ ] 🟡 certs：换证历史链（旧证→新证 relation + 历史视图）（2026-10-04 注：子记录模型 rowlog.ts 已落地（rowlogs.json 行级日志），换证链可复用同通道；relation 部分仍需行间引用设计）
-- [ ] 🟡 assets：位置变更历史（物品搬家记录）（2026-10-04 注：rowlog 通道就绪，加 moves 日志类型 + 抽屉分区即可，随下一轮）
+- [x] 🟡 assets：位置变更历史（物品搬家记录） ✅ 2026-10-04 第六十九轮（rowlog moves 类型 + 详情抽屉位置历史分区；通用构造器 addRowLogSection）
 - [x] 🟡 certs：复印件/电子版存放位置字段 ✅ 2026-10-04 第六十五轮（copy_location text 列 + 双语 i18n + 快照 -u）
 - [x] 🟡 assets：估值快照（手动记录 + 时间线，非自动估值） ✅ 2026-10-04 第六十八轮（**子记录模型落地首项**：rowlogs.json 行级日志 + 详情抽屉估值时间线分区——记一笔/删/行删除联动清理；纯逻辑 4 单测）
 - [ ] 🟡 assets：位置变更历史（物品搬家记录）
 - [ ] 🟢 assets：CSV 批量导入（列映射向导）
 - [x] 🟡 shopping：退货/退款记录字段与状态 ✅ 2026-10-04 第六十六轮（return_status select none/requested/returned/refunded + return_date + refund_amount）
-- [ ] 🟢 shopping：同商品价格历史（复购比价参考）
+- [x] 🟢 shopping：同商品价格历史（复购比价参考） ✅ 2026-10-04 第六十九轮（rowlog prices 类型：同日多条合法——不同渠道价格并存 + 抽屉价格历史分区）
 - [ ] 🟡 shopping：购入联动 stock（囤货品自动加库存）
 - [x] 🟡 memberships：家庭共享账号（主卡人/成员位标注） ✅ 2026-10-04 第六十五轮（seat_role select 列 holder/member 默认 holder + 双语 i18n；next_pay 规则顺带挂 autoRenewField → 自动续费会员到期也显示 🔄）
 - [x] 🟢 memberships：取消自动续费指引链接字段 ✅ 2026-10-04 第六十六轮（cancel_guide url 列）
@@ -411,7 +412,7 @@
 - [x] 🟡 social：缴费基数年度调整提醒 ✅ 2026-10-04 第六十七轮（base_adjust_date 列 + anniversary 规则 leadDays 14——年复一年自动滚动）
 - [x] 🟡 schooling：作业/考试日程（recurring）+ 家长会记录文档模板 ✅ 2026-10-04 第六十七轮部分（exam_date 列 + oneoff 规则 leadDays 3；作业 recurring 由 exams 模块承担不重复建规则；**家长会模板未做**——模板基建未实现，见下方新立项）
 - [ ] 🟡 模板基建（第六十七轮立项）：`DocTemplate` 类型自 schema.ts 声明以来无任何消费者（无 .tpl 文件、无渲染/建文档路径、无入口）——落地范围：模板文件加载、变量替换（行字段注入）、从台账行/详情抽屉创建文档、 schooling 家长会记录等首批模板；完成后补 16 组 schooling 模板项
-- [ ] 🟢 schooling：转学/插班历史
+- [x] 🟢 schooling：转学/插班历史 ✅ 2026-10-04 第六十九轮（rowlog transfers 类型 + 抽屉转学历史分区）
 - [x] 🟡 parenting：疫苗批号与接种点字段（接种追溯） ✅ 2026-10-04 第六十五轮（vaccine_batch/vaccine_site text 列 + 双语 i18n；**同轮修复隐患**：next_visit 规则引用 due 列但 schema 缺列——启用即扫描必错，已补 due 列）
 - [ ] 🟡 parenting：生长曲线图（身高体重 WHO 百分位 SVG 渲染）
 - [ ] 🟡 parenting：辅食新食材 3 天观察期 → 联动 health 过敏史
