@@ -147,13 +147,13 @@ describe("addDetachedRow 身份确认（D02）", () => {
 });
 
 describe("removeLedgerRows", () => {
-    it("payload 携带 avID + rowIDs", async () => {
+    it("payload 携带 avID + srcIDs（真机确认参数名）", async () => {
         handler = (endpoint) => {
             expect(endpoint).toBe("/api/av/removeAttributeViewBlocks");
             return { code: 0, msg: "", data: null };
         };
         await removeLedgerRows("av-1", ["row-1", "row-2"]);
-        expect(calls[0].payload).toEqual({ avID: "av-1", rowIDs: ["row-1", "row-2"] });
+        expect(calls[0].payload).toEqual({ avID: "av-1", srcIDs: ["row-1", "row-2"] });
     });
 });
 
