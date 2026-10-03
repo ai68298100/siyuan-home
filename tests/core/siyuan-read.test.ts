@@ -91,6 +91,15 @@ describe("renderLedger 完整性（D01）", () => {
 describe("addDetachedRow 身份确认（D02）", () => {
     const AV = "av-1";
     const ADD = "/api/av/addAttributeViewBlocks";
+    const RENDER = "/api/av/renderAttributeView";
+
+    /** mock renderAttributeView 返回 N 行（row-0..row-N-1） */
+    function renderRows(n: number) {
+        return (payload: any) => ({
+            code: 0, msg: "",
+            data: { view: { columns: [], rowCount: n, rows: ids(n).map((id) => ({ id, cells: [] })) } },
+        });
+    }
 
     it("响应直接携带新行 ID → 确认返回（不依赖 diff）", async () => {
         handler = (endpoint, payload) => {
@@ -98,16 +107,17 @@ describe("addDetachedRow 身份确认（D02）", () => {
                 expect(payload.srcs[0].isDetached).toBe(true);
                 return { code: 0, msg: "", data: { operations: [{ rowID: "new-1" }] } };
             }
-            return paginatedPK(1)(payload); // 加行前 1 行
+            return renderRows(1)(payload);
         };
         expect(await addDetachedRow(AV, "内容")).toBe("new-1");
     });
 
-    it("响应无 ID、diff 唯一 → 返回新增项", async () => {
+    it("响应无 ID、render diff 唯一 → 返回新增项", async () => {
         let added = false;
         handler = (endpoint, payload) => {
             if (endpoint === ADD) { added = true; return { code: 0, msg: "", data: {} }; }
-            return paginatedPK(added ? 2 : 1)(payload);
+            if (endpoint === RENDER) return renderRows(added ? 2 : 1)(payload);
+            return { code: 0, msg: "", data: {} };
         };
         expect(await addDetachedRow(AV, "内容")).toBe("row-1");
     });
@@ -116,7 +126,8 @@ describe("addDetachedRow 身份确认（D02）", () => {
         let added = false;
         handler = (endpoint, payload) => {
             if (endpoint === ADD) { added = true; return { code: 0, msg: "", data: {} }; }
-            return paginatedPK(added ? 3 : 1)(payload); // 两个"新"ID：并发场景
+            if (endpoint === RENDER) return renderRows(added ? 3 : 1)(payload);
+            return { code: 0, msg: "", data: {} };
         };
         await expect(addDetachedRow(AV, "内容")).rejects.toMatchObject({
             name: "RowIdentityPendingError",
@@ -128,7 +139,8 @@ describe("addDetachedRow 身份确认（D02）", () => {
         let added = false;
         handler = (endpoint, payload) => {
             if (endpoint === ADD) { added = true; return { code: 0, msg: "", data: { rowIDs: ["resp-new"] } }; }
-            return paginatedPK(added ? 3 : 1)(payload);
+            if (endpoint === RENDER) return renderRows(added ? 3 : 1)(payload);
+            return { code: 0, msg: "", data: {} };
         };
         expect(await addDetachedRow(AV, "内容")).toBe("resp-new");
     });
