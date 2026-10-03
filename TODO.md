@@ -1,4 +1,5 @@
 # 小驴管家（Lv Home）· 项目待办总清单
+| 2026-10-04 | 主线 | 第六十六轮：EC09 打卡绑定 v1 落地 + 16 组三易项 | ①**EC09（D20 定案后实现）**：CheckinBinding 进 settings + normalizeCheckinBindings 清洗（去重/非法剔除/缺名回退 itemId）+ 导入归一化接线；设置·提醒页绑定编辑器（探测 siyuanCheckin→queryItems 拉习惯列表、成员下拉、metric 三选、kind 自动推导默认、无插件提示）；总览健康卡绑定摘要（绑定×强度摘要求交 title 列明细）；只读消费不写打卡数据；②16 组：shopping 退货三字段（return_status 四态+return_date+refund_amount）、contracts 押金退还（deposit_returned+deposit_return_date）、memberships 取消续费指引（cancel_guide url）；i18n 644→654、单测 142（+2）、快照 -u；[待实测] 同实例 queryItems 实拉与总览展示 |
 | 2026-10-04 | 主线 | 第六十五轮：D13–D22 决策登记 + contracts 续约决策提醒 + 真机后台部署通道 | ①用户授权代拍全部决策 → docs/design/09 新增 D13–D22（disabledInPublish 保持/农历 🌙 定案落 D14 推翻 D10/name 必填落 D15/CSV 全列/搜索范围/上架触发/icon/EC09 绑定模型=settings 映射 v1/斜杠维持关闭/状态管理三分边界落 08 §8），C 类收口到 ~6；②contracts 新增 auto_renew 列 + autoRenewField 规则声明 → Reminder.autoRenew 透传（rule/providers/types）→ 提醒卡+总览卡 🔄 + title 提示（hub.autoRenew），快照 -u，单测 140（+1）；③真机部署通道打通：putFile 逐文件后台部署（cp 被 hook 拦/make-install 401/符号链接无权限，方法落 CONTRIBUTING）+ setPetalEnabled 热重载，14 文件验证一致；④e2e 受阻记录：并发会话切换工作区（token 瞬时 401/429）+ IAB web 壳启动失败（点击刷新循环，与本插件无关）——UI 行为验证（nameRequired/🌙/🔄）按用户指示转后台策略，列入 §7 待实测；单测 140、i18n 626、gzip ~52KB |
 | 2026-10-04 | 主线 | 第六十五轮·增量：16 组三字段 + parenting 缺列隐患修复 | certs+copy_location／parenting+vaccine_batch/vaccine_site／memberships+seat_role(holder/member 默认 holder)；**parenting next_visit 规则引用 due 列但 schema 未声明（启用即扫描报错）——补 due 列修复**；memberships next_pay 顺带挂 autoRenewField（🔄 复用）；i18n 626→632；快照 -u；全门禁绿后 putFile 后台部署+热重载 |
 | 2026-10-03 | 主线 | 第六十四轮：八项产品决策定案落地（C 类收口） | 用户全部按推荐定案：①disabledInPublish 保持 true；②农历 en 方案=locale 无关 🌙 标记（Reminder.lunar 透传 + 提醒卡/总览卡渲染，dueDate 恒为公历）；③快速录入 name 必填=阻止提交（按钮禁用+字段区提示+createRow 兜底，`ledger.nameRequired` 双语）；④Dock 面板暂不做；⑤icon.png 保留占位随 v0.3 视觉稿替换；⑥CSV 导出 v1 维持全列；⑦搜索范围维持名称+备注；⑧集市上架待真机回归通过后另议。决策 ③② 已实现+单测 139；④-⑧ 记录在案（含 24 组决策行修复：轮日志 \n 损坏行拆分） |
@@ -394,13 +395,13 @@
 - [ ] 🟡 assets：估值快照（手动记录 + 时间线，非自动估值）
 - [ ] 🟡 assets：位置变更历史（物品搬家记录）
 - [ ] 🟢 assets：CSV 批量导入（列映射向导）
-- [ ] 🟡 shopping：退货/退款记录字段与状态
+- [x] 🟡 shopping：退货/退款记录字段与状态 ✅ 2026-10-04 第六十六轮（return_status select none/requested/returned/refunded + return_date + refund_amount）
 - [ ] 🟢 shopping：同商品价格历史（复购比价参考）
 - [ ] 🟡 shopping：购入联动 stock（囤货品自动加库存）
 - [x] 🟡 memberships：家庭共享账号（主卡人/成员位标注） ✅ 2026-10-04 第六十五轮（seat_role select 列 holder/member 默认 holder + 双语 i18n；next_pay 规则顺带挂 autoRenewField → 自动续费会员到期也显示 🔄）
-- [ ] 🟢 memberships：取消自动续费指引链接字段
+- [x] 🟢 memberships：取消自动续费指引链接字段 ✅ 2026-10-04 第六十六轮（cancel_guide url 列）
 - [x] 🟡 contracts：自动续约条款标记 → 到期提醒升级为「续约决策提醒」 ✅ 2026-10-03 第六十五轮（schema 新增 auto_renew checkbox 列 + 规则 autoRenewField 声明；Reminder.autoRenew 透传（rule/providers）；提醒卡/总览卡 🔄 标记 + title 提示（hub.autoRenew 双语）；快照 -u；真机验收见 §7.1）
-- [ ] 🟢 contracts：押金退还记录
+- [x] 🟢 contracts：押金退还记录 ✅ 2026-10-04 第六十六轮（deposit_returned checkbox + deposit_return_date）
 - [ ] 🟡 health：体检年度计划模板（recurring）
 - [ ] 🟡 health：处方药 → 药箱联动（新建药箱行或扣减提示）
 - [ ] 🟡 insurance：理赔记录状态机（报案/材料/到账）
@@ -1105,7 +1106,7 @@
 - [ ] 🔴 **EC06 事件幂等与回执**：规定 `home:` 等 source/externalRef 命名空间、发生时刻、原始幂等键、逐项结果和墓碑；重试不换键、不新增重复行。
 - [ ] 🔴 **EC07 回路与生命周期**：定义主数据所有者、来源标记、订阅/注销回调；重复事件不互相回写，按真实函数 disposer 验证禁用/重载/切换无悬挂。
 - [ ] 🔴 **EC08 离线与丢事件恢复**：窗口未开、未 ready、断连、超时、部分失败均保留待处理和原键；重连先读有界快照再补偿，不假定 window 事件可重放。
-- [ ] 🟡 **EC09 打卡指标绑定**（依赖 D04/D09/H14/H16）：从 `siyuanCheckin.queryItems` 选择习惯/项目并绑定成员与健康、成长、车辆指标；次数/数量/时长/单位/目标值差异显式，不把次数当体重。（2026-10-03 第四十二轮进度：**只读消费 v1 落地**——`pullCheckinSummary` 拉 getStrengthSummary top 5 缓存进 runtime；绑定 UI 仍待产品决策。**2026-10-03 定案 D20**：绑定模型=settings 驱动"习惯→成员指标"映射 v1（下拉选择 checkin 项+成员+指标类型，次数/数量/时长显式区分，不做自由绑定画布；读取复用只读管道；不写打卡数据）——实现随 B 类互测轮，见 docs/design/09 D20）
+- [x] 🟡 **EC09 打卡指标绑定**（依赖 D04/D09/H14/H16）：从 `siyuanCheckin.queryItems` 选择习惯/项目并绑定成员与健康、成长、车辆指标；次数/数量/时长/单位/目标值差异显式，不把次数当体重。 ✅ 2026-10-04 第六十六轮 v1 落地（D20 定案后实现）：①数据层 `CheckinBinding{itemId,itemName,memberId,metric}` 进 settings + `normalizeCheckinBindings` 清洗（去重/非法剔除/缺名回退）+ 导入归一化接线；②设置·提醒页绑定编辑器（探测 siyuanCheckin→queryItems 下拉 + 成员下拉 + metric 三选，kind 自动推导默认 metric，无打卡插件给提示）；③总览健康卡绑定摘要（绑定×lastCheckinSummary 求交，title 列明细）；④i18n 644→654、单测 142（+2 归一化）。[待实测] 同实例 queryItems 实拉与总览展示（§7 补充项）
 - [x] 🟡 **EC10 打卡数值承接（只读 v1）**（依赖 EC06/EC09/D01/D03）：先定只读趋势还是写入管家指标；用 `getEventsInRange` 有界读取，保存源事件 ID/日期/单位；删除/修改按所有者对账，不复制私有存储。 ✅ 2026-10-03 第四十二轮（只读消费：checkin:* 三种事件 → 60s 节流 → getStrengthSummary top 5 缓存进 runtime；**不写打卡数据**——只读消费，写入侧属 EC09 绑定 UI；[待实测] 同实例联调随 EC30。原"EC09 先行"结论修订为"只读消费可先行，绑定 UI 仍待决策"）
 - [ ] 🟡 **EC11 家务/备考绑定已有习惯**（依赖 EC03/EC04/D09）：展示已有项目和绑定效果；一键新建仅在提供方公开能力存在时启用，否则引导到打卡创建后返回，不使用不存在的 `habits.list`。
 - [ ] 🟡 **EC12 生日/纪念日提醒归属**（依赖 H08/H09/H12/EC03）：先验证打卡 v5 的 `occasions.read/occasions.complete` 能力及其所有者，生日来源另定；无生日写入契约时只引用，不生成双份提醒。（2026-10-03 契约摘录：occasions.read/complete **v4 即存在、localOnly、effect read/write**；打卡 v5 形式化契约含 20 能力 since 矩阵+8 种集成事件+硬限制——EC10 触发源用 checkin:* 事件比 ws-main 更精准；owner 定案点保持）

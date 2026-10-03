@@ -660,6 +660,11 @@ exports[`31 模块 schema 契约快照（21 组） > 每个 schema 的结构快�
       ],
       "type": "select",
     },
+    {
+      "key": "cancel_guide",
+      "labelKey": "field.cancel_guide",
+      "type": "url",
+    },
   ],
   "reminders": [
     {
@@ -889,6 +894,28 @@ exports[`31 模块 schema 契约快照（21 组） > 每个 schema 的结构快�
       "labelKey": "field.pickup_code",
       "type": "text",
     },
+    {
+      "default": "none",
+      "key": "return_status",
+      "labelKey": "field.return_status",
+      "options": [
+        "none",
+        "requested",
+        "returned",
+        "refunded",
+      ],
+      "type": "select",
+    },
+    {
+      "key": "return_date",
+      "labelKey": "field.return_date",
+      "type": "date",
+    },
+    {
+      "key": "refund_amount",
+      "labelKey": "field.refund_amount",
+      "type": "number",
+    },
   ],
 }
 `;
@@ -980,6 +1007,16 @@ exports[`31 模块 schema 契约快照（21 组） > 每个 schema 的结构快�
       "key": "auto_renew",
       "labelKey": "field.auto_renew",
       "type": "checkbox",
+    },
+    {
+      "key": "deposit_returned",
+      "labelKey": "field.deposit_returned",
+      "type": "checkbox",
+    },
+    {
+      "key": "deposit_return_date",
+      "labelKey": "field.deposit_return_date",
+      "type": "date",
     },
   ],
   "reminders": [

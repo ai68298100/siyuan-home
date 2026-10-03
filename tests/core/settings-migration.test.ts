@@ -3,7 +3,7 @@
  * + 15 组：坏文件容错 + 17 组：同键通知合并器。
  */
 import { describe, it, expect, beforeEach } from "vitest";
-import { loadSettings, normalizeImportedSettings } from "@/core/settings";
+import { loadSettings, normalizeImportedSettings, normalizeCheckinBindings } from "@/core/settings";
 import { loadRuntime } from "@/core/hub/runtime";
 import { coalescedNotify, resetNotifyState } from "@/libs/notify-queue";
 
@@ -102,6 +102,29 @@ describe("导入归一化（16 轮：未知模块剔除 + 成员字段修复）"
         expect(settings.members[1].name).toBe("?");
         expect(settings.members[2].role).toBe("other");
         expect(settings.members[3].role).toBe("elder");
+    });
+});
+
+describe("打卡绑定归一化（EC09/D20，第六十六轮）", () => {
+    it("缺 id/成员/metric 非法剔除；同 itemId+memberId 去重首见保留；缺名回退 itemId", () => {
+        const out = normalizeCheckinBindings([
+            { itemId: "i1", itemName: "跑步", memberId: "m1", metric: "count" },
+            { itemId: "i1", itemName: "重复", memberId: "m1", metric: "count" },   // 去重
+            { itemId: "i2", memberId: "m1", metric: "count" },                      // 合法缺名
+            { itemId: "", memberId: "m1", metric: "count" },                        // 缺 itemId
+            { itemId: "i3", memberId: "", metric: "count" },                        // 缺 memberId
+            { itemId: "i4", memberId: "m2", metric: "weight" },                     // metric 非法
+            null, "junk",                                                           // 非对象
+        ]);
+        expect(out).toHaveLength(2);
+        expect(out[0]).toEqual({ itemId: "i1", itemName: "跑步", memberId: "m1", metric: "count" });
+        expect(out[1].itemName).toBe("i2"); // 缺名回退 itemId
+    });
+
+    it("非数组/缺失 → 空数组（旧设置无此字段兼容）", () => {
+        expect(normalizeCheckinBindings(undefined)).toEqual([]);
+        expect(normalizeCheckinBindings("junk")).toEqual([]);
+        expect(normalizeImportedSettings({ enabledModules: ["certs"] }).settings.checkinBindings).toEqual([]);
     });
 });
 

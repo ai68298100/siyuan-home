@@ -183,6 +183,7 @@ export const MEMBERSHIPS_SCHEMA: ModuleSchema = {
         { key: "auto_renew", type: "checkbox", labelKey: "field.auto_renew" },
         { key: "credentials_note", type: "text", labelKey: "field.credentials_note" },
         { key: "seat_role", type: "select", labelKey: "field.seat_role", options: ["holder", "member"], default: "holder" }, // 16 组：家庭共享账号主卡/成员位
+        { key: "cancel_guide", type: "url", labelKey: "field.cancel_guide" }, // 16 组：取消自动续费指引链接
     ],
     capture: ["name", "category", "amount", "cycle", "next_pay"],
     views: [{ key: "renewing", type: "table", sortBy: { key: "next_pay", asc: true } }],
@@ -256,6 +257,10 @@ export const SHOPPING_SCHEMA: ModuleSchema = {
         { key: "channel", type: "text", labelKey: "field.channel" },
         { key: "tracking_no", type: "text", labelKey: "field.tracking_no" },
         { key: "pickup_code", type: "text", labelKey: "field.pickup_code" },
+        // 16 组：退货/退款记录
+        { key: "return_status", type: "select", labelKey: "field.return_status", options: ["none", "requested", "returned", "refunded"], default: "none" },
+        { key: "return_date", type: "date", labelKey: "field.return_date" },
+        { key: "refund_amount", type: "number", labelKey: "field.refund_amount" },
     ],
     capture: ["name", "amount", "date", "channel"],
 };
@@ -270,6 +275,8 @@ export const CONTRACTS_SCHEMA: ModuleSchema = {
         { key: "contact", type: "text", labelKey: "field.contact" }, // EC13：对接人（人脉快照）
         { key: "deposit", type: "number", labelKey: "field.deposit" },
         { key: "auto_renew", type: "checkbox", labelKey: "field.auto_renew" }, // 16 组：自动续约条款 → 到期升级为续约决策提醒
+        { key: "deposit_returned", type: "checkbox", labelKey: "field.deposit_returned" }, // 16 组：押金退还记录
+        { key: "deposit_return_date", type: "date", labelKey: "field.deposit_return_date" },
     ],
     capture: ["name", "category", "expiry", "attachments"],
     reminders: [{ key: "expiry", field: "expiry", kind: "oneoff", leadDays: 30, autoRenewField: "auto_renew" }],

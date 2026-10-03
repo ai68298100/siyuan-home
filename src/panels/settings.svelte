@@ -1,8 +1,8 @@
 <script lang="ts">
     import { showMessage, confirm } from "siyuan";
     import { MODULE_GROUPS, modulesByGroup } from "@/core/modules";
-    import { newMember, saveSettings } from "@/core/settings";
-    import type { HomeSettings, MemberRole, FamilyMember } from "@/types";
+    import { newMember, saveSettings, normalizeCheckinBindings } from "@/core/settings";
+    import type { HomeSettings, MemberRole, FamilyMember, CheckinBinding } from "@/types";
 
     interface IHomePluginLike {
         i18n: Record<string, unknown>;
@@ -60,6 +60,51 @@
 
     const ROLES: MemberRole[] = ["self", "spouse", "partner", "child", "elder", "kin", "other"];
     const enabledIds = $derived(new Set(draftEnabled));
+
+    // EC09（D20）：打卡绑定 draft——习惯→成员指标映射，只读消费不写打卡数据
+    // svelte-ignore state_referenced_locally
+    let draftBindings: CheckinBinding[] = $state((settings.checkinBindings ?? []).map((b) => ({ ...b })));
+    const METRICS: CheckinBinding["metric"][] = ["count", "quantity", "duration"];
+    let checkinItems: { id: string; name: string; kind: string }[] = $state([]);
+    let checkinPresent = $state<boolean | null>(null); // null=探测中
+
+    $effect(() => {
+        let alive = true;
+        (async () => {
+            try {
+                const ck = (window as { siyuanCheckin?: { whenReady?: () => Promise<boolean>; queryItems?: (o?: { limit?: number }) => { id: string; name: string; kind: string }[] } }).siyuanCheckin;
+                if (!ck?.whenReady || !ck?.queryItems) { if (alive) checkinPresent = false; return; }
+                const ready = await ck.whenReady();
+                if (!alive) return;
+                checkinPresent = !!ready;
+                if (ready) checkinItems = (ck.queryItems({ limit: 200 }) ?? []).map((it) => ({ id: String(it.id), name: String(it.name), kind: String(it.kind) }));
+            } catch { if (alive) checkinPresent = false; }
+        })();
+        return () => { alive = false; };
+    });
+
+    /** kind → 默认指标（binary/count→次数；duration→时长；quantity/custom→数量） */
+    function defaultMetric(kind: string): CheckinBinding["metric"] {
+        if (kind === "duration") return "duration";
+        if (kind === "quantity" || kind === "custom") return "quantity";
+        return "count";
+    }
+    function addBinding() {
+        if (!checkinItems.length) return;
+        const it = checkinItems[0];
+        draftBindings = [...draftBindings, {
+            itemId: it.id, itemName: it.name,
+            memberId: draftMembers[0]?.id ?? "",
+            metric: defaultMetric(it.kind),
+        }];
+    }
+    function removeBinding(i: number) {
+        draftBindings = draftBindings.filter((_, idx) => idx !== i);
+    }
+    function syncBindingItem(b: CheckinBinding) {
+        const it = checkinItems.find((x) => x.id === b.itemId);
+        if (it) { b.itemName = it.name; b.metric = defaultMetric(it.kind); }
+    }
 
     // C8b：禁用模块需确认（数据保留语义：只隐藏入口与提醒，台账行不动）
     function toggleModule(id: string, alwaysOn?: boolean) {
@@ -190,6 +235,8 @@
                     .filter(([, v]) => v !== null && Number.isFinite(v as number) && (v as number) >= 0)
                     .map(([k, v]) => [k, Math.min(3650, v as number)]),
             );
+            // EC09：打卡绑定落盘（清洗在 normalize——缺 id/metric 非法剔除、去重）
+            plugin.settings.checkinBindings = normalizeCheckinBindings(draftBindings);
             await saveSettings(plugin as any, plugin.settings);
             // C8b：模块开关接线——新启用模块立即建库（禁用只隐藏保留数据）
             if (modulesChanged) {
@@ -306,6 +353,34 @@
                 <span class="lv-caption fn__flex-1">{t("settings.leadDefault").replace("${n}", String(lr.def))}</span>
             </div>
         {/each}
+        <!-- EC09（D20）：打卡习惯 → 成员指标绑定（只读消费） -->
+        <div style="margin-top:12px;border-top:1px solid var(--b3-border-color);padding-top:8px">
+            <p class="lv-caption">{t("settings.checkinBindingsTitle")}</p>
+            <p class="lv-caption ft__on-surface">{t("settings.checkinBindingsHint")}</p>
+        </div>
+        {#if checkinPresent === false}
+            <p class="lv-caption" style="color:var(--lv-warn)">{t("settings.checkinAbsent")}</p>
+        {:else if checkinPresent === true}
+            {#each draftBindings as b, i}
+                <div class="fn__flex lv-settings__row" style="gap:6px">
+                    <select class="b3-select" style="width:auto" bind:value={b.memberId} aria-label={t("settings.metricMember")}>
+                        {#each draftMembers as m (m.id)}<option value={m.id}>{m.name}</option>{/each}
+                    </select>
+                    <span class="lv-caption">·</span>
+                    <select class="b3-select" style="width:auto" bind:value={b.itemId} onchange={() => syncBindingItem(b)} aria-label={t("settings.metricItem")}>
+                        {#each checkinItems as it (it.id)}<option value={it.id}>{it.name}</option>{/each}
+                    </select>
+                    <select class="b3-select" style="width:auto" bind:value={b.metric} aria-label={t("settings.metricKind")}>
+                        {#each METRICS as mt (mt)}<option value={mt}>{t(`settings.metric.${mt}`)}</option>{/each}
+                    </select>
+                    <button class="b3-button b3-button--text" title={t("delete")} onclick={() => removeBinding(i)}>✕</button>
+                </div>
+            {/each}
+            {#if draftBindings.length === 0}
+                <p class="lv-caption ft__on-surface">{t("settings.checkinEmpty")}</p>
+            {/if}
+            <button class="b3-button b3-button--outline" style="margin-top:4px" disabled={!checkinItems.length} onclick={addBinding}>＋ {t("settings.checkinAdd")}</button>
+        {/if}
     {:else}
         <div class="lv-settings__about">
             <p>{t("about.line1")}</p>

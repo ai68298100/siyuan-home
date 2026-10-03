@@ -4,7 +4,7 @@
  * 结构与 docs/design/01 ADR-7 一致：业务数据一律在思源侧，这里只放设置与运行态。
  */
 import type { Plugin } from "siyuan";
-import type { HomeSettings, FamilyMember, MemberRole } from "@/types";
+import type { HomeSettings, FamilyMember, MemberRole, CheckinBinding } from "@/types";
 import { BUILT_IN_MODULES } from "./modules";
 
 const SETTINGS_NAME = "settings.json";
@@ -111,8 +111,34 @@ export function normalizeImportedSettings(data: Record<string, any>): Normalized
         members,
         leadOverrides: isPlainObject(data.leadOverrides) ? (data.leadOverrides as Record<string, number>) : defaults.leadOverrides,
         dbRefs: isPlainObject(data.dbRefs) ? data.dbRefs : defaults.dbRefs,
+        checkinBindings: normalizeCheckinBindings(data.checkinBindings),
     };
     return { settings, droppedModules, repairedMembers };
+}
+
+const CHECKIN_METRICS = new Set(["count", "quantity", "duration"]);
+
+/** EC09（D20）：打卡绑定清洗——缺 id/成员/metric 非法剔除；同 itemId+memberId 去重（首见保留） */
+export function normalizeCheckinBindings(raw: unknown): CheckinBinding[] {
+    if (!Array.isArray(raw)) return [];
+    const seen = new Set<string>();
+    const out: CheckinBinding[] = [];
+    for (const b of raw as Record<string, any>[]) {
+        if (!b || typeof b !== "object") continue;
+        if (typeof b.itemId !== "string" || !b.itemId) continue;
+        if (typeof b.memberId !== "string" || !b.memberId) continue;
+        if (typeof b.metric !== "string" || !CHECKIN_METRICS.has(b.metric)) continue;
+        const key = `${b.itemId}|${b.memberId}`;
+        if (seen.has(key)) continue;
+        seen.add(key);
+        out.push({
+            itemId: b.itemId,
+            itemName: typeof b.itemName === "string" && b.itemName.trim() ? b.itemName : b.itemId,
+            memberId: b.memberId,
+            metric: b.metric as CheckinBinding["metric"],
+        });
+    }
+    return out;
 }
 
 export function newMember(name: string, role: MemberRole, birthday?: string, lunarBirthday?: boolean): FamilyMember {

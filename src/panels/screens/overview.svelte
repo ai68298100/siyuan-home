@@ -26,6 +26,16 @@
             : allReminders,
     );
     const top = $derived(reminders.slice(0, 4));
+    // EC09（D20）：打卡绑定 × 强度摘要求交——只展示有数据的绑定（成员名·习惯名·强度）
+    function boundCheckins(): { label: string; score: number }[] {
+        void version;
+        const items = plugin.runtime?.lastCheckinSummary?.items ?? [];
+        const byId = new Map(items.map((it: { itemId: string; score: number }) => [it.itemId, it.score]));
+        const memberName = (id: string) => members.find((m) => m.id === id)?.name ?? "?";
+        return (plugin.settings.checkinBindings ?? [])
+            .filter((b) => byId.has(b.itemId))
+            .map((b) => ({ label: `${memberName(b.memberId)} · ${b.itemName}`, score: byId.get(b.itemId)! }));
+    }
     // 29 组月度完成率：当月完成数 / 当月应到基数（从 runtime.monthlyCompletions / monthlyDueTotals 读取）
     const monthlyDone = $derived.by(() => {
         const now = new Date();
@@ -142,6 +152,13 @@
                 <!-- EC21：lv-exam:stats 聚合展示（只读子集，标注更新日期；不读题目内容） -->
                 <div class="lv-caption" title={t("mod.examStatsTip").replace("${d}", new Date(plugin.runtime.lastExamStats.generatedAt).toLocaleDateString())}>
                     📝 {t("mod.examStreak").replace("${n}", String(plugin.runtime.lastExamStats.streak)).replace("${p}", String(plugin.runtime.lastExamStats.accuracy))}
+                </div>
+            {/if}
+            {#if mid === "health" && boundCheckins().length > 0}
+                <!-- EC09（D20）：打卡绑定摘要（只读；只统计有强度数据的绑定项） -->
+                {@const bound = boundCheckins()}
+                <div class="lv-caption" title={bound.map((b) => `${b.label} · ${b.score}`).join("\n")}>
+                    ⏱ {t("mod.checkinBound").replace("${n}", String(bound.length))}
                 </div>
             {/if}
         </div>

@@ -141,4 +141,14 @@ export interface HomeSettings {
     demoMemberIds?: string[];
     /** 15 组：settings.json 损坏已回退默认（onload 弹警告；marker 文件 settings.json.corrupted.json 可查） */
     corruptedSettings?: boolean;
+    /** EC09（D20）：打卡习惯 → 成员指标绑定（settings 驱动映射 v1；只读消费，不写打卡数据） */
+    checkinBindings?: CheckinBinding[];
+}
+
+/** EC09：打卡绑定。metric 显式区分（不把次数当体重）；itemName 为绑定时点快照（展示用） */
+export interface CheckinBinding {
+    itemId: string;
+    itemName: string;
+    memberId: string;
+    metric: "count" | "quantity" | "duration";
 }
