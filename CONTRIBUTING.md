@@ -29,6 +29,7 @@ pnpm run make-link   # 软链到思源工作空间 data/plugins/
 
 1. `pnpm run build` 后，用 `curl -F` 逐文件调 `/api/file/putFile`（token 在 `%APPDATA%/siyuan/env`；Git Bash 必须 `MSYS2_ARG_CONV_EXCL="*"` 防 `/data/...` 被改写成 Git 安装路径）；
 2. **注意 chunk 哈希**：代码一变 `chunks/*.js` 文件名就变，先 `grep -o 'require("./chunks/[^"]*")' dist/index.js` 列出全部依赖，逐个上传，缺一个插件就白屏；
+   **陈旧 chunk 积累**：putFile 管线只增不删，多次部署后远端会堆积旧哈希 chunk（不影响运行）。清理法：readDir 列远端 chunks ∖ 本地 dist/chunks 的差集，逐个 `/api/file/removeFile`（125 波实测清了 26 个）；预检脚本会报告堆积数量。
 3. 热重载：`/api/petal/setPetalEnabled` off→on（桌面端前端随即重载新代码）；
 4. 凭据：工作区 `conf/conf.json` 的 `api.token`；锁屏授权码在 `accessAuthCode`（仅 web 端登录用）。
 

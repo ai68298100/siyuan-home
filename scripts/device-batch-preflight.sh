@@ -37,6 +37,13 @@ if [ -f dist/index.js ] && [ -f dist/kernel.js ]; then
     [ "$lh" != "$rh" ] && { echo "  MISMATCH chunks/$b"; M=1; }
   done
   [ "$M" -eq 0 ] && ok "部署与本地 dist 字节一致" || bad "部署不一致（重跑 CONTRIBUTING 部署节）"
+  # 陈旧 chunk 报告（putFile 管线的已知积累，只报告不删除；清理见 CONTRIBUTING）
+  if [ -d dist/chunks ]; then
+    curl -s --max-time 15 -X POST "$SIYUAN_URL/api/file/readDir" -H "Authorization: Token $SIYUAN_TOKEN" -H "Content-Type: application/json" -d '{"path":"/data/plugins/siyuan-home/chunks"}' \
+      | node -e "let s='';process.stdin.on('data',d=>s+=d).on('end',()=>{try{const r=JSON.parse(s);console.log((r.data||[]).filter(x=>!x.isDir).map(x=>x.name).sort().join('\n'))}catch(e){}})" > "$TEMP/lv-preflight-remote.txt"
+    STALE=$(comm -23 <(sort "$TEMP/lv-preflight-remote.txt") <(cd dist/chunks && ls | sort) | wc -l)
+    [ "${STALE:-0}" -eq 0 ] && ok "无陈旧 chunk" || echo "  NOTE  远端有 $STALE 个陈旧 chunk（不影响运行；清理法见 CONTRIBUTING 部署节）"
+  fi
 fi
 
 echo "== 4. 插件启用 ="
