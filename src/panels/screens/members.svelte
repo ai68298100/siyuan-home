@@ -93,6 +93,32 @@
         editId = null; name = ""; role = "self"; birthday = ""; lunar = false;
     }
 
+    // UG11 v1（第九十波）：成员导出 vCard 4.0——姓名/生日/备注即个人信息，导出前一律确认
+    function exportVcf() {
+        const list = plugin.settings.members ?? [];
+        if (list.length === 0) return;
+        confirm(t("members.exportVcf"), t("members.exportVcfBody").replace("${n}", String(list.length)), () => {
+            import("@/core/vcard").then(({ buildVCard }) => {
+                const vcf = buildVCard(list.map((m) => ({
+                    uid: m.id,
+                    name: m.name,
+                    birthday: m.birthday,
+                    lunarBirthday: m.lunarBirthday,
+                    note: m.notes,
+                    category: t(`role.${m.role}`) !== `role.${m.role}` ? t(`role.${m.role}`) : m.role,
+                })));
+                if (!vcf) { showMessage(t("members.exportVcfEmpty"), 3000, "error"); return; }
+                const blob = new Blob([vcf], { type: "text/vcard;charset=utf-8" });
+                const a = document.createElement("a");
+                a.href = URL.createObjectURL(blob);
+                a.download = `lvhome-members-${new Date().toISOString().slice(0, 10)}.vcf`;
+                a.click();
+                URL.revokeObjectURL(a.href);
+                showMessage(t("members.exportVcfDone").replace("${n}", String(list.length)), 3000, "info");
+            });
+        });
+    }
+
     async function save() {
         if (!name.trim()) return;
         // D06 配套：同名成员会让按姓名回填产生歧义——新增时提示确认（编辑不受影响）
@@ -148,6 +174,8 @@
     {#if editId}
         <button class="b3-button b3-button--outline" onclick={cancelEdit}>{t("cancel")}</button>
     {/if}
+    <span style="flex:1"></span>
+    <button class="b3-button b3-button--outline" onclick={exportVcf} disabled={members.length === 0}>{t("members.exportVcf")}</button>
 </div>
 
 {#if members.length === 0}
