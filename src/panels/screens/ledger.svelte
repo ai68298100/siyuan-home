@@ -620,10 +620,17 @@
                         const vars: Record<string, string> = { name: String(cellText(row.cells[ref!.columns.name])), date: localDateKey(new Date()) };
                         for (const c of schemaCols) vars[c.key] = cellText(row.cells[ref!.columns[c.key]]);
                         const title = `${vars.name} · ${label} · ${vars.date}`;
-                        const docId = await createDocWithMd(notebook, `/${title}`, renderTemplate(file, vars));
-                        showMessage(t("ledger.genDocDone").replace("${title}", title), 3000, "info");
-                        dlg.destroy();
-                        plugin.showTabDocs(docId);
+                        // G2（UG12 研究产出）：落点说明——文档建在台账笔记本内，随思源同步/分享范围流转
+                        confirm(t("ledger.genDoc"), t("ledger.genDocConfirm").replace("${title}", title), async () => {
+                            try {
+                                const docId = await createDocWithMd(notebook, `/${title}`, renderTemplate(file, vars));
+                                showMessage(t("ledger.genDocDone").replace("${title}", title), 3000, "info");
+                                dlg.destroy();
+                                plugin.showTabDocs(docId);
+                            } catch (e) {
+                                showMessage(t("ledger.genDocFailed").replace("${msg}", e instanceof Error ? e.message : String(e)), 6000, "error");
+                            }
+                        });
                     } catch (e) {
                         showMessage(t("ledger.genDocFailed").replace("${msg}", e instanceof Error ? e.message : String(e)), 6000, "error");
                     }

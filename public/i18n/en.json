@@ -616,6 +616,7 @@
     "ledger.transfers": "School transfer history",
     "ledger.noTransfers": "No transfer records yet.",
     "ledger.genDoc": "Create doc",
+    "ledger.genDocConfirm": "A document \"${title}\" will be created in the ledger notebook. It flows with SiYuan's sync/sharing scope (including row field content). Continue?",
     "ledger.genDocDone": "Doc created: ${title}",
     "ledger.genDocFailed": "Doc creation failed: ${msg}",
     "tpl.parentMeeting": "Parent-teacher meeting",

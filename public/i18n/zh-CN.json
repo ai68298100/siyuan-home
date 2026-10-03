@@ -616,6 +616,7 @@
     "ledger.transfers": "转学/插班记录",
     "ledger.noTransfers": "还没有转学记录。",
     "ledger.genDoc": "生成文档",
+    "ledger.genDocConfirm": "将在台账所在笔记本内创建文档《${title}》。文档会随思源的同步与分享范围流转（含行字段内容），确认继续？",
     "ledger.genDocDone": "已创建文档：${title}",
     "ledger.genDocFailed": "文档创建失败：${msg}",
     "tpl.parentMeeting": "家长会记录",
