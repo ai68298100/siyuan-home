@@ -125,5 +125,6 @@ export async function buildReminder(
         daysLeft,
         level,
         kind: rule.kind,
+        ...(row.lunar ? { lunar: true } : {}),
     };
 }

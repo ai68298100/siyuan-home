@@ -114,7 +114,7 @@
     const unsupportedCount = $derived(captureCols.filter((e) => UNSUPPORTED_TYPES.includes(e.type)).length);
     // 表单值：列 key → 输入值（select/relation 为字符串值，checkbox 为布尔）
     let form: Record<string, any> = $state({});
-    // D03：保存状态与恢复——saving 防双击；失败保留输入；已建行 itemID 保留，重试补写同一行
+            // D03：保存状态与恢复——saving 防双击；失败保留输入；已建行 itemID 保留，重试补写同一行
     let saving = $state(false);
     let saveError = $state("");
     let identityPending = $state(false); // 行已提交但身份未确认（D02）：禁止自动重试，防重复建行
@@ -136,6 +136,8 @@
         const v = form[e.key];
         return e.key === "name" ? !!(v && String(v).trim()) : v !== undefined && v !== "" && v !== false;
     }));
+    // UI05：name 必填——为空但有其他字段时阻止提交（不允许"（未命名）"兜底）
+    const nameMissing = $derived(hasAnyInput && !(form.name && String(form.name).trim()));
 
     function resetForm() {
         form = {};
@@ -476,6 +478,12 @@
 
     async function createRow() {
         if (!ref?.avId || saving || identityPending || !hasAnyInput) return;
+        // UI05：name 必填——有其他输入但姓名为空时阻止建行（避免产生"（未命名）"行）
+        if (nameMissing) {
+            saveError = t("ledger.nameRequired");
+            showMessage(saveError, 4000, "error");
+            return;
+        }
         saving = true;
         saveError = "";
         try {
@@ -596,8 +604,10 @@
     {#if saveError}
         <div class="lv-caption" role="alert" style="color:var(--lv-danger);flex-basis:100%">⚠ {saveError}</div>
         <button class="b3-button b3-button--text" onclick={resetForm}>{t("ledger.reset")}</button>
+    {:else if nameMissing}
+        <div class="lv-caption" role="status" style="color:var(--lv-warn);flex-basis:100%">{t("ledger.nameRequired")}</div>
     {/if}
-    <button class="b3-button b3-button--text" onclick={createRow} disabled={!ref?.avId || saving || identityPending || !hasAnyInput}>
+    <button class="b3-button b3-button--text" onclick={createRow} disabled={!ref?.avId || saving || identityPending || !hasAnyInput || nameMissing}>
         {saving ? t("ledger.saving") : `＋ ${t("ledger.add")}`}
     </button>
 </div>

@@ -87,6 +87,8 @@ export interface Reminder {
     level: ReminderLevel;
     /** 规则类型（H05 完成语义分派；adhoc 备忘视为 oneoff。旧缓存可能缺失） */
     kind?: ReminderKind;
+    /** anniversary 农历标记（dueDate 为下次农历对应的公历日期；卡片显示 🌙） */
+    lunar?: boolean;
 }
 
 /** 扫描结果聚合（内存 + kernel storage 缓存） */

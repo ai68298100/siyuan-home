@@ -481,6 +481,7 @@
     "ledger.reset": "清除表单",
     "ledger.savePartial": "行已创建，但部分字段写入失败：${fields}。输入已保留，再次点击保存将补写同一行。",
     "ledger.saveFailed": "保存失败：${msg}。输入已保留。",
+    "ledger.nameRequired": "请先填写名称（姓名/名称列为必填）。",
     "ledger.savePending": "行已提交但无法确认新行身份，请在台账文档中核对后再继续；为避免重复创建，未自动重试。",
     "diag.health": "深度健康检查",
     "diag.healthSummary": "健康检查：${total} 个启用模块全部可读",

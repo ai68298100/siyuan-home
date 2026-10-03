@@ -481,6 +481,7 @@
     "ledger.reset": "Reset form",
     "ledger.savePartial": "Row created, but some fields failed to write: ${fields}. Input kept — press save again to retry the same row.",
     "ledger.saveFailed": "Save failed: ${msg}. Input kept.",
+    "ledger.nameRequired": "Name is required — fill the name/title field first.",
     "ledger.savePending": "Row committed but its identity could not be confirmed. Check the ledger document before continuing; auto-retry skipped to avoid duplicates.",
     "diag.health": "Deep health check",
     "diag.healthSummary": "Health check: all ${total} enabled modules readable",

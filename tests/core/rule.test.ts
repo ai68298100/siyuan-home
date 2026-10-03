@@ -135,6 +135,13 @@ describe("分级与降噪", async () => {
         expect(r.id).toBe("20260101-abc::certs.expiry");
         expect(r.dueDate).toBe("2026-10-01");
     });
+    it("lunar 标记透传：row.lunar → reminder.lunar（卡片 🌙；非农历不落字段）", async () => {
+        // 透传与 kind 无关（buildReminder 统一展开），用 oneoff 保证日期落在提醒窗口内
+        const lunarR = await buildReminder(oneoff, "members", row({ fieldValue: "2026-10-05", lunar: true }), { today: TODAY });
+        expect(lunarR?.lunar).toBe(true);
+        const solarR = await buildReminder(oneoff, "members", row({ fieldValue: "2026-10-05" }), { today: TODAY });
+        expect(solarR?.lunar).toBeUndefined();
+    });
 });
 
 describe("工具函数", async () => {
