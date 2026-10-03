@@ -21,10 +21,11 @@ if [ -n "$SIYUAN_TOKEN" ] && [ -n "$SIYUAN_URL" ]; then ok "SIYUAN_URL/TOKEN 已
 
 echo "== 3. 部署完整性（index.js + 全部 chunk 字节校验）="
 cd "$(dirname "$0")/.." || exit 1
-[ -f dist/index.js ] || { bad "缺 dist/（先 pnpm run build）"; }
-if [ -f dist/index.js ]; then
+[ -f dist/index.js ] || { bad "缺 dist/（先 pnpm run build 完整构建——app+kernel 双目标，勿用单目标 npx vite build）"; }
+[ -f dist/kernel.js ] || bad "缺 dist/kernel.js（同上：须 pnpm run build 完整构建）"
+if [ -f dist/index.js ] && [ -f dist/kernel.js ]; then
   M=0
-  for f in index.js index.css plugin.json; do
+  for f in index.js index.css plugin.json kernel.js; do
     lh=$(sha256sum "dist/$f" | cut -d' ' -f1)
     rh=$(curl -s --max-time 30 -X POST "$SIYUAN_URL/api/file/getFile" -H "Authorization: Token $SIYUAN_TOKEN" -H "Content-Type: application/json" -d "{\"path\":\"$BASE/$f\"}" | sha256sum | cut -d' ' -f1)
     [ "$lh" != "$rh" ] && { echo "  MISMATCH $f"; M=1; }
