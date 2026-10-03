@@ -4,6 +4,7 @@
     import type { HomePluginLike } from "@/types/plugin";
     import { saveRuntime } from "@/core/hub/runtime";
     import { localDateKey } from "@/core/hub/rule";
+    import { moduleIcon as icons } from "@/core/modules";
 
     let { plugin, t, onGoto, version }: { plugin: HomePluginLike; t: (k: string) => string; onGoto: (s: string) => void; version?: number } = $props();
 
@@ -48,16 +49,8 @@
         return plugin.runtime?.monthlyDueTotals?.[monthKey] ?? 0;
     });
 
-    // B2（94 波走查）：模块图标——提醒行与模块卡共用；未映射回退 🗂
-    const MODULE_ICONS: Record<string, string> = {
-        certs: "🪪", health: "🩺", insurance: "🛡️", exams: "📝", pets: "🐾", social: "👥",
-        "assets-real": "🏠", "assets-virtual": "🏦", shopping: "🛒", memberships: "🔁", contracts: "📄",
-        medicine: "💊", stock: "📦", favors: "🧧", chores: "🧹", food: "🍚", address: "📍",
-        snippets: "📎", house: "🏡", parenting: "🧸", schooling: "🎒", allowance: "💰",
-        vehicles: "🚗", transit: "🚌", "travel-plan": "✈️", "travel-booking": "🎫",
-        "travel-packing": "🧳", "travel-log": "📷", media: "🎬",
-    };
-    const moduleIcon = (mid: string) => MODULE_ICONS[mid] ?? "🗂";
+    // B2（94 波走查）：模块图标共享表移至 core/modules（95 波起与提醒行共用，覆盖测试钉住）
+    const moduleIcon = (mid: string) => icons(mid);
 
     async function setMemberFilter(id: string | undefined) {
         memberFilter = id;

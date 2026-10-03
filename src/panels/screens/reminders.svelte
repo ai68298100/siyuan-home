@@ -2,6 +2,7 @@
     import { Dialog, Menu, showMessage, confirm } from "siyuan";
     import type { HomePluginLike } from "@/types/plugin";
     import { saveRuntime } from "@/core/hub/runtime";
+    import { moduleIcon } from "@/core/modules";
     import type { Reminder } from "@/types";
     let { plugin, t, version }: { plugin: HomePluginLike; t: (k: string) => string; version?: number } = $props();
 
@@ -244,15 +245,16 @@
             <input type="checkbox" class="b3-checkbox" aria-label={t("hub.select")}
                 checked={selected.has(r.id)} onchange={() => toggleSelect(r.id)} style="flex-shrink:0" />
         {/if}
-        <div class="lv-rem-ic">{r.moduleId === "adhoc" ? "📝" : "🗂"}</div>
+        <div class="lv-rem-ic">{r.moduleId === "adhoc" ? "📝" : moduleIcon(r.moduleId)}</div>
         <div class="lv-rem-t" title={r.autoRenew ? t("hub.autoRenew") : undefined}><b>{r.title}</b><span class="lv-num">{r.dueDate}{r.lunar ? " 🌙" : ""}{r.autoRenew ? " 🔄" : ""}</span></div>
         <span class="lv-badge {levelBadge[r.level]}">
             {r.level === "overdue" ? t("level.overdue") : r.level === "soon" ? t("level.soon") : t("level.lead")}
         </span>
         <div class="lv-rem-ops">
             <button class="b3-button b3-button--text" onclick={() => plugin.complete(r)}>{t("act.done")}</button>
-            {#if ["certs", "insurance"].includes(r.moduleId)}
-                <!-- 续保/换证：新到期日写回台账行 expiry（26.6：insurance 续保决策的"续"动作；比价/放弃选项留 UI 细化） -->
+            {#if ["certs", "insurance", "contracts"].includes(r.moduleId)}
+                <!-- 续保/换证/合同续约：新到期日写回规则 field 列（26.6 + 98 波：contracts 规则带 field=expiry 与
+                     autoRenewField 升级路径，此前 🔄 决策提醒无"续"动作入口——漏项补齐） -->
                 <button class="b3-button b3-button--text" onclick={() => renewDialog(r)}>{t("act.renew")}</button>
             {/if}
             {#if r.moduleId !== "adhoc" && plugin.settings.dbRefs[r.moduleId]?.docId}

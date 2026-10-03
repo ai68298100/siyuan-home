@@ -52,3 +52,15 @@ export const getModule = (id: string): HomeModule | undefined => moduleMap.get(i
 
 export const modulesByGroup = (group: ModuleGroupId): HomeModule[] =>
     BUILT_IN_MODULES.filter((m) => m.group === group);
+
+/** B2（94 波走查）：模块图标——总览/提醒行共用；新模块记得补一行，moduleIcon 覆盖测试钉住 */
+export const MODULE_ICONS: Record<string, string> = {
+    members: "👪", certs: "🪪", health: "🩺", insurance: "🛡️", exams: "📝", pets: "🐾", social: "👥",
+    "assets-real": "🏠", "assets-virtual": "🏦", shopping: "🛒", memberships: "🔁", contracts: "📄",
+    medicine: "💊", stock: "📦", favors: "🧧", chores: "🧹", food: "🍚", address: "📍",
+    snippets: "📎", house: "🏡", parenting: "🧸", schooling: "🎒", allowance: "💰", bookmarks: "🔖",
+    vehicles: "🚗", transit: "🚌", "travel-plan": "✈️", "travel-booking": "🎫",
+    "travel-packing": "🧳", "travel-log": "📷", media: "🎬",
+};
+
+export const moduleIcon = (mid: string): string => MODULE_ICONS[mid] ?? "🗂";
