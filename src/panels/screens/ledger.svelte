@@ -1,5 +1,6 @@
 <script lang="ts">
     import { renderLedger, addDetachedRow, setCell, RowIdentityPendingError } from "@/core/siyuan";
+    import { buildCsv } from "@/core/csv";
     import { localDateKey } from "@/core/hub/rule";
     import { showMessage, Dialog, confirm } from "siyuan";
     import type { HomePluginLike } from "@/types/plugin";
@@ -63,10 +64,9 @@
     function exportCsv() {
         if (!ref?.columns || filteredRows.length === 0) return;
         const cols = (plugin.schemaCatalog?.[active]?.columns ?? []).filter((c: any) => ref!.columns![c.key]);
-        const esc = (v: string) => (/[",\n]/.test(v) ? `"${v.replace(/"/g, '""')}"` : v);
-        const head = cols.map((c: any) => esc(t(`field.${c.key}`) !== `field.${c.key}` ? t(`field.${c.key}`) : c.key)).join(",");
-        const lines = filteredRows.map((r) => cols.map((c: any) => esc(cellText(r.cells[ref!.columns![c.key]]))).join(","));
-        const blob = new Blob(["\uFEFF" + [head, ...lines].join("\r\n")], { type: "text/csv;charset=utf-8" });
+        const label = (c: any) => (t(`field.${c.key}`) !== `field.${c.key}` ? t(`field.${c.key}`) : c.key);
+        const csv = buildCsv(cols.map(label), filteredRows.map((r) => cols.map((c: any) => cellText(r.cells[ref!.columns![c.key]]))));
+        const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
         const a = document.createElement("a");
         a.href = URL.createObjectURL(blob);
         a.download = `lv-${active}-${new Date().toISOString().slice(0, 10)}.csv`;
