@@ -1,4 +1,5 @@
 # 小驴管家（Lv Home）· 项目待办总清单
+| 2026-10-04 | 巡检 | 第一百三十七波：巡检 + Dependabot 告警待开启（用户一步） | 预检 11/11 ✓；发现仓库 **Dependabot alerts 处于关闭状态**（API 403/422：当前 token 无 admin scope 无法代开）——CI 的 pnpm audit 是门禁层，GitHub 原生告警是持续层，建议用户在 GitHub 网页 Settings → Advanced Security → 开启 Dependabot alerts（30 秒一键）；纯巡检波零变更 |
 | 2026-10-04 | 巡检 | 第一百三十六波：例行巡检（预检 11/11 + 199 测试） | 全绿；纯巡检波零变更 |
 | 2026-10-04 | 巡检 | 第一百三十五波：预检巡检 11/11 PASS（无陈旧 chunk 报告） | 六面全绿含新增的陈旧 chunk 检测（清理后零堆积）；runbook 随时可跑；纯巡检波零变更 |
 | 2026-10-04 | 巡检 | 第一百三十四波：合并潮后 CI 核对 | PR 2/3/7/8 的合并提交在 main 上 CI 全部 success（新 Actions v7 组件下的完整门禁链验证通过）——升级后 CI 体系健康；实例探活 ✓；纯巡检波零变更 |
