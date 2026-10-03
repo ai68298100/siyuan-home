@@ -1,4 +1,5 @@
 # 小驴管家（Lv Home）· 项目待办总清单
+| 2026-10-04 | 兜底 | 第一百三十二波：GitHub PR 清理（6 并 + 4 触发 rebase） | 首查 Issues/PRs：零 Issues；**PR 6（sass devDep）CI 绿已合并**；剩 4 个 open——PR 7/8（js-yaml/vite-plugin-svelte devDep）、PR 2/3（Actions checkout/setup-node 4→7）；PR 2/3 的 CI 红经日志核对**与 Actions 升级无关**（从 10-01 旧 main 分出，跑的是 siyuan 1.2.8 升级后未修类型错的旧代码——该错现已在主线消失）→ 已对四个 PR 触发 `@dependabot rebase`，rebase 后 CI 重跑即验证纯升级面；下轮巡检跟进合并 |
 | 2026-10-04 | 巡检 | 第一百三十一波：预检工具巡检（11/11 PASS） | `device-batch-preflight.sh` 六面全绿（工作区/凭据/部署字节/插件启用/四兄弟/首启状态）——runbook 可随时开跑；纯巡检波零变更 |
 | 2026-10-04 | 巡检 | 第一百三十波：README 原型声明核验 | "Interactive prototype…7 screens incl. style guide"——prototype/index.html（1432 行）实测恰好 7 个 `class="screen"`（含 style guide）✓ 声明准确；纯巡检波零变更 |
 | 2026-10-04 | 巡检 | 第一百二十九波：例行巡检（全绿） | 实例探活 ✓（工作区在线）；五重门禁复跑全绿（i18n 739 键+308 静态键 / 199 测试 / tsc / svelte-check / meta v0.2.0）；纯巡检波零变更 |
