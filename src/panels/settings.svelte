@@ -153,13 +153,16 @@
     });
 
     function exportSettings() {
-        const payload = JSON.stringify(plugin.settings, null, 2);
-        const blob = new Blob([payload], { type: "application/json" });
-        const a = document.createElement("a");
-        a.href = URL.createObjectURL(blob);
-        a.download = `siyuan-home-settings-${new Date().toISOString().slice(0, 10)}.json`;
-        a.click();
-        URL.revokeObjectURL(a.href);
+        // G1：设置文件含成员档案/台账引用/提醒运行态——导出前提示保管责任
+        confirm(t("settings.exportWarningTitle"), t("settings.exportWarningBody"), () => {
+            const payload = JSON.stringify(plugin.settings, null, 2);
+            const blob = new Blob([payload], { type: "application/json" });
+            const a = document.createElement("a");
+            a.href = URL.createObjectURL(blob);
+            a.download = `siyuan-home-settings-${new Date().toISOString().slice(0, 10)}.json`;
+            a.click();
+            URL.revokeObjectURL(a.href);
+        });
     }
 
     async function restorePreImport() {

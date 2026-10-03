@@ -61,17 +61,27 @@
     const schemaKeys = $derived<string[]>(ref?.columns ? Object.keys(ref.columns) : []);
 
     // 13 组/DL11：CSV 导出（当前模块、schema 全列、BOM 头兼容 Excel；本地生成不外传）
+    // G1（UG12 研究产出）：高后果模块导出前点名确认——健康/证件/财务/儿童相关
+    const HIGH_CONSEQUENCE_MODULES = new Set(["health", "parenting", "certs", "insurance", "assets-real", "assets-virtual", "contracts", "medicine", "schooling"]);
+
     function exportCsv() {
         if (!ref?.columns || filteredRows.length === 0) return;
-        const cols = (plugin.schemaCatalog?.[active]?.columns ?? []).filter((c: any) => ref!.columns![c.key]);
-        const label = (c: any) => (t(`field.${c.key}`) !== `field.${c.key}` ? t(`field.${c.key}`) : c.key);
-        const csv = buildCsv(cols.map(label), filteredRows.map((r) => cols.map((c: any) => cellText(r.cells[ref!.columns![c.key]]))));
-        const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
-        const a = document.createElement("a");
-        a.href = URL.createObjectURL(blob);
-        a.download = `lv-${active}-${new Date().toISOString().slice(0, 10)}.csv`;
-        a.click();
-        URL.revokeObjectURL(a.href);
+        const download = () => {
+            const cols = (plugin.schemaCatalog?.[active]?.columns ?? []).filter((c: any) => ref!.columns![c.key]);
+            const label = (c: any) => (t(`field.${c.key}`) !== `field.${c.key}` ? t(`field.${c.key}`) : c.key);
+            const csv = buildCsv(cols.map(label), filteredRows.map((r) => cols.map((c: any) => cellText(r.cells[ref!.columns![c.key]]))));
+            const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
+            const a = document.createElement("a");
+            a.href = URL.createObjectURL(blob);
+            a.download = `lv-${active}-${new Date().toISOString().slice(0, 10)}.csv`;
+            a.click();
+            URL.revokeObjectURL(a.href);
+        };
+        if (HIGH_CONSEQUENCE_MODULES.has(active)) {
+            confirm(t("ledger.exportSensitiveTitle"), t("ledger.exportSensitiveBody").replace("${module}", t(`module.${active}`)), download);
+            return;
+        }
+        download();
     }
 
     // 第七十四轮：生长曲线（parenting）——身高/体重时间线 SVG；WHO 参考带待核实数据源后加入
