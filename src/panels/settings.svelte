@@ -165,6 +165,29 @@
         });
     }
 
+    // UG02：脱敏诊断包——确认框声明内容与残余风险，本地组装下载
+    function exportDiagnostics() {
+        const diag = plugin.getDiagnostics?.();
+        if (!diag) { showMessage(t("settings.diagExportNone"), 3000, "error"); return; }
+        confirm(t("settings.diagExport"), t("settings.diagExportBody"), () => {
+            import("@/core/diagnostics").then(({ buildDiagnosticPackage }) => {
+                const payload = buildDiagnosticPackage({
+                    diag,
+                    enabledModules: [...(plugin.settings.enabledModules ?? [])],
+                    platform: navigator.userAgent,
+                    generatedAt: new Date().toISOString(),
+                });
+                const blob = new Blob([JSON.stringify(payload, null, 2)], { type: "application/json" });
+                const a = document.createElement("a");
+                a.href = URL.createObjectURL(blob);
+                a.download = `siyuan-home-diagnostics-${new Date().toISOString().slice(0, 10)}.json`;
+                a.click();
+                URL.revokeObjectURL(a.href);
+                showMessage(t("settings.diagExportDone"), 3000, "info");
+            });
+        });
+    }
+
     async function restorePreImport() {
         confirm(t("settings.restoreTitle"), t("settings.restoreBody"), async () => {
             try {
@@ -482,6 +505,9 @@
                                 <p class="lv-caption" style="color:var(--lv-danger)">{c}</p>
                             {/each}
                         {/if}
+                        <div style="margin-top:8px">
+                            <button class="b3-button b3-button--outline" onclick={exportDiagnostics}>{t("settings.diagExport")}</button>
+                        </div>
                         {#if (plugin.settings.members ?? []).some((m) => !m.avItemId || m.syncError)}
                             <button class="b3-button b3-button--outline" style="margin-top:6px"
                                 onclick={async () => {
