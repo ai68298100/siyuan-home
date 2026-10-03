@@ -20,3 +20,9 @@ export function getTemplate(file: string): string | undefined {
 export function renderTemplate(tpl: string, vars: Record<string, string>): string {
     return tpl.replace(/\{\{([a-zA-Z0-9_]+)\}\}/g, (_, key: string) => vars[key] ?? "");
 }
+
+/** G3（UG03 威胁建模）：文档标题消毒——`/`、`\` 与控制字符替换为空格并收敛空白，
+ * 防止行名称带入路径分隔符造成 createDocWithMd 文档树意外嵌套。 */
+export function sanitizeDocTitle(title: string): string {
+    return title.replace(/[/\\\u0000-\u001f]/g, " ").replace(/\s+/g, " ").trim();
+}

@@ -610,7 +610,7 @@
                 btn.textContent = `${t("ledger.genDoc")}：${label}`;
                 btn.onclick = async () => {
                     try {
-                        const { getTemplate, renderTemplate } = await import("@/core/templates");
+                        const { getTemplate, renderTemplate, sanitizeDocTitle } = await import("@/core/templates");
                         const { sql, createDocWithMd } = await import("@/core/siyuan");
                         const file = getTemplate(tp.file);
                         if (!file) throw new Error("template missing: " + tp.file);
@@ -619,7 +619,8 @@
                         if (!notebook) throw new Error("notebook not found for " + ref!.docId);
                         const vars: Record<string, string> = { name: String(cellText(row.cells[ref!.columns.name])), date: localDateKey(new Date()) };
                         for (const c of schemaCols) vars[c.key] = cellText(row.cells[ref!.columns[c.key]]);
-                        const title = `${vars.name} · ${label} · ${vars.date}`;
+                        // G3（UG03 威胁建模）：标题消毒防文档树意外嵌套（纯函数在 core/templates）
+                        const title = sanitizeDocTitle(`${vars.name} · ${label} · ${vars.date}`);
                         // G2（UG12 研究产出）：落点说明——文档建在台账笔记本内，随思源同步/分享范围流转
                         confirm(t("ledger.genDoc"), t("ledger.genDocConfirm").replace("${title}", title), async () => {
                             try {
