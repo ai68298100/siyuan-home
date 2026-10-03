@@ -489,6 +489,38 @@
                 body.appendChild(btn);
             }
         })();
+        // 16 组联动：health 处方/用药记录 → 药箱建行（category=rx、成员 relation 复制；未建库不出现按钮）
+        function addRxToMedicineButton() {
+            if (active !== "health") return;
+            const medRef = plugin.settings.dbRefs?.["medicine"];
+            if (!medRef?.avId) return;
+            const name = String(cellText(row.cells[ref!.columns.name]));
+            if (!name || name === "—") return;
+            const btn = document.createElement("button");
+            btn.className = "b3-button b3-button--outline";
+            btn.style.cssText = "margin-top:8px;font-size:12px";
+            btn.textContent = t("ledger.rxToMedicine");
+            btn.onclick = () => {
+                confirm(t("ledger.rxToMedicine"), t("ledger.rxToMedicineBody").replace("${name}", name), async () => {
+                    try {
+                        const { addDetachedRow, setCell } = await import("@/core/siyuan");
+                        const itemID = await addDetachedRow(medRef.avId!, name);
+                        const catKey = medRef.columns?.category;
+                        if (catKey) await setCell(medRef.avId!, catKey, itemID, { type: "select", select: { content: "rx" } });
+                        const memKey = medRef.columns?.member;
+                        const relBlock = row.cells[ref!.columns.member]?.relation?.blockIDs?.[0];
+                        if (memKey && relBlock) await setCell(medRef.avId!, memKey, itemID, { type: "relation", relation: { blockIDs: [relBlock], contents: null } });
+                        showMessage(t("ledger.rxToMedicineDone").replace("${name}", name), 3000, "info");
+                        btn.disabled = true;
+                    } catch (e) {
+                        showMessage(t("ledger.rxToMedicineFailed").replace("${msg}", e instanceof Error ? e.message : String(e)), 6000, "error");
+                    }
+                });
+            };
+            body.appendChild(btn);
+        }
+        addRxToMedicineButton();
+
             addFavorsSyncSection();
         }
         // EC15：人情往来 → 人脉交集记录（ensurePerson + recordInteraction，externalRef 幂等；

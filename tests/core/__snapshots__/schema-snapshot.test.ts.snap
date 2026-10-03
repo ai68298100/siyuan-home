@@ -447,6 +447,13 @@ exports[`31 模块 schema 契约快照（21 组） > 每个 schema 的结构快�
       "leadDays": 7,
     },
   ],
+  "templates": [
+    {
+      "file": "health/checkup-plan.tpl",
+      "key": "checkup_plan",
+      "nameKey": "tpl.checkupPlan",
+    },
+  ],
   "views": [
     {
       "groupBy": "member",

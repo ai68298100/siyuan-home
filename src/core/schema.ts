@@ -249,6 +249,7 @@ export const HEALTH_SCHEMA: ModuleSchema = {
         { key: "followup_date", type: "date", labelKey: "field.followup_date" },
     ],
     capture: ["name", "member", "category", "date", "attachments"],
+    templates: [{ key: "checkup_plan", nameKey: "tpl.checkupPlan", file: "health/checkup-plan.tpl" }],
     views: [{ key: "by_member", type: "table", groupBy: "member" }],
     reminders: [{ key: "followup", field: "followup_date", kind: "oneoff", leadDays: 7 }],
 };
