@@ -454,20 +454,13 @@
         (dlg.element.querySelector("#lv-detail-del") as HTMLButtonElement).onclick = () => {
             confirm(t("ledger.delTitle"), t("ledger.delBody").replace("${name}", cellText(row.cells[ref.columns.name])), async () => {
                 try {
-                    const { removeLedgerRows } = await import("@/core/siyuan");
+                    const { removeLedgerRows, } = await import("@/core/siyuan");
                     await removeLedgerRows(ref!.avId!, [row.itemID]);
-                    // 行删除后清理孤儿运行态数据（renewHistory + favorSyncs）
-                    let dirty = false;
-                    if (plugin.runtime?.renewHistory?.[row.itemID]) {
-                        delete plugin.runtime.renewHistory[row.itemID];
-                        dirty = true;
-                    }
-                    if (plugin.runtime?.favorSyncs?.[row.itemID]) {
-                        delete plugin.runtime.favorSyncs[row.itemID];
-                        dirty = true;
-                    }
+                    // 行删除后清理孤儿运行态数据（handled/handledYear/handledUntil/snoozed/renewHistory/favorSyncs）
+                    const { cleanupRowRuntimeData } = await import("@/core/hub/runtime");
+                    const dirty = cleanupRowRuntimeData(plugin.runtime, row.itemID);
                     if (dirty) {
-                                                await saveRuntime(plugin, plugin.runtime);
+                        await saveRuntime(plugin, plugin.runtime);
                     }
                     showMessage(t("ledger.delDone"), 2500, "info");
                     dlg.destroy();

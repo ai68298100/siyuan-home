@@ -141,6 +141,26 @@ export const HANDLED_KEEP_DAYS = 30;
  * 已失效的 recurring 已办期。未处理项（备忘/延后/忽略/未到期已办）永不按到期自动删除。
  * 调用方负责随后落盘（refreshHub）。
  */
+
+/**
+ * 行删除后清理孤儿运行态数据（15 组/30 组/EC15）：
+ * 清理四个提醒运行态 map（handled/handledYear/handledUntil/snoozed）中
+ * 以 `${rowId}::` 为前缀的条目，以及按 rowId 键控的 renewHistory 和 favorSyncs。
+ * 返回是否有变更（调用方据此决定是否 saveRuntime）。
+ */
+export function cleanupRowRuntimeData(rt: HubRuntime, rowId: string): boolean {
+    let dirty = false;
+    const prefix = `${rowId}::`;
+    for (const map of [rt.handled, rt.handledYear, rt.handledUntil, rt.snoozed]) {
+        for (const key of Object.keys(map)) {
+            if (key.startsWith(prefix)) { delete map[key]; dirty = true; }
+        }
+    }
+    if (rt.renewHistory?.[rowId]) { delete rt.renewHistory[rowId]; dirty = true; }
+    if (rt.favorSyncs?.[rowId]) { delete rt.favorSyncs[rowId]; dirty = true; }
+    return dirty;
+}
+
 export function purgeHandled(rt: HubRuntime, today: Date, keepDays = HANDLED_KEEP_DAYS): void {
     const cutoff = today.getTime() - keepDays * 86400000;
     rt.memos = (rt.memos ?? []).filter((m) => !m.doneAt || new Date(m.doneAt).getTime() >= cutoff);
