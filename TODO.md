@@ -1,4 +1,5 @@
 # 小驴管家（Lv Home）· 项目待办总清单
+| 2026-10-04 | 巡检 | 第一百二十七波：docs 链接腐坏扫描 | 54 个 .md（docs/ 全量 + 根七篇）内 236 条相对链接逐一解析——**零腐坏**；纯巡检波零变更 |
 | 2026-10-04 | 兜底 | 第一百二十六波：部署树审计收尾——i18n/README 全对齐 | i18n 双语字节一致 ✓；发现真机 README.md/README.zh-CN.md 为旧副本（103/114 波改了徽章与 License 行后未重传）→ putFile 对齐 0 差异——至此部署目录**每个文件**（根 8 + chunks 15 + i18n 2 + asset 2）与本地逐字节一致，陈旧 chunk 已清；部署面审计闭环 |
 | 2026-10-04 | 兜底 | 第一百二十五波：部署树全量审计——26 个陈旧 chunk 清理 | readDir 全量树双向核对：零缺失（本地每个 chunk 远端都有）但远端 41 chunk 中 **26 个为历代旧哈希堆积**（putFile 只增不删，50 波积累）→ /api/file/removeFile 逐个清理 0 失败，远端 chunk 集与本地完全一致 + index.js 的 33 个 require 引用全命中；**工程化**：预检脚本新增陈旧 chunk 报告（只报告不删除），CONTRIBUTING 部署节补清理法（readDir 差集 + removeFile）；预检复跑 11/11 PASS；199 测试、i18n 门禁干净 |
 | 2026-10-04 | 兜底 | 第一百二十四波：**抓到本地构建缺口**——kernel.js 自 104 波起缺build | 交叉核对 smoke-test 必要文件清单 vs 部署清单发现：`dist/kernel.js` 本地缺失——104 波起误用 `npx vite build`（仅 app 目标）替代 `pnpm run build`（app+kernel 双目标），**本地 dist 一直不完整**；真机无恙（旧 kernel.js 是不变日志桩且字节与新构建一致），纯本地构建习惯问题；处置：①`pnpm run build` 完整构建恢复 + smoke test 过（zip 0.26MB 全文件无泄漏）+ 全量部署复核 0 差异；②预检脚本补 kernel.js 存在与字节检查（并警示勿用单目标构建），复跑 10/10 PASS；199 测试、i18n 门禁干净 |
