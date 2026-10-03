@@ -235,8 +235,8 @@ export default class LvHomePlugin extends Plugin {
         for (const evt of ["checkin:event-recorded", "checkin:event-deleted", "checkin:item-updated"]) {
             window.addEventListener(evt, this.checkinEventHandler);
         }
-        // 启动时拉取一次（打卡可能先于管家加载）
-        window.addEventListener("load", () => this.pullCheckinSummary());
+        // 启动时拉取一次（打卡可能先于管家加载；SPA 中 load 已触发，用延迟替代）
+        window.setTimeout(() => this.pullCheckinSummary(), 5000);
     }
 
     /** EC09/EC10：拉取打卡强度摘要（只读；写入 runtime 供模块卡展示）[待实测] */
