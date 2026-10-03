@@ -2354,6 +2354,16 @@ exports[`31 模块 schema 契约快照（21 组） > 每个 schema 的结构快�
       "type": "text",
     },
     {
+      "default": "height",
+      "key": "metric_type",
+      "labelKey": "field.metric_type",
+      "options": [
+        "height",
+        "weight",
+      ],
+      "type": "select",
+    },
+    {
       "key": "metric_value",
       "labelKey": "field.metric_value",
       "type": "number",

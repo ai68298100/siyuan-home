@@ -74,6 +74,76 @@
         URL.revokeObjectURL(a.href);
     }
 
+    // 第七十四轮：生长曲线（parenting）——身高/体重时间线 SVG；WHO 参考带待核实数据源后加入
+    function openGrowthChart() {
+        import("@/core/growth").then(({ collectGrowthSeries }) => {
+            const series = collectGrowthSeries(rows, (ref?.columns ?? {}) as Record<string, string | undefined>, plugin.settings.members ?? []);
+            const dlg = new Dialog({
+                title: t("ledger.growthChart"),
+                content: `<div class="b3-dialog__content" id="lv-growth-body" style="max-height:60vh;overflow:auto"></div>`,
+                width: "560px",
+            });
+            const body = dlg.element.querySelector("#lv-growth-body") as HTMLElement;
+            if (series.length === 0) {
+                body.innerHTML = `<div class="ft__on-surface" style="font-size:13px">${t("ledger.noGrowthData")}</div>`;
+                return;
+            }
+            const COLORS = ["#4a6785", "#ac503d", "#5a8a48", "#8a5aa0", "#b08030"];
+            const NS = "http://www.w3.org/2000/svg";
+            const el = (tag: string, attrs: Record<string, string | number>, textContent?: string) => {
+                const e = document.createElementNS(NS, tag);
+                for (const [k, v] of Object.entries(attrs)) e.setAttribute(k, String(v));
+                if (textContent !== undefined) e.textContent = textContent;
+                return e;
+            };
+            for (const metric of ["height", "weight"] as const) {
+                const ss = series.filter((s) => s.metric === metric);
+                if (!ss.length) continue;
+                const head = document.createElement("div");
+                head.style.cssText = "font-weight:600;font-size:13px;margin:10px 0 4px";
+                head.textContent = t(metric === "height" ? "ledger.growthHeight" : "ledger.growthWeight");
+                body.appendChild(head);
+                const W = 500, H = 170, PAD = 40;
+                const all = ss.flatMap((s) => s.points.map((p, pi) => ({ x: p.ageMonths ?? pi, y: p.value })));
+                const xs = all.map((p) => p.x), ys = all.map((p) => p.y);
+                const xMin = Math.min(...xs), xMax = Math.max(...xs);
+                const yMin = Math.min(...ys), yMax = Math.max(...ys);
+                const sx = (x: number) => (xMax === xMin ? W / 2 : PAD + ((x - xMin) / (xMax - xMin)) * (W - PAD * 2));
+                const sy = (y: number) => (yMax === yMin ? H / 2 : H - PAD - ((y - yMin) / (yMax - yMin)) * (H - PAD * 2));
+                const svg = el("svg", { width: W, height: H, viewBox: `0 0 ${W} ${H}` });
+                // 轴与端点标注（数值轴 min/max；月龄轴 first/last）
+                svg.appendChild(el("line", { x1: PAD, y1: H - PAD, x2: W - PAD / 2, y2: H - PAD, stroke: "var(--b3-border-color)" }));
+                svg.appendChild(el("line", { x1: PAD, y1: PAD / 2, x2: PAD, y2: H - PAD, stroke: "var(--b3-border-color)" }));
+                svg.appendChild(el("text", { x: PAD - 6, y: PAD / 2 + 4, "text-anchor": "end", "font-size": 10 }, String(yMax)));
+                svg.appendChild(el("text", { x: PAD - 6, y: H - PAD + 4, "text-anchor": "end", "font-size": 10 }, String(yMin)));
+                svg.appendChild(el("text", { x: PAD, y: H - PAD + 14, "font-size": 10 }, String(xMin)));
+                svg.appendChild(el("text", { x: W - PAD / 2, y: H - PAD + 14, "text-anchor": "end", "font-size": 10 }, `${xMax}${xs.some((x) => x > 0) ? "月龄" : ""}`));
+                ss.forEach((s, i) => {
+                    const color = COLORS[i % COLORS.length];
+                    const pts = s.points;
+                    if (pts.length === 1) {
+                        svg.appendChild(el("circle", { cx: sx(pts[0].ageMonths ?? 0), cy: sy(pts[0].value), r: 3, fill: color }));
+                    } else {
+                        svg.appendChild(el("polyline", {
+                            points: pts.map((p) => `${sx(p.ageMonths ?? 0)},${sy(p.value)}`).join(" "),
+                            fill: "none", stroke: color, "stroke-width": 2,
+                        }));
+                        for (const p of pts) svg.appendChild(el("circle", { cx: sx(p.ageMonths ?? 0), cy: sy(p.value), r: 2.5, fill: color }));
+                    }
+                    const legend = el("text", { x: PAD + 4, y: PAD / 2 + 16 + i * 14, "font-size": 11, fill: color });
+                    legend.textContent = s.memberName; // 用户内容走 textContent（19 组安全）
+                    svg.appendChild(legend);
+                });
+                body.appendChild(svg);
+            }
+            const note = document.createElement("div");
+            note.className = "ft__on-surface";
+            note.style.cssText = "font-size:11.5px;margin-top:6px";
+            note.textContent = t("ledger.growthWhoNote");
+            body.appendChild(note);
+        });
+    }
+
     async function rebuildLedger() {
         rebuilding = true;
         try {
@@ -904,6 +974,9 @@
             bind:value={searchText} title={t("ledger.search")} />
         <button class="b3-button b3-button--outline" title={t("ledger.exportCsvTip")}
             disabled={filteredRows.length === 0} onclick={exportCsv}>{t("ledger.exportCsv")}</button>
+        {#if active === "parenting"}
+            <button class="b3-button b3-button--outline" onclick={openGrowthChart}>{t("ledger.growthChart")}</button>
+        {/if}
         <button class="b3-button b3-button--outline" onclick={() => plugin.showTabDocs(ref?.docId)}>{t("ledger.openDoc")} ↗</button>
     {/if}
 </div>

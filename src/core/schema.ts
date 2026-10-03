@@ -425,6 +425,7 @@ export const PARENTING_SCHEMA: ModuleSchema = {
         { key: "dose_no", type: "number", labelKey: "field.dose_no" },
         { key: "vaccine_batch", type: "text", labelKey: "field.vaccine_batch" }, // 16 组：接种追溯
         { key: "vaccine_site", type: "text", labelKey: "field.vaccine_site" }, // 16 组：接种点
+        { key: "metric_type", type: "select", labelKey: "field.metric_type", options: ["height", "weight"], default: "height" }, // 生长曲线：指标类型
         { key: "metric_value", type: "number", labelKey: "field.metric_value" },
     ],
     capture: ["name", "member", "category", "date"],
