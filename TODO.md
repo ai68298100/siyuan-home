@@ -1,4 +1,5 @@
 # 小驴管家（Lv Home）· 项目待办总清单
+| 2026-10-05 | 主线 | 第二百波：media 图书借出记录（rowlog 第五消费方）+ allowance 利息流水核实勾选 | **借出记录**：rowlog loans 类型，media 行详情抽屉"借出记录"分区——借出日/借给谁/归还日（留空=在借），格式 \`日期 · 借给 X · 在借/已归还\`；通用 appendEntry 语义零新增基建；**allowance 利息核实**：interest_al 类别 + direction/amount/date/source 列齐备，收益流水今天即可记（待办早于 schema 批量生产属过时项）；i18n 811→817、232 测试持平 |
 | 2026-10-05 | 主线 | 第一百九十九波：CHANGELOG Unreleased 尾波补账（N2 第②步成稿） | 新增"一百一十三–一百九十八波"段（用户可感知变更按主题分组：总览质感/提醒可读性/模块深化×5/CSV 导入/成员三件套/向导引导；修复×4——触屏操作不可见、>50 行派生与导出截断、E14/E15 真机建库与上传、设置写入静默失败；质量——232 测试/活体套件 E11–E16/SCHEMA_CATALOG 白名单/升级演练/指南英文化）；事实精度自校（E10 归上段，改 E11–E16）；N2 第②步注记更新（发版时只需复核增补）；232 测试不变（纯文档波） |
 | 2026-10-05 | 主线 | 第一百九十八波：UG01 离线升级演练（0.3.0 首次升级前迁移完整性预演） | tests/core/upgrade-drill.test.ts +3：**旧档升级三连**（v0.1 load 补默认 → save → load 不动点，旧字段保留无漂移）；**写入中断**（JSON 截断读）→ 备份标记 + 默认回退不崩启动；**导入垃圾形状**归一化不崩（未知模块剔除/坏成员修复/非法打卡绑定剔除）；只增列 provision 演练由 provisioner.test 既有承担；UG01 ◐ 注记（剩余=真机/多设备面归真机批）；232 测试 |
 | 2026-10-05 | 主线 | 第一百九十七波：成员网格拖拽排序（§17 🟢） | core \`reorderMembers\`（仅重排 settings.members——台账行序无显示语义不动；未覆盖 id 附尾不丢人）+ 成员卡 HTML5 DnD（dragover 虚线落点、drop 即持久化）+ 右键菜单上移/下移（拖拽的键盘可达替代，边界位禁用）；+1 单测、i18n 809→811、229 测试 |
@@ -341,11 +342,11 @@
 - [x] 🟢 WHO 生长参考带实现（依赖上项调研结论）：scripts/fetch-who-data.mjs 构建期下载+转换 → 数据 JSON 入库 → growth.ts 参考带（P3/P15/P50/P85/P97 插值）+ 图注署名与"不构成医疗建议" ✅ 2026-10-04 第七十七轮全量落地（零依赖 fetch 脚本 + SD 全量校验 + who-refs.ts 17.7KB 入库 + whoBand 插值 4 单测 + 生长图带叠加/性别选择/署名免责图注 + D23 成员性别字段；WHO 页面"JS 渲染"误判更正：锚点服务端渲染，curl 原始 HTML 即得直链，调研文档已回填）
 - [ ] 🟡 parenting：辅食新食材 3 天观察期 → 联动 health 过敏史
 - [ ] 🟡 allowance：孩子愿望清单（目标金额 + 存钱进度条）（188 波注记：暂缓——allowance 行是收支事件而非目标实体，愿望的存储模型需产品决策；候选=shopping 模块挂 wish 类别行 + rowlog 存钱流水，随 16 组下一轮 UI 波定案）
-- [ ] 🟢 allowance：利息/收益流水
+- [x] 🟢 allowance：利息/收益流水 ✅ 2026-10-05 第二百波核实：ALLOWANCE_SCHEMA 既有 interest_al 类别 + direction(in)/amount/date/source 列——利息收益即记该类别行（来源列填银行/产品），日期金额流向齐备，无需新开发（待办早于 schema 批量生产，属过时项）
 - [ ] 🟡 favors：年度人情报告（收送 TOP / 净额走势）
 - [x] 🟡 favors：回礼提醒（事件后 N 天） ✅ 2026-10-05 第一百九十波：规则引擎新 kind "after"（ReminderRuleSpec.offsetDays + onlyIf select 条件；nextOccurrence=base+offsetDays，clamp 0–3650）——favors 声明 reciprocate 规则（收礼 direction=in、30 天后、leadDays 0）；完成语义落 oneoff 分支（记已办可恢复，H05 无需改动）；提醒卡标题带「回礼」标记（rule.reciprocate，UI 侧 i18n）；provider 级测试（收礼派生/送礼过滤）+ 黄金快照 -u（有意变更）
 - [x] 🟢 media：追更提醒（剧更新日手动登记 → 提醒中枢） ✅ 2026-10-05 第一百八十九波走 schema 声明路线：media 新增 next_update 日期列 + oneoff 规则（leadDays 0=当天提醒），capture 换入 next_update（rating 移出快速表单——观前未知评分，追更日常用登记更新日）；建库器只增列自动补老库；黄金快照 -u 更新（原因=本次有意变更）；field.next_update 双语
-- [ ] 🟢 media：图书借出记录（借出状态复用 assets 模式）
+- [x] 🟢 media：图书借出记录（借出状态复用 assets 模式） ✅ 2026-10-05 第二百波：rowlog loans 类型（第五消费方），media 行详情抽屉"借出记录"分区——借出日/借给谁/归还日（留空=在借），格式 `日期 · 借给 X · 在借/已归还`；通用 appendEntry 去重语义零新增基建；i18n +6（817 键）
 - [x] 🟢 travel：行前证件检查结果存档（检查时间/结论） ✅ 2026-10-05 第一百八十九波：rowlog 新增 checks 类型（第四消费方），travel-plan 行详情抽屉"行前证件检查"分区——日期+结论两字段（追加+完全重复去重），格式 `日期 · 结论`；i18n +3
 - [ ] 🟡 house：水电煤抄表流水（表读数记录）
 - [ ] 🟡 house：保修期联动 contracts（按原始保修条件核对范围、排除项、凭证及服务商确认；在保日期不自动代表免费维修）

@@ -822,6 +822,24 @@
                     remove: async (e) => { await rl.saveRowLogs(plugin as any, rl.removeEntry(await fresh(), ref!.avId!, row.itemID, "checks", e)); },
                     format: (e) => `${e.date} · ${e.result}`,
                 });
+            } else if (active === "media") {
+                // 16 组/200 波：图书借出记录（rowlog loans；归还日留空=在借）
+                await addRowLogSection({
+                    title: t("ledger.loans"), emptyText: t("ledger.noLoans"), addLabel: t("ledger.valAdd"),
+                    fields: [
+                        { key: "date", type: "date", placeholder: "", width: 130 },
+                        { key: "to", type: "text", placeholder: t("ledger.loanTo"), width: 100 },
+                        { key: "back", type: "date", placeholder: t("ledger.loanBack"), width: 130 },
+                    ],
+                    load: () => fresh().then((l) => rl.getEntries<any>(l, ref!.avId!, row.itemID, "loans")),
+                    add: async (v) => {
+                        if (!v.date || !v.to) { showMessage(t("ledger.logInvalid"), 3000, "error"); return false; }
+                        await rl.saveRowLogs(plugin as any, rl.appendEntry(await fresh(), ref!.avId!, row.itemID, "loans", { date: v.date, to: v.to, back: v.back || "", at: at() }));
+                        return true;
+                    },
+                    remove: async (e) => { await rl.saveRowLogs(plugin as any, rl.removeEntry(await fresh(), ref!.avId!, row.itemID, "loans", e)); },
+                    format: (e) => `${e.date} · ${t("ledger.loanTo")} ${e.to}${e.back ? ` · ${e.back} ${t("ledger.loanReturned")}` : ` · ${t("ledger.loanOut")}`}`,
+                });
             }
         })();
 
