@@ -297,8 +297,7 @@
 
     async function save() {
         saving = true;
-        try {
-            const prevMembers = plugin.settings.members;
+        try {            const prevMembers = plugin.settings.members;
             const prevModules = new Set(plugin.settings.enabledModules);
             const modulesChanged = draftEnabled.length !== prevModules.size || draftEnabled.some((id) => !prevModules.has(id));
             plugin.settings.enabledModules = [...draftEnabled];
@@ -336,6 +335,9 @@
             } else {
                 showMessage(t("saved"), 2000, "info");
             }
+        } catch (e) {
+            // §15/186 波：saveSettings 重试仍失败（或成员同步抛错）→ 显式上报，不静默假成功
+            showMessage(`${t("settings.saveFailed")}${e instanceof Error ? ` (${e.message})` : ""}`, 6000, "error");
         } finally {
             saving = false;
         }

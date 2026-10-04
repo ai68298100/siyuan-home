@@ -77,7 +77,17 @@ export async function loadSettings(plugin: Plugin): Promise<HomeSettings> {
 }
 
 export async function saveSettings(plugin: Plugin, settings: HomeSettings): Promise<void> {
-    await plugin.saveData(SETTINGS_NAME, settings);
+    // §15：写入失败重试一次（瞬时内核忙/工作区切换等）；仍失败抛带原始信息的错误，由调用方上报
+    try {
+        await plugin.saveData(SETTINGS_NAME, settings);
+    } catch (e1) {
+        await new Promise((r) => setTimeout(r, 300));
+        try {
+            await plugin.saveData(SETTINGS_NAME, settings);
+        } catch {
+            throw new Error(`settings save failed after retry: ${e1 instanceof Error ? e1.message : String(e1)}`);
+        }
+    }
 }
 
 export interface NormalizedImport {

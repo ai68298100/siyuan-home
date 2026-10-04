@@ -3,6 +3,7 @@
     import type { HomePluginLike } from "@/types/plugin";
     import { saveRuntime } from "@/core/hub/runtime";
     import { buildDisplay as display } from "@/core/hub/display";
+    import { relativeDue } from "@/core/hub/rule";
     import { moduleIcon } from "@/core/modules";
     import type { Reminder } from "@/types";
     let { plugin, t, version }: { plugin: HomePluginLike; t: (k: string) => string; version?: number } = $props();
@@ -215,6 +216,12 @@
     function memberName(id: string): string {
         return (plugin.settings.members ?? []).find((m) => m.id === id)?.name ?? t("members.unassigned");
     }
+    // 17 组/186 波：相对到期短语（今天/明天/N 天后/逾期 N 天）；≥7 天沿用 ISO；完整日期走 title 悬浮
+    function relDue(daysLeft: number, fallback: string): string {
+        const rel = relativeDue(daysLeft);
+        if (!rel) return fallback;
+        return rel.n === undefined ? t(rel.key) : t(rel.key).replace("${n}", String(rel.n));
+    }
 </script>
 
 {#snippet remRow(r: Reminder)}
@@ -224,7 +231,7 @@
                 checked={selected.has(r.id)} onchange={() => toggleSelect(r.id)} style="flex-shrink:0" />
         {/if}
         <div class="lv-rem-ic">{r.moduleId === "adhoc" ? "📝" : moduleIcon(r.moduleId)}</div>
-        <div class="lv-rem-t" title={r.autoRenew ? t("hub.autoRenew") : undefined}><b>{r.title}</b><span class="lv-num">{r.dueDate}{r.lunar ? " 🌙" : ""}{r.autoRenew ? " 🔄" : ""}</span></div>
+                        <div class="lv-rem-t" title={(r.autoRenew ? `${t("hub.autoRenew")} · ` : "") + r.dueDate}><b>{r.title}</b><span class="lv-num">{relDue(r.daysLeft, r.dueDate)}{r.lunar ? " 🌙" : ""}{r.autoRenew ? " 🔄" : ""}</span></div>
         <span class="lv-badge {levelBadge[r.level]}">
             {r.level === "overdue" ? t("level.overdue") : r.level === "soon" ? t("level.soon") : t("level.lead")}
         </span>
@@ -337,7 +344,7 @@
                         onkeydown={(e: KeyboardEvent) => (e.key === "Enter" || e.key === " ") && (e.preventDefault(), toggleMerge(entry.key))}
                         onclick={() => toggleMerge(entry.key)}>
                         <div class="lv-rem-ic" aria-hidden="true">👪</div>
-                        <div class="lv-rem-t"><b>{memberName(entry.memberId)} · {entry.dueDate}</b><span class="lv-caption">{t("hub.mergeHint")}</span></div>
+                        <div class="lv-rem-t" title={`${memberName(entry.memberId)} · ${entry.dueDate}`}><b>{memberName(entry.memberId)} · {relDue(entry.row.daysLeft, entry.dueDate)}</b><span class="lv-caption">{t("hub.mergeHint")}</span></div>
                         <span class="lv-badge orange">{entry.items.length}</span>
                         <div class="lv-rem-ops"><span class="lv-caption" aria-hidden="true">{expandedMerges.has(entry.key) ? "▾" : "▸"}</span></div>
                     </div>

@@ -131,3 +131,16 @@ export async function buildReminder(
         ...(row.autoRenew ? { autoRenew: true } : {}),
     };
 }
+
+/** 相对到期表述（17 组：时间文案本地化，186 波）。复用 overview 既有 days.* 键族（+补 days.tomorrow）；
+ * ≥7 天返回 null（调用方沿用 ISO 日期——信息密度优于"23 天后"）；完整日期恒由调用方挂 title 悬浮。 */
+export type RelativeDue = { key: "days.overdue" | "days.today" | "days.tomorrow" | "days.after"; n?: number };
+export function relativeDue(daysLeft: number): RelativeDue | null {
+    if (!Number.isFinite(daysLeft)) return null;
+    const d = Math.floor(daysLeft);
+    if (d < 0) return { key: "days.overdue", n: -d };
+    if (d === 0) return { key: "days.today" };
+    if (d === 1) return { key: "days.tomorrow" };
+    if (d <= 6) return { key: "days.after", n: d };
+    return null;
+}

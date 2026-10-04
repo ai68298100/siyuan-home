@@ -5,7 +5,7 @@
 import { describe, it, expect } from "vitest";
 import { Lunar } from "lunar-typescript";
 import {
-    nextOccurrence, levelOf, buildReminder, localDateKey, parseDate,
+    nextOccurrence, levelOf, buildReminder, localDateKey, parseDate, relativeDue,
     type LedgerRowDates,
 } from "@/core/hub/rule";
 import { lunarToSolar } from "@/core/hub/lunar-lazy";
@@ -159,5 +159,21 @@ describe("工具函数", async () => {
         expect(parseDate("not-a-date")).toBeUndefined();
         expect(parseDate(undefined)).toBeUndefined();
         expect(parseDate("2026-10-01")?.getFullYear()).toBe(2026);
+    });
+});
+
+describe("relativeDue（17 组/186 波：相对到期短语）", () => {
+    it("逾期/今天/明天/N 天后各有键；明天不落'1 天后'", () => {
+        expect(relativeDue(-2)).toEqual({ key: "days.overdue", n: 2 });
+        expect(relativeDue(0)).toEqual({ key: "days.today" });
+        expect(relativeDue(1)).toEqual({ key: "days.tomorrow" });
+        expect(relativeDue(3)).toEqual({ key: "days.after", n: 3 });
+    });
+
+    it("≥7 天与小数/非法输入回退（调用方沿用 ISO 日期）", () => {
+        expect(relativeDue(7)).toBeNull();
+        expect(relativeDue(90)).toBeNull();
+        expect(relativeDue(2.7)).toEqual({ key: "days.after", n: 2 }); // 向下取整
+        expect(relativeDue(NaN)).toBeNull();
     });
 });

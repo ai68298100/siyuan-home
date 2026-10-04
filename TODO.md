@@ -1,4 +1,5 @@
 # 小驴管家（Lv Home）· 项目待办总清单
+| 2026-10-05 | 主线 | 第一百八十六波：§15/§17 工程池三连清——相对时间表述 + saveSettings 重试 + 笔记本关闭核实（用户指令"继续开发，别停下"） | **时间表述本地化（17 组）**：`relativeDue` 纯函数（rule.ts——逾期N天/今天/明天/1–6 天后；≥7 天沿用 ISO 日期，信息密度优于"23 天后"；复用 overview 既有 days.* 键族+新增 days.tomorrow）；提醒页行卡与合并卡接入，悬浮 title=完整 ISO 日期（autoRenew 提示并入 title）；+2 单测；**settings 写入失败重试（§15）**：saveSettings 失败 300ms 后重试一次，仍失败抛带原始信息错误；设置页 save() 补 catch 显式上报（此前静默假成功）；+2 单测；**笔记本关闭核实（§15）**：ensureNotebook 两分支已处理 closed→openNotebook 且 provisioner.test 覆盖——已实现补勾选；i18n 773→775、单测 207→211；门禁全绿 |
 | 2026-10-05 | 主线 | 第一百八十五波：浏览器真机批尝试（跳过）+ N5 指南英文化全量收官（用户指令"继续开发，解决不了就跳过"） | **浏览器真机批**：IAB 驱动 web 端——锁屏授权页输入 accessAuthCode 解锁成功（凭据链首次验证 ✓），但思源应用壳自举后陷入"点击刷新"循环、整页重载后白屏（快照零节点）——与 65 波登记的"IAB web 壳启动失败（与本插件无关）"一致，二次确认死路，按授权跳过；真机批维持人工 runbook（阶段 1 前置状态未消耗，settings.json 仍不存在，预检"首启即 onboarding"保持原样）；**N5 收官**：六篇指南全部英文化（*.en.md，约 300 行人工翻译，术语对齐 i18n 键位），中文篇头加互链；探针教训沿用 E8（sy 包装器）无关；门禁全绿、部署无变化（纯文档波零代码变更） |
 | 2026-10-05 | 主线 | 第一百八十四波：N3 向导性别引导 + 26.7 移动端 CSS 覆盖修复 + N4 调研闭环（用户指令"继续开发，跳过解决不了的"） | **N3（重估方案 A）**：完成步在选中孩子时显示 `wiz.sexHint` 引导（role=note/accent 色）——"生长带需要成员性别，完成后到成员页补"；方案 B 经核不成立（向导本就不存 childrenSex，grep 零命中）；**26.7 🔴 移动端操作**：实锤 design-system.scss 窄屏块 hover:none 常显规则被后续同特异性 `display:none` 覆盖（触屏操作全隐），且一刀切 display:none 连桌面窄窗 hover/键盘 focus-within 一起杀掉——删 display:none，窄屏沿用宽屏 opacity 显现，仅 hover:none 强制常显（真机设备验收归 UI09）；**N4 调研闭环**：[WHO2007 生长参考 5–19 岁调研](docs/research/2026-10-05-WHO2007生长参考5-19岁调研.md)——可实施 1–2 波、无增量许可风险（官方 expanded LMS 表与 0–60 月管线同构、AnthroPlus 不需要），关键缺口=体重 for-age 仅到 10 岁（BMI 面板=立项决策点）；i18n 772→773、207 测试、部署 28 文件 0 陈旧、预检 11/11、活体 8/8 |
 | 2026-10-05 | 主线 | 第一百八十三波：N7 方案①落地（renderLedgerAll 全量读）+ D06 收尾（同名歧义人工选择）（用户授权自主决策） | **IT-07 探针结案**（一次性探针脚本建 62 行临时库）：render 接受 `page`（第 2 页余量 12/62 首行不同）与 `pageSize`（200→62 一次全量）参数，setter 端点不存在 → **E13** 结论，N7 定方案①；**renderLedgerAll**（200/页逐页累积、跨页去重、100 页上限、越界即止不谎报）接入扫描派生 providers×4/健康检查/成员回填/CSV 导出——**>50 行台账提醒恢复派生（N7 验收达成）**，UI 列表维持单页（PF11）；**D06 收尾**：BackfillResult.ambiguous 升级候选明细（id+角色·生日摘要），设置·关于回填后歧义自动弹人工选择对话框（radio 单选/textContent 安全/确认批量写 avItemId）；探针调试三坑自录（api 双 /api 前缀、j 带引号嵌入、JSON.stringify 后正则匹配转义引号）；i18n 769→772、单测 204→207、**活体 8/8**（新增 E13 真机用例）、部署 28 文件+4 陈旧清理、预检 11/11；**依赖注记**：pnpm-lock.yaml 由 pnpm 12.5.1 自动补 packageManagerDependencies 钉扎段（无版本变更，本地/CI 同绿后入库） |
@@ -284,11 +285,11 @@
 - [x] 🔴 settings.json 损坏容错：解析失败 → 备份坏文件 + 回退默认值 + 警告 toast ✅ 2026-10-03 第十四轮（loadDataSafe：抛错/非对象 → 回退默认 + onload 警告 toast；诚实边界：API 无法安全回读原始坏文件，备份为 .corrupted.json 标记（时间/原因），原文件留给思源备份处理；runtime 同样接入；单测两条路径）
 - [ ] 🔴 孤儿提醒清理：台账行被删除后，HubState 中残留提醒自动清除
 - [ ] 🔴 模块禁用时其提醒立即从 HubState 与通知中剔除
-- [ ] 🟡 settings 写入失败重试与错误上报（saveData 异常捕获）
+- [x] 🟡 settings 写入失败重试与错误上报（saveData 异常捕获） ✅ 2026-10-05 第一百八十六波：saveSettings 失败自动重试一次（300ms 间隔），仍失败抛带原始信息的错误；设置页 save() 补 catch——showMessage「保存失败（已自动重试一次）」+ 原因，不静默假成功；+2 单测（重试成功/重试仍失败）
 - [x] 🔴 成员双 ID 关联修正：FamilyMember.avItemId 回填（addDetachedRow 返回值）+ certs provider 读 relation.blockIDs 反查 memberId ✅ 2026-10-02（老成员无 avItemId 需重加或补写，迁移待办见 33.2）
 - [x] 🟡 老成员 avItemId 迁移：v0.2.0 前添加的成员在 members 库中已有行但 settings 无 avItemId → 诊断区提供"按姓名匹配回填"工具 ✅ 2026-10-02（诊断区一键按姓名回填）
 - [ ] 🔴 B2d 定案记录：kernel.js（goja）无定时器 API → 定时扫描=前端心跳 30min + Tab 打开触发；kernel 侧保留 RPC 供生态（v0.3）；03 §3 已按此实现，文档同步
-- [ ] 🟡 笔记本被用户关闭（closed=true）→ ensureNotebook 重新打开或引导
+- [x] 🟡 笔记本被用户关闭（closed=true）→ ensureNotebook 重新打开或引导 ✅ 2026-10-05 第一百八十六波核实：ensureNotebook 两个查找分支均已处理 closed → openNotebook 重开（provisioner.ts:71/79），provisioner.test 的 openNotebook mock（closed→false）覆盖该路径——已实现有测试，补勾选
 - [ ] 🟡 笔记本被删除 → 诊断区一键重建全部已启用模块台账
 - [ ] 🟡 台账文档被移入回收站 → dbRefs 失效检测与恢复路径
 - [ ] 🟡 提醒列表 >200 条虚拟滚动（防长列表卡顿）
@@ -352,7 +353,7 @@
 - [x] 🔴 删除行走思源块删除（保留撤销窗口），禁止绕过 UI 直接删（detached 行语义修正 ✅ 2026-10-03 第九轮：detached 行非块，走 av 行删除端点（[待实测]）+ 双确认 + 失败引导手动删除；绑定行的块删除与撤销窗口维持 P12 实测后设计）
 - [ ] 🟡 统计卡点击下钻（模块卡 → 预筛选的台账/提醒视图）
 - [ ] 🟢 提醒行就地展开摘要（不离开列表）
-- [ ] 🟡 时间表述本地化（「3 天后 / 下周三」+ 悬浮完整日期）
+- [x] 🟡 时间表述本地化（「3 天后 / 下周三」+ 悬浮完整日期） ✅ 2026-10-05 第一百八十六波：relativeDue 纯函数（rule.ts，逾期N天/今天/明天/N 天后；≥7 天沿用 ISO 日期——信息密度优于"23 天后"；复用 overview 既有 days.* 键族+补 days.tomorrow）；提醒页行卡与合并卡、悬浮 title=完整 ISO 日期（autoRenew 提示并入）；overview 原有同款相对文案保持一致；+2 单测共 211
 - [ ] 🟡 空工作区首启体验（无笔记本时引导先建笔记本）
 - [ ] 🟢 bookmarks 失效链接检测（周期 HEAD 检查+标记失效——Raindrop 印证，进阶）
 - [ ] 🟢 快速录入日期智能解析（TickTick 印证；实现规格已深挖：今天/明天/下周X/X月X日/明早9点等格式+模糊日期取最近有效日+识别后移除残留，见 MODULES.md 附录滴答清单·智能解析条目；中文正则可覆盖）

@@ -3,7 +3,7 @@
  * + 15 组：坏文件容错 + 17 组：同键通知合并器。
  */
 import { describe, it, expect, beforeEach } from "vitest";
-import { loadSettings, normalizeImportedSettings, normalizeCheckinBindings } from "@/core/settings";
+import { loadSettings, saveSettings, normalizeImportedSettings, normalizeCheckinBindings } from "@/core/settings";
 import { loadRuntime } from "@/core/hub/runtime";
 import { coalescedNotify, resetNotifyState } from "@/libs/notify-queue";
 
@@ -192,5 +192,23 @@ describe("通知合并器（17 组防轰炸适配）", () => {
         expect(coalescedNotify("a", () => { shown++; }, t0)).toBe(true);
         expect(coalescedNotify("b", () => { shown++; }, t0)).toBe(true);
         expect(shown).toBe(2);
+    });
+});
+
+describe("saveSettings 写入重试（§15/186 波）", () => {
+    const settings = { enabledModules: ["certs"], members: [] } as any;
+
+    it("首次失败 → 重试一次成功（不抛错，共两次写入）", async () => {
+        let calls = 0;
+        const plugin = { saveData: async () => { calls++; if (calls === 1) throw new Error("busy"); } } as any;
+        await saveSettings(plugin, settings);
+        expect(calls).toBe(2);
+    });
+
+    it("重试仍失败 → 抛带原始信息的错误（调用方上报）", async () => {
+        let calls = 0;
+        const plugin = { saveData: async () => { calls++; throw new Error("kernel gone"); } } as any;
+        await expect(saveSettings(plugin, settings)).rejects.toThrow(/kernel gone/);
+        expect(calls).toBe(2);
     });
 });
