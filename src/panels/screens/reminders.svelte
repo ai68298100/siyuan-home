@@ -3,7 +3,7 @@
     import type { HomePluginLike } from "@/types/plugin";
     import { saveRuntime } from "@/core/hub/runtime";
     import { buildDisplay as display } from "@/core/hub/display";
-    import { relativeDue } from "@/core/hub/rule";
+    import { relativeDue, weekdayKey } from "@/core/hub/rule";
     import { moduleIcon } from "@/core/modules";
     import type { Reminder } from "@/types";
     let { plugin, t, version }: { plugin: HomePluginLike; t: (k: string) => string; version?: number } = $props();
@@ -220,7 +220,12 @@
     function relDue(daysLeft: number, fallback: string): string {
         const rel = relativeDue(daysLeft);
         if (!rel) return fallback;
-        return rel.n === undefined ? t(rel.key) : t(rel.key).replace("${n}", String(rel.n));
+        const base = rel.n === undefined ? t(rel.key) : t(rel.key).replace("${n}", String(rel.n));
+        if (rel.key === "days.after") {
+            const wk = weekdayKey(fallback);
+            if (wk) return `${base} · ${t(wk)}`; // 205 波：N 天后附星期几（原待办「下周三」半边的补齐）
+        }
+        return base;
     }
 </script>
 

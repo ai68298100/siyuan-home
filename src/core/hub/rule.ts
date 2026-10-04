@@ -150,3 +150,10 @@ export function relativeDue(daysLeft: number): RelativeDue | null {
     if (d <= 6) return { key: "days.after", n: d };
     return null;
 }
+
+/** 周几键（17 组/205 波：「N 天后 · 周六」——排期语境星期比天数直观）。非法日期返回 null。 */
+export function weekdayKey(dueDate: string): "week.sun" | "week.mon" | "week.tue" | "week.wed" | "week.thu" | "week.fri" | "week.sat" | null {
+    const d = parseDate(dueDate);
+    if (!d || Number.isNaN(d.getDay())) return null;
+    return (["week.sun", "week.mon", "week.tue", "week.wed", "week.thu", "week.fri", "week.sat"] as const)[d.getDay()];
+}

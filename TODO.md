@@ -1,4 +1,5 @@
 # 小驴管家（Lv Home）· 项目待办总清单
+| 2026-10-05 | 主线 | 第二百零五波：相对到期表述附周几（17 组「下周三」半边补齐）+ 包体复测记档 | **周几增补**：2–6 天后显示\"N 天后 · 周六\"（排期语境星期比天数直观）——weekdayKey 纯函数（非法日期 null）+ reminders 页行卡/合并卡接入 + week.sun–sat 七键双语 + 2 测试共 235；**包体复测**：index.js gzip 63.0KB/100KB 预算（116 波 57.3KB → 百波功能净增 5.7KB，余量 37%；growth/lunar 懒加载 chunk 不计首屏）；门禁全绿 |
 | 2026-10-05 | 循环A | 第二百零四波：循环 A 全面走查（九项清单第 12 次全量，距上次约百波） | **即修 1 项**：libs/dialog.ts 死导出清除——inputDialog/inputDialogSync/confirmDialog/confirmDialogSync（模板继承工具箱，零调用；innerHTML 注入面所在一并消失）仅留在用 simpleDialog+svelteDialog（107 波 promise-pool 先例）；**零命中项**：console 调试残留、TODO/FIXME（仅 1 处在册已知边界）、innerHTML 用户内容面（存量三处均 i18n 常量/清空语义）、libs 其余死导出、pnpm audit；**接受项**：qr 黑白（扫码可靠性注释在册）、生长图五色系列（图表数据色，既往走查已接受）、any 82 处（av 内核形态层，历史决策）；234 测试、门禁全绿 |
 | 2026-10-05 | 主线 | 第二百零三波：端点结论在发版实例复核（§8）+ 集市元数据快检（CM） | **e2e-endpoints 首次在真机批实例（14643）重跑**：E1（render 250/50 默认分页）、E2（PK 200+50 无重叠）复确认；E6/E15（upload file[] + succMap 相对路径）原始 curl 手工复确认——脚本上传步空响应根因=Git Bash /tmp 虚拟路径在 MSYS2 排除下 curl 不可读（curl 26），cygpath 转 Windows 路径即成功（教训已在册）；E11–E16 由活体套件日常覆盖——**§8 全部结论在发版所用实例上成立**（记档）；**CM 快检**：plugin.json 双语 displayName/description/readme 映射/keywords/funding/前端后端矩阵完备，无需增补 |
 | 2026-10-05 | 主线 | 第二百零二波：取证核销轮——四条待办逐一处置（两设计覆盖/一文档测试/一评估挂起） | **成员下钻面包屑返回**：手风琴展开形态再点即收（返回路径内建）✓；**空工作区首启**：零笔记本由 onboarding/ensureCoreLedgers 自动建库（provisioner.test 在册）✓；**跨时区说明**：FAQ 新增「多设备时区不同，日期会乱吗？」+ rule.test 跨时区不变式（UTC 构造时刻键=本地字段推导，不假设 CI 时区）✓；**虚拟滚动**：评估后挂起（家庭量级数百简单卡片远低于卡顿阈值，虚拟化对变高合并卡复杂度不值；PF17 真机实测遇卡顿再立项）✓；+1 测试共 235 |
@@ -372,7 +373,7 @@
 - [x] 🔴 删除行走思源块删除（保留撤销窗口），禁止绕过 UI 直接删（detached 行语义修正 ✅ 2026-10-03 第九轮：detached 行非块，走 av 行删除端点（[待实测]）+ 双确认 + 失败引导手动删除；绑定行的块删除与撤销窗口维持 P12 实测后设计）
 - [x] 🟡 统计卡点击下钻（模块卡 → 预筛选的台账/提醒视图） ✅ 2026-10-05 第一百九十六波：模块卡待办徽章（pending>0 时）成为独立下钻目标——点击/Enter → runtime.hubModuleId 预筛选 + 切提醒页（stopPropagation，卡片本体仍进台账预选）；徽章带 role=button/tabindex/标题提示（PL13 语义）；提醒页筛选持久化机制（C3a hubModuleId）直接复用
 - [ ] 🟢 提醒行就地展开摘要（不离开列表）
-- [x] 🟡 时间表述本地化（「3 天后 / 下周三」+ 悬浮完整日期） ✅ 2026-10-05 第一百八十六波：relativeDue 纯函数（rule.ts，逾期N天/今天/明天/N 天后；≥7 天沿用 ISO 日期——信息密度优于"23 天后"；复用 overview 既有 days.* 键族+补 days.tomorrow）；提醒页行卡与合并卡、悬浮 title=完整 ISO 日期（autoRenew 提示并入）；overview 原有同款相对文案保持一致；+2 单测共 211
+- [x] 🟡 时间表述本地化（「3 天后 / 下周三」+ 悬浮完整日期） ✅ 2026-10-05 第一百八十六波（205 波增补：2–6 天后附周几——"N 天后 · 周六"，排期语境星期比天数直观；weekdayKey 纯函数 + week.sun–sat 七键双语 + 2 测试）：relativeDue 纯函数（rule.ts，逾期N天/今天/明天/N 天后；≥7 天沿用 ISO 日期——信息密度优于"23 天后"；复用 overview 既有 days.* 键族+补 days.tomorrow）；提醒页行卡与合并卡、悬浮 title=完整 ISO 日期（autoRenew 提示并入）；overview 原有同款相对文案保持一致；+2 单测共 211
 - [x] 🟡 空工作区首启体验（无笔记本时引导先建笔记本） ✅ 2026-10-05 第二百零二波核实（设计覆盖+测试在册）：零笔记本工作区由 onboarding/ensureCoreLedgers 自动建默认笔记本——provisioner.test「无登记且默认名不存在 → 新建」即此路径，无需引导步骤
 - [ ] 🟢 bookmarks 失效链接检测（周期 HEAD 检查+标记失效——Raindrop 印证，进阶）
 - [ ] 🟢 快速录入日期智能解析（TickTick 印证；实现规格已深挖：今天/明天/下周X/X月X日/明早9点等格式+模糊日期取最近有效日+识别后移除残留，见 MODULES.md 附录滴答清单·智能解析条目；中文正则可覆盖）

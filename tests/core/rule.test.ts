@@ -5,7 +5,7 @@
 import { describe, it, expect } from "vitest";
 import { Lunar } from "lunar-typescript";
 import {
-    nextOccurrence, levelOf, buildReminder, localDateKey, parseDate, relativeDue,
+    nextOccurrence, levelOf, buildReminder, localDateKey, parseDate, relativeDue, weekdayKey,
     type LedgerRowDates,
 } from "@/core/hub/rule";
 import { lunarToSolar } from "@/core/hub/lunar-lazy";
@@ -184,6 +184,13 @@ describe("时间回拨与跨天容错（§15/194 波：due 计算幂等）", () 
         const instant = new Date("2026-01-01T20:00:00Z"); // UTC+8 为 1/2 凌晨，UTC 为 1/1
         const expected = `${instant.getFullYear()}-${String(instant.getMonth() + 1).padStart(2, "0")}-${String(instant.getDate()).padStart(2, "0")}`;
         expect(localDateKey(instant)).toBe(expected);
+    });
+
+    it("weekdayKey（205 波：N 天后附周几）", () => {
+        expect(weekdayKey("2026-10-05")).toBe("week.mon"); // 周一
+        expect(weekdayKey("2026-10-10")).toBe("week.sat"); // 周六
+        expect(weekdayKey("not-a-date")).toBeNull();
+        expect(weekdayKey(undefined as unknown as string)).toBeNull();
     });
 
     const ruleMonthly = { key: "pay", field: "due", kind: "recurring" as const, leadDays: 3 };
