@@ -1,4 +1,5 @@
 # 小驴管家（Lv Home）· 项目待办总清单
+| 2026-10-05 | 主线 | 第一百九十四波：§15 容错与幂等测试加固（时间回拨/跨天 + 多端同行写回） | **时间容错（测试钉住）**：recurring 回拨后 due 不早于 today（永不 overdue）且与未回拨一致；anniversary 2/29 平年 2/28/滚明年/回拨当天即当天（决策 09）；buildReminder 同日重扫完全一致——+3 测试；**多端幂等（测试钉住）**：成员 DAL 同数据双调用 updateMember → av 行快照一致、行数不变（值覆盖写天然幂等）；+1 测试；§15 剩余均为需真机/产品项（回收站恢复路径、虚拟滚动、金额显示层等）；228 测试 |
 | 2026-10-05 | 主线 | 第一百九十三波：SCHEMA_CATALOG 单源收口（12 波清单漂移教训同类结构）+ IT-12 列类型×真机矩阵（E16） | **单源收口**：core/schema.ts 导出 SCHEMA_CATALOG（31 模块）+ KERNEL_COLUMN_TYPES 白名单；index.ts 两份手工清单（schemaCatalog 属性 + 契约门禁 allSchemas）+ getDiagnostics contracts 全部改单源引用（约 50 行清单→单引用）；**IT-12**：白名单 9 类型（text/number/date/select/mSelect/checkbox/url/relation/mAsset）逐一真机建列全支持（mSelect 本波核验入册）；静态契约双测试=目录覆盖 BUILT_IN_MODULES 全部 id（新增模块漏 schema 当场红）+ 全部列类型⊆白名单（E14 教训契约化，当场抓到 mSelect 未入册）；§8 补 E16；224 测试、i18n 807 |
 | 2026-10-05 | 主线 | 第一百九十二波：**IT-11 真机实测抓到两个潜在建库/上传 bug（E14/E15）+ 成员头像上传** | **IT-11 新用例**（uploadAsset + 资源单元格写读回）首跑连爆两雷：**E14** 内核 addAttributeViewKey 不支持 asset 单资源列——MEMBERS_SCHEMA.avatar 原声明 asset，**成员台账首次建库会在前端首启直接失败**（真机批阶段 1 前被活体套件拦截）→ 改 mAsset 单值承载（快照 -u）；**E15** uploadAsset 字段名 file → 真机 code 0 但 succMap 空（抽屉附件上传同源失效）→ 改 file[]；succMap 返回相对路径（无前导斜杠）如实记档；live-env 补绝对地址上传 transport（node 无相对 fetch）；**头像上传 UI**：成员卡 📷 → uploadAsset → mAsset 写入台账行（事实源，settings 不冗余）→ 卡片 img 展示（origin 相对解析），无关联行引导；§8 补 E14/E15；i18n 803→807、活体 9/9、222 测试 |
 | 2026-10-05 | 主线 | 第一百九十一波：assets CSV 批量导入（16 组，列映射向导——迁移路径闭环） | **解析层**：`parseCsv` RFC 4180（BOM 剥离/引号字段含逗号换行/"" 转义/LF+CRLF/空行跳过；与 buildCsv 互逆往返测试）；**映射层**：`core/importer.ts` 纯函数——planImport（名称列必需、数字容忍千分位、日期斜杠转连字符、非法值记行内 warning 不废弃整行、checkbox 中文符号识别、名称为空整行跳过）+ guessMapping（表头=key 或 i18n 标签，不区分大小写）；**UI**：assets 工具栏"导入 CSV"→ 向导（逐列映射下拉可跳过、开始导入前确认新建行数、逐行 addDetachedRow+按映射 setCell（复用 D09 cellValue）、失败行号聚合报告、完成后增量重扫）；高后果语义：确认框言明不可一键撤销；+5 单测共 222、i18n 792→803 |
@@ -302,9 +303,9 @@
 - [ ] 🟡 提醒列表 >200 条虚拟滚动（防长列表卡顿）
 - [x] 🟡 系统休眠错过定时扫描 → 唤醒/开面板补扫 ✅ 2026-10-03 第十一轮（visibilitychange 恢复可见即补扫，10 分钟最小间隔合并重复触发（PF13 语义），卸载解绑；Tab 打开触发与 30min 心跳原有；真机休眠/唤醒走查见回归清单 7.5）
 - [x] 🟡 农历闰月生日规则定案（闰月生日在平年如何处理）+ 单测 ✅ 2026-10-01（09 决策记录 / commit 168dcae）
-- [ ] 🟡 系统时间回拨/跨天瞬间的扫描容错（due 计算幂等）
+- [x] 🟡 系统时间回拨/跨天瞬间的扫描容错（due 计算幂等） ✅ 2026-10-05 第一百九十四波（测试钉住）：recurring 回拨后 due 不早于 today（永不 overdue 语义）且与未回拨一致；anniversary 2/29 平年 2/28、已过滚明年、回拨回当天即当天（决策 09）；buildReminder 同日重扫完全一致；+3 测试
 - [ ] 🟢 金额显示层：小数/千分位/多币种符号（仅显示，不做汇率）
-- [ ] 🟢 多端同时编辑同一行：写回操作幂等性验证
+- [x] 🟢 多端同时编辑同一行：写回操作幂等性验证 ✅ 2026-10-05 第一百九十四波（测试钉住）：成员 DAL 同数据双调用 updateMember → av 行快照逐字节一致、行数不变（值覆盖写天然幂等，多端 last-write-wins 下重复写不产生差异）；+1 测试
 - [ ] 🟢 跨时区说明：due 以内核本地时区计算（文档 + 测试用例）
 
 ## 16. 模块功能深化（按模块细化，v0.3+ 逐版吸收进 schema）

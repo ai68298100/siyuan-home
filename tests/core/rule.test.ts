@@ -177,3 +177,34 @@ describe("relativeDue（17 组/186 波：相对到期短语）", () => {
         expect(relativeDue(NaN)).toBeNull();
     });
 });
+
+describe("时间回拨与跨天容错（§15/194 波：due 计算幂等）", () => {
+    const ruleMonthly = { key: "pay", field: "due", kind: "recurring" as const, leadDays: 3 };
+    const row = (d: string): LedgerRowDates => ({ rowId: "r1", title: "t", fieldValue: d, cycle: "month" });
+
+    it("recurring 月周期：正常推进；回拨后 due 不早于 today（recurring 永不 overdue）且与未回拨一致", async () => {
+        expect(localDateKey((await nextOccurrence(ruleMonthly, row("2026-01-10"), new Date(2026, 2, 5)))!)).toBe("2026-03-10");
+        // 时钟从 3 月拨回 2 月：02-10 已过 → 滚到 03-10（与未回拨时相同，不产生 overdue）
+        expect(localDateKey((await nextOccurrence(ruleMonthly, row("2026-01-10"), new Date(2026, 1, 20)))!)).toBe("2026-03-10");
+        // 同日两次扫描 → 同一 due（幂等）
+        const a = await nextOccurrence(ruleMonthly, row("2026-01-10"), new Date(2026, 2, 5));
+        const b = await nextOccurrence(ruleMonthly, row("2026-01-10"), new Date(2026, 2, 5));
+        expect(localDateKey(a!)).toBe(localDateKey(b!));
+    });
+
+    it("anniversary 2/29（决策 09）：平年 2/28；已过则明年；回拨回 2/28 当天即当天", async () => {
+        const ruleAnn = { key: "birthday", field: "birthday", kind: "anniversary" as const, leadDays: 7 };
+        const feb29: LedgerRowDates = { rowId: "r", title: "t", fieldValue: "2000-02-29" };
+        expect(localDateKey((await nextOccurrence(ruleAnn, feb29, new Date(2027, 1, 20)))!)).toBe("2027-02-28");
+        expect(localDateKey((await nextOccurrence(ruleAnn, feb29, new Date(2027, 2, 1)))!)).toBe("2028-02-28");
+        expect(localDateKey((await nextOccurrence(ruleAnn, feb29, new Date(2027, 1, 28)))!)).toBe("2027-02-28");
+    });
+
+    it("buildReminder 同日重复扫描 → 完全一致（level/dueDate/daysLeft 不漂移）", async () => {
+        const rule = { key: "expiry", field: "expiry", kind: "oneoff" as const, leadDays: 7 };
+        const opts = { today: new Date(2026, 9, 1) };
+        const a = await buildReminder(rule, "certs", { rowId: "r", title: "t", fieldValue: "2026-10-05" }, opts);
+        const b = await buildReminder(rule, "certs", { rowId: "r", title: "t", fieldValue: "2026-10-05" }, opts);
+        expect(b).toEqual(a);
+    });
+});

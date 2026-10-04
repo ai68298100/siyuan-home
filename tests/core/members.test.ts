@@ -175,6 +175,22 @@ describe("syncMembersToAv（D05 设置页差异同步）", () => {
         expect(rep.created).toBe(0);
         expect(st.members[0].avItemId).toBeUndefined();
     });
+
+    it("多端同行幂等（§15/194 波）：同数据双调用 updateMember → 写值一致、不新增行", async () => {
+        const av = fakeAv();
+        const { plugin } = memoryPlugin();
+        const st = settings([member({ name: "张三", id: "m1" })]);
+        await addMember(plugin, st, st.members[0]);
+        expect(av.rows.size).toBe(1);
+        const m = st.members.find((x) => x.id === "m1")!;
+        m.birthday = "2000-01-02";
+        await updateMember(plugin, st, { ...m });
+        const snap1 = JSON.stringify([...av.rows.entries()]);
+        await updateMember(plugin, st, { ...m });
+        const snap2 = JSON.stringify([...av.rows.entries()]);
+        expect(snap2).toBe(snap1); // 值覆盖写幂等（多端 last-write-wins 下重复写不产生差异）
+        expect(av.rows.size).toBe(1); // 不新增行
+    });
 });
 
 describe("backfillMemberLinks（D06）", () => {
