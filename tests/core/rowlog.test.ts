@@ -5,6 +5,7 @@ import { describe, it, expect } from "vitest";
 import {
     logKey, getValuations, appendValuation, removeValuation, removeRowLog,
     getEntries, appendEntry, removeEntry,
+    getMeterReadings, appendMeterReading, removeMeterReading,
     type RowLogs,
 } from "@/core/rowlog";
 
@@ -75,5 +76,40 @@ describe("rowlog（行级子记录模型）", () => {
         expect(logs[logKey("av1", "r1")]).toBeDefined(); // transfers 仍在，key 保留
         logs = removeEntry(logs, "av1", "r1", "transfers", { date: "2026-02-01", from: "甲", to: "乙", at: AT });
         expect(logs[logKey("av1", "r1")]).toBeUndefined(); // 全空清 key
+    });
+});
+
+describe("rowlog 抄表（16 组/187 波：house 水电煤）", () => {
+    it("首表无用量；顺序读数记差值；回填旧日期按日期序与前值计差", () => {
+        let logs: RowLogs = {};
+        logs = appendMeterReading(logs, "av1", "r1", "2026-01-01", 100, AT);
+        logs = appendMeterReading(logs, "av1", "r1", "2026-02-01", 130, AT);
+        expect(getMeterReadings(logs, "av1", "r1").map((m) => m.usage)).toEqual([undefined, 30]);
+        logs = appendMeterReading(logs, "av1", "r1", "2026-01-15", 115, AT); // 回填中间读数
+        const readings = getMeterReadings(logs, "av1", "r1");
+        expect(readings.map((m) => m.date)).toEqual(["2026-01-01", "2026-01-15", "2026-02-01"]);
+        expect(readings[1].usage).toBe(15); // 与 01-01 的差
+        expect(readings[2].usage).toBe(30); // 02-01 的差不受回填影响（append 时已定，不重算）
+    });
+
+    it("同日期覆盖；负差（换表/倒转）不记用量；非法输入安静返回", () => {
+        let logs: RowLogs = {};
+        logs = appendMeterReading(logs, "av1", "r1", "2026-01-01", 100, AT);
+        logs = appendMeterReading(logs, "av1", "r1", "2026-01-01", 105, AT); // 同口径日覆盖
+        expect(getMeterReadings(logs, "av1", "r1")).toHaveLength(1);
+        logs = appendMeterReading(logs, "av1", "r1", "2026-02-01", 90, AT); // 负差
+        expect(getMeterReadings(logs, "av1", "r1")[1].usage).toBeUndefined();
+        expect(appendMeterReading(logs, "av1", "r1", "", 10, AT)).toBe(logs);
+        expect(appendMeterReading(logs, "av1", "r1", "2026-03-01", NaN, AT)).toBe(logs);
+    });
+
+    it("删除口径日；全空清 key", () => {
+        let logs: RowLogs = {};
+        logs = appendMeterReading(logs, "av1", "r1", "2026-01-01", 100, AT);
+        logs = appendMeterReading(logs, "av1", "r1", "2026-02-01", 130, AT);
+        logs = removeMeterReading(logs, "av1", "r1", "2026-01-01");
+        expect(getMeterReadings(logs, "av1", "r1")).toHaveLength(1);
+        logs = removeMeterReading(logs, "av1", "r1", "2026-02-01");
+        expect(logs[logKey("av1", "r1")]).toBeUndefined();
     });
 });

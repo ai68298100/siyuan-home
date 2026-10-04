@@ -39,11 +39,20 @@ export interface RowLog {
     moves?: MoveEntry[];
     prices?: PriceEntry[];
     transfers?: MoveEntry[];
+    meters?: MeterEntry[];
 }
 
 export type RowLogs = Record<string, RowLog>;
 
-export type LogKind = "valuations" | "moves" | "prices" | "transfers";
+export type LogKind = "valuations" | "moves" | "prices" | "transfers" | "meters";
+
+export interface MeterEntry {
+    date: string;
+    reading: number;
+    /** 与前一读数的差值；首表或负差（换表/倒转，不猜原因）不记 */
+    usage?: number;
+    at: string;
+}
 
 export function logKey(avId: string, rowId: string): string {
     return `${avId}|${rowId}`;
@@ -107,6 +116,41 @@ export function removeValuation(logs: RowLogs, avId: string, rowId: string, date
     if (!log?.valuations) return logs;
     const rest = log.valuations.filter((v) => v.date !== date);
     const next = { ...logs, [key]: { ...log, valuations: rest } };
+    pruneKeyIfEmpty(next, key);
+    return next;
+}
+
+/** 抄表读数时间线：按日期升序（16 组/187 波：house 水电煤） */
+export function getMeterReadings(logs: RowLogs, avId: string, rowId: string): MeterEntry[] {
+    return getEntries<MeterEntry>(logs, avId, rowId, "meters");
+}
+
+/** 记一笔抄表：同日期覆盖（口径日一个读数）；用量=与"日期早于本次的最近读数"之差
+ * （回填旧读数也按日期序计差）；首表或负差（换表/倒转，不猜原因）不记用量。返回新对象。 */
+export function appendMeterReading(logs: RowLogs, avId: string, rowId: string, date: string, reading: number, at: string): RowLogs {
+    if (!date || !Number.isFinite(reading)) return logs;
+    const key = logKey(avId, rowId);
+    const log = logs[key] ?? {};
+    const prev = (log.meters ?? [])
+        .filter((m) => m.date < date && Number.isFinite(m.reading))
+        .sort((a, b) => a.date.localeCompare(b.date))
+        .pop();
+    const entry: MeterEntry = { date, reading, at };
+    if (prev) {
+        const usage = reading - prev.reading;
+        if (usage >= 0) entry.usage = usage;
+    }
+    const rest = (log.meters ?? []).filter((m) => m.date !== date);
+    return { ...logs, [key]: { ...log, meters: [...rest, entry] } };
+}
+
+/** 删除某口径日的抄表；行下全空时清 key（后续读数的用量不重算——诚实保留既有记录） */
+export function removeMeterReading(logs: RowLogs, avId: string, rowId: string, date: string): RowLogs {
+    const key = logKey(avId, rowId);
+    const log = logs[key];
+    if (!log?.meters) return logs;
+    const rest = log.meters.filter((m) => m.date !== date);
+    const next = { ...logs, [key]: { ...log, meters: rest } };
     pruneKeyIfEmpty(next, key);
     return next;
 }

@@ -638,6 +638,23 @@
                     remove: async (e) => { await rl.saveRowLogs(plugin as any, rl.removeEntry(await fresh(), ref!.avId!, row.itemID, "transfers", e)); },
                     format: (e) => `${e.date} · ${e.from} → ${e.to}`,
                 });
+            } else if (active === "house") {
+                // 16 组/187 波：水电煤抄表流水（rowlog meters 类型；用量=与前一读数之差，换表/倒转不记）
+                await addRowLogSection({
+                    title: t("ledger.meters"), emptyText: t("ledger.noMeters"), addLabel: t("ledger.valAdd"),
+                    fields: [
+                        { key: "date", type: "date", placeholder: "", width: 130 },
+                        { key: "reading", type: "number", placeholder: t("ledger.meterReading"), width: 110 },
+                    ],
+                    load: () => fresh().then((l) => rl.getMeterReadings(l, ref!.avId!, row.itemID)),
+                    add: async (v) => {
+                        if (!v.date || !Number.isFinite(Number(v.reading))) { showMessage(t("ledger.logInvalid"), 3000, "error"); return false; }
+                        await rl.saveRowLogs(plugin as any, rl.appendMeterReading(await fresh(), ref!.avId!, row.itemID, v.date, Number(v.reading), at()));
+                        return true;
+                    },
+                    remove: async (e) => { await rl.saveRowLogs(plugin as any, rl.removeMeterReading(await fresh(), ref!.avId!, row.itemID, e.date)); },
+                    format: (e: any) => `${e.date} · ${e.reading}${typeof e.usage === "number" ? `（+${e.usage}）` : ""}`,
+                });
             }
         })();
 
