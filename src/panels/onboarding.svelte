@@ -79,6 +79,10 @@
             {/each}
             {#if recommended.length === 0}<span class="lv-sub">{t("wiz.noExtra")}</span>{/if}
         </div>
+        {#if picked.includes("child") && children > 0}
+            <!-- N3（重估后方案 A）：向导不建成员实体，性别只读不写不问——完成页引导去成员页补（D23 生长带依赖） -->
+            <p class="lv-caption" role="note" style="margin:-6px 0 14px;color:var(--lv-accent)">ⓘ {t("wiz.sexHint")}</p>
+        {/if}
         <div style="display:flex;justify-content:space-between;align-items:center">
             <button class="b3-button b3-button--outline" onclick={() => (step = 1)}>← {t("wiz.back")}</button>
             {#if provisionError}

@@ -496,6 +496,7 @@
     "diag.rebuilding": "Provisioning…",
     "wiz.finishAndCapture": "Finish & add first cert",
     "wiz.finishCta": "Provision, then jump to cert quick-entry",
+    "wiz.sexHint": "Child selected: growth reference bands need the member's sex — after finishing, add your child on the Members page and set it.",
     "members.deleteTitle": "Remove member",
     "members.deleteBody": "This removes the member reference for \"${name}\" (ledger rows like certificates and reminders are kept and can be reassigned later). Remove?",
     "ledger.notProvisioned": "Ledger not provisioned yet",
