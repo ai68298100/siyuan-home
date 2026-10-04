@@ -15,7 +15,7 @@ import { CertsProvider } from "@/core/hub/providers";
 import { runScan } from "@/core/hub/scanner";
 import { defaultRuntime } from "@/core/hub/runtime";
 import { runHealthCheck } from "@/core/health";
-import { CERTS_SCHEMA } from "@/core/schema";
+import { CERTS_SCHEMA, SCHEMA_CATALOG, KERNEL_COLUMN_TYPES } from "@/core/schema";
 import type { HomeSettings, Reminder } from "@/types";
 
 const gate = await gateProbe();
@@ -188,5 +188,29 @@ describe("live.健康检查 · runHealthCheck 真实模块", () => {
         expect(m.complete).toBe(true);
         expect(m.rows).toBe(3); // 即将 + 远期 + 规则测试重建的逾期行
         expect((m.missingColumns ?? []).length).toBeGreaterThan(0); // fixture 只建 name/expiry/due
+    });
+});
+
+describe("live.IT-12 · 列类型 × 真机支持矩阵（E14 教训的契约化）", () => {
+    it.skipIf(skip)("KERNEL_COLUMN_TYPES 每种类型都能在真机 addAttributeViewKey 建列", async () => {
+        // 独立 scratch av（afterAll 删文档一并清理），逐类型建列收集失败清单
+        const scratchAv = await createAttributeView(DOC, `lvh-it12-${Date.now()}`);
+        const unsupported: string[] = [];
+        for (const type of KERNEL_COLUMN_TYPES) {
+            try {
+                await addAttributeViewColumn(scratchAv, { name: `it12-${type}`, type });
+            } catch (e) {
+                unsupported.push(`${type}: ${e instanceof Error ? e.message : String(e)}`);
+            }
+        }
+        expect(unsupported).toEqual([]);
+    });
+
+    it.skipIf(skip)("SCHEMA_CATALOG 用到的列类型 ⊆ 白名单（静态侧与真机核验对齐）", () => {
+        const used = new Set<string>();
+        for (const schema of Object.values(SCHEMA_CATALOG)) {
+            for (const c of schema.columns) used.add(c.type);
+        }
+        for (const t of used) expect(KERNEL_COLUMN_TYPES.has(t), `类型 ${t} 未入白名单`).toBe(true);
     });
 });

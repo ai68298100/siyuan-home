@@ -637,3 +637,27 @@ export function validateSchema(id: string, schema: ModuleSchema): string[] {
     }
     return errors;
 }
+
+/** 31 模块 schema 单源目录（193 波：index.ts 两份手工清单收口于此——12 波"清单漂移"教训的同类结构；
+ * 消费方：schemaCatalog、ensureCoreLedgers 契约门禁、活体 IT-12 列类型矩阵） */
+export const SCHEMA_CATALOG: Record<string, ModuleSchema> = {
+    members: MEMBERS_SCHEMA, certs: CERTS_SCHEMA,
+    "assets-real": ASSETS_REAL_SCHEMA, health: HEALTH_SCHEMA,
+    medicine: MEDICINE_SCHEMA, memberships: MEMBERSHIPS_SCHEMA, insurance: INSURANCE_SCHEMA,
+    shopping: SHOPPING_SCHEMA, contracts: CONTRACTS_SCHEMA, exams: EXAMS_SCHEMA,
+    allowance: ALLOWANCE_SCHEMA, favors: FAVORS_SCHEMA, stock: STOCK_SCHEMA,
+    chores: CHORES_SCHEMA, house: HOUSE_SCHEMA,
+    media: MEDIA_SCHEMA, pets: PETS_SCHEMA, vehicles: VEHICLES_SCHEMA, transit: TRANSIT_SCHEMA,
+    "travel-plan": TRAVEL_PLAN_SCHEMA, "travel-booking": TRAVEL_BOOKING_SCHEMA,
+    "travel-packing": TRAVEL_PACKING_SCHEMA, "travel-log": TRAVEL_LOG_SCHEMA,
+    "assets-virtual": ASSETS_VIRTUAL_SCHEMA,
+    food: FOOD_SCHEMA, address: ADDRESS_SCHEMA, bookmarks: BOOKMARKS_SCHEMA, snippets: SNIPPETS_SCHEMA,
+    parenting: PARENTING_SCHEMA, schooling: SCHOOLING_SCHEMA, social: SOCIAL_SCHEMA,
+};
+
+/** 列类型白名单（192 波 E14 教训：内核不支持的类型会让该模块建库失败）。
+ * 活体 IT-12 以真机核验本清单；schema 声明新类型前必须先入白名单并过 IT-12。
+ * mSelect（FIELD_DICT.tags）193 波 IT-12 真机核验通过。 */
+export const KERNEL_COLUMN_TYPES: ReadonlySet<string> = new Set([
+    "text", "number", "date", "select", "mSelect", "checkbox", "url", "relation", "mAsset",
+]);

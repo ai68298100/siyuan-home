@@ -6,6 +6,7 @@
 import { describe, it, expect } from "vitest";
 import { buildScanProviders, providerCoverage } from "@/core/hub/registry";
 import {
+    SCHEMA_CATALOG, KERNEL_COLUMN_TYPES,
     MEMBERS_SCHEMA, CERTS_SCHEMA, MEDICINE_SCHEMA, MEMBERSHIPS_SCHEMA, INSURANCE_SCHEMA,
     SHOPPING_SCHEMA, CONTRACTS_SCHEMA, EXAMS_SCHEMA, ALLOWANCE_SCHEMA, FAVORS_SCHEMA,
     STOCK_SCHEMA, CHORES_SCHEMA, HOUSE_SCHEMA, MEDIA_SCHEMA, PETS_SCHEMA, VEHICLES_SCHEMA,
@@ -14,6 +15,7 @@ import {
     FOOD_SCHEMA, ADDRESS_SCHEMA, BOOKMARKS_SCHEMA, SNIPPETS_SCHEMA, PARENTING_SCHEMA,
     SCHOOLING_SCHEMA, SOCIAL_SCHEMA,
 } from "@/core/schema";
+import { BUILT_IN_MODULES } from "@/core/modules";
 import { defaultSettings } from "@/core/settings";
 import type { HomeSettings } from "@/types";
 
@@ -64,5 +66,21 @@ describe("provider 注册表覆盖契约", () => {
         const providers = buildScanProviders(ALL, deps);
         expect(providerCoverage(ALL, providers)).toEqual([]);
         expect(providers.length).toBeGreaterThanOrEqual(19 + 2); // 19 提醒 schema + certs/members 专属 + 数值追加
+    });
+});
+
+describe("SCHEMA_CATALOG 单源契约（193 波）", () => {
+    it("覆盖 BUILT_IN_MODULES 全部模块 id（新增模块漏 schema 当场红）", () => {
+        const ids = BUILT_IN_MODULES.map((m) => m.id).sort();
+        expect(Object.keys(SCHEMA_CATALOG).sort()).toEqual(ids);
+    });
+
+    it("全部列类型都在内核白名单内（E14 教训：新类型必须先过 IT-12 真机核验）", () => {
+        const used = new Set<string>();
+        for (const schema of Object.values(SCHEMA_CATALOG)) {
+            for (const c of schema.columns) used.add(c.type);
+        }
+        const illegal = [...used].filter((ty) => !KERNEL_COLUMN_TYPES.has(ty));
+        expect(illegal).toEqual([]);
     });
 });

@@ -14,7 +14,7 @@ import { complete, snooze, mute, unmute, renew, restore, addMemo, removeMemo } f
 import { provisionModule } from "@/core/provisioner";
 import { addDetachedRow, setCell } from "@/core/siyuan";
 import { mountLvHomeBridge } from "@/bridge/external-bridge";
-import { CERTS_SCHEMA, MEMBERS_SCHEMA, MEDICINE_SCHEMA, MEMBERSHIPS_SCHEMA, INSURANCE_SCHEMA, SHOPPING_SCHEMA, CONTRACTS_SCHEMA, EXAMS_SCHEMA, ALLOWANCE_SCHEMA, FAVORS_SCHEMA, STOCK_SCHEMA, CHORES_SCHEMA, HOUSE_SCHEMA, MEDIA_SCHEMA, PETS_SCHEMA, VEHICLES_SCHEMA, TRANSIT_SCHEMA, TRAVEL_PLAN_SCHEMA, TRAVEL_BOOKING_SCHEMA, TRAVEL_PACKING_SCHEMA, TRAVEL_LOG_SCHEMA, ASSETS_VIRTUAL_SCHEMA, ASSETS_REAL_SCHEMA, HEALTH_SCHEMA, FOOD_SCHEMA, ADDRESS_SCHEMA, BOOKMARKS_SCHEMA, SNIPPETS_SCHEMA, PARENTING_SCHEMA, SCHOOLING_SCHEMA, SOCIAL_SCHEMA, validateSchema } from "@/core/schema";
+import { SCHEMA_CATALOG, validateSchema } from "@/core/schema";
 import type { HomeSettings } from "@/types";
 
 const TAB_TYPE = "hub-tab";
@@ -30,21 +30,8 @@ export default class LvHomePlugin extends Plugin {
     runtime: HubRuntime;
     scan: ScanResult;
     private heartbeat: number | undefined;
-    /** moduleId → schema 目录（UI 按需读取列定义/枚举；与 ensureCoreLedgers 同源） */
-    schemaCatalog: Record<string, any> = {
-        members: MEMBERS_SCHEMA, certs: CERTS_SCHEMA,
-        "assets-real": ASSETS_REAL_SCHEMA, health: HEALTH_SCHEMA,
-        medicine: MEDICINE_SCHEMA, memberships: MEMBERSHIPS_SCHEMA, insurance: INSURANCE_SCHEMA,
-        shopping: SHOPPING_SCHEMA, contracts: CONTRACTS_SCHEMA, exams: EXAMS_SCHEMA,
-        allowance: ALLOWANCE_SCHEMA, favors: FAVORS_SCHEMA, stock: STOCK_SCHEMA,
-        chores: CHORES_SCHEMA, house: HOUSE_SCHEMA,
-        media: MEDIA_SCHEMA, pets: PETS_SCHEMA, vehicles: VEHICLES_SCHEMA, transit: TRANSIT_SCHEMA,
-        "travel-plan": TRAVEL_PLAN_SCHEMA, "travel-booking": TRAVEL_BOOKING_SCHEMA,
-        "travel-packing": TRAVEL_PACKING_SCHEMA, "travel-log": TRAVEL_LOG_SCHEMA,
-        "assets-virtual": ASSETS_VIRTUAL_SCHEMA,
-        food: FOOD_SCHEMA, address: ADDRESS_SCHEMA, bookmarks: BOOKMARKS_SCHEMA, snippets: SNIPPETS_SCHEMA,
-        parenting: PARENTING_SCHEMA, schooling: SCHOOLING_SCHEMA, social: SOCIAL_SCHEMA,
-    };
+    /** moduleId → schema 目录（193 波收口为 SCHEMA_CATALOG 单源；UI 按需读取列定义/枚举，与 ensureCoreLedgers 同源） */
+    schemaCatalog: Record<string, any> = SCHEMA_CATALOG;
     /** Tab 面板刷新回调（支持多实例，33.1：所有打开的管家面板同步刷新） */
     hubListeners = new Set<() => void>();
     /** 扫描序号（H11）：慢的旧扫描不得覆写新扫描结果或之后的手动动作 */
@@ -123,23 +110,8 @@ export default class LvHomePlugin extends Plugin {
             callback: () => this.showTab(),
         });
 
-        // schema 契约门禁（33.2）：开发期发现违规立即暴露
-        const allSchemas: [string, any][] = [
-            ["members", MEMBERS_SCHEMA], ["certs", CERTS_SCHEMA],
-            ["assets-real", ASSETS_REAL_SCHEMA], ["health", HEALTH_SCHEMA],
-            ["medicine", MEDICINE_SCHEMA], ["memberships", MEMBERSHIPS_SCHEMA], ["insurance", INSURANCE_SCHEMA],
-            ["shopping", SHOPPING_SCHEMA], ["contracts", CONTRACTS_SCHEMA], ["exams", EXAMS_SCHEMA],
-            ["allowance", ALLOWANCE_SCHEMA], ["favors", FAVORS_SCHEMA], ["stock", STOCK_SCHEMA],
-            ["chores", CHORES_SCHEMA], ["house", HOUSE_SCHEMA],
-            ["media", MEDIA_SCHEMA], ["pets", PETS_SCHEMA], ["vehicles", VEHICLES_SCHEMA], ["transit", TRANSIT_SCHEMA],
-            ["travel-plan", TRAVEL_PLAN_SCHEMA], ["travel-booking", TRAVEL_BOOKING_SCHEMA],
-            ["travel-packing", TRAVEL_PACKING_SCHEMA], ["travel-log", TRAVEL_LOG_SCHEMA],
-            ["assets-virtual", ASSETS_VIRTUAL_SCHEMA],
-            ["food", FOOD_SCHEMA], ["address", ADDRESS_SCHEMA], ["bookmarks", BOOKMARKS_SCHEMA],
-            ["snippets", SNIPPETS_SCHEMA], ["parenting", PARENTING_SCHEMA], ["schooling", SCHOOLING_SCHEMA],
-            ["social", SOCIAL_SCHEMA],
-        ];
-        for (const [id, schema] of allSchemas) {
+        // schema 契约门禁（33.2；193 波收口 SCHEMA_CATALOG 单源）：开发期发现违规立即暴露
+        for (const [id, schema] of Object.entries(SCHEMA_CATALOG)) {
             const errors = validateSchema(id, schema);
             if (errors.length) console.error("[siyuan-home] schema contract violations:", errors);
         }
@@ -572,8 +544,8 @@ export default class LvHomePlugin extends Plugin {
                 error: ref?.provisionError,
             })),
             contracts: [
-                validateSchema("members", MEMBERS_SCHEMA),
-                validateSchema("certs", CERTS_SCHEMA),
+                validateSchema("members", SCHEMA_CATALOG.members),
+                validateSchema("certs", SCHEMA_CATALOG.certs),
             ].flat(),
         };
     }
