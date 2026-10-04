@@ -476,9 +476,12 @@ export const MEDIA_SCHEMA: ModuleSchema = {
         { ...FIELD_DICT.status, options: ["wishlist", "consuming", "done", "dropped"], default: "wishlist" },
         { key: "rating", type: "number", labelKey: "field.rating" },
         { key: "progress", type: "text", labelKey: "field.progress" },
+        // 16 组/189 波：追更提醒——更新日手动登记，提醒中枢派生（oneoff，当天提醒）
+        { key: "next_update", type: "date", labelKey: "field.next_update" },
         ...d("url", "date", "note"),
     ],
-    capture: ["name", "category", "status", "rating"],
+    capture: ["name", "category", "status", "next_update"],
+    reminders: [{ key: "next_update", field: "next_update", kind: "oneoff", leadDays: 0 }],
     // 海报墙（seerr 印证，26.6）：画廊视图以封面卡片呈现；思源 gallery 视图类型原生支持
     views: [
         { key: "wall", type: "gallery" },

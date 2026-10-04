@@ -44,7 +44,7 @@ export interface RowLog {
 
 export type RowLogs = Record<string, RowLog>;
 
-export type LogKind = "valuations" | "moves" | "prices" | "transfers" | "meters";
+export type LogKind = "valuations" | "moves" | "prices" | "transfers" | "meters" | "checks";
 
 export interface MeterEntry {
     date: string;

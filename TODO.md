@@ -1,4 +1,5 @@
 # 小驴管家（Lv Home）· 项目待办总清单
+| 2026-10-05 | 主线 | 第一百八十九波：media 追更提醒（schema 声明路线）+ travel 行前证件检查存档（rowlog 第四消费方） | **media 追更提醒**：next_update 日期列 + oneoff 规则（leadDays 0=当天）——纯 schema 声明，SchemaLedgerProvider 自动派生（"新增模块=数据"路线的规则侧首次实战加列）；capture 换入 next_update 换出 rating（观前未知评分）；建库器只增列补老库；黄金快照 -u 更新并登记原因（有意变更）；**travel 检查存档**：rowlog checks 类型（第四消费方），travel-plan 抽屉"行前证件检查"分区（日期+结论，追加去重）；i18n +4（791 键）；216 测试持平（快照更新） |
 | 2026-10-05 | 主线 | 第一百八十八波：stock 采购建议清单（16 组，低库存汇总+复制分享）+ allowance 愿望清单暂缓注记 | **采购建议**：`core/shopping.ts buildShoppingList` 纯函数（H15 同口径——qty 与阈值均有值且 qty≤阈值才入清单，缺列不评估不误报；建议量=补回阈值下限 1；名称排序）+ 台账页 stock 模块"采购建议"按钮 → 对话框逐项可改建议数量（renderLedgerAll 全量读，>50 行不漏）+ 复制清单到剪贴板（`名称 ×N` 文本，可直接贴给家人/购物 App）；剪贴板失败显式报错不假成功；+2 单测、i18n 778→787；**allowance 愿望清单暂缓注记**：allowance 行是收支事件而非目标实体，存储模型需产品决策（候选=shopping 挂 wish 类别行 + rowlog 存钱流水），随 16 组 UI 波定案；单测 214→216 |
 | 2026-10-05 | 主线 | 第一百八十七波：house 水电煤抄表流水（16 组 rowlog 第三消费方）+ §15 两项核实勾选 | **抄表流水**：rowlog 新增 `meters` 类型（MeterEntry：date/reading/usage?/at）+ `appendMeterReading`（同口径日覆盖；用量=与"日期早于本次的最近读数"之差——回填旧读数按日期序计差、已定用量不重算；首表或负差（换表/倒转）不记用量，不猜原因）+ `getMeterReadings`/`removeMeterReading`；house 详情抽屉"抄表记录"分区（日期+读数两字段，格式 `日期 · 读数（+用量）`）；i18n +3；**§15 核实勾选**：孤儿提醒清理=扫描全量重派生+删行触发增量重扫+cleanupRowRuntimeData，无残留面；模块禁用剔除=scanner 跳过禁用 provider+deriveVisible 二次过滤（scanner.ts:33/96）——均设计覆盖，补证据勾选；rowlog +3 单测、i18n 775→778 |
 | 2026-10-05 | 主线 | 第一百八十六波：§15/§17 工程池三连清——相对时间表述 + saveSettings 重试 + 笔记本关闭核实（用户指令"继续开发，别停下"） | **时间表述本地化（17 组）**：`relativeDue` 纯函数（rule.ts——逾期N天/今天/明天/1–6 天后；≥7 天沿用 ISO 日期，信息密度优于"23 天后"；复用 overview 既有 days.* 键族+新增 days.tomorrow）；提醒页行卡与合并卡接入，悬浮 title=完整 ISO 日期（autoRenew 提示并入 title）；+2 单测；**settings 写入失败重试（§15）**：saveSettings 失败 300ms 后重试一次，仍失败抛带原始信息错误；设置页 save() 补 catch 显式上报（此前静默假成功）；+2 单测；**笔记本关闭核实（§15）**：ensureNotebook 两分支已处理 closed→openNotebook 且 provisioner.test 覆盖——已实现补勾选；i18n 773→775、单测 207→211；门禁全绿 |
@@ -333,9 +334,9 @@
 - [ ] 🟢 allowance：利息/收益流水
 - [ ] 🟡 favors：年度人情报告（收送 TOP / 净额走势）
 - [ ] 🟡 favors：回礼提醒（事件后 N 天）
-- [ ] 🟢 media：追更提醒（剧更新日手动登记 → 提醒中枢）
+- [x] 🟢 media：追更提醒（剧更新日手动登记 → 提醒中枢） ✅ 2026-10-05 第一百八十九波走 schema 声明路线：media 新增 next_update 日期列 + oneoff 规则（leadDays 0=当天提醒），capture 换入 next_update（rating 移出快速表单——观前未知评分，追更日常用登记更新日）；建库器只增列自动补老库；黄金快照 -u 更新（原因=本次有意变更）；field.next_update 双语
 - [ ] 🟢 media：图书借出记录（借出状态复用 assets 模式）
-- [ ] 🟢 travel：行前证件检查结果存档（检查时间/结论）
+- [x] 🟢 travel：行前证件检查结果存档（检查时间/结论） ✅ 2026-10-05 第一百八十九波：rowlog 新增 checks 类型（第四消费方），travel-plan 行详情抽屉"行前证件检查"分区——日期+结论两字段（追加+完全重复去重），格式 `日期 · 结论`；i18n +3
 - [ ] 🟡 house：水电煤抄表流水（表读数记录）
 - [ ] 🟡 house：保修期联动 contracts（按原始保修条件核对范围、排除项、凭证及服务商确认；在保日期不自动代表免费维修）
 - [ ] 🟡 stock：采购建议清单（低于阈值项自动汇总视图）

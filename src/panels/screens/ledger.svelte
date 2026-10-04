@@ -717,6 +717,23 @@
                     remove: async (e) => { await rl.saveRowLogs(plugin as any, rl.removeMeterReading(await fresh(), ref!.avId!, row.itemID, e.date)); },
                     format: (e: any) => `${e.date} · ${e.reading}${typeof e.usage === "number" ? `（+${e.usage}）` : ""}`,
                 });
+            } else if (active === "travel-plan") {
+                // 16 组/189 波：行前证件检查结果存档（rowlog checks 类型；追加去重，结论文本自由记录）
+                await addRowLogSection({
+                    title: t("ledger.checks"), emptyText: t("ledger.noChecks"), addLabel: t("ledger.valAdd"),
+                    fields: [
+                        { key: "date", type: "date", placeholder: "", width: 130 },
+                        { key: "result", type: "text", placeholder: t("ledger.checkResult"), width: 200 },
+                    ],
+                    load: () => fresh().then((l) => rl.getEntries<any>(l, ref!.avId!, row.itemID, "checks")),
+                    add: async (v) => {
+                        if (!v.date || !v.result) { showMessage(t("ledger.logInvalid"), 3000, "error"); return false; }
+                        await rl.saveRowLogs(plugin as any, rl.appendEntry(await fresh(), ref!.avId!, row.itemID, "checks", { date: v.date, result: v.result, at: at() }));
+                        return true;
+                    },
+                    remove: async (e) => { await rl.saveRowLogs(plugin as any, rl.removeEntry(await fresh(), ref!.avId!, row.itemID, "checks", e)); },
+                    format: (e) => `${e.date} · ${e.result}`,
+                });
             }
         })();
 

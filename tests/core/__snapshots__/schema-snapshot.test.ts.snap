@@ -1528,7 +1528,7 @@ exports[`31 模块 schema 契约快照（21 组） > 每个 schema 的结构快�
     "name",
     "category",
     "status",
-    "rating",
+    "next_update",
   ],
   "columns": [
     {
@@ -1577,6 +1577,11 @@ exports[`31 模块 schema 契约快照（21 组） > 每个 schema 的结构快�
       "type": "text",
     },
     {
+      "key": "next_update",
+      "labelKey": "field.next_update",
+      "type": "date",
+    },
+    {
       "key": "url",
       "labelKey": "field.url",
       "type": "url",
@@ -1590,6 +1595,14 @@ exports[`31 模块 schema 契约快照（21 组） > 每个 schema 的结构快�
       "key": "note",
       "labelKey": "field.note",
       "type": "text",
+    },
+  ],
+  "reminders": [
+    {
+      "field": "next_update",
+      "key": "next_update",
+      "kind": "oneoff",
+      "leadDays": 0,
     },
   ],
   "views": [
