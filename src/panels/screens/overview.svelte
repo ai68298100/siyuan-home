@@ -64,8 +64,13 @@
     });
     const scopeLabel = $derived(memberFilter ? (members.find((m) => m.id === memberFilter)?.name ?? "?") : t("dash.scopeAll"));
 
-    async function setMemberFilter(id: string | undefined) {
-        memberFilter = id;
+    // 17 组/196 波：统计卡下钻——待办徽章点击 → 提醒页并预筛选该模块（runtime.hubModuleId 为提醒页筛选持久态）
+    function drillReminders(mid: string) {
+        plugin.runtime.hubModuleId = mid;
+        onGoto("reminders");
+    }
+
+    async function setMemberFilter(id: string | undefined) {        memberFilter = id;
         plugin.runtime.filterMemberId = id;
                 await saveRuntime(plugin, plugin.runtime);
     }
@@ -189,7 +194,12 @@
             <div class="lv-mi t-blue" aria-hidden="true">{moduleIcon(mid)}</div><b>{t(`module.${mid}`)}</b>
             <div class="lv-stat" title={t("dash.statScope").replace("${t}", snapshotLabel)}>
             {#if pending > 0}
-                <b class="lv-num">{pending}</b><span style="color:var(--lv-warn)">{t("mod.pending")}</span>
+                <!-- 17 组/196 波：徽章=独立下钻目标（stopPropagation，卡片本体仍进台账） -->
+                <span class="lv-num" role="button" tabindex="0" style="cursor:pointer"
+                    title={t("mod.pendingDrill")}
+                    onkeydown={(e: KeyboardEvent) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); e.stopPropagation(); drillReminders(mid); } }}
+                    onclick={(e: MouseEvent) => { e.stopPropagation(); drillReminders(mid); }}
+                ><b>{pending}</b><span style="color:var(--lv-warn)">{t("mod.pending")}</span></span>
             {:else if plugin.settings.dbRefs?.[mid] && !plugin.settings.dbRefs[mid].docId}
                     <span style="color:var(--lv-warn)">{t("diag.missing")}</span>
             {:else if plugin.settings.dbRefs?.[mid]?.provisional}

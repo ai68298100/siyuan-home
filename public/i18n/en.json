@@ -193,6 +193,7 @@
     "memo.add": "Memo",
     "adhoc.name": "Memo",
     "mod.inLedger": "View in ledger",
+    "mod.pendingDrill": "Click to see this module's due reminders",
     "dash.hello": "Home at a glance",
     "dash.sub": "Everything on track",
     "dash.needAttention": "items need attention",
