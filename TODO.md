@@ -1,4 +1,5 @@
 # 小驴管家（Lv Home）· 项目待办总清单
+| 2026-10-05 | 主线 | 第一百八十八波：stock 采购建议清单（16 组，低库存汇总+复制分享）+ allowance 愿望清单暂缓注记 | **采购建议**：`core/shopping.ts buildShoppingList` 纯函数（H15 同口径——qty 与阈值均有值且 qty≤阈值才入清单，缺列不评估不误报；建议量=补回阈值下限 1；名称排序）+ 台账页 stock 模块"采购建议"按钮 → 对话框逐项可改建议数量（renderLedgerAll 全量读，>50 行不漏）+ 复制清单到剪贴板（`名称 ×N` 文本，可直接贴给家人/购物 App）；剪贴板失败显式报错不假成功；+2 单测、i18n 778→787；**allowance 愿望清单暂缓注记**：allowance 行是收支事件而非目标实体，存储模型需产品决策（候选=shopping 挂 wish 类别行 + rowlog 存钱流水），随 16 组 UI 波定案；单测 214→216 |
 | 2026-10-05 | 主线 | 第一百八十七波：house 水电煤抄表流水（16 组 rowlog 第三消费方）+ §15 两项核实勾选 | **抄表流水**：rowlog 新增 `meters` 类型（MeterEntry：date/reading/usage?/at）+ `appendMeterReading`（同口径日覆盖；用量=与"日期早于本次的最近读数"之差——回填旧读数按日期序计差、已定用量不重算；首表或负差（换表/倒转）不记用量，不猜原因）+ `getMeterReadings`/`removeMeterReading`；house 详情抽屉"抄表记录"分区（日期+读数两字段，格式 `日期 · 读数（+用量）`）；i18n +3；**§15 核实勾选**：孤儿提醒清理=扫描全量重派生+删行触发增量重扫+cleanupRowRuntimeData，无残留面；模块禁用剔除=scanner 跳过禁用 provider+deriveVisible 二次过滤（scanner.ts:33/96）——均设计覆盖，补证据勾选；rowlog +3 单测、i18n 775→778 |
 | 2026-10-05 | 主线 | 第一百八十六波：§15/§17 工程池三连清——相对时间表述 + saveSettings 重试 + 笔记本关闭核实（用户指令"继续开发，别停下"） | **时间表述本地化（17 组）**：`relativeDue` 纯函数（rule.ts——逾期N天/今天/明天/1–6 天后；≥7 天沿用 ISO 日期，信息密度优于"23 天后"；复用 overview 既有 days.* 键族+新增 days.tomorrow）；提醒页行卡与合并卡接入，悬浮 title=完整 ISO 日期（autoRenew 提示并入 title）；+2 单测；**settings 写入失败重试（§15）**：saveSettings 失败 300ms 后重试一次，仍失败抛带原始信息错误；设置页 save() 补 catch 显式上报（此前静默假成功）；+2 单测；**笔记本关闭核实（§15）**：ensureNotebook 两分支已处理 closed→openNotebook 且 provisioner.test 覆盖——已实现补勾选；i18n 773→775、单测 207→211；门禁全绿 |
 | 2026-10-05 | 主线 | 第一百八十五波：浏览器真机批尝试（跳过）+ N5 指南英文化全量收官（用户指令"继续开发，解决不了就跳过"） | **浏览器真机批**：IAB 驱动 web 端——锁屏授权页输入 accessAuthCode 解锁成功（凭据链首次验证 ✓），但思源应用壳自举后陷入"点击刷新"循环、整页重载后白屏（快照零节点）——与 65 波登记的"IAB web 壳启动失败（与本插件无关）"一致，二次确认死路，按授权跳过；真机批维持人工 runbook（阶段 1 前置状态未消耗，settings.json 仍不存在，预检"首启即 onboarding"保持原样）；**N5 收官**：六篇指南全部英文化（*.en.md，约 300 行人工翻译，术语对齐 i18n 键位），中文篇头加互链；探针教训沿用 E8（sy 包装器）无关；门禁全绿、部署无变化（纯文档波零代码变更） |
@@ -328,7 +329,7 @@
 - [x] 🟢 **WHO 儿童生长百分位数据源研究**（第七十四轮立项） ✅ 2026-10-04 第七十四波循环 B 调研闭环（docs/research/2026-10-04-WHO生长数据源调研.md）：**推荐 WHO 官方 expanded tables**（署名即可商用/开发复用，条款与 MIT 兼容）；备选 CDC 改编版（public domain 零负担）；落地形态=构建期 fetch 脚本转压缩 JSON（~1100 数字离线内嵌）+ LMS→百分位插值渲染 P3/P15/P50/P85/P97；xlsx 直链动态化已实测（猜测枚举 404），实现期从页面解析精确文件名
 - [x] 🟢 WHO 生长参考带实现（依赖上项调研结论）：scripts/fetch-who-data.mjs 构建期下载+转换 → 数据 JSON 入库 → growth.ts 参考带（P3/P15/P50/P85/P97 插值）+ 图注署名与"不构成医疗建议" ✅ 2026-10-04 第七十七轮全量落地（零依赖 fetch 脚本 + SD 全量校验 + who-refs.ts 17.7KB 入库 + whoBand 插值 4 单测 + 生长图带叠加/性别选择/署名免责图注 + D23 成员性别字段；WHO 页面"JS 渲染"误判更正：锚点服务端渲染，curl 原始 HTML 即得直链，调研文档已回填）
 - [ ] 🟡 parenting：辅食新食材 3 天观察期 → 联动 health 过敏史
-- [ ] 🟡 allowance：孩子愿望清单（目标金额 + 存钱进度条）
+- [ ] 🟡 allowance：孩子愿望清单（目标金额 + 存钱进度条）（188 波注记：暂缓——allowance 行是收支事件而非目标实体，愿望的存储模型需产品决策；候选=shopping 模块挂 wish 类别行 + rowlog 存钱流水，随 16 组下一轮 UI 波定案）
 - [ ] 🟢 allowance：利息/收益流水
 - [ ] 🟡 favors：年度人情报告（收送 TOP / 净额走势）
 - [ ] 🟡 favors：回礼提醒（事件后 N 天）
