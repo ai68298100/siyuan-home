@@ -1,5 +1,5 @@
 <script lang="ts">
-    import { renderLedger, addDetachedRow, setCell, RowIdentityPendingError } from "@/core/siyuan";
+    import { renderLedger, renderLedgerAll, addDetachedRow, setCell, RowIdentityPendingError } from "@/core/siyuan";
     import { buildCsv } from "@/core/csv";
     import { localDateKey } from "@/core/hub/rule";
     import { showMessage, Dialog, confirm } from "siyuan";
@@ -68,10 +68,23 @@
 
     function exportCsv() {
         if (!ref?.columns || filteredRows.length === 0) return;
-        const download = () => {
+        const download = async () => {
+            // N7/E13：导出走全量读（UI 列表仍单页，PF11）；搜索词对全量行复用同一过滤语义
+            const all = await renderLedgerAll(ref!.avId!);
+            const q = searchText.trim().toLowerCase();
+            let list = all.rows;
+            if (q) {
+                const nameKey = ref!.columns?.name;
+                const noteKey = ref!.columns?.note;
+                list = list.filter((r) => {
+                    const nameCol = nameKey ? (r.cells[nameKey]?.text?.content ?? r.cells[nameKey]?.block?.content ?? "") : "";
+                    const noteCol = noteKey ? (r.cells[noteKey]?.text?.content ?? "") : "";
+                    return nameCol.toLowerCase().includes(q) || noteCol.toLowerCase().includes(q);
+                });
+            }
             const cols = (plugin.schemaCatalog?.[active]?.columns ?? []).filter((c: any) => ref!.columns![c.key]);
             const label = (c: any) => (t(`field.${c.key}`) !== `field.${c.key}` ? t(`field.${c.key}`) : c.key);
-            const csv = buildCsv(cols.map(label), filteredRows.map((r) => cols.map((c: any) => cellText(r.cells[ref!.columns![c.key]]))));
+            const csv = buildCsv(cols.map(label), list.map((r) => cols.map((c: any) => cellText(r.cells[ref!.columns![c.key]]))));
             const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
             const a = document.createElement("a");
             a.href = URL.createObjectURL(blob);
@@ -80,10 +93,10 @@
             URL.revokeObjectURL(a.href);
         };
         if (HIGH_CONSEQUENCE_MODULES.has(active)) {
-            confirm(t("ledger.exportSensitiveTitle"), t("ledger.exportSensitiveBody").replace("${module}", t(`module.${active}`)), download);
+            confirm(t("ledger.exportSensitiveTitle"), t("ledger.exportSensitiveBody").replace("${module}", t(`module.${active}`)), () => { void download(); });
             return;
         }
-        download();
+        void download();
     }
 
     // 第七十四轮：生长曲线（parenting）——身高/体重时间线 SVG；WHO 参考带待核实数据源后加入

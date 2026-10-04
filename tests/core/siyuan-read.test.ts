@@ -8,6 +8,7 @@ import {
     setUploadTransport,
     primaryRowItemIDs,
     renderLedger,
+    renderLedgerAll,
     addDetachedRow,
     removeLedgerRows,
     uploadAsset,
@@ -85,6 +86,57 @@ describe("renderLedger 完整性（D01）", () => {
             return { code: 0, msg: "", data: { rows: { values: [] } } };
         };
         expect((await renderLedger("av-1")).complete).toBe(true);
+    });
+});
+
+describe("renderLedgerAll 全量读取（N7/E13：render 接受 page/pageSize）", () => {
+    const row = (id: string) => ({ id, cells: [] });
+
+    it("翻页累积 → rowCount 达成 complete=true 即停（不带多余翻页）；翻页带 page 参数", async () => {
+        const pages: Record<number, string[]> = { 0: ["r1", "r2", "r3"], 2: ["r4", "r5"] };
+        const seenPages: (number | undefined)[] = [];
+        handler = (endpoint, payload) => {
+            if (endpoint === "/api/av/renderAttributeView") {
+                seenPages.push(payload.page);
+                const list = pages[payload.page ?? 0] ?? [];
+                return { code: 0, msg: "", data: { view: { columns: [], rowCount: 5, rows: list.map(row) } } };
+            }
+            return { code: 0, msg: "", data: { rows: { values: [] } } };
+        };
+        const read = await renderLedgerAll("av-1");
+        expect(read.rows.map((r) => r.itemID)).toEqual(["r1", "r2", "r3", "r4", "r5"]);
+        expect(read.rowCount).toBe(5);
+        expect(read.complete).toBe(true);
+        expect(seenPages).toEqual([undefined, 2]); // 凑满 rowCount 即停，不多翻
+    });
+
+    it("翻页越界即止 → complete=false 不谎报（H04 诚实语义保留）", async () => {
+        handler = (endpoint, payload) => {
+            if (endpoint === "/api/av/renderAttributeView") {
+                const list = payload.page ? [] : ["r1", "r2"];
+                return { code: 0, msg: "", data: { view: { columns: [], rowCount: 5, rows: list.map(row) } } };
+            }
+            return { code: 0, msg: "", data: { rows: { values: [] } } };
+        };
+        const read = await renderLedgerAll("av-1");
+        expect(read.complete).toBe(false);
+        expect(read.rows).toHaveLength(2);
+    });
+
+    it("单页即全量 → 不发翻页请求；跨页重复 itemID 去重", async () => {
+        let renderCalls = 0;
+        handler = (endpoint, payload) => {
+            if (endpoint === "/api/av/renderAttributeView") {
+                renderCalls++;
+                const list = payload.page === 2 ? ["r2", "r3"] : ["r1", "r2"];
+                return { code: 0, msg: "", data: { view: { columns: [], rowCount: 3, rows: list.map(row) } } };
+            }
+            return { code: 0, msg: "", data: { rows: { values: [] } } };
+        };
+        const read = await renderLedgerAll("av-1");
+        expect(renderCalls).toBe(2);
+        expect(read.rows.map((r) => r.itemID)).toEqual(["r1", "r2", "r3"]); // r2 跨页重复只留一次
+        expect(read.complete).toBe(true);
     });
 });
 

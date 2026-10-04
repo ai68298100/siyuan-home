@@ -33,6 +33,8 @@ describe("health.runHealthCheck", () => {
         handler = (endpoint, payload) => {
             if (endpoint === "/api/av/renderAttributeView") {
                 if (payload.id === "av-c") {
+                    // page≥2 返回空（renderLedgerAll 翻页越界即止）→ 保持"不完整读"语义（N7 前：>50 行；此处 rowCount=5 模拟）
+                    if (payload.page) return { code: 0, msg: "", data: { view: { columns: [], rowCount: 5, rows: [] } } };
                     return { code: 0, msg: "", data: { view: { columns: [], rowCount: 5, rows: [{ id: "r1", cells: [] }, { id: "r2", cells: [] }] } } };
                 }
                 if (payload.id === "av-h") {

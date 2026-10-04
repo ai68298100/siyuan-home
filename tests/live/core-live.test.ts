@@ -9,7 +9,7 @@ import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import { gateProbe, liveTransport, rawApi, LIVE_NOTEBOOK } from "./live-env";
 import {
     setTransport, createAttributeView, addAttributeViewColumn, addDetachedRow,
-    setCell, renderLedger, primaryRowItemIDs, removeLedgerRows,
+    setCell, renderLedger, renderLedgerAll, primaryRowItemIDs, removeLedgerRows,
 } from "@/core/siyuan";
 import { CertsProvider } from "@/core/hub/providers";
 import { runScan } from "@/core/hub/scanner";
@@ -90,6 +90,14 @@ describe("live.IT-03 · D01 主键分页循环（插件代码路径）", () => {
         expect(read.rowCount).toBe(60);
         expect(read.rows).toHaveLength(50);
         expect(read.complete).toBe(false);
+    });
+
+    it.skipIf(skip)("IT-07/E13 renderLedgerAll：60 行全量读回 complete=true（N7：>50 行派生不再受阻）", async () => {
+        const all = await renderLedgerAll(AV);
+        expect(all.rowCount).toBe(60);
+        expect(all.rows).toHaveLength(60);
+        expect(all.complete).toBe(true);
+        expect(new Set(all.rows.map((r) => r.itemID)).size).toBe(60);
     });
 });
 

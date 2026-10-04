@@ -1,5 +1,5 @@
 <script lang="ts">
-    import { showMessage, confirm } from "siyuan";
+    import { showMessage, confirm, Dialog } from "siyuan";
     import { MODULE_GROUPS, modulesByGroup } from "@/core/modules";
     import { newMember, saveSettings, normalizeCheckinBindings } from "@/core/settings";
     import type { HomeSettings, MemberRole, FamilyMember, CheckinBinding } from "@/types";
@@ -191,6 +191,54 @@
                 showMessage(t("settings.diagExportDone"), 3000, "info");
             });
         });
+    }
+
+    // D06 收尾：同名歧义人工选择对话框——按候选摘要单选，保存写 avItemId（DOM 构建用户内容，不走 HTML 模板——19 组安全）
+    function openAmbiguityDialog(ambiguous: { member: string; candidates: { id: string; summary: string }[] }[]) {
+        const picks: Record<number, string> = {};
+        const dlg = new Dialog({
+            title: t("diag.ambigTitle"),
+            content: `<div class="b3-dialog__content" id="lv-ambig-body" style="max-height:60vh;overflow:auto"></div>
+<div class="b3-dialog__action"><button class="b3-button b3-button--cancel" id="lv-ambig-cancel">${t("cancel")}</button><button class="b3-button b3-button--text" id="lv-ambig-ok">${t("save")}</button></div>`,
+            width: "520px",
+        });
+        const body = dlg.element.querySelector("#lv-ambig-body") as HTMLElement;
+        ambiguous.forEach((a, ai) => {
+            const head = document.createElement("div");
+            head.className = "ft__on-surface";
+            head.style.cssText = "margin-top:10px;font-size:12px";
+            head.textContent = a.member;
+            body.appendChild(head);
+            for (const c of a.candidates) {
+                const line = document.createElement("label");
+                line.style.cssText = "display:flex;gap:6px;align-items:center;padding:2px 0 2px 14px;font-size:13px";
+                const radio = document.createElement("input");
+                radio.type = "radio";
+                radio.name = `lv-ambig-${ai}`;
+                radio.value = c.id;
+                radio.onchange = () => { picks[ai] = c.id; };
+                const sp = document.createElement("span");
+                sp.textContent = c.summary || t("diag.ambigNoInfo");
+                line.append(radio, sp);
+                body.appendChild(line);
+            }
+        });
+        (dlg.element.querySelector("#lv-ambig-cancel") as HTMLButtonElement).onclick = () => dlg.destroy();
+        (dlg.element.querySelector("#lv-ambig-ok") as HTMLButtonElement).onclick = async () => {
+            let applied = 0;
+            ambiguous.forEach((a, ai) => {
+                const pick = picks[ai];
+                if (!pick) return;
+                const m = plugin.settings.members.find((x) => x.name === a.member);
+                if (m) { m.avItemId = pick; m.syncError = undefined; applied++; }
+            });
+            dlg.destroy();
+            if (applied > 0) {
+                await import("@/core/settings").then((m) => m.saveSettings(plugin as any, plugin.settings));
+                await plugin.refreshHub?.();
+            }
+            showMessage(t("diag.ambigDone").replace("${n}", String(applied)), 3000, "info");
+        };
     }
 
     async function restorePreImport() {
@@ -527,7 +575,8 @@
                                     showMessage(t("diag.backfillResult")
                                         .replace("${n}", String(res.linked.length))
                                         .replace("${amb}", String(res.ambiguous.length))
-                                        .replace("${stale}", String(res.stale.length)), 6000, res.ambiguous.length ? "info" : "info");
+                                        .replace("${stale}", String(res.stale.length)), 6000, "info");
+                                    if (res.ambiguous.length > 0) openAmbiguityDialog(res.ambiguous);
                                 }}>{t("diag.backfill")}</button>
                         {/if}
                         <button class="b3-button b3-button--outline" style="margin-top:6px"

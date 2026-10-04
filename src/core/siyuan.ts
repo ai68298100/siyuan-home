@@ -303,9 +303,13 @@ export interface LedgerRead {
     complete: boolean;
 }
 
-/** 读取台账（表格视图）列与行。cells 以列 keyID 索引；value 无 keyID 时按位置回退（Spike 未确认该字段） */
-export async function renderLedger(avID: string): Promise<LedgerRead> {
-    const d = await post<any>("/api/av/renderAttributeView", { id: avID });
+/** 读取台账（表格视图）列与行。cells 以列 keyID 索引；value 无 keyID 时按位置回退（Spike 未确认该字段）。
+ * pageSize/page 可选（E13/183 波：内核 render 接受分页参数——50/页默认，page 翻页，pageSize 为单页上限）。 */
+export async function renderLedger(avID: string, pageSize?: number, page?: number): Promise<LedgerRead> {
+    const payload: Record<string, unknown> = { id: avID };
+    if (pageSize) payload.pageSize = pageSize;
+    if (page) payload.page = page;
+    const d = await post<any>("/api/av/renderAttributeView", payload);
     const view = d?.view ?? {};
     const cols: any[] = view.columns ?? [];
     const rows: AvRow[] = (view.rows ?? []).map((r: any) => {
@@ -319,4 +323,22 @@ export async function renderLedger(avID: string): Promise<LedgerRead> {
     });
     const rowCount = view.rowCount ?? rows.length;
     return { columns: cols, rows, rowCount, complete: rows.length >= rowCount };
+}
+
+/** 全量读取台账（N7/E13）：200/页逐页累积直到 rowCount（去重防翻页重叠），扫描派生/健康检查/CSV 导出用。
+ * UI 列表维持单页 renderLedger（PF11 长列表预算）；上限 100 页（2 万行）防内核异常死循环。 */
+export async function renderLedgerAll(avID: string, pageSize = 200): Promise<LedgerRead> {
+    const first = await renderLedger(avID, pageSize);
+    const rows = [...first.rows];
+    const seen = new Set(rows.map((r) => r.itemID));
+    let page = 2;
+    while (rows.length < first.rowCount && page <= 100) {
+        const next = await renderLedger(avID, pageSize, page);
+        if (next.rows.length === 0) break; // 翻页越界：内核已无更多行
+        for (const r of next.rows) {
+            if (!seen.has(r.itemID)) { seen.add(r.itemID); rows.push(r); }
+        }
+        page++;
+    }
+    return { columns: first.columns, rows, rowCount: first.rowCount, complete: rows.length >= first.rowCount };
 }

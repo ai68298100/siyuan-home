@@ -192,7 +192,10 @@ describe("backfillMemberLinks（D06）", () => {
         await addMember(plugin, st, member({ name: "同名", id: "ledger-3" }));
         const res = await backfillMemberLinks(plugin, st);
         expect(res.linked).toEqual(["唯一"]);
-        expect(res.ambiguous).toEqual(["同名"]);
+        // D06 收尾：歧义项携带候选明细（id + 摘要）供人工选择对话框；row 顺序=插入序 row-2/row-3
+        expect(res.ambiguous).toHaveLength(1);
+        expect(res.ambiguous[0].member).toBe("同名");
+        expect(res.ambiguous[0].candidates.map((c) => c.id)).toEqual(["row-2", "row-3"]);
         expect(res.unmatched).toEqual(["缺失"]);
         expect(st.members.find((m) => m.name === "唯一")!.avItemId).toMatch(/^row-/);
         expect(st.members.find((m) => m.name === "同名")!.avItemId).toBeUndefined(); // 不静默共用行

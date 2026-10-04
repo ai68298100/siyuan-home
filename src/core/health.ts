@@ -4,7 +4,7 @@
  * 以及建库/读取错误。结果带检查时间；只读，不修复（修复动作属 F07 局部修复，另行）。
  */
 import type { HomeSettings } from "@/types";
-import { renderLedger } from "./siyuan";
+import { renderLedgerAll } from "./siyuan";
 
 export interface ModuleHealth {
     moduleId: string;
@@ -36,7 +36,7 @@ export async function runHealthCheck(
             continue;
         }
         try {
-            const read = await renderLedger(ref.avId);
+            const read = await renderLedgerAll(ref.avId);
             const declared = new Set((schema?.columns ?? []).map((c) => c.key));
             const missing = [...declared].filter((k) => !ref.columns![k]);
             modules.push({

@@ -7,7 +7,7 @@
  */
 import type { Plugin } from "siyuan";
 import type { FamilyMember, HomeSettings, DbRef } from "@/types";
-import { addDetachedRow, setCell, renderLedger } from "./siyuan";
+import { addDetachedRow, setCell, renderLedgerAll } from "./siyuan";
 import { saveSettings } from "./settings";
 
 export function colMsToLocalDate(ms?: number): string | undefined {
@@ -137,11 +137,17 @@ export async function syncMembersToAv(
     return report;
 }
 
+export interface AmbiguousCandidate {
+    id: string;
+    /** 候选行区分信息（角色·生日等，可空串）——同名候选之间用户靠它辨认（D06 收尾） */
+    summary: string;
+}
+
 export interface BackfillResult {
     linked: string[];
     unmatched: string[];
-    /** 同名多候选：不自动回填，留人工选择（D06） */
-    ambiguous: string[];
+    /** 同名多候选：不自动回填，附候选明细供人工选择对话框（D06） */
+    ambiguous: { member: string; candidates: AmbiguousCandidate[] }[];
     /** 已有 avItemId 但台账行已不存在：清除关联并报告（D06） */
     stale: string[];
 }
@@ -159,8 +165,27 @@ export async function backfillMemberLinks(
     const ref = settings.dbRefs.members;
     const empty: BackfillResult = { linked: [], unmatched: [], ambiguous: [], stale: [] };
     if (!ref?.avId || !ref.columns?.name) return empty;
-    const { rows } = await renderLedger(ref.avId);
+    const { rows } = await renderLedgerAll(ref.avId);
     const nameKey = ref.columns.name;
+    // D06 收尾：候选行区分摘要（角色/生日——ref.columns 里有才显示，缺失留空串）
+    const roleKey = ref.columns.role;
+    const birthdayKey = ref.columns.birthday;
+    const summaryOf = (rowItemID: string): string => {
+        const r = rows.find((x) => x.itemID === rowItemID);
+        if (!r) return "";
+        const parts: string[] = [];
+        if (roleKey) {
+            const v = r.cells[roleKey];
+            const s = v?.select?.content ?? v?.text?.content ?? "";
+            if (s) parts.push(s);
+        }
+        if (birthdayKey) {
+            const v = r.cells[birthdayKey];
+            const d = v?.date?.isNotEmpty ? colMsToLocalDate(v.date.content) : undefined;
+            if (d) parts.push(d);
+        }
+        return parts.join(" · ");
+    };
     const byName = new Map<string, string[]>();
     const rowIds = new Set(rows.map((r) => r.itemID));
     for (const r of rows) {
@@ -188,7 +213,10 @@ export async function backfillMemberLinks(
             result.linked.push(m.name);
             dirty = true;
         } else if (cands.length > 1) {
-            result.ambiguous.push(m.name);
+            result.ambiguous.push({
+                member: m.name,
+                candidates: cands.map((id) => ({ id, summary: summaryOf(id) })),
+            });
         } else {
             result.unmatched.push(m.name);
         }

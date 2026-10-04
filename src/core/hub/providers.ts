@@ -4,7 +4,7 @@
  */
 import type { Reminder, ReminderRuleSpec } from "@/types";
 import { buildReminder, localDateKey, type LedgerRowDates } from "./rule";
-import { renderLedger } from "../siyuan";
+import { renderLedgerAll } from "../siyuan";
 import { CERTS_SCHEMA, MEMBERS_SCHEMA, type ModuleSchema, type NumericRuleSpec } from "../schema";
 import type { DbRef, HomeSettings } from "@/types";
 
@@ -77,7 +77,7 @@ export class CertsProvider implements DataProvider {
         if (!ref?.avId || !ref.columns) return [];
         const schema = CERTS_SCHEMA;
         const out: Reminder[] = [];
-        const read = await renderLedger(ref.avId);
+        const read = await renderLedgerAll(ref.avId);
         if (!read.complete) throw new Error(`ledger read incomplete (${read.rows.length}/${read.rowCount} rows)`);
         requireReminderColumns(ref.columns!, CERTS_SCHEMA);
         const { rows } = read;
@@ -127,7 +127,7 @@ export class SchemaLedgerProvider implements DataProvider {
         const ref = this.deps.getDbRef(this.moduleId);
         if (!ref?.avId || !ref.columns) return [];
         const out: Reminder[] = [];
-        const read = await renderLedger(ref.avId);
+        const read = await renderLedgerAll(ref.avId);
         if (!read.complete) throw new Error(`ledger read incomplete (${read.rows.length}/${read.rowCount} rows)`);
         requireReminderColumns(ref.columns!, this.schema);
         const { rows } = read;
@@ -170,7 +170,7 @@ export class MembersProvider implements DataProvider {
         if (!ref?.avId || !ref.columns) return [];
         const schema = MEMBERS_SCHEMA;
         const out: Reminder[] = [];
-        const read = await renderLedger(ref.avId);
+        const read = await renderLedgerAll(ref.avId);
         if (!read.complete) throw new Error(`ledger read incomplete (${read.rows.length}/${read.rowCount} rows)`);
         requireReminderColumns(ref.columns!, schema);
         const { rows } = read;
@@ -220,7 +220,7 @@ export class NumericRuleProvider implements DataProvider {
         if (rules.length === 0) return [];
         const missing = rules.flatMap((r) => [r.field, r.thresholdField]).filter((f) => !ref.columns![f]);
         if (missing.length) throw new Error(`missing numeric rule column(s): ${[...new Set(missing)].join(", ")}`);
-        const read = await renderLedger(ref.avId);
+        const read = await renderLedgerAll(ref.avId);
         if (!read.complete) throw new Error(`ledger read incomplete (${read.rows.length}/${read.rowCount} rows)`);
         const out: Reminder[] = [];
         const members = this.deps.settings.members ?? [];
