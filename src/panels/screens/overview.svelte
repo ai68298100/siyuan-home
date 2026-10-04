@@ -4,6 +4,8 @@
     import type { HomePluginLike } from "@/types/plugin";
     import { saveRuntime } from "@/core/hub/runtime";
     import { localDateKey } from "@/core/hub/rule";
+    import { parseNaturalDate } from "@/core/dateparse";
+    import { showMessage } from "siyuan";
     import { moduleIcon as icons } from "@/core/modules";
 
     let { plugin, t, onGoto, version }: { plugin: HomePluginLike; t: (k: string) => string; onGoto: (s: string) => void; version?: number } = $props();
@@ -79,9 +81,20 @@
     let memoDue = $state("");
     function addMemo() {
         if (!memoTitle.trim()) return;
+        // 16 组/214 波：智能日期解析（滴答清单规格）——标题命中日期表达式则剥离进到期日；
+        // 显式选择的日期优先于解析（用户选了日期选择器即为明确意图）。
+        const parsed = parseNaturalDate(memoTitle);
+        let title = memoTitle.trim();
+        let due = memoDue;
+        if (parsed && parsed.rest) {
+            if (!due) due = parsed.date;
+            title = parsed.rest;
+            showMessage(t("memo.dateParsed").replace("${d}", parsed.date), 2500, "info");
+        }
+        if (!title) return;
         // 默认到期日走本地时区（33.3：禁 toISOString，UTC+8 夜间会偏一天）
-        const d = memoDue || localDateKey(new Date(Date.now() + 3 * 86400000));
-        plugin.addMemo(memoTitle.trim(), d);
+        const d = due || localDateKey(new Date(Date.now() + 3 * 86400000));
+        plugin.addMemo(title, d);
         memoTitle = ""; memoDue = "";
     }
 </script>
