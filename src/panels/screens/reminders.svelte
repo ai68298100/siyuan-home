@@ -201,26 +201,27 @@
         menu.open({ x: ev.clientX, y: ev.clientY });
     }
 
-    // 29 组：同成员同日多条合并为一条可展开卡（"儿子的 3 件事"）；单条与无成员事项保持独立
+    // 29 组：同成员同日多条合并为一条可展开卡（"儿子的 3 件事"）；单条与无成员事项保持独立。
+    // 175 波性能：先按键一次分组（原实现对每个合并组再做 items.filter，最坏 O(n²)）
     function buildDisplay(items: any[]): any[] {
-        const counts = new Map<string, number>();
+        const groups = new Map<string, any[]>();
         for (const r of items) {
             if (!r.memberId) continue;
             const k = `${r.memberId}|${r.dueDate}`;
-            counts.set(k, (counts.get(k) ?? 0) + 1);
+            let g = groups.get(k);
+            if (!g) { g = []; groups.set(k, g); }
+            g.push(r);
         }
         const used = new Set<string>();
         const out: any[] = [];
         for (const r of items) {
             if (!r.memberId) { out.push({ merged: false, row: r }); continue; }
             const k = `${r.memberId}|${r.dueDate}`;
-            if ((counts.get(k) ?? 0) > 1) {
+            const g = groups.get(k);
+            if (g && g.length > 1) {
                 if (used.has(k)) continue; // 同键后续行并入合并条目
                 used.add(k);
-                out.push({
-                    merged: true, key: k, memberId: r.memberId, dueDate: r.dueDate,
-                    items: items.filter((x) => x.memberId === r.memberId && x.dueDate === r.dueDate),
-                });
+                out.push({ merged: true, key: k, memberId: r.memberId, dueDate: r.dueDate, items: g });
             } else {
                 out.push({ merged: false, row: r });
             }
