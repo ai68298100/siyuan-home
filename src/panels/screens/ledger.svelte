@@ -1,7 +1,7 @@
 <script lang="ts">
     import { renderLedger, renderLedgerAll, addDetachedRow, setCell, RowIdentityPendingError } from "@/core/siyuan";
     import { buildShoppingList } from "@/core/shopping";
-    import { AMOUNT_KEYS, formatAmount } from "@/core/format";
+    import { AMOUNT_KEYS, formatAmount, optLabel, optLabelText } from "@/core/format";
     import { parseCsv } from "@/core/csv";
     import { planImport, guessMapping } from "@/core/importer";
     import { buildCsv } from "@/core/csv";
@@ -453,15 +453,8 @@
         saveError = ""; identityPending = false; pendingItemID = null;
     }
 
-    /** 枚举值 → i18n 标签（210 波：field.<key>.opt.<value> 族；缺键回退原值——消费面此前为零） */
-    function optLabel(colKey: string, value: string): string {
-        if (!value || value === "—") return value;
-        const k = `field.${colKey}.opt.${value}`;
-        const label = t(k);
-        return label === k ? value : label;
-    }
-
-    /** 单元格值 → 显示文本（详情抽屉/表格共用；日期走本地时区；select 值带列上下文走枚举 i18n） */
+    /** 单元格值 → 显示文本（详情抽屉/表格共用；日期走本地时区；select 值带列上下文走枚举 i18n——
+     * optLabel/optLabelText 纯函数在 core/format，212 波抽核心可单测） */
     function cellText(v: any, colKey?: string): string {
         if (!v) return "—";
         switch (v.type) {
@@ -469,11 +462,11 @@
             case "date": return v.date?.isNotEmpty ? localDateKey(new Date(v.date.content)) : "—";
             case "select": {
                 const s = v.select?.content ?? "—";
-                return colKey ? optLabel(colKey, s) : s;
+                return colKey ? optLabel(t, colKey, s) : s;
             }
             case "mSelect": {
                 const list = v.mSelect?.length ? v.mSelect.map((o: any) => o.content).join("、") : "—";
-                return colKey && list !== "—" ? list.split("、").map((x) => optLabel(colKey, x)).join("、") : list;
+                return colKey && list !== "—" ? optLabelText(t, colKey, list) : list;
             }
             case "number": return v.number?.isNotEmpty ? String(v.number.content) : "—";
             case "url": return v.url?.content ?? "—";
@@ -1169,7 +1162,7 @@
                     const sel = document.createElement("select");
                     sel.className = "b3-select fn__flex-1";
                     sel.add(new Option("", ""));
-                    for (const opt of col.options ?? []) sel.add(new Option(optLabel(col.key, opt), String(opt))); // 211 波：枚举标签
+                    for (const opt of col.options ?? []) sel.add(new Option(optLabel(t, col.key, opt), String(opt))); // 211 波：枚举标签
                     sel.value = String(cur ?? "");
                     control = sel;
                 } else {

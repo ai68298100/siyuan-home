@@ -295,7 +295,7 @@
 {:else}
     <div class="lv-people">
         {#each members as m (m.id)}
-            <div class="lv-card lv-mod"
+            <div class="lv-card lv-mod" role="group" aria-label={m.name}
             draggable="true"
             ondragstart={(e: DragEvent) => onDragStart(m, e)}
             ondragover={(e: DragEvent) => { e.preventDefault(); dragOverId = m.id; }}

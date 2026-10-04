@@ -2,7 +2,14 @@
  * 金额格式化单测（提案 B/210 波）：千分位、两位小数去尾零、负数、非有限值。
  */
 import { describe, it, expect } from "vitest";
-import { AMOUNT_KEYS, formatAmount } from "@/core/format";
+import { AMOUNT_KEYS, formatAmount, optLabel, optLabelText } from "@/core/format";
+
+const zh: Record<string, string> = {
+    "field.category.opt.food_st": "食品",
+    "field.direction.opt.in": "收",
+    "field.direction.opt.out": "支",
+};
+const t = (k: string) => zh[k] ?? k;
 
 describe("formatAmount", () => {
     it("千分位 + 整数无小数点", () => {
@@ -28,5 +35,23 @@ describe("formatAmount", () => {
         }
         expect(AMOUNT_KEYS.has("year")).toBe(false);
         expect(AMOUNT_KEYS.has("rating")).toBe(false);
+    });
+});
+
+describe("optLabel / optLabelText（211 波：枚举值 i18n）", () => {
+    it("命中键 → 标签；缺键 → 原值回退（schema 新选项先于翻译上线不裸键）", () => {
+        expect(optLabel(t, "category", "food_st")).toBe("食品");
+        expect(optLabel(t, "category", "future_opt")).toBe("future_opt");
+    });
+
+    it("空值与 — 原样透传", () => {
+        expect(optLabel(t, "category", "")).toBe("");
+        expect(optLabel(t, "category", "—")).toBe("—");
+    });
+
+    it("mSelect 串逐值翻译；非分隔串原样", () => {
+        expect(optLabelText(t, "direction", "in、out")).toBe("收、支");
+        expect(optLabelText(t, "direction", "—")).toBe("—");
+        expect(optLabelText(t, "direction", "")).toBe("");
     });
 });

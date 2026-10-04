@@ -14,3 +14,18 @@ export function formatAmount(n: number): string {
     const intFmt = int.replace(/\B(?=(\d{3})+(?!\d))/g, ",");
     return dec ? `${intFmt}.${dec}` : intFmt;
 }
+
+/** 枚举值 → i18n 标签（211 波抽核心可单测）：field.<colKey>.opt.<value> 族；
+ * 缺键回退原值（schema 新增选项先于翻译上线时不裸键）。t 由调用方注入——核心层无 i18n 依赖。 */
+export function optLabel(t: (k: string) => string, colKey: string, value: string): string {
+    if (!value || value === "—") return value;
+    const k = `field.${colKey}.opt.${value}`;
+    const label = t(k);
+    return label === k ? value : label;
+}
+
+/** mSelect 串（、分隔）逐值翻译 */
+export function optLabelText(t: (k: string) => string, colKey: string, joined: string): string {
+    if (!joined || joined === "—") return joined;
+    return joined.split("、").map((x) => optLabel(t, colKey, x)).join("、");
+}
