@@ -453,14 +453,28 @@
         saveError = ""; identityPending = false; pendingItemID = null;
     }
 
-    /** 单元格值 → 显示文本（详情抽屉/表格共用；日期走本地时区） */
-    function cellText(v: any): string {
+    /** 枚举值 → i18n 标签（210 波：field.<key>.opt.<value> 族；缺键回退原值——消费面此前为零） */
+    function optLabel(colKey: string, value: string): string {
+        if (!value || value === "—") return value;
+        const k = `field.${colKey}.opt.${value}`;
+        const label = t(k);
+        return label === k ? value : label;
+    }
+
+    /** 单元格值 → 显示文本（详情抽屉/表格共用；日期走本地时区；select 值带列上下文走枚举 i18n） */
+    function cellText(v: any, colKey?: string): string {
         if (!v) return "—";
         switch (v.type) {
             case "text": return v.text?.content ?? "—";
             case "date": return v.date?.isNotEmpty ? localDateKey(new Date(v.date.content)) : "—";
-            case "select": return v.select?.content ?? "—";
-            case "mSelect": return v.mSelect?.length ? v.mSelect.map((o: any) => o.content).join("、") : "—";
+            case "select": {
+                const s = v.select?.content ?? "—";
+                return colKey ? optLabel(colKey, s) : s;
+            }
+            case "mSelect": {
+                const list = v.mSelect?.length ? v.mSelect.map((o: any) => o.content).join("、") : "—";
+                return colKey && list !== "—" ? list.split("、").map((x) => optLabel(colKey, x)).join("、") : list;
+            }
             case "number": return v.number?.isNotEmpty ? String(v.number.content) : "—";
             case "url": return v.url?.content ?? "—";
             case "checkbox": return v.checkbox?.checked ? "✓" : "—";
@@ -611,7 +625,7 @@
                 if (AMOUNT_KEYS.has(col.key) && cell?.type === "number" && cell?.number?.isNotEmpty && typeof cell.number.content === "number") {
                     v.textContent = formatAmount(cell.number.content);
                 } else {
-                    v.textContent = cellText(cell);
+                    v.textContent = cellText(cell, col.key); // 211 波：select 值走枚举 i18n
                 }
                 line.append(v);
                 body.appendChild(line);
@@ -1155,7 +1169,7 @@
                     const sel = document.createElement("select");
                     sel.className = "b3-select fn__flex-1";
                     sel.add(new Option("", ""));
-                    for (const opt of col.options ?? []) sel.add(new Option(opt, String(opt)));
+                    for (const opt of col.options ?? []) sel.add(new Option(optLabel(col.key, opt), String(opt))); // 211 波：枚举标签
                     sel.value = String(cur ?? "");
                     control = sel;
                 } else {
@@ -1453,7 +1467,7 @@
                         {#each schemaKeys.filter((k) => ["name", "status", "expiry", "due"].includes(k)) as k (k)}
                             {@const v = r.cells[ref.columns[k]]}
                             <td class="lv-num">
-                                {cellText(v)}
+                                {cellText(v, k)}
                             </td>
                         {/each}
                     </tr>

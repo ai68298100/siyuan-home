@@ -39,15 +39,20 @@ export async function runHealthCheck(
         }
         try {
             if (ref.docId) {
-                // 文档根块 id 即 docId；回收站/删除的文档已退出 blocks 索引
-                const hit = await sql<{ id: string }>(`SELECT id FROM blocks WHERE id='${ref.docId}' LIMIT 1`);
-                if (!hit.length) {
-                    modules.push({
-                        moduleId,
-                        ok: false,
-                        error: "ledger document missing (deleted or in trash?) — rebuild from the ledger page",
-                    });
-                    continue;
+                // 文档根块 id 即 docId；回收站/删除的文档已退出 blocks 索引。
+                // 索引延迟（E5）可致瞬时查空——判缺失前延迟复检一次，避免误报。
+                const exists = async () =>
+                    (await sql<{ id: string }>(`SELECT id FROM blocks WHERE id='${ref.docId}' LIMIT 1`)).length > 0;
+                if (!(await exists())) {
+                    await new Promise((r) => setTimeout(r, 600));
+                    if (!(await exists())) {
+                        modules.push({
+                            moduleId,
+                            ok: false,
+                            error: "ledger document missing (deleted or in trash?) — rebuild from the ledger page",
+                        });
+                        continue;
+                    }
                 }
             }
             const read = await renderLedgerAll(ref.avId);
