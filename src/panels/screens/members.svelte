@@ -19,7 +19,19 @@
         void version;
         return plugin.scan?.reminders ?? [];
     });
-    const alertsFor = (id: string) => reminders.filter((r: Reminder) => r.memberId === id);
+    // 176 波性能：按成员一次预分组（模板内每卡多次调用 alertsFor，此前每次全量 filter）
+    const alertsByMember = $derived.by(() => {
+        void version;
+        const map = new Map<string, Reminder[]>();
+        for (const r of reminders) {
+            if (!r.memberId) continue;
+            let g = map.get(r.memberId);
+            if (!g) { g = []; map.set(r.memberId, g); }
+            g.push(r);
+        }
+        return map;
+    });
+    const alertsFor = (id: string) => alertsByMember.get(id) ?? [];
     // C5a 统计 chips：该成员待办按模块聚类的 top-3（数据来自当前扫描，不做全库聚合查询）
     function statChips(id: string): { label: string; n: number }[] {
         const byModule = new Map<string, number>();
