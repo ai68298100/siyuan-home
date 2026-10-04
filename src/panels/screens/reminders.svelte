@@ -2,6 +2,7 @@
     import { Dialog, Menu, showMessage, confirm } from "siyuan";
     import type { HomePluginLike } from "@/types/plugin";
     import { saveRuntime } from "@/core/hub/runtime";
+    import { buildDisplay as display } from "@/core/hub/display";
     import { moduleIcon } from "@/core/modules";
     import type { Reminder } from "@/types";
     let { plugin, t, version }: { plugin: HomePluginLike; t: (k: string) => string; version?: number } = $props();
@@ -201,33 +202,8 @@
         menu.open({ x: ev.clientX, y: ev.clientY });
     }
 
-    // 29 组：同成员同日多条合并为一条可展开卡（"儿子的 3 件事"）；单条与无成员事项保持独立。
-    // 175 波性能：先按键一次分组（原实现对每个合并组再做 items.filter，最坏 O(n²)）
-    function buildDisplay(items: any[]): any[] {
-        const groups = new Map<string, any[]>();
-        for (const r of items) {
-            if (!r.memberId) continue;
-            const k = `${r.memberId}|${r.dueDate}`;
-            let g = groups.get(k);
-            if (!g) { g = []; groups.set(k, g); }
-            g.push(r);
-        }
-        const used = new Set<string>();
-        const out: any[] = [];
-        for (const r of items) {
-            if (!r.memberId) { out.push({ merged: false, row: r }); continue; }
-            const k = `${r.memberId}|${r.dueDate}`;
-            const g = groups.get(k);
-            if (g && g.length > 1) {
-                if (used.has(k)) continue; // 同键后续行并入合并条目
-                used.add(k);
-                out.push({ merged: true, key: k, memberId: r.memberId, dueDate: r.dueDate, items: g });
-            } else {
-                out.push({ merged: false, row: r });
-            }
-        }
-        return out;
-    }
+    // 29 组：同成员同日多条合并为一条可展开卡；175 波 O(n) 分组、179 波抽纯函数（core/hub/display，带单测）
+    const buildDisplay = (items: Reminder[]) => display(items);
     let expandedMerges = $state<Set<string>>(new Set());
     function toggleMerge(key: string) {
         const next = new Set(expandedMerges);
