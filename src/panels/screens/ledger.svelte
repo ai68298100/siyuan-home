@@ -1,6 +1,8 @@
 <script lang="ts">
     import { renderLedger, renderLedgerAll, addDetachedRow, setCell, RowIdentityPendingError } from "@/core/siyuan";
     import { buildShoppingList } from "@/core/shopping";
+    import { parseCsv } from "@/core/csv";
+    import { planImport, guessMapping } from "@/core/importer";
     import { buildCsv } from "@/core/csv";
     import { localDateKey } from "@/core/hub/rule";
     import { showMessage, Dialog, confirm } from "siyuan";
@@ -301,6 +303,92 @@
                 showMessage(t("ledger.shopCopyFailed"), 4000, "error");
             }
         };
+    }
+
+    // 16 组/191 波：assets CSV 批量导入——列映射向导（解析/规划纯函数在 core，UI 只做映射与写入）
+    function openCsvImport() {
+        if (!ref?.avId) return;
+        const input = document.createElement("input");
+        input.type = "file";
+        input.accept = ".csv,text/csv";
+        input.style.display = "none";
+        input.onchange = async () => {
+            const file = input.files?.[0];
+            if (!file) return;
+            let table: string[][];
+            try {
+                table = parseCsv(await file.text());
+            } catch (e) {
+                showMessage(t("ledger.importBadCsv") + ` (${e instanceof Error ? e.message : String(e)})`, 5000, "error");
+                return;
+            }
+            if (table.length < 2) { showMessage(t("ledger.importBadCsv"), 5000, "error"); return; }
+            const headers = table[0];
+            const schemaCols: any[] = plugin.schemaCatalog?.[active]?.columns ?? [];
+            const labelOf = (key: string) => (t(`field.${key}`) !== `field.${key}` ? t(`field.${key}`) : key);
+            let mapping = guessMapping(headers, schemaCols, labelOf);
+            const dlg = new Dialog({
+                title: t("ledger.importCsv"),
+                content: `<div class="b3-dialog__content" id="lv-csvimp-body" style="max-height:60vh;overflow:auto">
+<p class="lv-caption ft__on-surface">${t("ledger.importMapHint").replace("${file}", file.name).replace("${n}", String(table.length - 1))}</p>
+<div id="lv-csvimp-map"></div></div>
+<div class="b3-dialog__action"><span class="lv-caption" style="flex:1" id="lv-csvimp-stat"></span><button class="b3-button b3-button--cancel" id="lv-csvimp-close">${t("cancel")}</button><button class="b3-button b3-button--text" id="lv-csvimp-start">${t("ledger.importStart")}</button></div>`,
+                width: "560px",
+            });
+            const mapBox = dlg.element.querySelector("#lv-csvimp-map") as HTMLElement;
+            const selects: HTMLSelectElement[] = [];
+            headers.forEach((h, i) => {
+                const line = document.createElement("div");
+                line.className = "fn__flex";
+                line.style.cssText = "gap:8px;align-items:center;padding:3px 0;font-size:13px";
+                const label = document.createElement("span");
+                label.style.cssText = "flex:1;word-break:break-all";
+                label.textContent = h || `#${i + 1}`;
+                const sel = document.createElement("select");
+                sel.className = "b3-select";
+                sel.style.cssText = "width:200px;flex-shrink:0";
+                sel.add(new Option(t("ledger.importSkip"), ""));
+                for (const c of schemaCols) sel.add(new Option(labelOf(c.key), c.key));
+                sel.value = mapping[i] ?? "";
+                selects.push(sel);
+                line.append(label, sel);
+                mapBox.appendChild(line);
+            });
+            (dlg.element.querySelector("#lv-csvimp-close") as HTMLButtonElement).onclick = () => dlg.destroy();
+            (dlg.element.querySelector("#lv-csvimp-start") as HTMLButtonElement).onclick = async () => {
+                mapping = Object.fromEntries(selects.map((s, i) => [i, s.value || undefined]));
+                const mappedCount = Object.values(mapping).filter(Boolean).length;
+                if (mappedCount === 0) { showMessage(t("ledger.importNoMap"), 4000, "error"); return; }
+                const plan = planImport(table, mapping, schemaCols, "name");
+                if (plan.rows.length === 0) { showMessage(t("ledger.importNoRows"), 4000, "error"); return; }
+                dlg.destroy();
+                confirm(
+                    t("ledger.importCsv"),
+                    t("ledger.importConfirm").replace("${n}", String(plan.rows.length)).replace("${skip}", String(plan.skipped)),
+                    async () => {
+                        let ok = 0;
+                        const failed: number[] = [];
+                        for (let i = 0; i < plan.rows.length; i++) {
+                            const row = plan.rows[i];
+                            try {
+                                const itemID = await addDetachedRow(ref!.avId!, row.name);
+                                for (const c of row.cells) {
+                                    if (ref!.columns![c.key]) await setCell(ref!.avId!, ref!.columns![c.key], itemID, cellValue(c.type, c.value));
+                                }
+                                ok++;
+                            } catch {
+                                failed.push(i + 1);
+                            }
+                        }
+                        await load();
+                        await plugin.refreshHub([active]); // PF06：只重扫本模块
+                        const failTxt = failed.length ? ` · ${t("ledger.importRowFail").replace("${n}", String(failed.length))} (#${failed.slice(0, 3).join(", #")}${failed.length > 3 ? "…" : ""})` : "";
+                        showMessage(t("ledger.importDone").replace("${ok}", String(ok)).replace("${skip}", String(plan.skipped)) + failTxt, 8000, failed.length ? "error" : "info");
+                    },
+                );
+            };
+        };
+        input.click();
     }
 
     async function load() {
@@ -1217,6 +1305,10 @@
         {#if active === "stock"}
             <!-- 16 组/188 波：采购建议（低库存汇总） -->
             <button class="b3-button b3-button--outline" onclick={openShoppingList}>{t("ledger.shoppingList")}</button>
+        {/if}
+        {#if active === "assets"}
+            <!-- 16 组/191 波：CSV 批量导入（列映射向导） -->
+            <button class="b3-button b3-button--outline" onclick={openCsvImport}>{t("ledger.importCsv")}</button>
         {/if}
         <button class="b3-button b3-button--outline" onclick={() => plugin.showTabDocs(ref?.docId)}>{t("ledger.openDoc")} ↗</button>
     {/if}

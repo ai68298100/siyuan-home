@@ -1,4 +1,5 @@
 # 小驴管家（Lv Home）· 项目待办总清单
+| 2026-10-05 | 主线 | 第一百九十一波：assets CSV 批量导入（16 组，列映射向导——迁移路径闭环） | **解析层**：`parseCsv` RFC 4180（BOM 剥离/引号字段含逗号换行/"" 转义/LF+CRLF/空行跳过；与 buildCsv 互逆往返测试）；**映射层**：`core/importer.ts` 纯函数——planImport（名称列必需、数字容忍千分位、日期斜杠转连字符、非法值记行内 warning 不废弃整行、checkbox 中文符号识别、名称为空整行跳过）+ guessMapping（表头=key 或 i18n 标签，不区分大小写）；**UI**：assets 工具栏"导入 CSV"→ 向导（逐列映射下拉可跳过、开始导入前确认新建行数、逐行 addDetachedRow+按映射 setCell（复用 D09 cellValue）、失败行号聚合报告、完成后增量重扫）；高后果语义：确认框言明不可一键撤销；+5 单测共 222、i18n 792→803 |
 | 2026-10-05 | 主线 | 第一百九十波：favors 回礼提醒——规则引擎新 kind "after"（offsetDays + onlyIf 条件派生） | **引擎扩展**：ReminderKind 新增 `after`（ReminderRuleSpec.offsetDays 0–3650 clamp + onlyIf select 条件）；nextOccurrence=事件日期+offsetDays 一次性；SchemaLedgerProvider 在规则循环里先评 onlyIf（select 值不匹配即跳过，CertsProvider 专属路径不受影响）；**favors reciprocate 规则**：收礼（direction=in）30 天后派生、leadDays 0；完成语义自然落入 oneoff 分支（记已办可恢复——H05 分派无需改动）；提醒卡标题带「回礼」标记（rule.reciprocate，UI 侧 i18n，引擎保持无 i18n 依赖）；provider 级 mock transport 测试（收礼派生+送礼过滤两行对照）+ rule 单测 + 黄金快照 -u（有意变更）；i18n 792、217 测试 |
 | 2026-10-05 | 主线 | 第一百八十九波：media 追更提醒（schema 声明路线）+ travel 行前证件检查存档（rowlog 第四消费方） | **media 追更提醒**：next_update 日期列 + oneoff 规则（leadDays 0=当天）——纯 schema 声明，SchemaLedgerProvider 自动派生（"新增模块=数据"路线的规则侧首次实战加列）；capture 换入 next_update 换出 rating（观前未知评分）；建库器只增列补老库；黄金快照 -u 更新并登记原因（有意变更）；**travel 检查存档**：rowlog checks 类型（第四消费方），travel-plan 抽屉"行前证件检查"分区（日期+结论，追加去重）；i18n +4（791 键）；216 测试持平（快照更新） |
 | 2026-10-05 | 主线 | 第一百八十八波：stock 采购建议清单（16 组，低库存汇总+复制分享）+ allowance 愿望清单暂缓注记 | **采购建议**：`core/shopping.ts buildShoppingList` 纯函数（H15 同口径——qty 与阈值均有值且 qty≤阈值才入清单，缺列不评估不误报；建议量=补回阈值下限 1；名称排序）+ 台账页 stock 模块"采购建议"按钮 → 对话框逐项可改建议数量（renderLedgerAll 全量读，>50 行不漏）+ 复制清单到剪贴板（`名称 ×N` 文本，可直接贴给家人/购物 App）；剪贴板失败显式报错不假成功；+2 单测、i18n 778→787；**allowance 愿望清单暂缓注记**：allowance 行是收支事件而非目标实体，存储模型需产品决策（候选=shopping 挂 wish 类别行 + rowlog 存钱流水），随 16 组 UI 波定案；单测 214→216 |
@@ -311,7 +312,7 @@
 - [x] 🟡 certs：复印件/电子版存放位置字段 ✅ 2026-10-04 第六十五轮（copy_location text 列 + 双语 i18n + 快照 -u）
 - [x] 🟡 assets：估值快照（手动记录 + 时间线，非自动估值） ✅ 2026-10-04 第六十八轮（**子记录模型落地首项**：rowlogs.json 行级日志 + 详情抽屉估值时间线分区——记一笔/删/行删除联动清理；纯逻辑 4 单测）
 - [ ] 🟡 assets：位置变更历史（物品搬家记录）
-- [ ] 🟢 assets：CSV 批量导入（列映射向导）
+- [x] 🟢 assets：CSV 批量导入（列映射向导） ✅ 2026-10-05 第一百九十一波：`parseCsv`（RFC 4180：BOM/引号字段/转义引号/LF+CRLF/空行跳过，往返测试钉 buildCsv 互逆）+ `core/importer.ts` 纯函数（planImport：名称列必需、数字千分位容忍/日期斜杠转连字符/非法记行内 warning 不废弃整行；checkbox 中文符号识别；guessMapping 表头=key 或 i18n 标签猜测）+ 台账 assets 工具栏"导入 CSV"向导（逐列映射下拉、开始导入前 G1 式确认、逐行 addDetachedRow+setCell、失败行号聚合报告、完成后增量重扫）；i18n +11（803 键）+5 单测共 222
 - [x] 🟡 shopping：退货/退款记录字段与状态 ✅ 2026-10-04 第六十六轮（return_status select none/requested/returned/refunded + return_date + refund_amount）
 - [x] 🟢 shopping：同商品价格历史（复购比价参考） ✅ 2026-10-04 第六十九轮（rowlog prices 类型：同日多条合法——不同渠道价格并存 + 抽屉价格历史分区）
 - [x] 🟡 shopping：购入联动 stock（囤货品自动加库存） ✅ 2026-10-04 第七十二轮（shopping 新增 qty 数量列；详情抽屉"入库到囤货"：同名药箱行首个累加 stock_qty、无匹配新建囤货行（数量缺省 1），确认框报匹配数，成功后禁用防重复 + medicine 部分重扫（低库存即时重算））
