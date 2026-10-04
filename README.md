@@ -27,9 +27,11 @@ Certificates expire, medicine expires, insurance needs renewal, subscriptions au
 | ⏰ **Unified expiry reminders** | Certificates, medicine, policies, subscriptions, inspections, birthdays (lunar supported) — all derived automatically, lead time configurable per type (passport 1 year, medicine 30 days), overdue shown in red on top |
 | 👥 **Members as first-class citizens** | Self / spouse / partner / children / elders / kin — every ledger is organized per member, filter "everything about my son" in one click |
 | 🗃 **31 life modules** | People & records · assets & shopping · daily living · parenting & school · travel · media (details below) |
-| 📋 **Rich detail drawer** | View all fields, edit inline, upload attachments, renewal history, delete with double-confirm |
+| 📋 **Rich detail drawer** | View all fields, edit inline, upload attachments, renewal history, replacement chains & timeline journals (valuations / prices / meter readings / lending / pre-trip checks), delete with double-confirm |
+| 📈 **Growth charts (parenting)** | Height/weight timelines with official WHO reference bands (P3–P97, 0–13 weeks weekly + 0–60 months), percentile on hover |
+| 🛒 **Smart lists** | Shopping suggestions from low stock (editable, copy-to-clipboard), media update reminders, reciprocation reminders for received gifts |
 | 📊 **Check-in & exam integration** | Display study streaks and accuracy from 小驴考试, check-in strength summaries from 小驴打卡 |
-| 📤 **Data portability** | CSV export per module, settings JSON export/import with auto-backup, sample data generator |
+| 📤 **Data portability** | CSV export per module + bulk CSV import (column-mapping wizard), calendar (.ics) & contacts (.vcf) export, sanitized diagnostics bundle, settings JSON export/import with auto-backup, sample data generator |
 | 🔒 **Local-first** | Everything lives in your SiYuan workspace; no telemetry, no network calls; share the ledger notebook with your family |
 | 🔗 **Native databases** | Ledgers are SiYuan attribute-view databases inside a dedicated notebook — open any ledger doc to edit, link or embed it in daily notes ("mom's passport" inside your journal) |
 | 🧩 **Modules on demand** | Disabled modules create no data and stay out of the UI; parenting/school only suggested when you have kids |
@@ -123,7 +125,7 @@ pnpm test         # unit tests (33)
 
 | Category | Docs |
 |---|---|
-| Usage | [FAQ](./docs/FAQ.md) · [Privacy](./docs/privacy.md) · [Migration](./docs/migration.md) |
+| Usage | [FAQ](./docs/FAQ.md) · [Privacy](./docs/privacy.md) · [Migration](./docs/migration.md) · [Glossary](./docs/glossary.md) |
 | Design | [01 Architecture](./docs/design/01-架构总览.md) · [02 Data model](./docs/design/02-数据模型与模块规格.md) · [03 Reminder hub](./docs/design/03-提醒中枢.md) · [07 Visual language](./docs/design/07-视觉设计语言.md) · [Index](./docs/design/00-index.md) |
 | Interactive prototype | [prototype/index.html](./prototype/index.html) (open in browser — dark/light themes, 7 screens incl. style guide) |
 
