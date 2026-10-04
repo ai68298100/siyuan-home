@@ -1,4 +1,5 @@
 # 小驴管家（Lv Home）· 项目待办总清单
+| 2026-10-04 | 兜底 | 第一百七十八波：N2 发版清单聚合 + N3 重估 | 单探仍 401（外来工作区）；**N2 成文** docs/release-checklist.md 七步（版本号交互脚本/CHANGELOG 定稿口径/release-notes 生成/构建四验全绿门禁/tag+Release+zip/集市材料含 D13 复核/发版后预检回归）；**N3 重估**：向导不建成员实体（household 仅存档），直接问性别是只写不读 → 改建议"完成页引导补性别"或"child 添加预填 household 队列"（需消费链路设计，随发版后 UI 波）；纯文档波零代码变更 |
 | 2026-10-04 | 主线 | 第一百七十七波：**活体集成测试套件**（用户问询"真机走查可否后台 e2e"→ 可，已建成） | 架构洞察：core 层只需内核 HTTP API（transport 可注入），无需前端——`vitest.live.config.ts`（排除于默认测试，串行/长超时）+ `tests/live/live-env.ts`（真实 HTTP transport + 单次门禁探测）+ `tests/live/core-live.test.ts`（**插件自己的代码路径**打真机：IT-03 D01 分页循环 60 行全返回、IT-04 renderLedger 语义钉住、IT-02 addDetachedRow→setCell→读回、IT-05 删行、CertsProvider 真实派生三级提醒、健康检查）+ `scripts/e2e-core.sh`（source env→单探门禁→vitest）；**并发安全三件套**：单探 skip 不重试、专用笔记本 LVH-真机批、afterAll 自清理；门禁 401 优雅 skip 实测 ✓、默认套件排除实测 ✓（24 文件/199）、tsc 0；`pnpm run test:live`；runbook 阶段 4 待挂链 |
 | 2026-10-04 | 主线 | 第一百七十六波：成员页 alertsByMember 预分组（性能） | `alertsFor(id)` 原每次全量 filter reminders——模板每卡调用 3–4 次（chips/计数/展开明细）→ `alertsByMember` derived 预分组 Map，O(成员+提醒) 单遍；401（非 429：锁定过期、外来工作区占用）——部署队列 171–176 波十项继续挂起；199 测试、完整构建+smoke 绿 |
 | 2026-10-04 | 主线 | 第一百七十五波：buildDisplay O(n) 化（性能） | 提醒合并卡分组重构：原实现两遍扫描（计数 Map + 每合并组 items.filter 回扫，同成员同日堆积时最坏 O(n²)）→ 单遍预分组 Map + 顺序消费（O(n)，组内顺序天然保留）；台账空态核对：未建库/搜索无命中/真空三分支已完善（UI16 语义，无需改）；i18n 760 持平、199 测试、完整构建+smoke 绿；单探仍 429，**待部署队列累计 171–175 波**（九项） |
@@ -1993,8 +1994,8 @@
 > 全方位梳理（已完成/未完成/新增建议）后新增六项；编号接续分组内，前置条件标注明确。
 
 - [ ] 🔴 **N1 部署后新 UI 验收增补**（并入 runbook 阶段 2）：171–176 波部署队列追平后，把新 UI 纳入真机批阶段 2 观察项——context-strip 状态条数值真实性、focus-row 三卡动作回跳、forced-colors 高对比、筛选空态解释/清除、键盘 Tab 提醒操作显现、成员卡 chips（预分组后显示一致）；**前置 = 内核锁定冷却 + 本工作区窗口（部署 21 文件）**
-- [ ] 🟡 **N2 发版清单聚合**（真机批全绿后执行）：①`update_version.js` 0.2.0→0.3.0；②CHANGELOG Unreleased 定稿（当前已覆盖 65–112 波，发版前补齐尾波）；③`release-notes.mjs` 生成 + 润色；④集市材料（PL24 截图 + 描述双语）；⑤tag + GitHub Release——散于 D18/PL24/runbook 收尾，聚合为一站式清单
-- [ ] 🟡 **N3 onboarding 向导补性别选择**（小，随任意 UI 波）：D23 成员性别字段已落地，但向导未询问——无性别则生长曲线参考带不显示（D23 语义）；向导步骤 1 角色选择旁加性别 chips（可跳过），减少后补成本
+- [ ] 🟡 **N2 发版清单聚合**（真机批全绿后执行）：①`update_version.js` 0.2.0→0.3.0；②CHANGELOG Unreleased 定稿（当前已覆盖 65–112 波，发版前补齐尾波）；③`release-notes.mjs` 生成 + 润色；④集市材料（PL24 截图 + 描述双语）；⑤tag + GitHub Release——散于 D18/PL24/runbook 收尾，聚合为一站式清单 ✅ 2026-10-04 清单成文：[docs/release-checklist.md](docs/release-checklist.md)（七步：版本号/CHANGELOG 定稿/notes/构建四验/tag+Release/集市材料/发版后预检——执行时照单走）
+- [ ] 🟡 **N3 onboarding 向导补性别选择**（小，随任意 UI 波）：D23 成员性别字段已落地，但向导未询问——无性别则生长曲线参考带不显示（D23 语义）；**重估**：向导不建成员实体（household 仅存档，成员由用户在成员页手动添加），直接问性别是只写不读——建议改为"向导完成页引导去成员页补性别"或"成员页 child 角色添加时从 household.childrenSex 预填"（需 household→成员消费链路设计），随 N2 发版后的 UI 波处理
 - [ ] 🟢 **N4 生长曲线 5–19 岁扩展研究**（远期/可选）：当前 WHO 参考带覆盖 0–60 月，儿童超 5 岁后曲线无参考带——5–19 岁走 WHO 2007 growth reference（AnthroPlus，另有许可与数据源调研量）；孩子年龄跨 5 岁的家庭真实存在，立项前先调研数据许可与转换成本
 - [ ] 🟢 **N5 用户指南英文化**（可选，集市国际化）：六篇 docs/guide 为中文；README 双语、i18n 双语已备——面向海外集市用户时补英文指南（机器初翻 + 人工润色，量大不急）
 - [ ] 🟢 **N6 TODO.md 历史日志归档治理**（维护性）：循环执行记录表已 170+ 行且持续增长——建议定期（如每里程碑）把已闭环轮次行归档到 `docs/` 历史文档，主表只留近程，控制主待办文件体积与可读性
