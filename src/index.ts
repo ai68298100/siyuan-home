@@ -158,10 +158,27 @@ export default class LvHomePlugin extends Plugin {
             this.refreshHub().catch((e) => console.warn("[siyuan-home] heartbeat scan failed:", e));
         }, 30 * 60 * 1000);
 
-        // C6c：块菜单入口——选中文字 → 存为常用语/网址（URL 形态分流到 bookmarks，其余进 snippets）
+        // C6c：块菜单入口——选中文字 → 存入（URL 命中二级菜单分流：存为网址/存为地址；其余进常用语）
         this.captureMenuHandler = ((event: { detail: { menu: { addItem: (item: unknown) => void } } }) => {
             const text = (window.getSelection()?.toString() ?? "").trim();
             if (!text) return;
+            if (/^https?:\/\/\S+$/i.test(text)) {
+                // C6c 收尾：URL 两入口可见（子项常显，未启用模块在 label 标注，点击给引导消息）
+                event.detail.menu.addItem({
+                    icon: "iconInbox",
+                    label: this.i18nText("capture.menuUrl"),
+                    submenu: ([
+                        { id: "bookmarks", labelKey: "capture.toBookmarks" },
+                        { id: "address", labelKey: "capture.toAddress" },
+                    ] as const).map((t) => ({
+                        label: this.settings.enabledModules.includes(t.id)
+                            ? this.i18nText(t.labelKey)
+                            : `${this.i18nText(t.labelKey)}（${this.i18nText(`module.${t.id}`)}${this.i18nText("capture.off")}）`,
+                        click: () => this.captureTo(t.id, text),
+                    })),
+                });
+                return;
+            }
             event.detail.menu.addItem({
                 icon: "iconInbox",
                 label: this.i18nText("capture.menu"),
@@ -479,12 +496,19 @@ export default class LvHomePlugin extends Plugin {
     }
 
     /**
-     * C6c：选中文字快速存入（URL 形态 → bookmarks.url；其余 → snippets.content）。
-     * 模块未启用给引导；失败保留原文在剪贴板（文本本就在原文档中，不丢数据）。
+     * C6c：选中文字快速存入（非 URL → snippets.content）。
      */
     async quickCapture(text: string) {
-        const looksUrl = /^https?:\/\/\S+$/i.test(text);
-        const moduleId = looksUrl ? "bookmarks" : "snippets";
+        if (/^https?:\/\/\S+$/i.test(text)) return; // URL 走块菜单二级分流（capture.menuUrl 子项）
+        await this.captureTo("snippets", text);
+    }
+
+    /**
+     * C6c 收尾：按目标模块写入——bookmarks.url / address.address_full / snippets.content
+     * （存入字段与各模块 capture 一致；address 场景=收货/登记地址，全文入 address_full）。
+     * 模块未启用给引导；失败保留原文（文本本就在原文档中，不丢数据）。
+     */
+    async captureTo(moduleId: "bookmarks" | "address" | "snippets", text: string) {
         if (!this.settings.enabledModules.includes(moduleId)) {
             showMessage(this.i18nText("capture.moduleOff").replace("${module}", this.i18nText(`module.${moduleId}`)), 5000, "info");
             return;
@@ -496,14 +520,16 @@ export default class LvHomePlugin extends Plugin {
             // 码点安全截断（Array.from 按 Unicode 码点切，emoji/生僻字不被劈成乱码）
             const name = Array.from(text).length > 40 ? `${Array.from(text).slice(0, 40).join("")}…` : text;
             const itemID = await addDetachedRow(ref.avId, name);
-            const targetCol = looksUrl ? ref.columns.url : ref.columns.content;
+            const targetCol = moduleId === "bookmarks" ? ref.columns.url
+                : moduleId === "address" ? ref.columns.address_full
+                : ref.columns.content;
             if (targetCol) {
-                await setCell(ref.avId, targetCol, itemID, looksUrl
+                await setCell(ref.avId, targetCol, itemID, moduleId === "bookmarks"
                     ? { type: "url", url: { content: text } }
                     : { type: "text", text: { content: text } });
             }
             showMessage(this.i18nText("capture.saved").replace("${module}", this.i18nText(`module.${moduleId}`)), 3000, "info");
-            // 常用语/书签无提醒规则——写入不触发扫描（PF06：无相关变更不重扫）
+            // 常用语/书签/地址无提醒规则——写入不触发扫描（PF06：无相关变更不重扫）
         } catch (e) {
             const { coalescedNotify } = await import("@/libs/notify-queue");
             coalescedNotify("capture-failed", () =>

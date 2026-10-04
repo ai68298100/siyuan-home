@@ -113,9 +113,15 @@ export function setBlockAttrs(id: string, attrs: Record<string, string>): Promis
  * - detached 行不在 blocks 表：SQL 不可查、不可块定位 → 行定位降级为打开台账文档（B4e 定案）
  */
 
-export function insertBlock(parentID: string, markdown: string): Promise<void> {
-    // 返回结构 data[0].doOperations[] 无稳定新块 ID → 调用方用 SQL 定位
-    return post("/api/block/insertBlock", { dataType: "markdown", parentID, data: markdown }).then(() => undefined);
+/** 插入 markdown 块，返回新块 ID（E9/182 波：insertBlock 响应 doOperations[].data 带 data-node-id，可同步提取；取不到回空串由调用方兜底） */
+export async function insertBlock(parentID: string, markdown: string): Promise<string> {
+    const d = await post<any>("/api/block/insertBlock", { dataType: "markdown", parentID, data: markdown });
+    const ops: any[] = Array.isArray(d) ? (d[0]?.doOperations ?? []) : (d?.doOperations ?? d?.data?.doOperations ?? []);
+    for (const op of ops) {
+        const m = String(op?.data ?? "").match(/data-node-id="(\d{14}-[a-z0-9]+)"/);
+        if (m) return m[1];
+    }
+    return "";
 }
 
 /** 新思源 ID（yyyyMMddHHmmss-xxxxxxx 形态；内核对 keyID/avIdSeed 接受自造值）。crypto 随机，非加密用途但避可预测值 */
@@ -149,15 +155,19 @@ export async function addAttributeViewColumn(avID: string, col: AvColumnSpec): P
     return keyID;
 }
 
-/** 在文档内插入 av 容器 div 并触发内核建库，返回真实 avID（= av 块 ID） */
+/** 在文档内插入 av 容器 div 并触发内核建库，返回真实 avID（= av 块 ID）。
+ * 优先同步取 insertBlock 响应里的新块 ID（E9）；SQL 索引异步重建仅作回退（轮询 ~3s——
+ * 182 波活体套件首跑实证：忙实例上 400ms 固定等待会落空）。 */
 export async function createAttributeView(docId: string, avIdSeed: string): Promise<string> {
     const div = `<div data-type="NodeAttributeView" data-av-id="${avIdSeed}" data-av-type="table"></div>`;
-    await insertBlock(docId, div);
-    await new Promise((r) => setTimeout(r, 400)); // 块索引异步重建
-    const rows = await sql<{ id: string }>(
-        `SELECT id FROM blocks WHERE type='av' AND markdown LIKE '%${avIdSeed}%' LIMIT 1`,
-    );
-    const blockId = rows[0]?.id;
+    let blockId = await insertBlock(docId, div);
+    for (let i = 0; !blockId && i < 6; i++) {
+        await new Promise((r) => setTimeout(r, 500));
+        const rows = await sql<{ id: string }>(
+            `SELECT id FROM blocks WHERE type='av' AND markdown LIKE '%${avIdSeed}%' LIMIT 1`,
+        );
+        blockId = rows[0]?.id ?? "";
+    }
     if (!blockId) throw new KernelError("av.createAttributeView", -3, "av block not found after insert");
     await post("/api/av/renderAttributeView", { id: blockId, createIfNotExist: true });
     return blockId;

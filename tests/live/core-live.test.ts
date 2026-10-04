@@ -28,6 +28,7 @@ let DOC = "";
 let AV = "";
 let kName = "";
 let kExp = "";
+let kDue = ""; // endorsement 规则字段（certs schema 声明 due 列——H14 缺列显式报错，fixture 必须齐）
 const pluginRowIds: string[] = [];
 const pluginRowNames = ["逾期证件", "即将到期证件", "远期证件"];
 
@@ -39,7 +40,7 @@ const iso = (offsetDays: number) => {
 
 const settings = (): HomeSettings => ({
     enabledModules: ["certs"],
-    dbRefs: { certs: { avId: AV, docId: DOC, columns: { name: kName, expiry: kExp } } },
+    dbRefs: { certs: { avId: AV, docId: DOC, columns: { name: kName, expiry: kExp, due: kDue } } },
     members: [],
 } as unknown as HomeSettings);
 
@@ -59,9 +60,10 @@ beforeAll(async () => {
     expect(DOC).toBeTruthy();
     AV = await createAttributeView(DOC, `lvh-core-${Date.now()}`);
     expect(AV).toBeTruthy();
-    // 列：名称(text) + 到期(date)——keyID 由插件 newSiYuanId 自造（E4'：留空会产生空 id 列）
+    // 列：名称(text) + 到期(date) + 签注 due(date)——keyID 由插件 newSiYuanId 自造（E4'：留空会产生空 id 列）
     kName = await addAttributeViewColumn(AV, { name: "名称", type: "text" });
     kExp = await addAttributeViewColumn(AV, { name: "到期", type: "date" });
+    kDue = await addAttributeViewColumn(AV, { name: "签注", type: "date" });
     expect(kName).toBeTruthy();
     expect(kExp).toBeTruthy();
 }, 120_000);
@@ -119,15 +121,26 @@ describe("live.IT-02/05 · 插件写路径（D02 行确认 / 删行）", () => {
 });
 
 describe("live.规则引擎 · CertsProvider 在真实内核数据上派生", () => {
-    it.skipIf(skip)("先清 60 批量行（插件删行路径，63 行 → 2 行）", async () => {
-        const ids = (await primaryRowItemIDs(AV)).filter((id) => !pluginRowIds.includes(id));
-        expect(ids.length).toBeGreaterThan(50);
-        await removeLedgerRows(AV, ids);
+    it.skipIf(skip)("先清 60 批量行（插件删行路径，render 分页逐页删 → 2 行）", async () => {
+        // 182 波真机发现：内核删行端点只认 render row.id 空间；PK values id（primaryRowItemIDs）
+        // 传入 srcIDs 静默无效（D02 两套 ID 空间论断延伸到删除路径）。render 恒 50/页（E1），
+        // >50 行批量删除只能逐页删到净。guard 防死循环。
+        for (let guard = 0; guard < 5; guard++) {
+            const read = await renderLedger(AV);
+            if (read.rowCount <= 2) break;
+            const ids = read.rows.map((r) => r.itemID).filter((id) => !pluginRowIds.includes(id));
+            if (ids.length === 0) break;
+            await removeLedgerRows(AV, ids);
+        }
         const read = await renderLedger(AV);
         expect(read.rowCount).toBe(2);
     });
 
-    it.skipIf(skip)("扫描派生：逾期/即将/远期 三级提醒与种子一致", async () => {
+    it.skipIf(skip)("扫描派生：重建逾期行（IT-05 已删）→ 逾期/即将/远期 三级提醒与种子一致", async () => {
+        // IT-05 删除了 pluginRowIds[0]（逾期行）——重建同语义行再扫描
+        const itemID = await addDetachedRow(AV, pluginRowNames[0]);
+        await setCell(AV, kName, itemID, { type: "text", text: { content: pluginRowNames[0] } });
+        await setCell(AV, kExp, itemID, { type: "date", date: { content: new Date(`${iso(-2)}T00:00:00`).getTime(), isNotEmpty: true, isNotTime: true } });
         const deps = { settings: settings(), getDbRef: (mid: string) => settings().dbRefs[mid] };
         const providers = [new CertsProvider(deps)];
         const result = await runScan(providers, settings(), defaultRuntime(), new Date());
@@ -150,7 +163,7 @@ describe("live.健康检查 · runHealthCheck 真实模块", () => {
         expect(m.moduleId).toBe("certs");
         expect(m.ok).toBe(true);
         expect(m.complete).toBe(true);
-        expect(m.rows).toBe(2);
-        expect((m.missingColumns ?? []).length).toBeGreaterThan(0); // fixture 只建了 name/expiry
+        expect(m.rows).toBe(3); // 即将 + 远期 + 规则测试重建的逾期行
+        expect((m.missingColumns ?? []).length).toBeGreaterThan(0); // fixture 只建 name/expiry/due
     });
 });
