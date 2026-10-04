@@ -51,7 +51,7 @@
         <nav class="lv-tabs" bind:this={navEl} style="position:relative">
             <span class="lv-nav-pill" style="transform:translateX({pill.x}px);width:{pill.w}px"></span>
             {#each screens as s (s.id)}
-                <button data-s={s.id} class="lv-tabs__item" class:on={screen === s.id} onclick={() => (screen = s.id)}>
+                <button data-s={s.id} class="lv-tabs__item" class:on={screen === s.id} aria-current={screen === s.id ? "page" : undefined} onclick={() => (screen = s.id)}>
                     {t(s.key)}
                 </button>
             {/each}

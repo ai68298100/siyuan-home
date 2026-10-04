@@ -758,5 +758,8 @@
     "dash.focusDataErr": "Snapshot ${t} · ${n} scan error(s)",
     "dash.focusStale": "Stale snapshot · open to rescan",
     "dash.focusOpen": "Open",
-    "dash.focusView": "View"
+    "dash.focusView": "View",
+    "dash.filteredEmpty": "No reminders match the current scope",
+    "dash.filteredEmptyHint": "This does not mean there are no member records or pending items.",
+    "dash.clearFilter": "Clear filter"
 }

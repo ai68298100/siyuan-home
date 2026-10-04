@@ -132,7 +132,12 @@
 <div class="lv-sec"><h2 class="lv-title-sec">{t("dash.upcoming")}</h2>
     <button class="b3-button b3-button--text" onclick={() => onGoto("reminders")}>{t("dash.viewAll")} →</button>
 </div>
-{#if top.length === 0}
+{#if reminders.length === 0 && memberFilter}
+    <!-- 174 波（对齐原型空态解释）：筛选导致的空 ≠ 无资料，说明并给清除出口 -->
+    <div class="lv-card"><div class="lv-empty" role="status"><div class="eic">🔍</div><b>{t("dash.filteredEmpty")}</b><span>{t("dash.filteredEmptyHint")}</span>
+        <button class="b3-button b3-button--outline" style="margin-top:8px" onclick={() => setMemberFilter(undefined)}>{t("dash.clearFilter")}</button>
+    </div></div>
+{:else if reminders.length === 0}
     <div class="lv-card"><div class="lv-empty" role="status"><div class="eic">✓</div><b>{t("dash.allClear")}</b><span>{t("hub.emptyHint")}</span></div></div>
 {:else}
     <div class="lv-card lv-rems">
