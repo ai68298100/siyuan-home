@@ -529,6 +529,8 @@
     "ledger.unsupportedInForm": "Attachments etc. — edit in the ledger document",
     "members.edit": "Edit",
     "members.openLedger": "Open ledger document",
+    "members.moveUp": "Move up",
+    "members.moveDown": "Move down",
     "members.editing": "Editing — save writes back to the ledger row",
     "members.exportVcf": "Export contacts (.vcf)",
     "members.uploadAvatar": "Upload avatar",

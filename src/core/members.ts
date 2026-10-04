@@ -77,6 +77,15 @@ export async function updateMember(plugin: Plugin, settings: HomeSettings, membe
     await saveSettings(plugin, settings);
 }
 
+/** 成员显示排序（17 组/197 波：网格拖拽）：仅重排 settings.members（台账行序不动，行序无显示语义）。
+ * orderedIds 未覆盖的成员（并发新增等）按原相对顺序附尾，不丢人。 */
+export async function reorderMembers(plugin: Plugin, settings: HomeSettings, orderedIds: string[]): Promise<void> {
+    const rank = new Map(orderedIds.map((id, i) => [id, i]));
+    settings.members = [...settings.members].sort((a, b) =>
+        (rank.get(a.id) ?? orderedIds.length) - (rank.get(b.id) ?? orderedIds.length));
+    await saveSettings(plugin, settings);
+}
+
 /** 删除成员：仅移除设置侧引用（台账行保留） */
 export async function removeMember(plugin: Plugin, settings: HomeSettings, id: string): Promise<void> {
     settings.members = settings.members.filter((m) => m.id !== id);

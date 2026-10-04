@@ -102,8 +102,41 @@
         menu.addItem({ label: t("members.edit"), click: () => startEdit(m) });
         const docId = plugin.settings.dbRefs?.members?.docId;
         if (docId) menu.addItem({ label: t("members.openLedger"), click: () => plugin.showTabDocs(docId) });
+        // 17 组/197 波：上移/下移（拖拽排序的键盘可达替代）
+        const idx = members.findIndex((x) => x.id === m.id);
+        menu.addItem({ label: t("members.moveUp"), disabled: idx <= 0, click: () => move(m, -1) });
+        menu.addItem({ label: t("members.moveDown"), disabled: idx === members.length - 1, click: () => move(m, 1) });
         menu.addItem({ label: t("delete"), click: () => confirmRemove(m) });
         menu.open({ x, y });
+    }
+    async function move(m: FamilyMember, delta: number) {
+        const ids = members.map((x) => x.id);
+        const i = ids.indexOf(m.id);
+        const j = i + delta;
+        if (j < 0 || j >= ids.length) return;
+        [ids[i], ids[j]] = [ids[j], ids[i]];
+        const { reorderMembers } = await import("@/core/members");
+        await reorderMembers(plugin as any, plugin.settings, ids);
+    }
+    // 拖拽排序（17 组/197 波）：HTML5 DnD；drop 即持久化（reorderMembers）
+    let dragId = $state<string | null>(null);
+    let dragOverId = $state<string | null>(null);
+    function onDragStart(m: FamilyMember, e: DragEvent) {
+        dragId = m.id;
+        e.dataTransfer?.setData("text/plain", m.id);
+    }
+    async function onDrop(m: FamilyMember, e: DragEvent) {
+        e.preventDefault();
+        const src = dragId ?? e.dataTransfer?.getData("text/plain") ?? null;
+        dragId = null; dragOverId = null;
+        if (!src || src === m.id) return;
+        const ids = members.map((x) => x.id);
+        const from = ids.indexOf(src);
+        const to = ids.indexOf(m.id);
+        if (from < 0 || to < 0) return;
+        ids.splice(to, 0, ids.splice(from, 1)[0]);
+        const { reorderMembers } = await import("@/core/members");
+        await reorderMembers(plugin as any, plugin.settings, ids);
     }
     function cardTouchStart(m: FamilyMember, e: TouchEvent) {
         const t0 = e.touches[0];
@@ -262,7 +295,14 @@
 {:else}
     <div class="lv-people">
         {#each members as m (m.id)}
-            <div class="lv-card lv-mod">
+            <div class="lv-card lv-mod"
+            draggable="true"
+            ondragstart={(e: DragEvent) => onDragStart(m, e)}
+            ondragover={(e: DragEvent) => { e.preventDefault(); dragOverId = m.id; }}
+            ondragleave={() => { if (dragOverId === m.id) dragOverId = null; }}
+            ondrop={(e: DragEvent) => void onDrop(m, e)}
+            ondragend={() => { dragId = null; dragOverId = null; }}
+            style={dragOverId === m.id && dragId !== m.id ? "outline:2px dashed var(--lv-accent);outline-offset:-2px" : ""}>
         <div class="head" style="display:flex;gap:10px;align-items:center;cursor:pointer" role="button" tabindex="0"
             onkeydown={(e: KeyboardEvent) => e.key === "Enter" && toggleExpand(m.id)}
             oncontextmenu={(e: MouseEvent) => { e.preventDefault(); cardMenu(m, e.clientX, e.clientY); }}

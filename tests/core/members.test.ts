@@ -5,7 +5,7 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { setTransport } from "@/core/siyuan";
 import {
-    addMember, updateMember, syncMembersToAv, backfillMemberLinks,
+    addMember, updateMember, reorderMembers, syncMembersToAv, backfillMemberLinks,
 } from "@/core/members";
 import { defaultSettings } from "@/core/settings";
 import type { HomeSettings, FamilyMember } from "@/types";
@@ -190,6 +190,20 @@ describe("syncMembersToAv（D05 设置页差异同步）", () => {
         const snap2 = JSON.stringify([...av.rows.entries()]);
         expect(snap2).toBe(snap1); // 值覆盖写幂等（多端 last-write-wins 下重复写不产生差异）
         expect(av.rows.size).toBe(1); // 不新增行
+    });
+
+    it("reorderMembers（17 组/197 波）：按传入 id 序重排；未覆盖成员附尾不丢人；不写台账", async () => {
+        const av = fakeAv();
+        const { plugin, store } = memoryPlugin();
+        const st = settings([]);
+        for (const m of [member({ name: "甲", id: "a" }), member({ name: "乙", id: "b" }), member({ name: "丙", id: "c" })]) {
+            await addMember(plugin, st, m);
+        }
+        await reorderMembers(plugin, st, ["c", "a"]); // 乙未提及 → 附尾
+        expect(st.members.map((m) => m.id)).toEqual(["c", "a", "b"]);
+        const saved: HomeSettings = JSON.parse(store["settings.json"]);
+        expect(saved.members.map((m: FamilyMember) => m.id)).toEqual(["c", "a", "b"]);
+        expect(av.rows.size).toBe(3); // 台账行不动（行序无显示语义）
     });
 });
 
