@@ -38,6 +38,22 @@ describe("hub.display.buildDisplay", () => {
         expect(kinds).toEqual(["S:memo", "S:solo", "M:m1a+m1b", "S:free"]);
     });
 
+    it("平铺形态（181 波）：key 单条=row.id、合并=merge 键；items/row 恒有值", () => {
+        const out = buildDisplay([
+            rem("memo", undefined, "2026-10-10"),
+            rem("m1a", "m1", "2026-10-12"),
+            rem("m1b", "m1", "2026-10-12"),
+        ]);
+        expect(out.map((e) => e.key)).toEqual(["memo", "m1|2026-10-12"]);
+        for (const e of out) {
+            expect(e.items.length).toBeGreaterThan(0);
+            expect(e.items[0]).toBe(e.row);
+            expect(typeof e.dueDate).toBe("string");
+        }
+        expect(out[0].merged).toBe(false);
+        expect(out[1].merged).toBe(true);
+    });
+
     it("同成员不同日期不合并", () => {
         const out = buildDisplay([rem("a", "m1", "2026-10-10"), rem("b", "m1", "2026-10-11")]);
         expect(out.every((e) => !e.merged)).toBe(true);

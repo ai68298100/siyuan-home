@@ -203,6 +203,7 @@
     }
 
     // 29 组：同成员同日多条合并为一条可展开卡；175 波 O(n) 分组、179 波抽纯函数（core/hub/display，带单测）
+    // 181 波：DisplayEntry 平铺化（key/row/items 恒有值），模板无需联合收窄。
     const buildDisplay = (items: Reminder[]) => display(items);
     let expandedMerges = $state<Set<string>>(new Set());
     function toggleMerge(key: string) {
@@ -328,7 +329,7 @@
     {#each groups as g (g.key)}
         {#if g.label}<div class="lv-group-label">{g.label} · {g.items.length}</div>{/if}
         <div class="lv-card lv-rems">
-            {#each buildDisplay(g.items) as entry (entry.merged ? entry.key : entry.row.id)}
+            {#each buildDisplay(g.items) as entry (entry.key)}
                 {#if entry.merged}
                     <!-- 29 组：同成员同日合并卡；PL13：Enter/Space 等价 + aria-expanded -->
                     <div class="lv-rem lead" role="button" tabindex="0"
