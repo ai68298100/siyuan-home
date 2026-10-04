@@ -527,6 +527,7 @@
     "field.birthday": "生日",
     "ledger.unsupportedInForm": "附件等列请到台账文档中编辑",
     "members.edit": "编辑",
+    "members.openLedger": "查看台账文档",
     "members.editing": "编辑中——保存写回台账行",
     "members.exportVcf": "导出联系人 (.vcf)",
     "members.uploadAvatar": "上传头像",

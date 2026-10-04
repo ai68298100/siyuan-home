@@ -1,12 +1,11 @@
 <script lang="ts">
     import type { Reminder, FamilyMember } from "@/types";
-    import { confirm } from "siyuan";
+    import { confirm, Menu, showMessage } from "siyuan";
     import { addMember, updateMember, removeMember } from "@/core/members";
     import { newSiYuanId, renderLedgerAll, setCell, uploadAsset } from "@/core/siyuan";
     import type { HomePluginLike } from "@/types/plugin";
     import { saveRuntime } from "@/core/hub/runtime";
     import { openContactPicker, getContactsBridge } from "@/libs/contact-picker";
-    import { showMessage } from "siyuan";
 
     let { plugin, t, version }: { plugin: HomePluginLike; t: (k: string) => string; version?: number } = $props();
 
@@ -94,6 +93,25 @@
     let expandedId = $state<string | null>(null);
     function toggleExpand(id: string) {
         expandedId = expandedId === id ? null : id;
+    }
+    // 17 组/195 波：成员卡右键/长按菜单（编辑/查看台账/删除）——触屏长按 500ms，桌面右键
+    let lpTimer: ReturnType<typeof setTimeout> | null = null;
+    let lpFired = false;
+    function cardMenu(m: FamilyMember, x: number, y: number) {
+        const menu = new Menu("lv-member-card");
+        menu.addItem({ label: t("members.edit"), click: () => startEdit(m) });
+        const docId = plugin.settings.dbRefs?.members?.docId;
+        if (docId) menu.addItem({ label: t("members.openLedger"), click: () => plugin.showTabDocs(docId) });
+        menu.addItem({ label: t("delete"), click: () => confirmRemove(m) });
+        menu.open({ x, y });
+    }
+    function cardTouchStart(m: FamilyMember, e: TouchEvent) {
+        const t0 = e.touches[0];
+        lpFired = false;
+        lpTimer = setTimeout(() => { lpFired = true; cardMenu(m, t0.clientX, t0.clientY); }, 500);
+    }
+    function cardTouchEnd() {
+        if (lpTimer) { clearTimeout(lpTimer); lpTimer = null; }
     }
     // 26.7 删除文案升级：说明数据保留语义（仅移除引用，台账行保留）
     // H16：删除成员后复位指向它的失效筛选（总览与提醒页）
@@ -247,7 +265,11 @@
             <div class="lv-card lv-mod">
         <div class="head" style="display:flex;gap:10px;align-items:center;cursor:pointer" role="button" tabindex="0"
             onkeydown={(e: KeyboardEvent) => e.key === "Enter" && toggleExpand(m.id)}
-            onclick={() => toggleExpand(m.id)}>
+            oncontextmenu={(e: MouseEvent) => { e.preventDefault(); cardMenu(m, e.clientX, e.clientY); }}
+            ontouchstart={(e: TouchEvent) => cardTouchStart(m, e)}
+            ontouchend={cardTouchEnd}
+            ontouchmove={cardTouchEnd}
+            onclick={() => { if (lpFired) { lpFired = false; return; } toggleExpand(m.id); }}>
             {#if avatars[m.id]}
                 <!-- 17 组/192 波：头像图（资产相对路径 → 内核 origin） -->
                 <img class="lv-avatar lg" src={new URL(avatars[m.id], location.origin).href}
