@@ -1,5 +1,7 @@
 # 成员管理
 
+> English version: [members.en.md](members.en.md)
+
 > 家庭成员是小驴管家所有模块共用的组织维度。
 
 ## 添加成员

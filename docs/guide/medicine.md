@@ -1,5 +1,7 @@
 # 药箱管理
 
+> English version: [medicine.en.md](medicine.en.md)
+
 > 追踪药品效期与库存余量，低库存和临期自动提醒。
 
 ## 录入

@@ -1,5 +1,7 @@
 # 快速上手
 
+> English version: [getting-started.en.md](getting-started.en.md)
+
 > 5 分钟完成首次设置，看到第一条到期提醒。
 
 ## 1. 启用插件

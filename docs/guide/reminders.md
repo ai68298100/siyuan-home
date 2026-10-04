@@ -1,5 +1,7 @@
 # 提醒中枢
 
+> English version: [reminders.en.md](reminders.en.md)
+
 > 所有模块的日期字段自动派生为提醒，统一在这里管理。
 
 ## 三级分组
