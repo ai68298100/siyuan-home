@@ -175,7 +175,8 @@
       span { font-size: 11.5px; color: var(--lv-tx-3); } }
     .lv-rem-ops { display: flex; gap: 4px; flex: none; opacity: 0; transform: translateX(6px);
       transition: all var(--lv-t-med) var(--lv-ease); }
-    &:hover .lv-rem-ops { opacity: 1; transform: none; }
+    // 173 波（13 §3.3 对齐原型）：键盘聚焦行时操作显现（触屏常显另有 hover:none 分支）
+    &:hover .lv-rem-ops, &:focus-within .lv-rem-ops { opacity: 1; transform: none; }
     &.overdue { background: var(--lv-danger-soft);
       &::before { background: var(--lv-danger); } &:hover::before { box-shadow: 0 0 8px 1px var(--lv-danger); } }
     &.soon::before { background: var(--lv-warn); } &.soon:hover::before { box-shadow: 0 0 8px 1px var(--lv-warn); }
