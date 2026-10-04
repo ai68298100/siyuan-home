@@ -30,7 +30,8 @@
 
 ### 阶段 4 · 端点与集成收尾（§8，~20 分钟）
 1. 重跑 `bash scripts/e2e-endpoints.sh` 确认仍绿
-2. IT-04（renderLedger rows==rowCount）、IT-08（用户视图筛选影响）——见 [§8 清单](v0.2.md)
+2. **活体集成测试**（177 波新增）：`bash scripts/e2e-core.sh`——插件自己的 core 代码路径（provisioner 语义/D01 分页/D02 行确认/删行/CertsProvider 真实派生/健康检查）打真实内核；门禁 401/429 优雅 skip；数据专用笔记本自清理
+3. IT-04（renderLedger rows==rowCount，≤50 行时）、IT-08（用户视图筛选影响）——见 [§8 清单](v0.2.md)
 
 ### 阶段 5 · B 类兄弟互测（EC30，~45 分钟）
 - **checkin**：打卡后管家摘要更新（EC09 绑定×强度）
