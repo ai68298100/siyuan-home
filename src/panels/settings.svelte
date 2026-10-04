@@ -60,6 +60,11 @@
 
     const ROLES: MemberRole[] = ["self", "spouse", "partner", "child", "elder", "kin", "other"];
     const enabledIds = $derived(new Set(draftEnabled));
+    // C8c 收尾：leadOverrides 编辑行只列启用模块（25+ 全量行过长）；未启用模块的
+    // 覆盖值保留在 draftLeads 里不动——关模块保存再开，自定义值原样回来。
+    let showAllLeads = $state(false);
+    const enabledLeadRules = $derived(leadRules.filter((lr) => enabledIds.has(lr.moduleId)));
+    const visibleLeadRules = $derived(showAllLeads ? leadRules : enabledLeadRules);
 
     // EC09（D20）：打卡绑定 draft——习惯→成员指标映射，只读消费不写打卡数据
     // svelte-ignore state_referenced_locally
@@ -374,14 +379,19 @@
         <div style="margin-top:12px;border-top:1px solid var(--b3-border-color);padding-top:8px">
             <p class="lv-caption">{t("settings.leadsTitle")}</p>
             <p class="lv-caption ft__on-surface">{t("settings.leadsHint")}</p>
+            {#if enabledLeadRules.length < leadRules.length}
+                <button class="b3-button b3-button--text" style="margin-top:2px" onclick={() => (showAllLeads = !showAllLeads)}>
+                    {showAllLeads ? t("settings.leadsEnabledOnly") : t("settings.leadsShowAll").replace("${n}", String(leadRules.length - enabledLeadRules.length))}
+                </button>
+            {/if}
         </div>
-        {#each leadRules as lr (lr.key)}
-            <div class="fn__flex lv-settings__row">
+        {#each visibleLeadRules as lr (lr.key)}
+            <div class="fn__flex lv-settings__row" style={enabledIds.has(lr.moduleId) ? "" : "opacity:.55"}>
                 <span style="min-width:220px">{t(`module.${lr.moduleId}`)} · {t(`rule.${lr.ruleKey}`) !== `rule.${lr.ruleKey}` ? t(`rule.${lr.ruleKey}`) : lr.ruleKey}</span>
                 <input class="b3-text-field" style="width:90px" type="number" min="0" max="3650"
                     placeholder={String(lr.def)}
                     bind:value={draftLeads[lr.key]} />
-                <span class="lv-caption fn__flex-1">{t("settings.leadDefault").replace("${n}", String(lr.def))}</span>
+                <span class="lv-caption fn__flex-1">{t("settings.leadDefault").replace("${n}", String(lr.def))}{#if !enabledIds.has(lr.moduleId)} · {t("settings.leadDisabled")}{/if}</span>
             </div>
         {/each}
         <!-- EC09（D20）：打卡习惯 → 成员指标绑定（只读消费） -->

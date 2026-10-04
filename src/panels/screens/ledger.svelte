@@ -19,6 +19,8 @@
     // svelte-ignore state_referenced_locally
     let active = $state(plugin.activeLedger ?? "certs");
     let rows: any[] = $state([]);
+    // C4b 收尾：renderLedger 的原始列数组（含用户在思源视图手建的列，schema 映射之外）
+    let avCols: any[] = $state([]);
     let loading = $state(false);
     let rebuilding = $state(false);
     // 17 组：台账内搜索（标题/备注 contains，与成员过滤不叠加——本页无成员过滤）
@@ -227,11 +229,12 @@
     }
 
     async function load() {
-        if (!ref?.avId) { rows = []; return; }
+        if (!ref?.avId) { rows = []; avCols = []; return; }
         loading = true;
         try {
             const res = await renderLedger(ref.avId);
             rows = res.rows;
+            avCols = res.columns ?? [];
         } finally {
             loading = false;
         }
@@ -442,6 +445,32 @@
                 v.textContent = cellText(row.cells[keyID]);
                 line.append(v);
                 body.appendChild(line);
+            }
+            // C4b 收尾：用户在思源视图手建的列（schema 映射之外）追加展示——独立分区、
+            // 原始列名直出（不做 i18n 包装），只读；编辑仍走思源视图，不冒充 schema 字段。
+            const schemaKeyIDs = new Set(Object.values<string>(ref!.columns));
+            const customCols = avCols.filter((c: any) => c?.id && !schemaKeyIDs.has(c.id) && String(c.name ?? "").trim() !== "");
+            if (customCols.length > 0) {
+                const head = document.createElement("div");
+                head.className = "ft__on-surface";
+                head.style.cssText = "margin-top:10px;padding-top:8px;border-top:1px solid var(--b3-border-color);font-size:12px";
+                head.textContent = t("ledger.customCols");
+                body.appendChild(head);
+                for (const c of customCols) {
+                    const line = document.createElement("div");
+                    line.className = "fn__flex";
+                    line.style.cssText = "gap:10px;padding:4px 0;font-size:13px";
+                    const k = document.createElement("span");
+                    k.className = "ft__on-surface";
+                    k.style.cssText = "min-width:96px;flex-shrink:0";
+                    k.textContent = String(c.name);
+                    line.append(k);
+                    const v = document.createElement("span");
+                    v.style.cssText = "word-break:break-all";
+                    v.textContent = cellText(row.cells[c.id]);
+                    line.append(v);
+                    body.appendChild(line);
+                }
             }
         // 子记录模型（2026-10-04 定案）：行日志时间线分区通用构造器（rowlogs.json；行删除联动清理）
         async function addRowLogSection(opts: {
