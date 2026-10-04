@@ -259,12 +259,14 @@ export const HEALTH_SCHEMA: ModuleSchema = {
 export const SHOPPING_SCHEMA: ModuleSchema = {
     columns: [
         ...d("name", "member"),
-        { ...FIELD_DICT.category, options: ["daily", "digital", "apparel", "food_sh", "other_sh"] },
+        { ...FIELD_DICT.category, options: ["daily", "digital", "apparel", "food_sh", "other_sh", "wish"] },
         ...d("date", "amount", "url", "note"),
         { key: "channel", type: "text", labelKey: "field.channel" },
         { key: "tracking_no", type: "text", labelKey: "field.tracking_no" },
         { key: "pickup_code", type: "text", labelKey: "field.pickup_code" },
         { key: "qty", type: "number", labelKey: "field.qty" }, // 16 组：数量（购入→囤货联动用）
+        // 提案 A/210 波：愿望（wish 类别行）的目标金额——存钱流水在 rowlog deposits，进度在抽屉分区
+        { key: "target_amount", type: "number", labelKey: "field.target_amount" },
         // 16 组：退货/退款记录
         { key: "return_status", type: "select", labelKey: "field.return_status", options: ["none", "requested", "returned", "refunded"], default: "none" },
         { key: "return_date", type: "date", labelKey: "field.return_date" },

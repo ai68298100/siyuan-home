@@ -1,4 +1,5 @@
 # 小驴管家（Lv Home）· 项目待办总清单
+| 2026-10-05 | 主线 | 第二百一十波：提案 A/B 定案实施（依 197 波常设授权）——愿望清单 + 金额格式化 | **提案 B**：core/format.ts formatAmount（千分位 + 两位小数四舍五入去尾零 + 负号后不分隔）+ AMOUNT_KEYS 五 key 白名单；抽屉 kv 显示层接入（CSV/导入保持机器可读原始值）+4 测试；**提案 A**：shopping 新增 wish 类别 + target_amount 列（只增列，快照 -u）、rowlog deposits 类型（第六消费方）+ shopping 抽屉"存钱进度"分区（Σ 已存/目标/百分比汇总 + 流水增删）；allowance 侧零改动——存钱动作本就是 allowance 行；**顺带发现登记**：field.category.opt.* 枚举标签 i18n 全库零消费（分类列显示原始 key 如 food_st）——登记待办；design/15 提案 C（拼音检索）维持观察；快照 -u、239 测试、i18n 825 |
 | 2026-10-05 | 主线 | 第二百零九波：三项"待定案"待办提案成文（docs/design/15）——阻塞态转"批准即实施" | 新增 [15-小额功能提案](docs/design/15-小额功能提案.md) 并入设计索引：**提案 A** 愿望清单（shopping 挂 wish 类别行 + target_amount 列 + rowlog deposits 流水 + 抽屉进度分区；allowance 侧不加东西——存钱动作本就是 allowance 行，一波工作量）；**提案 B** 金额格式化（key 白名单 amount/price/refund_amount/deposit/target_amount，千分位+两位小数，不加币种符号，仅抽屉显示层 CSV 保持原始值，半波）；**提案 C** 拼音检索（pinyin-pro 懒加载估 30–60KB，真机批观察后再定）；三条待办注记指向提案——**待用户一句定案即可实施，无需再澄清**；235 测试（纯文档波） |
 | 2026-10-05 | 主线 | 第二百零八波：design/13 原型质感快照现势化（172 后收敛项补记） | §0 快照更新：标题改"173–206 波继续收敛"；补第 6 条（提醒操作 hover 限定已补齐——173 波 focus-within 键盘路径 + 184 波触屏覆盖修复，原型 3.3 要求达成）；新增第 7 条生产增强清单（174 空态解释+aria-current、181/190 Space 等价+aria-expanded、196 徽章下钻、205 周几表述——均真实数据映射，超原型）；五项初始差距现状=3 已实现 + 1 部分（宿主 API 约束如实）+ 1 对等 + 增补若干；235 测试（纯文档波） |
 | 2026-10-05 | 主线 | 第二百零七波：对外文档货币度收尾（ROADMAP 现状段重写/MODULES 注记/N2 preview.png 预警） | **ROADMAP**：当前状态注记更新至 206 波（235 测试+活体套件；真机 UI 走查=上架先决条件如实声明）；"已实现的基础能力"段重写——旧文三条"仍待修正/待补齐/未闭环"（动作持久化/生日农历/编辑双写/引导闭环）全部早已完成却仍写待办，现按现状如实改写并保留诚实边界（进度条/交互级重试仍规划）；**MODULES**：补 10-05 进展注记（113–206 波）；**N2 预警**：preview.png 仍为 v0.1 骨架时代 12KB 占位图——发版第④步必须替换当前 UI 截图（需真机 UI，离线不可为）；235 测试 |
@@ -319,7 +320,7 @@
 - [x] 🟡 系统休眠错过定时扫描 → 唤醒/开面板补扫 ✅ 2026-10-03 第十一轮（visibilitychange 恢复可见即补扫，10 分钟最小间隔合并重复触发（PF13 语义），卸载解绑；Tab 打开触发与 30min 心跳原有；真机休眠/唤醒走查见回归清单 7.5）
 - [x] 🟡 农历闰月生日规则定案（闰月生日在平年如何处理）+ 单测 ✅ 2026-10-01（09 决策记录 / commit 168dcae）
 - [x] 🟡 系统时间回拨/跨天瞬间的扫描容错（due 计算幂等） ✅ 2026-10-05 第一百九十四波（测试钉住）：recurring 回拨后 due 不早于 today（永不 overdue 语义）且与未回拨一致；anniversary 2/29 平年 2/28、已过滚明年、回拨回当天即当天（决策 09）；buildReminder 同日重扫完全一致；+3 测试
-- [ ] 🟢 金额显示层：小数/千分位/多币种符号（仅显示，不做汇率）（209 波：**提案已成文** docs/design/15 提案 B——key 白名单 amount/price/refund_amount/deposit/target_amount，千分位+两位小数，不加币种符号，仅抽屉显示层 CSV 保持原始值；**待定案即实施**）
+- [x] 🟢 金额显示层：小数/千分位/多币种符号（仅显示，不做汇率） ✅ 2026-10-05 第二百一十波（提案 B 定案实施）：core/format.ts formatAmount（千分位 + 两位小数四舍五入去尾零 + 负号后不分隔）+ AMOUNT_KEYS 白名单（amount/price/refund_amount/deposit/target_amount 五 key）；抽屉 kv 显示层接入，CSV/导入保持机器可读原始值；+4 测试共 239（209 波：**提案已成文** docs/design/15 提案 B——key 白名单 amount/price/refund_amount/deposit/target_amount，千分位+两位小数，不加币种符号，仅抽屉显示层 CSV 保持原始值；**待定案即实施**）
 - [x] 🟢 多端同时编辑同一行：写回操作幂等性验证 ✅ 2026-10-05 第一百九十四波（测试钉住）：成员 DAL 同数据双调用 updateMember → av 行快照逐字节一致、行数不变（值覆盖写天然幂等，多端 last-write-wins 下重复写不产生差异）；+1 测试
 - [x] 🟢 跨时区说明：due 以内核本地时区计算（文档 + 测试用例） ✅ 2026-10-05 第二百零二波：FAQ 新增「多设备时区不同，日期会乱吗？」节（本地时区计算/跨时区可能相差一天属正常/以最后编辑设备为准）；rule.test 补跨时区不变式（UTC 构造时刻的键=本地字段推导，不假设 CI 时区）
 
@@ -350,7 +351,7 @@
 - [x] 🟢 **WHO 儿童生长百分位数据源研究**（第七十四轮立项） ✅ 2026-10-04 第七十四波循环 B 调研闭环（docs/research/2026-10-04-WHO生长数据源调研.md）：**推荐 WHO 官方 expanded tables**（署名即可商用/开发复用，条款与 MIT 兼容）；备选 CDC 改编版（public domain 零负担）；落地形态=构建期 fetch 脚本转压缩 JSON（~1100 数字离线内嵌）+ LMS→百分位插值渲染 P3/P15/P50/P85/P97；xlsx 直链动态化已实测（猜测枚举 404），实现期从页面解析精确文件名
 - [x] 🟢 WHO 生长参考带实现（依赖上项调研结论）：scripts/fetch-who-data.mjs 构建期下载+转换 → 数据 JSON 入库 → growth.ts 参考带（P3/P15/P50/P85/P97 插值）+ 图注署名与"不构成医疗建议" ✅ 2026-10-04 第七十七轮全量落地（零依赖 fetch 脚本 + SD 全量校验 + who-refs.ts 17.7KB 入库 + whoBand 插值 4 单测 + 生长图带叠加/性别选择/署名免责图注 + D23 成员性别字段；WHO 页面"JS 渲染"误判更正：锚点服务端渲染，curl 原始 HTML 即得直链，调研文档已回填）
 - [ ] 🟡 parenting：辅食新食材 3 天观察期 → 联动 health 过敏史
-- [ ] 🟡 allowance：孩子愿望清单（目标金额 + 存钱进度条）（188 波注记：暂缓——allowance 行是收支事件而非目标实体，愿望的存储模型需产品决策；候选=shopping 模块挂 wish 类别行 + rowlog 存钱流水，随 16 组下一轮 UI 波定案）
+- [x] 🟡 allowance：孩子愿望清单（目标金额 + 存钱进度条） ✅ 2026-10-05 第二百一十波（提案 A 定案实施，依 197 波常设授权）：shopping 新增 wish 类别 + target_amount 列（只增列，快照 -u）；rowlog deposits 类型 + shopping 抽屉"存钱进度"分区（Σ 已存/目标/百分比汇总 + 流水增删）；allowance 侧零改动——存钱动作本就是 allowance 行，记账与进度各归其位；allowance 利息流水见下行核实项
 - [x] 🟢 allowance：利息/收益流水 ✅ 2026-10-05 第二百波核实：ALLOWANCE_SCHEMA 既有 interest_al 类别 + direction(in)/amount/date/source 列——利息收益即记该类别行（来源列填银行/产品），日期金额流向齐备，无需新开发（待办早于 schema 批量生产，属过时项）
 - [ ] 🟡 favors：年度人情报告（收送 TOP / 净额走势）
 - [x] 🟡 favors：回礼提醒（事件后 N 天） ✅ 2026-10-05 第一百九十波：规则引擎新 kind "after"（ReminderRuleSpec.offsetDays + onlyIf select 条件；nextOccurrence=base+offsetDays，clamp 0–3650）——favors 声明 reciprocate 规则（收礼 direction=in、30 天后、leadDays 0）；完成语义落 oneoff 分支（记已办可恢复，H05 无需改动）；提醒卡标题带「回礼」标记（rule.reciprocate，UI 侧 i18n）；provider 级测试（收礼派生/送礼过滤）+ 黄金快照 -u（有意变更）
@@ -368,6 +369,7 @@
 - [x] 🟡 提醒/台账行批量操作（多选 → 批量归档/延后/忽略） ✅ 2026-10-03 第十三轮（提醒页批量模式：筛选条"批量"开关 → 勾选/全选当前结果 → 批量完成/延后 7 天/忽略，经 H01 串行队列逐条落盘；台账行批量（归档写回）随 A5 行编辑；[待实测] 大批量（50+）串行耗时随回归观察）
 - [x] 🟡 成员卡右键/长按菜单（编辑/归档/查看档案） ✅ 2026-10-05 第一百九十五波：成员卡 head 右键 + 触屏长按 500ms → 菜单（编辑/查看台账文档/删除——"归档"不存在对应实体，诚实替换为查看台账）；长按后抑制紧随的 click 展开（lpFired 标记）；键盘路径已有 Enter 展开，菜单为增量入口
 - [ ] 🟢 台账搜索拼音/首字母命中（UG05 研究产出，195 波）：家庭数据量小、contains 已覆盖多数场景——需求观察项；实现候选=懒加载拼音库（参照 lunar chunk 惰性先例），搜索框命中拼音全拼/首字母（209 波：方案已成文 docs/design/15 提案 C——pinyin-pro 懒加载 chunk 估 30–60KB，真机批使用观察后再定）
+- [ ] 🟡 枚举值显示走 i18n（210 波发现）：field.category.opt.* 等枚举标签键全库零消费——详情抽屉/表格的 category/status/direction 等 select 列显示原始 key（如 food_st）；修法=cellText 增加 select 值翻译路径（按列 key 定位 opt 键族，缺键回退原值）
 - [x] 🟢 成员网格拖拽排序 ✅ 2026-10-05 第一百九十七波：core `reorderMembers`（仅重排 settings.members，台账行序不动——行序无显示语义；未覆盖 id 附尾不丢人）+ 卡片 HTML5 DnD（dragover 虚线落点提示、drop 即持久化）+ 右键菜单上移/下移（键盘可达替代，边界位禁用）；+1 单测、i18n +2（811 键）
 - [x] 🟡 头像上传（asset 文件选择器 → 成员库 avatar 列） ✅ 2026-10-05 第一百九十二波：**活体 IT-11 先行实测抓到两个真机潜在 bug 并修复**——E14：内核无 asset 单资源列（原 MEMBERS_SCHEMA.avatar=asset 会使成员台账首次建库直接失败→改 mAsset 单值承载）；E15：上传字段名必须 file[]（原 file 在真机 succMap 为空——抽屉附件上传同源修复），succMap 返回相对路径；UI：成员卡 📷 按钮 → uploadAsset → mAsset 写入 → 卡片 img 展示（origin 相对解析），无关联行给引导；资产存台账行（事实源），settings 不冗余；i18n +4（807 键）
 - [ ] 🟡 单条记录复制为脱敏文本（分享场景）

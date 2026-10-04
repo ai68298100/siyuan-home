@@ -890,6 +890,7 @@ exports[`31 模块 schema 契约快照（21 组） > 每个 schema 的结构快�
         "apparel",
         "food_sh",
         "other_sh",
+        "wish",
       ],
       "type": "select",
     },
@@ -931,6 +932,11 @@ exports[`31 模块 schema 契约快照（21 组） > 每个 schema 的结构快�
     {
       "key": "qty",
       "labelKey": "field.qty",
+      "type": "number",
+    },
+    {
+      "key": "target_amount",
+      "labelKey": "field.target_amount",
       "type": "number",
     },
     {

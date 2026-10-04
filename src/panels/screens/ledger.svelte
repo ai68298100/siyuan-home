@@ -1,6 +1,7 @@
 <script lang="ts">
     import { renderLedger, renderLedgerAll, addDetachedRow, setCell, RowIdentityPendingError } from "@/core/siyuan";
     import { buildShoppingList } from "@/core/shopping";
+    import { AMOUNT_KEYS, formatAmount } from "@/core/format";
     import { parseCsv } from "@/core/csv";
     import { planImport, guessMapping } from "@/core/importer";
     import { buildCsv } from "@/core/csv";
@@ -605,7 +606,13 @@
                 line.append(labelSpan(col));
                 const v = document.createElement("span");
                 v.style.cssText = "word-break:break-all";
-                v.textContent = cellText(row.cells[keyID]);
+                // 提案 B/210 波：金额白名单列的数值走千分位显示（CSV/导入仍为机器可读原始值）
+                const cell = row.cells[keyID];
+                if (AMOUNT_KEYS.has(col.key) && cell?.type === "number" && cell?.number?.isNotEmpty && typeof cell.number.content === "number") {
+                    v.textContent = formatAmount(cell.number.content);
+                } else {
+                    v.textContent = cellText(cell);
+                }
                 line.append(v);
                 body.appendChild(line);
             }
@@ -755,6 +762,36 @@
                     format: (e) => `${e.date} · ${e.from} → ${e.to}`,
                 });
             } else if (active === "shopping") {
+                // 提案 A/210 波：愿望存钱进度（wish 行 target_amount + rowlog deposits 流水）
+                (async () => {
+                    const targetCell = row.cells[ref!.columns.target_amount ?? ""]?.number;
+                    const target = targetCell?.isNotEmpty && typeof targetCell.content === "number" ? targetCell.content : undefined;
+                    const logs = await rl.loadRowLogs(plugin as any);
+                    const entries = rl.getEntries<any>(logs, ref!.avId!, row.itemID, "deposits");
+                    const saved = entries.reduce((s, e) => s + (Number(e.amount) || 0), 0);
+                    if (target !== undefined || entries.length > 0) {
+                        const head = document.createElement("div");
+                        head.className = "lv-caption";
+                        head.style.cssText = "margin-top:10px;font-size:12px";
+                        head.textContent = `${t("ledger.savedOf").replace("${s}", String(Math.round(saved * 100) / 100)).replace("${t2}", target !== undefined ? String(target) : "—")}${target !== undefined && target > 0 ? `（${Math.min(999, Math.round((saved / target) * 100))}%）` : ""}`;
+                        body.appendChild(head);
+                    }
+                })();
+                await addRowLogSection({
+                    title: t("ledger.deposits"), emptyText: t("ledger.noDeposits"), addLabel: t("ledger.valAdd"),
+                    fields: [
+                        { key: "date", type: "date", placeholder: "", width: 130 },
+                        { key: "amount", type: "number", placeholder: t("ledger.depositAmt"), width: 100 },
+                    ],
+                    load: () => fresh().then((l) => rl.getEntries<any>(l, ref!.avId!, row.itemID, "deposits")),
+                    add: async (v) => {
+                        if (!v.date || !Number.isFinite(Number(v.amount))) { showMessage(t("ledger.logInvalid"), 3000, "error"); return false; }
+                        await rl.saveRowLogs(plugin as any, rl.appendEntry(await fresh(), ref!.avId!, row.itemID, "deposits", { date: v.date, amount: Number(v.amount), at: at() }));
+                        return true;
+                    },
+                    remove: async (e) => { await rl.saveRowLogs(plugin as any, rl.removeEntry(await fresh(), ref!.avId!, row.itemID, "deposits", e)); },
+                    format: (e) => `${e.date} · +${e.amount}`,
+                });
                 await addRowLogSection({
                     title: t("ledger.prices"), emptyText: t("ledger.noPrices"), addLabel: t("ledger.valAdd"),
                     fields: [
