@@ -209,18 +209,18 @@ describe("removeLedgerRows", () => {
     });
 });
 
-describe("uploadAsset（A2c，[待实测] 端点层契约）", () => {
+describe("uploadAsset（A2c；192 波 E15：字段名 file[]，succMap 相对路径）", () => {
     afterEach(() => setUploadTransport(null));
 
     it("成功：返回 succMap 首个 name/path", async () => {
         setUploadTransport(async (formData: FormData) => {
             expect(formData.get("assetsPath")).toBe("/assets/siyuan-home/");
-            expect(formData.get("file")).toBeInstanceOf(File);
-            return { code: 0, msg: "", data: { succMap: { "保单.png": "/assets/siyuan-home/保单-20260101120000.png" } } };
+            expect(formData.get("file[]")).toBeInstanceOf(File); // E15：内核要求 file[]，"file" 会 succMap 空
+            return { code: 0, msg: "", data: { succMap: { "保单.png": "assets/siyuan-home/保单-20260101120000.png" } } };
         });
         const file = new File(["x"], "保单.png", { type: "image/png" });
         const out = await uploadAsset(file);
-        expect(out).toEqual({ name: "保单.png", path: "/assets/siyuan-home/保单-20260101120000.png" });
+        expect(out).toEqual({ name: "保单.png", path: "assets/siyuan-home/保单-20260101120000.png" }); // 相对路径（真机形态）
     });
 
     it("非零 code → KernelError；空 succMap → KernelError", async () => {

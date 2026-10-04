@@ -1,4 +1,5 @@
 # 小驴管家（Lv Home）· 项目待办总清单
+| 2026-10-05 | 主线 | 第一百九十二波：**IT-11 真机实测抓到两个潜在建库/上传 bug（E14/E15）+ 成员头像上传** | **IT-11 新用例**（uploadAsset + 资源单元格写读回）首跑连爆两雷：**E14** 内核 addAttributeViewKey 不支持 asset 单资源列——MEMBERS_SCHEMA.avatar 原声明 asset，**成员台账首次建库会在前端首启直接失败**（真机批阶段 1 前被活体套件拦截）→ 改 mAsset 单值承载（快照 -u）；**E15** uploadAsset 字段名 file → 真机 code 0 但 succMap 空（抽屉附件上传同源失效）→ 改 file[]；succMap 返回相对路径（无前导斜杠）如实记档；live-env 补绝对地址上传 transport（node 无相对 fetch）；**头像上传 UI**：成员卡 📷 → uploadAsset → mAsset 写入台账行（事实源，settings 不冗余）→ 卡片 img 展示（origin 相对解析），无关联行引导；§8 补 E14/E15；i18n 803→807、活体 9/9、222 测试 |
 | 2026-10-05 | 主线 | 第一百九十一波：assets CSV 批量导入（16 组，列映射向导——迁移路径闭环） | **解析层**：`parseCsv` RFC 4180（BOM 剥离/引号字段含逗号换行/"" 转义/LF+CRLF/空行跳过；与 buildCsv 互逆往返测试）；**映射层**：`core/importer.ts` 纯函数——planImport（名称列必需、数字容忍千分位、日期斜杠转连字符、非法值记行内 warning 不废弃整行、checkbox 中文符号识别、名称为空整行跳过）+ guessMapping（表头=key 或 i18n 标签，不区分大小写）；**UI**：assets 工具栏"导入 CSV"→ 向导（逐列映射下拉可跳过、开始导入前确认新建行数、逐行 addDetachedRow+按映射 setCell（复用 D09 cellValue）、失败行号聚合报告、完成后增量重扫）；高后果语义：确认框言明不可一键撤销；+5 单测共 222、i18n 792→803 |
 | 2026-10-05 | 主线 | 第一百九十波：favors 回礼提醒——规则引擎新 kind "after"（offsetDays + onlyIf 条件派生） | **引擎扩展**：ReminderKind 新增 `after`（ReminderRuleSpec.offsetDays 0–3650 clamp + onlyIf select 条件）；nextOccurrence=事件日期+offsetDays 一次性；SchemaLedgerProvider 在规则循环里先评 onlyIf（select 值不匹配即跳过，CertsProvider 专属路径不受影响）；**favors reciprocate 规则**：收礼（direction=in）30 天后派生、leadDays 0；完成语义自然落入 oneoff 分支（记已办可恢复——H05 分派无需改动）；提醒卡标题带「回礼」标记（rule.reciprocate，UI 侧 i18n，引擎保持无 i18n 依赖）；provider 级 mock transport 测试（收礼派生+送礼过滤两行对照）+ rule 单测 + 黄金快照 -u（有意变更）；i18n 792、217 测试 |
 | 2026-10-05 | 主线 | 第一百八十九波：media 追更提醒（schema 声明路线）+ travel 行前证件检查存档（rowlog 第四消费方） | **media 追更提醒**：next_update 日期列 + oneoff 规则（leadDays 0=当天）——纯 schema 声明，SchemaLedgerProvider 自动派生（"新增模块=数据"路线的规则侧首次实战加列）；capture 换入 next_update 换出 rating（观前未知评分）；建库器只增列补老库；黄金快照 -u 更新并登记原因（有意变更）；**travel 检查存档**：rowlog checks 类型（第四消费方），travel-plan 抽屉"行前证件检查"分区（日期+结论，追加去重）；i18n +4（791 键）；216 测试持平（快照更新） |
@@ -350,7 +351,7 @@
 - [x] 🟡 提醒/台账行批量操作（多选 → 批量归档/延后/忽略） ✅ 2026-10-03 第十三轮（提醒页批量模式：筛选条"批量"开关 → 勾选/全选当前结果 → 批量完成/延后 7 天/忽略，经 H01 串行队列逐条落盘；台账行批量（归档写回）随 A5 行编辑；[待实测] 大批量（50+）串行耗时随回归观察）
 - [ ] 🟡 成员卡右键/长按菜单（编辑/归档/查看档案）
 - [ ] 🟢 成员网格拖拽排序
-- [ ] 🟡 头像上传（asset 文件选择器 → 成员库 avatar 列）
+- [x] 🟡 头像上传（asset 文件选择器 → 成员库 avatar 列） ✅ 2026-10-05 第一百九十二波：**活体 IT-11 先行实测抓到两个真机潜在 bug 并修复**——E14：内核无 asset 单资源列（原 MEMBERS_SCHEMA.avatar=asset 会使成员台账首次建库直接失败→改 mAsset 单值承载）；E15：上传字段名必须 file[]（原 file 在真机 succMap 为空——抽屉附件上传同源修复），succMap 返回相对路径；UI：成员卡 📷 按钮 → uploadAsset → mAsset 写入 → 卡片 img 展示（origin 相对解析），无关联行给引导；资产存台账行（事实源），settings 不冗余；i18n +4（807 键）
 - [ ] 🟡 单条记录复制为脱敏文本（分享场景）
 - [x] 🟡 紧急信息卡打印样式（@media print，家庭紧急信息卡可打印） ✅ 2026-10-03 第三十二轮（@media print：隐藏导航/操作按钮/快捷记录行，白底黑字，卡片防跨页断裂——覆盖总览/提醒/台账/成员/设置五屏）
 - [x] 🟢 快捷键速查表（设置·关于区） ✅ 2026-10-02（快捷键与入口说明进关于区）

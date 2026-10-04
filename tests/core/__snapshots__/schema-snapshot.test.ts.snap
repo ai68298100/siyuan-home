@@ -58,7 +58,7 @@ exports[`31 模块 schema 契约快照（21 组） > 每个 schema 的结构快�
     },
     {
       "key": "avatar",
-      "type": "asset",
+      "type": "mAsset",
     },
     {
       "default": "active",

@@ -6,10 +6,10 @@
  * 运行：pnpm run test:live（或 scripts/e2e-core.sh，其会 source 环境并先跑门禁）。
  */
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
-import { gateProbe, liveTransport, rawApi, LIVE_NOTEBOOK } from "./live-env";
+import { gateProbe, liveTransport, liveUploadTransport, rawApi, LIVE_NOTEBOOK } from "./live-env";
 import {
-    setTransport, createAttributeView, addAttributeViewColumn, addDetachedRow,
-    setCell, renderLedger, renderLedgerAll, primaryRowItemIDs, removeLedgerRows,
+    setTransport, setUploadTransport, createAttributeView, addAttributeViewColumn, addDetachedRow,
+    setCell, renderLedger, renderLedgerAll, primaryRowItemIDs, removeLedgerRows, uploadAsset,
 } from "@/core/siyuan";
 import { CertsProvider } from "@/core/hub/providers";
 import { runScan } from "@/core/hub/scanner";
@@ -22,6 +22,7 @@ const gate = await gateProbe();
 const skip = !gate.ok;
 if (skip) console.warn(`[live] SKIP 整套件：${gate.reason}`);
 setTransport(liveTransport); // 无害：门禁失败时测试全部 skip
+setUploadTransport(liveUploadTransport); // 192 波：node 下 uploadAsset 需绝对地址（E6 端点已证可用）
 
 let NB = "";
 let DOC = "";
@@ -29,6 +30,7 @@ let AV = "";
 let kName = "";
 let kExp = "";
 let kDue = ""; // endorsement 规则字段（certs schema 声明 due 列——H14 缺列显式报错，fixture 必须齐）
+let kAsset = ""; // IT-11：asset 单元格形状验证列
 const pluginRowIds: string[] = [];
 const pluginRowNames = ["逾期证件", "即将到期证件", "远期证件"];
 
@@ -60,10 +62,11 @@ beforeAll(async () => {
     expect(DOC).toBeTruthy();
     AV = await createAttributeView(DOC, `lvh-core-${Date.now()}`);
     expect(AV).toBeTruthy();
-    // 列：名称(text) + 到期(date) + 签注 due(date)——keyID 由插件 newSiYuanId 自造（E4'：留空会产生空 id 列）
+    // 列：名称(text) + 到期(date) + 签注 due(date) + 附件(mAsset, IT-11——E14：内核无 asset 单资源列)——keyID 由插件 newSiYuanId 自造
     kName = await addAttributeViewColumn(AV, { name: "名称", type: "text" });
     kExp = await addAttributeViewColumn(AV, { name: "到期", type: "date" });
     kDue = await addAttributeViewColumn(AV, { name: "签注", type: "date" });
+    kAsset = await addAttributeViewColumn(AV, { name: "附件", type: "mAsset" });
     expect(kName).toBeTruthy();
     expect(kExp).toBeTruthy();
 }, 120_000);
@@ -125,6 +128,18 @@ describe("live.IT-02/05 · 插件写路径（D02 行确认 / 删行）", () => {
         // 60 批量行 + 3 插件行 - 1 = 62
         expect(read.rowCount).toBe(62);
         expect(read.rows.find((r) => r.itemID === pluginRowIds[0])).toBeUndefined();
+    });
+
+    it.skipIf(skip)("IT-11 mAsset 单元格：uploadAsset → setCell {mAsset:[{content,name}]} → render 读回（E14：无 asset 单资源列；头像/附件写值形态真机验证）", async () => {
+        const file = new File([new Uint8Array([1, 2, 3, 4])], "lvh-it11.txt", { type: "text/plain" });
+        const up = await uploadAsset(file);
+        expect(up.path).toMatch(/^assets\//); // E6/192 波：succMap 路径为工作区相对路径（无前导斜杠）
+        await setCell(AV, kAsset, pluginRowIds[1], { type: "mAsset", mAsset: [{ content: up.path, name: up.name }] });
+        const read = await renderLedger(AV);
+        const row = read.rows.find((r) => r.itemID === pluginRowIds[1]);
+        const v = row?.cells[kAsset];
+        expect(v?.type).toBe("mAsset");
+        expect(v?.mAsset?.[0]?.content ?? v?.mAsset?.[0]?.block?.content).toBe(up.path);
     });
 });
 

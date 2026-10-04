@@ -19,6 +19,17 @@ export async function liveTransport(endpoint: string, payload: object): Promise<
     return (await res.json()) as RawEnvelope;
 }
 
+/** 真实上传 transport（与 setUploadTransport 接口一致；192 波：node 下 uploadAsset 默认相对 URL 不可用，
+ * 活体套件必须注入绝对地址。multipart 由 fetch/FormData 原生构造，不手工设 content-type）。 */
+export async function liveUploadTransport(formData: FormData): Promise<RawEnvelope> {
+    const res = await fetch(`${LIVE_URL}/api/asset/upload`, {
+        method: "POST",
+        headers: { authorization: `Token ${LIVE_TOKEN}` },
+        body: formData,
+    });
+    return (await res.json()) as RawEnvelope;
+}
+
 /** 原始内核调用（setup/teardown 用，不经插件代码） */
 export async function rawApi(endpoint: string, payload: object): Promise<RawEnvelope> {
     return liveTransport(endpoint, payload);

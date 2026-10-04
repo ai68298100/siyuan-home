@@ -136,7 +136,8 @@ const MEMBERS_PRIVATE: ColumnDef[] = [
     { key: "size_bottom", type: "text" },
     { key: "size_shoe", type: "text" },
     { key: "dislike", type: "text" },
-    { key: "avatar", type: "asset" },
+    // 192 波 E14：内核 addAttributeViewKey 不支持 asset 单资源列（思源只有多资源 mAsset）——头像用 mAsset 单值承载
+    { key: "avatar", type: "mAsset" },
 ];
 
 export const MEMBERS_SCHEMA: ModuleSchema = {

@@ -2,7 +2,7 @@
     import type { Reminder, FamilyMember } from "@/types";
     import { confirm } from "siyuan";
     import { addMember, updateMember, removeMember } from "@/core/members";
-    import { newSiYuanId } from "@/core/siyuan";
+    import { newSiYuanId, renderLedgerAll, setCell, uploadAsset } from "@/core/siyuan";
     import type { HomePluginLike } from "@/types/plugin";
     import { saveRuntime } from "@/core/hub/runtime";
     import { openContactPicker, getContactsBridge } from "@/libs/contact-picker";
@@ -32,6 +32,55 @@
         return map;
     });
     const alertsFor = (id: string) => alertsByMember.get(id) ?? [];
+
+    // 17 组/192 波：成员头像（E14/E15 实测形状）——资产存成员台账行 mAsset 列（台账为事实源，settings 不存）。
+    // avatars: memberId → 资产相对路径；version 驱动加载（成员行量小，全量读）。
+    let avatars = $state<Record<string, string>>({});
+    $effect(() => {
+        void version;
+        let alive = true;
+        (async () => {
+            const ref = plugin.settings.dbRefs?.members;
+            const avatarKey = ref?.columns?.avatar;
+            if (!ref?.avId || !avatarKey) return;
+            try {
+                const read = await renderLedgerAll(ref.avId);
+                const map: Record<string, string> = {};
+                for (const m of plugin.settings.members ?? []) {
+                    if (!m.avItemId) continue;
+                    const row = read.rows.find((r) => r.itemID === m.avItemId);
+                    const p = row?.cells[avatarKey]?.mAsset?.[0]?.content;
+                    if (p) map[m.id] = p;
+                }
+                if (alive) avatars = map;
+            } catch { /* 读不到就维持首字母头像，不弹错 */ }
+        })();
+        return () => { alive = false; };
+    });
+    let avatarInput: HTMLInputElement | undefined = $state();
+    let avatarTarget: FamilyMember | null = null;
+    function pickAvatar(m: FamilyMember) {
+        if (!m.avItemId) { showMessage(t("members.avatarNoRow"), 4000, "info"); return; }
+        avatarTarget = m;
+        avatarInput?.click();
+    }
+    async function onAvatarPicked(e: Event) {
+        const file = (e.target as HTMLInputElement).files?.[0];
+        (e.target as HTMLInputElement).value = "";
+        const m = avatarTarget;
+        if (!file || !m?.avItemId) return;
+        const ref = plugin.settings.dbRefs?.members;
+        const avatarKey = ref?.columns?.avatar;
+        if (!ref?.avId || !avatarKey) return;
+        try {
+            const { name, path } = await uploadAsset(file);
+            await setCell(ref.avId, avatarKey, m.avItemId, { type: "mAsset", mAsset: [{ content: path, name }] });
+            avatars = { ...avatars, [m.id]: path };
+            showMessage(t("members.avatarUploaded").replace("${name}", m.name), 2500, "info");
+        } catch (e) {
+            showMessage(t("members.avatarFailed").replace("${msg}", e instanceof Error ? e.message : String(e)), 5000, "error");
+        }
+    }
     // C5a 统计 chips：该成员待办按模块聚类的 top-3（数据来自当前扫描，不做全库聚合查询）
     function statChips(id: string): { label: string; n: number }[] {
         const byModule = new Map<string, number>();
@@ -199,7 +248,13 @@
         <div class="head" style="display:flex;gap:10px;align-items:center;cursor:pointer" role="button" tabindex="0"
             onkeydown={(e: KeyboardEvent) => e.key === "Enter" && toggleExpand(m.id)}
             onclick={() => toggleExpand(m.id)}>
-            <span class="lv-avatar lg" style="background:linear-gradient(135deg,var(--lv-accent),var(--lv-accent-2))">{m.name.slice(0, 1)}</span>
+            {#if avatars[m.id]}
+                <!-- 17 组/192 波：头像图（资产相对路径 → 内核 origin） -->
+                <img class="lv-avatar lg" src={new URL(avatars[m.id], location.origin).href}
+                    alt={m.name} style="width:40px;height:40px;object-fit:cover;flex-shrink:0" />
+            {:else}
+                <span class="lv-avatar lg" style="background:linear-gradient(135deg,var(--lv-accent),var(--lv-accent-2))">{m.name.slice(0, 1)}</span>
+            {/if}
             <div><b>{m.name}</b><div class="lv-caption">{t(`role.${m.role}`)}{m.lunarBirthday ? " 🌙" : ""} {m.birthday ?? ""}</div></div>
             <span style="flex:1"></span>
             {#if m.contactSnapshot}
@@ -208,6 +263,7 @@
             {:else}
                 <button class="b3-button b3-button--text" onclick={(e) => { e.stopPropagation(); linkContact(m); }}>{t("members.contactLink")}</button>
             {/if}
+            <button class="b3-button b3-button--text" title={t("members.uploadAvatar")} onclick={(e) => { e.stopPropagation(); pickAvatar(m); }}>📷</button>
             <button class="b3-button b3-button--text" onclick={(e) => { e.stopPropagation(); startEdit(m); }}>{t("members.edit")}</button>
             <button class="b3-button b3-button--text" onclick={(e) => { e.stopPropagation(); confirmRemove(m); }}>{t("delete")}</button>
         </div>
@@ -247,3 +303,4 @@
         {/each}
     </div>
 {/if}
+<input type="file" accept="image/*" style="display:none" bind:this={avatarInput} onchange={(e) => void onAvatarPicked(e)} />

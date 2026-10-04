@@ -274,7 +274,8 @@ async function defaultUploadTransport(formData: FormData): Promise<IRawResponse>
  */
 export async function uploadAsset(file: File, assetsPath = "/assets/siyuan-home/"): Promise<{ name: string; path: string }> {
     const formData = new FormData();
-    formData.append("file", file);
+    // E6/192 波：内核要求的字段名是 file[]（endpoints 脚本实证；此前 "file" 在真机 succMap 为空——活体套件抓到的第二个潜在 bug）
+    formData.append("file[]", file);
     formData.append("assetsPath", assetsPath);
     const res = await (uploadTransport ?? defaultUploadTransport)(formData);
     if (!res || typeof res.code !== "number") throw new KernelError("asset.upload", -1, "malformed response envelope");
