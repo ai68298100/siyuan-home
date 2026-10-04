@@ -4,8 +4,9 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { applyRuntime, defaultRuntime, type HubRuntime } from "@/core/hub/runtime";
 import { runScan } from "@/core/hub/scanner";
-import { CertsProvider } from "@/core/hub/providers";
+import { CertsProvider, SchemaLedgerProvider } from "@/core/hub/providers";
 import { setTransport } from "@/core/siyuan";
+import { FAVORS_SCHEMA } from "@/core/schema";
 import type { DataProvider } from "@/core/hub/providers";
 import type { HomeSettings, Reminder } from "@/types";
 
@@ -151,5 +152,61 @@ describe("CertsProvider（mock transport，读路径）", () => {
     it("无 dbRef → 空数组（模块未建库时不报错）", async () => {
         const p = new CertsProvider({ settings: settings(), getDbRef: () => undefined });
         expect(await p.collect(TODAY)).toEqual([]);
+    });
+});
+
+describe("SchemaLedgerProvider favors 回礼（16 组/190 波：after kind + onlyIf）", () => {
+    afterEach(() => setTransport(null));
+
+    const AV = "av-favors-1";
+    const COLS = { name: "k-name", direction: "k-dir", date: "k-date" };
+    const dayMs = (dayOfMonth: number) => new Date(2026, 8, dayOfMonth).getTime(); // 2026-09 月
+
+    function favorsPayload() {
+        return {
+            code: 0, msg: "",
+            data: {
+                view: {
+                    columns: Object.values(COLS).map((id) => ({ id, type: "text", name: id })),
+                    rowCount: 2,
+                    rows: [
+                        { // 收礼：9 月 1 日（TODAY 前 30 天）→ 回礼提醒 10 月 1 日到期
+                            id: "row-in",
+                            cells: [
+                                { value: { keyID: "k-name", type: "text", text: { content: "张三婚礼礼金" } } },
+                                { value: { keyID: "k-dir", type: "select", select: { content: "in" } } },
+                                { value: { keyID: "k-date", type: "date", date: { content: dayMs(1), isNotEmpty: true, isNotTime: true } } },
+                            ],
+                        },
+                        { // 送礼：不派生（onlyIf direction=in）
+                            id: "row-out",
+                            cells: [
+                                { value: { keyID: "k-name", type: "text", text: { content: "李四乔迁" } } },
+                                { value: { keyID: "k-dir", type: "select", select: { content: "out" } } },
+                                { value: { keyID: "k-date", type: "date", date: { content: dayMs(1), isNotEmpty: true, isNotTime: true } } },
+                            ],
+                        },
+                    ],
+                },
+            },
+        };
+    }
+
+    it("after kind：事件+30 天派生；onlyIf direction=in 过滤送礼行", async () => {
+        setTransport(async (endpoint) => {
+            if (endpoint === "/api/av/renderAttributeView") return favorsPayload();
+            throw new Error("unexpected endpoint " + endpoint);
+        });
+        const p = new SchemaLedgerProvider("favors", FAVORS_SCHEMA, {
+            settings: settings(["favors"]),
+            getDbRef: () => ({ avId: AV, columns: COLS, docId: "d1" }),
+        });
+        const out = await p.collect(TODAY);
+        expect(out).toHaveLength(1);
+        expect(out[0].ruleKey).toBe("reciprocate");
+        expect(out[0].title).toBe("张三婚礼礼金");
+        expect(out[0].dueDate).toBe("2026-10-01"); // 09-01 + 30 天 = TODAY
+        expect(out[0].daysLeft).toBe(0);
+        expect(out[0].level).toBe("soon");
     });
 });

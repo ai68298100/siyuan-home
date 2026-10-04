@@ -324,6 +324,8 @@ export const FAVORS_SCHEMA: ModuleSchema = {
         ...d("amount", "date", "note"),
     ],
     capture: ["name", "direction", "person", "amount", "date"],
+    // 16 组/190 波：回礼提醒——收礼（direction=in）30 天后一次性（leadDays 0=到期当天起提醒）；提醒卡带「回礼」标记（rule.reciprocate）
+    reminders: [{ key: "reciprocate", field: "date", kind: "after", offsetDays: 30, leadDays: 0, onlyIf: { field: "direction", equals: "in" } }],
     views: [{ key: "by_person", type: "table", groupBy: "person" }],
 };
 

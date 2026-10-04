@@ -566,6 +566,7 @@
     "settings.disableBody": "Disabling \"${name}\" only hides its entry and stops its reminders; ledger data is kept and it can be re-enabled anytime.",
     "about.repo": "GitHub repo ↗",
     "rule.expiry": "Expiry",
+    "rule.reciprocate": "Reciprocate",
     "rule.endorsement": "Endorsement",
     "rule.birthday": "Birthday",
     "rule.next_pay": "Next payment",

@@ -53,8 +53,8 @@ export interface HomeModule {
 
 // ── 提醒中枢（docs/design/03）──────────────────────────────
 
-/** 规则类型：一次性效期 / 周期 / 周年（支持农历） */
-export type ReminderKind = "oneoff" | "recurring" | "anniversary";
+/** 规则类型：一次性效期 / 周期 / 周年（支持农历）/ 事件后 N 天（favors 回礼，190 波） */
+export type ReminderKind = "oneoff" | "recurring" | "anniversary" | "after";
 
 /** 模块 schema 声明的提醒规则（数据驱动，中枢不写死模块） */
 export interface ReminderRuleSpec {
@@ -70,6 +70,10 @@ export interface ReminderRuleSpec {
     lunarField?: string;
     /** 合同等：自动续约条款标记列 key（有标记的到期提醒升级为「续约决策提醒」，D19/16 组） */
     autoRenewField?: string;
+    /** after（favors 回礼等）：事件日期 + offsetDays 的一次性提醒 */
+    offsetDays?: number;
+    /** after：仅当该 select 列值等于 equals 时才派生（favors 只对 direction=in 回礼） */
+    onlyIf?: { field: string; equals: string };
 }
 
 /** 紧急级别：🔴 已逾期 / 🟠 7 天内 / 🟡 提前量内 / ⚪ 更远 */

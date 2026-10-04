@@ -58,6 +58,12 @@ export async function nextOccurrence(rule: ReminderRuleSpec, row: LedgerRowDates
 
     if (rule.kind === "oneoff") return base;
 
+    // after（16 组/190 波：favors 回礼类——事件后 N 天一次性）：base + offsetDays；无周期滚动
+    if (rule.kind === "after") {
+        const offset = Math.max(0, Math.min(rule.offsetDays ?? 0, 3650));
+        return addDays(base, offset);
+    }
+
     if (rule.kind === "anniversary") {
         if (row.lunar) return nextLunarAnniversary(base, today0);
         // 公历周年：2/29 平年取 2/28（决策 09）

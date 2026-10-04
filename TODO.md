@@ -1,4 +1,5 @@
 # 小驴管家（Lv Home）· 项目待办总清单
+| 2026-10-05 | 主线 | 第一百九十波：favors 回礼提醒——规则引擎新 kind "after"（offsetDays + onlyIf 条件派生） | **引擎扩展**：ReminderKind 新增 `after`（ReminderRuleSpec.offsetDays 0–3650 clamp + onlyIf select 条件）；nextOccurrence=事件日期+offsetDays 一次性；SchemaLedgerProvider 在规则循环里先评 onlyIf（select 值不匹配即跳过，CertsProvider 专属路径不受影响）；**favors reciprocate 规则**：收礼（direction=in）30 天后派生、leadDays 0；完成语义自然落入 oneoff 分支（记已办可恢复——H05 分派无需改动）；提醒卡标题带「回礼」标记（rule.reciprocate，UI 侧 i18n，引擎保持无 i18n 依赖）；provider 级 mock transport 测试（收礼派生+送礼过滤两行对照）+ rule 单测 + 黄金快照 -u（有意变更）；i18n 792、217 测试 |
 | 2026-10-05 | 主线 | 第一百八十九波：media 追更提醒（schema 声明路线）+ travel 行前证件检查存档（rowlog 第四消费方） | **media 追更提醒**：next_update 日期列 + oneoff 规则（leadDays 0=当天）——纯 schema 声明，SchemaLedgerProvider 自动派生（"新增模块=数据"路线的规则侧首次实战加列）；capture 换入 next_update 换出 rating（观前未知评分）；建库器只增列补老库；黄金快照 -u 更新并登记原因（有意变更）；**travel 检查存档**：rowlog checks 类型（第四消费方），travel-plan 抽屉"行前证件检查"分区（日期+结论，追加去重）；i18n +4（791 键）；216 测试持平（快照更新） |
 | 2026-10-05 | 主线 | 第一百八十八波：stock 采购建议清单（16 组，低库存汇总+复制分享）+ allowance 愿望清单暂缓注记 | **采购建议**：`core/shopping.ts buildShoppingList` 纯函数（H15 同口径——qty 与阈值均有值且 qty≤阈值才入清单，缺列不评估不误报；建议量=补回阈值下限 1；名称排序）+ 台账页 stock 模块"采购建议"按钮 → 对话框逐项可改建议数量（renderLedgerAll 全量读，>50 行不漏）+ 复制清单到剪贴板（`名称 ×N` 文本，可直接贴给家人/购物 App）；剪贴板失败显式报错不假成功；+2 单测、i18n 778→787；**allowance 愿望清单暂缓注记**：allowance 行是收支事件而非目标实体，存储模型需产品决策（候选=shopping 挂 wish 类别行 + rowlog 存钱流水），随 16 组 UI 波定案；单测 214→216 |
 | 2026-10-05 | 主线 | 第一百八十七波：house 水电煤抄表流水（16 组 rowlog 第三消费方）+ §15 两项核实勾选 | **抄表流水**：rowlog 新增 `meters` 类型（MeterEntry：date/reading/usage?/at）+ `appendMeterReading`（同口径日覆盖；用量=与"日期早于本次的最近读数"之差——回填旧读数按日期序计差、已定用量不重算；首表或负差（换表/倒转）不记用量，不猜原因）+ `getMeterReadings`/`removeMeterReading`；house 详情抽屉"抄表记录"分区（日期+读数两字段，格式 `日期 · 读数（+用量）`）；i18n +3；**§15 核实勾选**：孤儿提醒清理=扫描全量重派生+删行触发增量重扫+cleanupRowRuntimeData，无残留面；模块禁用剔除=scanner 跳过禁用 provider+deriveVisible 二次过滤（scanner.ts:33/96）——均设计覆盖，补证据勾选；rowlog +3 单测、i18n 775→778 |
@@ -333,7 +334,7 @@
 - [ ] 🟡 allowance：孩子愿望清单（目标金额 + 存钱进度条）（188 波注记：暂缓——allowance 行是收支事件而非目标实体，愿望的存储模型需产品决策；候选=shopping 模块挂 wish 类别行 + rowlog 存钱流水，随 16 组下一轮 UI 波定案）
 - [ ] 🟢 allowance：利息/收益流水
 - [ ] 🟡 favors：年度人情报告（收送 TOP / 净额走势）
-- [ ] 🟡 favors：回礼提醒（事件后 N 天）
+- [x] 🟡 favors：回礼提醒（事件后 N 天） ✅ 2026-10-05 第一百九十波：规则引擎新 kind "after"（ReminderRuleSpec.offsetDays + onlyIf select 条件；nextOccurrence=base+offsetDays，clamp 0–3650）——favors 声明 reciprocate 规则（收礼 direction=in、30 天后、leadDays 0）；完成语义落 oneoff 分支（记已办可恢复，H05 无需改动）；提醒卡标题带「回礼」标记（rule.reciprocate，UI 侧 i18n）；provider 级测试（收礼派生/送礼过滤）+ 黄金快照 -u（有意变更）
 - [x] 🟢 media：追更提醒（剧更新日手动登记 → 提醒中枢） ✅ 2026-10-05 第一百八十九波走 schema 声明路线：media 新增 next_update 日期列 + oneoff 规则（leadDays 0=当天提醒），capture 换入 next_update（rating 移出快速表单——观前未知评分，追更日常用登记更新日）；建库器只增列自动补老库；黄金快照 -u 更新（原因=本次有意变更）；field.next_update 双语
 - [ ] 🟢 media：图书借出记录（借出状态复用 assets 模式）
 - [x] 🟢 travel：行前证件检查结果存档（检查时间/结论） ✅ 2026-10-05 第一百八十九波：rowlog 新增 checks 类型（第四消费方），travel-plan 行详情抽屉"行前证件检查"分区——日期+结论两字段（追加+完全重复去重），格式 `日期 · 结论`；i18n +3

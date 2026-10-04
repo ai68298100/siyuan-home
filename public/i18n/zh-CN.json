@@ -566,6 +566,7 @@
     "settings.disableBody": "停用「${name}」后仅隐藏入口并停止其提醒，台账数据保留，可随时重新启用。",
     "about.repo": "GitHub 仓库 ↗",
     "rule.expiry": "到期",
+    "rule.reciprocate": "回礼",
     "rule.endorsement": "签注/审验",
     "rule.birthday": "生日",
     "rule.next_pay": "下次缴费",

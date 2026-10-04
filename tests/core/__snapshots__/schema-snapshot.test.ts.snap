@@ -1283,6 +1283,19 @@ exports[`31 模块 schema 契约快照（21 组） > 每个 schema 的结构快�
       "type": "text",
     },
   ],
+  "reminders": [
+    {
+      "field": "date",
+      "key": "reciprocate",
+      "kind": "after",
+      "leadDays": 0,
+      "offsetDays": 30,
+      "onlyIf": {
+        "equals": "in",
+        "field": "direction",
+      },
+    },
+  ],
   "views": [
     {
       "groupBy": "person",

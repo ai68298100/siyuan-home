@@ -141,6 +141,11 @@ export class SchemaLedgerProvider implements DataProvider {
             const rel: string[] | undefined = cell("member")?.relation?.blockIDs ?? undefined;
             const member = rel?.[0] ? members.find((m) => m.avItemId === rel[0]) : undefined;
             for (const rule of this.schema.reminders ?? []) {
+                // onlyIf（190 波）：仅当指定 select 列值匹配时才派生（favors 只对收礼 direction=in 回礼）
+                if (rule.onlyIf) {
+                    const actual = selectFromValue(cell(rule.onlyIf.field)) ?? "";
+                    if (actual !== rule.onlyIf.equals) continue;
+                }
                 const v = cell(rule.field);
                 const fieldValue = v?.type === "date" ? dateFromValue(v) : textFromValue(v);
                 if (!fieldValue) continue;
