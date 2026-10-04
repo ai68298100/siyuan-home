@@ -75,7 +75,22 @@
     color: var(--lv-tx-2); background: none; border: none; cursor: pointer; transition: color var(--lv-t-med) var(--lv-ease);
     &:hover { color: var(--lv-tx); } &.on { color: var(--lv-tx); font-weight: 500; } }
   .lv-people { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 12px; }
-  .lv-hero { display: flex; align-items: flex-end; gap: 16px; margin: 26px 2px 4px; flex-wrap: wrap;
+  /* 171 波（对齐原型质感，不低于）：context-strip 状态条 + focus-row 三重点卡 */
+  .lv-strip { display: flex; flex-wrap: wrap; gap: 4px 18px; margin: 14px 2px 0; padding: 6px 10px;
+    border: 1px solid var(--lv-line); border-radius: 10px; font-size: 12px; color: var(--lv-tx-3);
+    strong { color: var(--lv-tx-2); font-weight: 500; margin-right: 4px; } }
+  .lv-focus { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin: 14px 2px 2px; }
+  .lv-focus-card { display: flex; align-items: center; gap: 10px; padding: 12px 14px;
+    border: 1px solid var(--lv-line); border-radius: 12px; background: var(--b3-theme-background);
+    .lv-focus-icon { font-size: 18px; color: var(--lv-accent); }
+    div { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px;
+      b { font-size: 13px; font-weight: 600; }
+      span { font-size: 11.5px; color: var(--lv-tx-3); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; } }
+    .b3-button { flex-shrink: 0; font-size: 12px; padding: 4px 8px; } }
+  @media (max-width: 640px) {
+    .lv-focus { grid-template-columns: 1fr; }
+  }
+  .lv-hero { display: flex; align-items: flex-end; gap: 16px; margin: 10px 2px 4px; flex-wrap: wrap;
     h1 { font-size: 26px; font-weight: 600; letter-spacing: -.02em; }
     p { color: var(--lv-tx-3); font-size: 13px; margin-top: 2px; }
     .lv-hero-count { margin-left: auto; display: flex; align-items: baseline; gap: 8px;
@@ -169,7 +184,7 @@
   // ── 8. 模块卡 / 色砖 / 趋势条 / 进度条 ──────────────────
   .lv-mi { width: 34px; height: 34px; border-radius: 10px; display: grid; place-items: center;
     font-size: 16px; transition: transform var(--lv-t-med) var(--lv-spring); }
-  .lv-mod { padding: 16px; display: flex; flex-direction: column; gap: 10px;
+  .lv-mod { padding: 16px; display: flex; flex-direction: column; gap: 10px; min-height: 118px;
     &:hover .lv-mi { transform: scale(1.08) rotate(-4deg); }
     b { font-size: 13.5px; font-weight: 500; }
     .lv-stat { display: flex; align-items: baseline; gap: 6px;
@@ -311,6 +326,12 @@
   .lv-anim .lv-mod:nth-child(7) { animation: lv-rise var(--lv-t-slow) var(--lv-ease) 240ms backwards; }
   @media (prefers-reduced-motion: reduce) {
     *, *::before, *::after { animation: none !important; transition: none !important; }
+  }
+  // 171 波（对齐原型质感，不低于）：forced-colors 降级——高对比模式下恢复边框轮廓，品牌色块保留原色
+  @media (forced-colors: active) {
+    .lv-card, .lv-mod, .lv-chip, .lv-badge, .lv-qbtn, .lv-focus-card, .lv-strip,
+    .b3-button, .b3-select, .b3-text-field { border: 1px solid CanvasText; }
+    .lv-avatar, .lv-mi, .lv-focus-icon, .t-blue { forced-color-adjust: none; }
   }
   @media (max-width: 760px) {
     .lv-hero h1 { font-size: 21px; }

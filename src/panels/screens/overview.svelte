@@ -52,6 +52,18 @@
     // B2（94 波走查）：模块图标共享表移至 core/modules（95 波起与提醒行共用，覆盖测试钉住）
     const moduleIcon = (mid: string) => icons(mid);
 
+    // 170/171 波（对齐原型质感，不低于）：context-strip 状态条 + focus-row 三重点卡
+    const overdueCount = $derived.by(() => { void version; return allReminders.filter((r: Reminder) => r.level === "overdue").length; });
+    const soon7Count = $derived.by(() => { void version; return allReminders.filter((r: Reminder) => r.daysLeft >= 0 && r.daysLeft <= 7).length; });
+    const syncErrCount = $derived.by(() => { void version; return members.filter((m) => m.syncError).length; });
+    const scanErrors = $derived.by(() => { void version; return plugin.scan?.errors ?? []; });
+    const scanStale = $derived.by(() => { void version; return plugin.scan?.stale === true; });
+    const snapshotLabel = $derived.by(() => {
+        const at = plugin.runtime?.scannedAt;
+        return at ? new Date(at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) : "—";
+    });
+    const scopeLabel = $derived(memberFilter ? (members.find((m) => m.id === memberFilter)?.name ?? "?") : t("dash.scopeAll"));
+
     async function setMemberFilter(id: string | undefined) {
         memberFilter = id;
         plugin.runtime.filterMemberId = id;
@@ -73,6 +85,12 @@
     <Onboarding {plugin} {t} onGoto={onGoto} />
 {/if}
 
+<div class="lv-strip" role="status" aria-label={t("dash.stripLabel")}>
+    <span><strong>{t("dash.stripScope")}</strong> {scopeLabel}</span>
+    <span><strong>{t("dash.stripSnapshot")}</strong> <span class="lv-num">{snapshotLabel}</span>{scanStale ? ` · ${t("dash.stale")}` : ""}</span>
+    <span><strong>{t("dash.stripErrors")}</strong> {scanErrors.length}</span>
+</div>
+
 <div class="lv-hero">
     <div><h1>{t("dash.hello")}</h1><p>{t("dash.sub")}</p></div>
     <div class="lv-hero-count">
@@ -80,6 +98,24 @@
         {#if monthlyDone > 0}
             <span class="lv-caption" style="display:block;margin-top:2px">✓ {t("dash.monthlyDone").replace("${n}", monthlyDueTotal > 0 ? `${monthlyDone}/${monthlyDueTotal}` : String(monthlyDone))}</span>
         {/if}
+    </div>
+</div>
+
+<div class="lv-focus" aria-label={t("dash.focusLabel")}>
+    <div class="lv-focus-card">
+        <span class="lv-focus-icon">◷</span>
+        <div><b>{t("dash.focusToday")}</b><span>{t("dash.focusTodayBody").replace("${od}", String(overdueCount)).replace("${s}", String(soon7Count))}</span></div>
+        <button class="b3-button b3-button--text" onclick={() => onGoto("reminders")}>{t("dash.focusOpen")}</button>
+    </div>
+    <div class="lv-focus-card">
+        <span class="lv-focus-icon">⌁</span>
+        <div><b>{t("dash.focusReview")}</b><span>{syncErrCount > 0 ? t("dash.focusReviewBody").replace("${n}", String(syncErrCount)) : t("dash.focusReviewOk")}</span></div>
+        <button class="b3-button b3-button--text" onclick={() => onGoto("members")}>{t("dash.focusView")}</button>
+    </div>
+    <div class="lv-focus-card">
+        <span class="lv-focus-icon" style={scanStale || scanErrors.length ? "color:var(--lv-warn)" : "color:var(--lv-ok)"}>✓</span>
+        <div><b>{t("dash.focusData")}</b><span>{scanStale ? t("dash.focusStale") : scanErrors.length > 0 ? t("dash.focusDataErr").replace("${t}", snapshotLabel).replace("${n}", String(scanErrors.length)) : t("dash.focusDataOk").replace("${t}", snapshotLabel)}</span></div>
+        <button class="b3-button b3-button--text" onclick={() => plugin.openSetting()}>{t("dash.focusView")}</button>
     </div>
 </div>
 
