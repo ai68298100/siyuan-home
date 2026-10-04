@@ -759,6 +759,7 @@
     "dash.focusStale": "快照陈旧 · 打开管家触发重扫",
     "dash.focusOpen": "打开",
     "dash.focusView": "查看",
+    "dash.statScope": "来源：最近扫描 ${t}；口径 = 逾期 + 7 天内 + 提前量内",
     "dash.filteredEmpty": "当前范围没有匹配提醒",
     "dash.filteredEmptyHint": "这不表示没有成员资料或待办事项。",
     "dash.clearFilter": "清除筛选"

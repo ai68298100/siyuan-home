@@ -93,7 +93,7 @@
 
 <div class="lv-hero">
     <div><h1>{t("dash.hello")}</h1><p>{t("dash.sub")}</p></div>
-    <div class="lv-hero-count">
+    <div class="lv-hero-count" title={t("dash.statScope").replace("${t}", snapshotLabel)}>
         <b class="lv-num">{reminders.length}</b><span>{t("dash.needAttention")}</span>
         {#if monthlyDone > 0}
             <span class="lv-caption" style="display:block;margin-top:2px">✓ {t("dash.monthlyDone").replace("${n}", monthlyDueTotal > 0 ? `${monthlyDone}/${monthlyDueTotal}` : String(monthlyDone))}</span>
@@ -120,10 +120,10 @@
 </div>
 
 <div class="lv-members" style="margin-bottom:4px">
-    <button class="lv-chip {!memberFilter ? 'on' : ''}" onclick={() => setMemberFilter(undefined)}>{t("members.all")}</button>
+    <button class="lv-chip {!memberFilter ? 'on' : ''}" aria-pressed={!memberFilter} onclick={() => setMemberFilter(undefined)}>{t("members.all")}</button>
     {#each members as m (m.id)}
-        <button class="lv-chip {memberFilter === m.id ? 'on' : ''}" onclick={() => setMemberFilter(m.id)}>
-            <span class="lv-avatar" style="background:linear-gradient(135deg,var(--lv-accent),var(--lv-accent-2))">{m.name.slice(0, 1)}</span>{m.name}
+        <button class="lv-chip {memberFilter === m.id ? 'on' : ''}" aria-pressed={memberFilter === m.id} onclick={() => setMemberFilter(m.id)}>
+            <span class="lv-avatar" aria-hidden="true" style="background:linear-gradient(135deg,var(--lv-accent),var(--lv-accent-2))">{m.name.slice(0, 1)}</span>{m.name}
         </button>
     {/each}
     <button class="lv-chip" onclick={() => onGoto("members")}>＋</button>
@@ -182,20 +182,21 @@
             class="lv-card lv-card--hover lv-mod"
             role="button"
             tabindex="0"
-            onkeydown={(e: KeyboardEvent) => { if (e.key === "Enter") { plugin.setActiveLedger(mid); onGoto("ledger"); } }}
+            aria-label={t(`module.${mid}`)}
+            onkeydown={(e: KeyboardEvent) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); plugin.setActiveLedger(mid); onGoto("ledger"); } }}
             onclick={() => { plugin.setActiveLedger(mid); onGoto("ledger"); }}
         >
-            <div class="lv-mi t-blue">{moduleIcon(mid)}</div><b>{t(`module.${mid}`)}</b>
-            <div class="lv-stat">
-                {#if pending > 0}
-                    <b class="lv-num">{pending}</b><span style="color:var(--lv-warn)">{t("mod.pending")}</span>
-                {:else if plugin.settings.dbRefs?.[mid] && !plugin.settings.dbRefs[mid].docId}
+            <div class="lv-mi t-blue" aria-hidden="true">{moduleIcon(mid)}</div><b>{t(`module.${mid}`)}</b>
+            <div class="lv-stat" title={t("dash.statScope").replace("${t}", snapshotLabel)}>
+            {#if pending > 0}
+                <b class="lv-num">{pending}</b><span style="color:var(--lv-warn)">{t("mod.pending")}</span>
+            {:else if plugin.settings.dbRefs?.[mid] && !plugin.settings.dbRefs[mid].docId}
                     <span style="color:var(--lv-warn)">{t("diag.missing")}</span>
-                {:else if plugin.settings.dbRefs?.[mid]?.provisional}
+            {:else if plugin.settings.dbRefs?.[mid]?.provisional}
                     <span>{t("diag.provisional")}</span>
-                {:else}
+            {:else}
                     <span>{t("mod.inLedger")}</span>
-                {/if}
+            {/if}
             </div>
             {#if mid === "exams" && plugin.runtime?.lastExamStats?.generatedAt}
                 <!-- EC21：lv-exam:stats 聚合展示（只读子集，标注更新日期；不读题目内容） -->

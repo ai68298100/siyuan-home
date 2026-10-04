@@ -330,14 +330,15 @@
         <div class="lv-card lv-rems">
             {#each buildDisplay(g.items) as entry (entry.merged ? entry.key : entry.row.id)}
                 {#if entry.merged}
-                    <!-- 29 组：同成员同日合并卡 -->
+                    <!-- 29 组：同成员同日合并卡；PL13：Enter/Space 等价 + aria-expanded -->
                     <div class="lv-rem lead" role="button" tabindex="0"
-                        onkeydown={(e: KeyboardEvent) => e.key === "Enter" && toggleMerge(entry.key)}
+                        aria-expanded={expandedMerges.has(entry.key)}
+                        onkeydown={(e: KeyboardEvent) => (e.key === "Enter" || e.key === " ") && (e.preventDefault(), toggleMerge(entry.key))}
                         onclick={() => toggleMerge(entry.key)}>
-                        <div class="lv-rem-ic">👪</div>
+                        <div class="lv-rem-ic" aria-hidden="true">👪</div>
                         <div class="lv-rem-t"><b>{memberName(entry.memberId)} · {entry.dueDate}</b><span class="lv-caption">{t("hub.mergeHint")}</span></div>
                         <span class="lv-badge orange">{entry.items.length}</span>
-                        <div class="lv-rem-ops"><span class="lv-caption">{expandedMerges.has(entry.key) ? "▾" : "▸"}</span></div>
+                        <div class="lv-rem-ops"><span class="lv-caption" aria-hidden="true">{expandedMerges.has(entry.key) ? "▾" : "▸"}</span></div>
                     </div>
                     {#if expandedMerges.has(entry.key)}
                         {#each entry.items as sub (sub.id)}
