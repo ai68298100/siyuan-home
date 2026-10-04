@@ -179,6 +179,13 @@ describe("relativeDue（17 组/186 波：相对到期短语）", () => {
 });
 
 describe("时间回拨与跨天容错（§15/194 波：due 计算幂等）", () => {
+    it("localDateKey 用本地日期字段（跨时区不变式，§15/202 波）：UTC 构造的时刻按本地年月日出键", () => {
+        // 不假设 CI 时区：期望值由同一 Date 的本地字段推导——键与本地字段恒一致即为本时区语义
+        const instant = new Date("2026-01-01T20:00:00Z"); // UTC+8 为 1/2 凌晨，UTC 为 1/1
+        const expected = `${instant.getFullYear()}-${String(instant.getMonth() + 1).padStart(2, "0")}-${String(instant.getDate()).padStart(2, "0")}`;
+        expect(localDateKey(instant)).toBe(expected);
+    });
+
     const ruleMonthly = { key: "pay", field: "due", kind: "recurring" as const, leadDays: 3 };
     const row = (d: string): LedgerRowDates => ({ rowId: "r1", title: "t", fieldValue: d, cycle: "month" });
 
