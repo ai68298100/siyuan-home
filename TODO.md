@@ -1,11 +1,11 @@
 # 小驴管家（Lv Home）· 项目待办总清单
-> **当前事实（2026-10-05 · 第 224 波复审）**：v0.3.0 已发布；250 项单测通过，类型/i18n/meta/audit/build 通过；Svelte 0 错误但 2 警告；Windows `pnpm run smoke` 因系统缺少 `unzip` 失败；真实 SiYuan UI 六阶段真机批尚未执行；icon/preview 仍为占位图；集市上架继续暂缓。开发入口以 [状态评审与下一阶段路线](docs/research/2026-10-05-开发状态与待办评审.md) 和上方第 224 波行动清单为准，历史波次不代表当前队列。
+> **当前事实（2026-10-05 · 第 225 波）**：v0.3.1 已发布（v0.3.0 零入口事故热修：chunks 分包在思源加载器下必然失败 → 单文件 bundle + smoke/loader 双门禁；pets cycle 列；REL-01 版本单源）。250 项单测通过，类型/i18n/meta/audit/build/loader 全绿；Svelte 0 错误但 2 警告；Windows `pnpm run smoke` 因系统缺少 `unzip` 失败；真实 SiYuan UI 六阶段真机批尚未执行；icon/preview 仍为占位图；集市上架继续暂缓。开发入口以 [状态评审与下一阶段路线](docs/research/2026-10-05-开发状态与待办评审.md) 和上方第 224 波行动清单为准，历史波次不代表当前队列。
 
 ## 第 224 波复审行动清单（当前唯一入口）
 
 ### 发布信任门禁（P0）
 
-- [ ] **REL-01 版本单源**：修复 `src/index.ts` 诊断/关于显示 0.2.0；由 package/plugin 或构建注入统一版本，并加入漂移测试。
+- [x] **REL-01 版本单源**：~~修复 `src/index.ts` 诊断/关于显示 0.2.0；由 package/plugin 或构建注入统一版本，并加入漂移测试。~~（225 波完成：vite define 从 plugin.json 注入 `__PLUGIN_VERSION__`，字面量清零；package↔plugin 漂移由 check:meta 既有交叉校验覆盖）
 - [ ] **REL-02 跨平台 smoke**：移除对系统 `unzip` 的硬依赖；Windows、Ubuntu、macOS 均能验证 package.zip 必需文件、禁入文件、manifest、i18n 和体积。
 - [ ] **REL-03 文档事实同步**：ROADMAP、MODULES、发布清单、隐私、FAQ、README 统一 v0.3.0、250 tests、真机 UI 未验收、集市暂缓；历史快照加日期和“仅供追溯”。
 - [ ] **REL-04 Release 门禁**：tag 工作流增加 test、smoke、包内容/体积/版本交叉检查；门禁失败不得创建或覆盖 Release。
@@ -33,6 +33,7 @@
 
 - [ ] 拼音/首字母检索、已有文档块进台账、Webhook、rollup、提醒双日期、QR、语音、AI、家庭共享权限、更多模块深化；每项先写用户结果、依赖、停止条件和证据等级。
 
+| 2026-10-05 | 主线 | 第二百二十五波：🏁 **v0.3.1 热修补版**（用户实测 v0.3.0"找不到任何进入的入口"） | 根因定位（读宿主 common.js 加载器源码 + 1:1 Node 复现）：**chunks 分包 × 思源加载器不兼容**——加载器用 window.eval 包 CJS，require 桩只映射 `"siyuan"`、其余转交 Electron `window.require`（相对路径以思源 app 根为基准），`require("./chunks/...")` 必然 MODULE_NOT_FOUND 被静默吞掉 → 插件从未实例化 → 全部入口消失；既有门禁全盲区（单测走 vitest 解析/smoke 只查包内容/活体只打内核 API/真机 UI 批未执行）。**修复**：vite `inlineDynamicImports` 单文件 bundle（e7fca30 分包优化回退，gzip 仍在预算）+ 双门禁防回归（smoke 禁相对 require/chunks 目录；新增 `verify:loader` 按思源真实加载语义评估 dist 并断言四入口注册）+ pets deworm 补 `cycle` 列（快照 -u）+ REL-01 版本单源（vite define 注入 `__PLUGIN_VERSION__`，字面量漂移清零）+ 开发脚本 SIYUAN_TOKEN 支持；250 测试/check 五重/build/smoke/loader 全绿 → 提交分账（docs 224 波 / fix×3 / release）→ tag v0.3.1 → CI 发布 → v0.3.0 notes 补已知问题 → 发布包核验单文件 → 装回工作区 |
 | 2026-10-05 | 主线 | 第二百二十三波：剩余待办行动地图（用户指令"梳理剩余待办，整理优化便于接着开发"） | 全量普查 993 未勾/243 已勾——大头是 §35–62 只规划池（约 850 条非承诺）；**新增"剩余待办行动地图"节**（TODO 顶部，五桶：🅰真机批约 25 条=唯一硬闸门 / 🅱小额功能 8 条按价值排序=接着开发主粮 / 🅲产品定案待批 5 项 / 🅳调研挖矿池含优先序建议 / 🅴有意不做清单防重复立项）；**核销六条过时项**（assets 位置历史 69 波/house 抄表 187 波/stock 采购建议 188 波/枚举 i18n 211 波均已交付；provisioner 只增列与 B2d 定案记录设计覆盖有据）；旧版本节 §2–§13 声明为历史分组不作开发队列 |
 | 2026-10-05 | 主线 | 第二百二十二波：🏁 **v0.3.0 发版**（用户指令：更新优化 README、发版、暂不提交集市） | README 双语优化（安装节/路线图行对齐现状）→ CHANGELOG 定稿（尾波折入 + Unreleased→v0.3.0）→ 版本 0.3.0（package/plugin）→ 全门禁+smoke 绿 → tag+push → **发现并修复 tag 发布工作流的 pnpm 版本硬编码冲突**（11.4.0 vs packageManager 12.5.1，只引爆于 tag push；release.yml 改读 packageManager，tag 移至修复提交重触发）→ **CI 自动构建发布 v0.3.0 成功**（zip 0.27MB/28 文件）→ 润色 notes 回填（双语，说明集市暂缓）→ zip 下载核验 → v0.3.0 构建部署实例 0 失败+热重载+预检全绿；D18 发版前置由用户显式指令替代，集市上架（D13 disabledInPublish=true）待真机 UI 走查后另议 |
 | 2026-10-05 | 巡检 | 第二百二十一波：仓库维护巡检（PR/issue/依赖三清确认 + 全门禁） | gh 盘点：开放 PR 零、开放 issue 零、生产依赖零过时（Dependabot 无新候选）；全门禁复跑绿（check 五重/250 测试/build/smoke）、预检 10-11/0（readDir 瞬态波动，部署字节一致性 28 文件实测 0 失败）；工作区干净。结论：仓库处于零欠账稳态，等待真机批窗口 |

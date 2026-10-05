@@ -37,7 +37,7 @@ Certificates expire, medicine expires, insurance needs renewal, subscriptions au
 | 🧩 **Modules on demand** | Disabled modules create no data and stay out of the UI; parenting/school only suggested when you have kids |
 | 🔌 **Ecosystem ready** | Block menu quick capture, statusbar badge, service bridge (`window.LvHome`), contacts picker via 小驴人脉 |
 
-## 📦 Install (v0.3.0)
+## 📦 Install (v0.3.1)
 
 1. Download `package.zip` from [Releases](https://github.com/ai68298100/siyuan-home/releases/latest)
 2. SiYuan → Settings → Marketplace → Download → **Import** the zip
@@ -102,7 +102,7 @@ The current release is in a trust-and-validation phase: complete the real SiYuan
 
 | Phase | Content |
 |---|---|
-| ✅ v0.3.0 (current) | 31 module ledgers · reminder hub · growth charts (WHO bands) · smart date parsing · bulk CSV import · .ics/.vcf export · member avatars & drag order · shopping suggestions & wish lists · sanitized diagnostics |
+| ✅ v0.3.1 (current) | 31 module ledgers · reminder hub · growth charts (WHO bands) · smart date parsing · bulk CSV import · .ics/.vcf export · member avatars & drag order · shopping suggestions & wish lists · sanitized diagnostics |
 | 🔜 Next | Native calendar view, Webhook push (Bark/ntfy), pinyin search, QR labels |
 | 🔭 Later | Family collaboration, template packs, yearly family report, AI capabilities |
 
