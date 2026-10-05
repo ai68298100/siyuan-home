@@ -396,7 +396,9 @@
         if (!ref?.avId) { rows = []; avCols = []; return; }
         loading = true;
         try {
-            const res = await renderLedger(ref.avId);
+            // 226 波修复（真机 e2e 发现）：renderLedger 单次调用受内核 pageSize 封顶（默认 50），
+            // 表格永远只显示前 50 行——改用分页聚合的 renderLedgerAll
+            const res = await renderLedgerAll(ref.avId);
             rows = res.rows;
             avCols = res.columns ?? [];
         } finally {

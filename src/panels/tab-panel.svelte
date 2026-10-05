@@ -33,7 +33,7 @@
     let pill = $state({ x: 0, w: 0 });
     function movePill(btn: HTMLElement | undefined) {
         if (!btn) return;
-        pill = { x: btn.offsetLeft - 3, w: btn.offsetWidth };
+        pill = { x: btn.offsetLeft - 4, w: btn.offsetWidth };
     }
     $effect(() => {
         movePill(navEl?.querySelector(`[data-s="${screen}"]`) as HTMLElement | undefined);

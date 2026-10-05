@@ -18,6 +18,9 @@ let runtimeChain: Promise<unknown> = Promise.resolve();
 export function withRuntime(plugin: Plugin, fn: (rt: HubRuntime) => void | Promise<void>): Promise<HubRuntime> {
     const run = runtimeChain.then(async () => {
         const rt = await loadRuntime(plugin);
+        // 226 波修复（真机 e2e 发现的数据丢失竞态）：写回后必须同步插件活引用——
+        // 否则 notifyHubChanged/扫描仍持有旧对象并整体回写，把刚落盘的备忘/延后/已办覆盖丢失
+        (plugin as unknown as { runtime: HubRuntime }).runtime = rt;
         await fn(rt);
         await saveRuntime(plugin, rt);
         return rt;
