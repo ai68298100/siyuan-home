@@ -31,15 +31,7 @@
         return map;
     });
     const alertsFor = (id: string) => alertsByMember.get(id) ?? [];
-    // 17 组/215 波：生日倒计时 chip——提醒中枢已派生的 birthday 提醒里取 30 天内的最迫近一条，
-    // 显示"N 天后/N 天前"；零新增扫描（数据来自既有 HubState）。
-    function birthdaySoon(id: string): string | null {
-        const hit = alertsFor(id)
-            .filter((r) => r.ruleKey === "birthday" && r.daysLeft <= 30)
-            .sort((a, b) => a.daysLeft - b.daysLeft)[0];
-        if (!hit) return null;
-        return hit.daysLeft < 0 ? t("days.overdue").replace("${n}", String(-hit.daysLeft)) : t("days.after").replace("${n}", String(hit.daysLeft));
-    }
+    // （215 波的 birthdaySoon 于 219 波并入下方 memberStats 单遍派生，附 0/1 天文案修正）
 
     // 17 组/192 波：成员头像（E14/E15 实测形状）——资产存成员台账行 mAsset 列（台账为事实源，settings 不存）。
     // avatars: memberId → 资产相对路径；version 驱动加载（成员行量小，全量读）。
@@ -89,15 +81,36 @@
             showMessage(t("members.avatarFailed").replace("${msg}", e instanceof Error ? e.message : String(e)), 5000, "error");
         }
     }
-    // C5a 统计 chips：该成员待办按模块聚类的 top-3（数据来自当前扫描，不做全库聚合查询）
-    function statChips(id: string): { label: string; n: number }[] {
-        const byModule = new Map<string, number>();
-        for (const r of alertsFor(id)) byModule.set(r.moduleId, (byModule.get(r.moduleId) ?? 0) + 1);
-        return [...byModule.entries()]
-            .sort((a, b) => b[1] - a[1])
-            .slice(0, 3)
-            .map(([mid, n]) => ({ label: t(`module.${mid}`) !== `module.${mid}` ? t(`module.${mid}`) : mid, n }));
-    }
+    // C5a 统计 chips + 17 组/219 波生日倒计时：单遍预计算（原 statChips/birthdaySoon
+    // 每成员每次渲染重复 filter+sort；现 alertsByMember 变化时单遍派生 Map）
+    interface MemberStat { chips: { label: string; n: number }[]; birthday: string | null; }
+    const memberStats = $derived.by(() => {
+        void version;
+        const map = new Map<string, MemberStat>();
+        for (const m of members) {
+            const alerts = alertsByMember.get(m.id) ?? [];
+            const byModule = new Map<string, number>();
+            for (const r of alerts) byModule.set(r.moduleId, (byModule.get(r.moduleId) ?? 0) + 1);
+            const chips = [...byModule.entries()]
+                .sort((a, b) => b[1] - a[1])
+                .slice(0, 3)
+                .map(([mid, n]) => ({ label: t(`module.${mid}`) !== `module.${mid}` ? t(`module.${mid}`) : mid, n }));
+            const hit = alerts
+                .filter((r) => r.ruleKey === "birthday" && r.daysLeft <= 30)
+                .sort((a, b) => a.daysLeft - b.daysLeft)[0];
+            let birthday: string | null = null;
+            if (hit) {
+                birthday = hit.daysLeft < 0
+                    ? t("days.overdue").replace("${n}", String(-hit.daysLeft))
+                    : hit.daysLeft === 0 ? t("days.today")
+                    : hit.daysLeft === 1 ? t("days.tomorrow")
+                    : t("days.after").replace("${n}", String(hit.daysLeft));
+            }
+            map.set(m.id, { chips, birthday });
+        }
+        return map;
+    });
+    const statsOf = (id: string): MemberStat => memberStats.get(id) ?? { chips: [], birthday: null };
     // C5b：卡片点击展开该成员提醒明细（含日期与动作）
     let expandedId = $state<string | null>(null);
     function toggleExpand(id: string) {
@@ -341,14 +354,15 @@
         {#if m.syncError}
             <div class="lv-caption" role="alert" style="color:var(--lv-danger)">⚠ {t("members.syncError")}: {m.syncError}</div>
         {/if}
-        {#if statChips(m.id).length > 0 || birthdaySoon(m.id)}
+        {#if statsOf(m.id).chips.length > 0 || statsOf(m.id).birthday}
+            {@const s = statsOf(m.id)}
             <div style="display:flex;gap:6px;flex-wrap:wrap;padding-top:6px">
-                {#each statChips(m.id) as c (c.label)}
+                {#each s.chips as c (c.label)}
                     <span class="b3-chip b3-chip--small b3-chip--secondary">{c.label} {c.n}</span>
                 {/each}
-                {#if birthdaySoon(m.id)}
-                    <!-- 17 组/215 波：生日倒计时 chip（数据来自提醒中枢既有派生，零新增扫描） -->
-                    <span class="b3-chip b3-chip--small" style="background:var(--lv-accent);color:var(--b3-theme-surface)">🎂 {birthdaySoon(m.id)}</span>
+                {#if s.birthday}
+                    <!-- 17 组/219 波：生日倒计时 chip（单遍预计算，数据来自提醒中枢既有派生） -->
+                    <span class="b3-chip b3-chip--small" style="background:var(--lv-accent);color:var(--b3-theme-surface)">🎂 {s.birthday}</span>
                 {/if}
             </div>
         {/if}
