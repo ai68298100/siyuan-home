@@ -286,9 +286,11 @@ export async function uploadAsset(file: File, assetsPath = "/assets/siyuan-home/
     return { name: entry[0], path: entry[1] };
 }
 
-/** 单元格写值（value 按列类型：{type:"text",text:{content}} / {type:"date",date:{content,isNotEmpty}} / {type:"relation",relation:{blockIDs}} …） */
+/** 单元格写值（value 按列类型：{type:"text",text:{content}} / {type:"date",date:{content,isNotEmpty}} / {type:"relation",relation:{blockIDs}} …）。
+ * 217 波：迁移到文档化公开端点 setAttributeViewBlockAttr（itemID=render row.id，D02 一致）——
+ * 此前用的 batchSetAttributeViewBlockAttrs 是未入文档的内部路由（无兼容性保证，上游 API.md 141 行明示）。 */
 export async function setCell(avID: string, keyID: string, itemID: string, value: unknown): Promise<void> {
-    await post("/api/av/batchSetAttributeViewBlockAttrs", { avID, values: [{ keyID, itemID, value }] });
+    await post("/api/av/setAttributeViewBlockAttr", { avID, keyID, itemID, value });
 }
 
 export interface AvRow {

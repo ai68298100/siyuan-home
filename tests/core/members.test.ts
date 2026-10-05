@@ -27,10 +27,10 @@ function fakeAv() {
                 // D02：响应直接携带新行 ID
                 return { code: 0, msg: "", data: { operations: [{ rowID: id }] } };
             }
-            case "/api/av/batchSetAttributeViewBlockAttrs": {
-                const v = payload.values[0];
-                if (failCellKey && v.keyID === failCellKey) return { code: 7, msg: "cell write failed" };
-                rows.get(v.itemID)![v.keyID] = v.value;
+            case "/api/av/setAttributeViewBlockAttr": {
+                // 217 波：单数文档化端点 { avID, keyID, itemID, value }（原 batch 的 values[0] 形状废弃）
+                if (failCellKey && payload.keyID === failCellKey) return { code: 7, msg: "cell write failed" };
+                rows.get(payload.itemID)![payload.keyID] = payload.value;
                 return { code: 0, msg: "", data: null };
             }
             case "/api/av/renderAttributeView":

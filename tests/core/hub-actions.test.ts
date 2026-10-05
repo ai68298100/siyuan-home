@@ -265,7 +265,7 @@ describe("H10 续期目标列分派", () => {
     it("next_pay 规则写 next_pay 列（缴费不改保障到期日）+ 续期流水留痕", async () => {
         const written: any[] = [];
         setTransport(async (endpoint: string, payload: any) => {
-            expect(endpoint).toBe("/api/av/batchSetAttributeViewBlockAttrs");
+            expect(endpoint).toBe("/api/av/setAttributeViewBlockAttr");
             written.push(payload);
             return { code: 0, msg: "", data: null };
         });
@@ -273,7 +273,7 @@ describe("H10 续期目标列分派", () => {
         const r = rem("row9::insurance.next_pay", "2026-10-05", "lead", "recurring", "insurance");
         const dbRef = { avId: "av-ins", columns: { next_pay: "k-nextpay", expiry: "k-expiry" } };
         await renew(plugin, r, "2026-11-05", dbRef, "next_pay");
-        expect(written[0].values[0].keyID).toBe("k-nextpay");
+        expect(written[0].keyID).toBe("k-nextpay"); // 217 波：单数端点 { avID, keyID, itemID, value }
         const rt: HubRuntime = JSON.parse(store["hub-runtime.json"]);
         expect(rt.renewHistory.row9).toEqual([{ from: "2026-10-05", to: "2026-11-05", at: expect.any(String) }]);
     });
