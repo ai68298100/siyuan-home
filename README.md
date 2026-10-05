@@ -10,7 +10,7 @@ Family archive · unified expiry reminder hub · household workspace
 
 **[⬇️ Download](https://github.com/ai68298100/siyuan-home/releases/latest)** · **[🗺 Roadmap](./ROADMAP.md)** · **[📖 中文文档](./README.zh-CN.md)**
 
-*Local-first · Zero telemetry · Data never locked in*
+*Local-first · No plugin-owned telemetry · Data stays in your SiYuan workspace*
 
 </div>
 
@@ -32,7 +32,7 @@ Certificates expire, medicine expires, insurance needs renewal, subscriptions au
 | 🛒 **Smart lists** | Shopping suggestions from low stock (editable, copy-to-clipboard), media update reminders, reciprocation reminders for received gifts |
 | 📊 **Check-in & exam integration** | Display study streaks and accuracy from 小驴考试, check-in strength summaries from 小驴打卡 |
 | 📤 **Data portability** | CSV export per module + bulk CSV import (column-mapping wizard), calendar (.ics) & contacts (.vcf) export, sanitized diagnostics bundle, settings JSON export/import with auto-backup, sample data generator |
-| 🔒 **Local-first** | Everything lives in your SiYuan workspace; no telemetry, no network calls; share the ledger notebook with your family |
+| 🔒 **Local-first** | Records live in your SiYuan workspace; the plugin has no author-owned server or telemetry. SiYuan sync, collaboration, backups and marketplace downloads remain host-controlled |
 | 🔗 **Native databases** | Ledgers are SiYuan attribute-view databases inside a dedicated notebook — open any ledger doc to edit, link or embed it in daily notes ("mom's passport" inside your journal) |
 | 🧩 **Modules on demand** | Disabled modules create no data and stay out of the UI; parenting/school only suggested when you have kids |
 | 🔌 **Ecosystem ready** | Block menu quick capture, statusbar badge, service bridge (`window.LvHome`), contacts picker via 小驴人脉 |
@@ -44,8 +44,11 @@ Certificates expire, medicine expires, insurance needs renewal, subscriptions au
 3. Enable the plugin → complete the 3-step onboarding (household → module picks → provisioning)
 4. Press `Ctrl+Alt+H` anytime to open the hub
 
-> Family sharing: share the ledger notebook via SiYuan collaboration — zero extra setup.
-> Privacy & FAQ: [privacy statement](./docs/privacy.md) · [FAQ](./docs/FAQ.md)
+> **Validation status:** core data paths have automated tests and live-kernel coverage. The six-stage real SiYuan UI batch, including Android WebView and accessibility checks, is still pending; marketplace submission remains paused. `icon.png` and `preview.png` are also pending replacement with production assets.
+>
+> Family sharing depends on SiYuan's collaboration, permissions, sync and conflict behavior. Test with non-sensitive data before sharing; this plugin does not provide a separate permission system.
+>
+> Privacy & FAQ: [privacy statement](https://github.com/ai68298100/siyuan-home/blob/main/docs/privacy.md) · [FAQ](https://github.com/ai68298100/siyuan-home/blob/main/docs/FAQ.md)
 
 ## 🧩 Module Overview (6 groups, 31 modules)
 
@@ -95,6 +98,8 @@ Full accounting · password vaults · official data integrations · real-time tr
 
 ## 🗺 Roadmap
 
+The current release is in a trust-and-validation phase: complete the real SiYuan UI batch, mobile/accessibility checks, recovery paths and production screenshots before marketplace submission. The next feature slice should optimize the five-minute path from a member to a first reminder and its source record. Pinyin search, webhooks, QR labels, AI and family collaboration remain an observation pool until host capability and user evidence are available.
+
 | Phase | Content |
 |---|---|
 | ✅ v0.3.0 (current) | 31 module ledgers · reminder hub · growth charts (WHO bands) · smart date parsing · bulk CSV import · .ics/.vcf export · member avatars & drag order · shopping suggestions & wish lists · sanitized diagnostics |
@@ -125,7 +130,7 @@ pnpm test         # unit tests (33)
 
 | Category | Docs |
 |---|---|
-| Usage | [FAQ](./docs/FAQ.md) · [Privacy](./docs/privacy.md) · [Migration](./docs/migration.md) · [Glossary](./docs/glossary.md) |
+| Usage | [FAQ](https://github.com/ai68298100/siyuan-home/blob/main/docs/FAQ.md) · [Privacy](https://github.com/ai68298100/siyuan-home/blob/main/docs/privacy.md) · [Migration](https://github.com/ai68298100/siyuan-home/blob/main/docs/migration.md) · [Glossary](https://github.com/ai68298100/siyuan-home/blob/main/docs/glossary.en.md) |
 | Design | [01 Architecture](./docs/design/01-架构总览.md) · [02 Data model](./docs/design/02-数据模型与模块规格.md) · [03 Reminder hub](./docs/design/03-提醒中枢.md) · [07 Visual language](./docs/design/07-视觉设计语言.md) · [Index](./docs/design/00-index.md) |
 | Interactive prototype | [prototype/index.html](./prototype/index.html) (open in browser — dark/light themes, 7 screens incl. style guide) |
 
