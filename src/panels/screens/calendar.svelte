@@ -6,12 +6,13 @@
     import { localDateKey } from "@/core/hub/rule";
     import { moduleIcon } from "@/core/modules";
 
-    let { items, t, version, onComplete, onAddMemo }: {
+    let { items, t, version, onComplete, onAddMemo, onConvert }: {
         items: Reminder[];
         t: (k: string) => string;
         version?: number;
         onComplete: (r: Reminder) => void;
         onAddMemo: (title: string, due: string) => void;
+        onConvert: (r: Reminder) => void;
     } = $props();
 
     const now = new Date();
@@ -138,6 +139,10 @@
                             <span class="lv-caption" style="display:block">{t(`module.${r.moduleId}`) !== `module.${r.moduleId}` ? t(`module.${r.moduleId}`) : r.moduleId}</span>
                         </div>
                         <span class="lv-badge {r.level === "overdue" ? "red" : r.level === "soon" ? "orange" : "yellow"}">{r.level === "overdue" ? t("level.overdue") : r.level === "soon" ? t("level.soon") : t("level.lead")}</span>
+                        {#if r.moduleId === "adhoc"}
+                            <!-- 241 波：备忘项同步提供分诊入口（与提醒中枢一致） -->
+                            <button class="b3-button b3-button--text" title={t("triage.title")} onclick={() => onConvert(r)}>{t("triage.title")}</button>
+                        {/if}
                         <button class="b3-button b3-button--text" onclick={() => onComplete(r)}>{t("act.done")}</button>
                     </div>
                 {/each}

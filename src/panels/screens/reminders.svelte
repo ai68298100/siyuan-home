@@ -407,7 +407,8 @@
 {:else if viewMode === "calendar"}
     <!-- 230 波：原生日历视图（数据同列表筛选口径；动作仅"完成"，其余回列表） -->
     <Calendar items={filtered} {t} {version} onComplete={(r: Reminder) => plugin.complete(r)}
-        onAddMemo={(title: string, due: string) => plugin.addMemo(title, due)} />
+        onAddMemo={(title: string, due: string) => plugin.addMemo(title, due)}
+        onConvert={(r: Reminder) => toLedgerDialog(r)} />
 {:else}
     {@const groups = filter === "all"
         ? [
