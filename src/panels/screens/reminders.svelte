@@ -4,6 +4,7 @@
     import { saveRuntime } from "@/core/hub/runtime";
     import { buildDisplay as display } from "@/core/hub/display";
     import { relativeDue, weekdayKey } from "@/core/hub/rule";
+    import { addDetachedRow, setCell } from "@/core/siyuan";
     import Calendar from "@/panels/screens/calendar.svelte";
     import { moduleIcon } from "@/core/modules";
     import type { Reminder } from "@/types";
@@ -209,6 +210,59 @@
     // 29 组：同成员同日多条合并为一条可展开卡；175 波 O(n) 分组、179 波抽纯函数（core/hub/display，带单测）
     // 181 波：DisplayEntry 平铺化（key/row/items 恒有值），模板无需联合收窄。
     const buildDisplay = (items: Reminder[]) => display(items);
+
+    // 236 波（收件箱分诊）：备忘 → 正式台账行。目标限已建库的非成员模块；
+    // 名称带入备忘标题、日期带入目标模块首个日期列；创建后完成备忘（可在"已处理"恢复）。
+    async function toLedgerDialog(r: Reminder) {
+        const targets = (plugin.settings.enabledModules ?? [])
+            .filter((id) => id !== "adhoc" && id !== "members")
+            .map((id) => ({ id, ref: plugin.settings.dbRefs[id] }))
+            .filter((x) => x.ref?.avId);
+        if (!targets.length) { showMessage(t("triage.noTarget"), 3500, "error"); return; }
+        const modLabel = (id: string) => (t(`module.${id}`) !== `module.${id}` ? t(`module.${id}`) : id);
+        const dlg = new Dialog({ title: t("triage.title"), content: `<div id="lv-triage" style="display:flex;flex-direction:column;gap:10px"></div>`, width: "460px" });
+        const box = dlg.element.querySelector("#lv-triage") as HTMLElement;
+        const row1 = document.createElement("div");
+        row1.style.cssText = "display:flex;gap:8px;align-items:center";
+        const l1 = document.createElement("span"); l1.className = "ft__on-surface"; l1.style.minWidth = "72px"; l1.textContent = t("triage.module");
+        const sel = document.createElement("select"); sel.className = "b3-select"; sel.style.flex = "1";
+        for (const x of targets) { const o = document.createElement("option"); o.value = x.id; o.textContent = modLabel(x.id); sel.append(o); }
+        row1.append(l1, sel);
+        const row2 = document.createElement("div");
+        row2.style.cssText = "display:flex;gap:8px;align-items:center";
+        const l2 = document.createElement("span"); l2.className = "ft__on-surface"; l2.style.minWidth = "72px"; l2.textContent = t("triage.name");
+        const nameInput = document.createElement("input"); nameInput.className = "b3-text-field"; nameInput.style.flex = "1"; nameInput.value = r.title;
+        row2.append(l2, nameInput);
+        const row3 = document.createElement("div");
+        row3.style.cssText = "display:flex;gap:8px;align-items:center";
+        const l3 = document.createElement("span"); l3.className = "ft__on-surface"; l3.style.minWidth = "72px"; l3.textContent = t("triage.due");
+        const dateInput = document.createElement("input"); dateInput.className = "b3-text-field"; dateInput.type = "date"; dateInput.value = r.dueDate;
+        row3.append(l3, dateInput);
+        const ok = document.createElement("button"); ok.className = "b3-button b3-button--text"; ok.textContent = t("triage.create");
+        const doCreate = async () => {
+            const title = nameInput.value.trim();
+            if (!title) return;
+            const mod = sel.value;
+            const ref = plugin.settings.dbRefs[mod];
+            if (!ref?.avId) { showMessage(t("triage.noTarget"), 3000, "error"); return; }
+            const itemID = await addDetachedRow(ref.avId, title);
+            const nameKey = ref.columns?.name;
+            if (nameKey) await setCell(ref.avId, nameKey, itemID, { type: "text", text: { content: title } });
+            // 日期写入目标模块首个 date 列（提醒规则字段因模块而异，先保"行有到期日"）
+            const dateCol = (plugin.schemaCatalog?.[mod]?.columns ?? []).find((c: any) => c.type === "date");
+            const dateKeyID = dateCol ? ref.columns?.[dateCol.key] : undefined;
+            if (dateKeyID && r.dueDate) {
+                await setCell(ref.avId, dateKeyID, itemID, { type: "date", date: { content: new Date(`${r.dueDate}T00:00:00`).getTime(), isNotEmpty: true, isNotTime: true } });
+            }
+            dlg.destroy();
+            showMessage(t("triage.done").replace("${mod}", modLabel(mod)), 4000, "info");
+            await plugin.complete(r);
+        };
+        ok.addEventListener("click", () => { ok.disabled = true; doCreate().finally(() => { ok.disabled = false; }); });
+        box.append(row1, row2, row3, ok);
+        nameInput.focus();
+    }
+
     let expandedMerges = $state<Set<string>>(new Set());
     function toggleMerge(key: string) {
         const next = new Set(expandedMerges);
@@ -267,6 +321,8 @@
             {#if r.moduleId === "adhoc"}
                 <!-- H03：备忘的显式删除（唯一物理删除路径；未处理项不自动清理） -->
                 <button class="b3-button b3-button--text" onclick={() => confirmDeleteMemo(r)}>{t("delete")}</button>
+                <!-- 240 波（收件箱分诊）：备忘 → 正式台账行 -->
+                <button class="b3-button b3-button--text" onclick={() => toLedgerDialog(r)}>{t("triage.title")}</button>
             {/if}
         </div>
     </div>
