@@ -1645,6 +1645,7 @@ exports[`31 模块 schema 契约快照（21 组） > 每个 schema 的结构快�
     "species",
     "vaccine_due",
     "deworm_due",
+    "cycle",
   ],
   "columns": [
     {
@@ -1676,6 +1677,18 @@ exports[`31 模块 schema 契约快照（21 组） > 每个 schema 的结构快�
       "key": "deworm_due",
       "labelKey": "field.deworm_due",
       "type": "date",
+    },
+    {
+      "key": "cycle",
+      "labelKey": "field.cycle",
+      "options": [
+        "day",
+        "week",
+        "month",
+        "quarter",
+        "year",
+      ],
+      "type": "select",
     },
     {
       "key": "note",

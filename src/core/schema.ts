@@ -501,9 +501,10 @@ export const PETS_SCHEMA: ModuleSchema = {
         { key: "breed", type: "text", labelKey: "field.breed" },
         { key: "vaccine_due", type: "date", labelKey: "field.vaccine_due" },
         { key: "deworm_due", type: "date", labelKey: "field.deworm_due" },
+        ...d("cycle"), // deworm recurring 的周期来源（缺失时规则按 oneoff 降级；旧库由补列续跑补齐）
         ...d("note"),
     ],
-    capture: ["name", "species", "vaccine_due", "deworm_due"],
+    capture: ["name", "species", "vaccine_due", "deworm_due", "cycle"],
     reminders: [
         { key: "vaccine", field: "vaccine_due", kind: "oneoff", leadDays: 14 },
         { key: "deworm", field: "deworm_due", kind: "recurring", leadDays: 7, cycleField: "cycle" },
