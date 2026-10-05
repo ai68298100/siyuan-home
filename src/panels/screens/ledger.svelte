@@ -1,5 +1,6 @@
 <script lang="ts">
     import { renderLedgerAll, addDetachedRow, setCell, RowIdentityPendingError } from "@/core/siyuan";
+    import { generateQRDataUrl, blockDeepLink } from "@/core/qr";
     import { buildShoppingList } from "@/core/shopping";
     import { AMOUNT_KEYS, formatAmount, optLabel, optLabelText } from "@/core/format";
     import { parseCsv } from "@/core/csv";
@@ -754,6 +755,32 @@
 
         addHistorySection();
         addAttachmentsSection();
+        // 26.6 QR 标签（路线图 QR 项，235 波接线）：扫码直达——行有绑定块用块深链，否则回退台账文档深链
+        addQrSection();
+
+        function addQrSection() {
+            const nameKey = ref?.columns?.name;
+            const nameVal = nameKey ? row.cells?.[nameKey] : undefined;
+            const blockId = nameVal?.type === "block" ? nameVal.block?.id : undefined;
+            const link = blockDeepLink(blockId || ref?.docId || "");
+            const wrap = document.createElement("div");
+            wrap.style.cssText = "border-top:1px solid var(--b3-border-color);margin-top:10px;padding-top:10px";
+            const head = document.createElement("p");
+            head.style.cssText = "font-size:12px;margin:0 0 6px;color:var(--b3-theme-on-surface)";
+            head.textContent = t("ledger.qrTitle");
+            const rowEl = document.createElement("div");
+            rowEl.style.cssText = "display:flex;gap:10px;align-items:center";
+            const img = document.createElement("img");
+            img.alt = "QR";
+            img.style.cssText = "width:96px;height:96px;border:1px solid var(--b3-border-color);border-radius:8px;padding:4px;background:#fff;flex-shrink:0";
+            const hint = document.createElement("span");
+            hint.style.cssText = "font-size:12px;color:var(--b3-theme-on-surface);flex:1";
+            hint.textContent = t("ledger.qrHint");
+            rowEl.append(img, hint);
+            wrap.append(head, rowEl);
+            body.appendChild(wrap);
+            generateQRDataUrl(link, 128).then((url) => { img.src = url; }).catch(() => { wrap.remove(); });
+        }
         // 各模块时间线分区（只读通道共用 rowlogs.json；估值=口径日覆盖，其余=追加去重）
         (async () => {
             const rl = await import("@/core/rowlog");
