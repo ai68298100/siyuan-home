@@ -18,8 +18,9 @@ jobs:
       - name: Install pnpm
         uses: pnpm/action-setup@v6
         with:
-          version: 11.4.0
           run_install: false
+        # 版本取自 package.json 的 packageManager（217 波 pnpm 12.5 升级后与硬编码 11.4.0 冲突——
+        # 该矛盾只在 tag push 引爆；action-setup v6 会校验两者一致）
 
       - name: Install Node.js
         uses: actions/setup-node@v7
