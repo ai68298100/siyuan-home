@@ -53,7 +53,7 @@
         }
         return list;
     });
-    const levelBadge: Record<string, string> = { overdue: "red", soon: "orange", lead: "yellow" };
+    // 225 波：行级级别徽章撤除（级别由色轨+右侧相对时间大字承载，避免重复）——levelBadge 随之移除
 
     // UG11 v1：提醒导出 .ics（当前筛选为范围；G1 同款——含高后果模块先点名确认）
     const HIGH_CONSEQUENCE_MODULES = new Set(["health", "parenting", "certs", "insurance", "assets-real", "assets-virtual", "contracts", "medicine", "schooling"]);
@@ -216,12 +216,17 @@
     function memberName(id: string): string {
         return (plugin.settings.members ?? []).find((m) => m.id === id)?.name ?? t("members.unassigned");
     }
-    // 17 组/186 波：相对到期短语（今天/明天/N 天后/逾期 N 天）；≥7 天沿用 ISO；完整日期走 title 悬浮
+    // 17 组/186 波：相对到期短语（今天/明天/N 天后/逾期 N 天）；完整日期走 title 悬浮 + 标题下方 meta 行
     function relDue(daysLeft: number, fallback: string): string {
         const rel = relativeDue(daysLeft);
-        if (!rel) return fallback;
+        if (!rel) {
+            // 225 波对齐原型：提醒中枢右侧 30 天内一律相对短语（扫描工作台视角）；
+            // 星期几仍只对 ≤6 天附注（205 波）；>30 天沿用 ISO（行下方已带完整日期）
+            if (daysLeft >= 7 && daysLeft <= 30) return t("days.after").replace("${n}", String(Math.floor(daysLeft)));
+            return fallback;
+        }
         const base = rel.n === undefined ? t(rel.key) : t(rel.key).replace("${n}", String(rel.n));
-        if (rel.key === "days.after") {
+        if (rel.key === "days.after" && daysLeft <= 6) {
             const wk = weekdayKey(fallback);
             if (wk) return `${base} · ${t(wk)}`; // 205 波：N 天后附星期几（原待办「下周三」半边的补齐）
         }
@@ -236,10 +241,14 @@
                 checked={selected.has(r.id)} onchange={() => toggleSelect(r.id)} style="flex-shrink:0" />
         {/if}
         <div class="lv-rem-ic">{r.moduleId === "adhoc" ? "📝" : moduleIcon(r.moduleId)}</div>
-                        <div class="lv-rem-t" title={(r.autoRenew ? `${t("hub.autoRenew")} · ` : "") + r.dueDate}><b>{r.title}{r.ruleKey === "reciprocate" ? ` · ${t("rule.reciprocate")}` : ""}</b><span class="lv-num">{relDue(r.daysLeft, r.dueDate)}{r.lunar ? " 🌙" : ""}{r.autoRenew ? " 🔄" : ""}</span></div>
-        <span class="lv-badge {levelBadge[r.level]}">
-            {r.level === "overdue" ? t("level.overdue") : r.level === "soon" ? t("level.soon") : t("level.lead")}
-        </span>
+        <div class="lv-rem-t" title={(r.autoRenew ? `${t("hub.autoRenew")} · ` : "") + r.dueDate}>
+            <b>{r.title}{r.ruleKey === "reciprocate" ? ` · ${t("rule.reciprocate")}` : ""}</b>
+            <span class="lv-num">{r.dueDate}{r.lunar ? " 🌙" : ""}{r.autoRenew ? " 🔄" : ""}</span>
+        </div>
+        <!-- 对齐原型：相对到期大字居右（颜色随级别；文字本身已承载逾期/N天后语义，级别徽章不再重复） -->
+        <div class="lv-rem-when">
+            <b class="lv-num" style="color:var(--lv-{r.level === 'overdue' ? 'danger' : r.level === 'soon' ? 'warn' : 'amber'})">{relDue(r.daysLeft, r.dueDate)}</b>
+        </div>
         <div class="lv-rem-ops">
             <button class="b3-button b3-button--text" onclick={() => plugin.complete(r)}>{t("act.done")}</button>
             {#if ["certs", "insurance", "contracts"].includes(r.moduleId)}

@@ -5,6 +5,7 @@
     import { newSiYuanId, renderLedgerAll, setCell, uploadAsset } from "@/core/siyuan";
     import type { HomePluginLike } from "@/types/plugin";
     import { saveRuntime } from "@/core/hub/runtime";
+    import { memberHue } from "@/core/format";
     import { openContactPicker, getContactsBridge } from "@/libs/contact-picker";
 
     let { plugin, t, version }: { plugin: HomePluginLike; t: (k: string) => string; version?: number } = $props();
@@ -124,6 +125,12 @@
         menu.addItem({ label: t("members.edit"), click: () => startEdit(m) });
         const docId = plugin.settings.dbRefs?.members?.docId;
         if (docId) menu.addItem({ label: t("members.openLedger"), click: () => plugin.showTabDocs(docId) });
+        // 225 波：头像上传/联系人绑定收入菜单（头行只留编辑，修复 230px 窄卡按钮挤爆姓名排版）
+        menu.addItem({ label: t("members.uploadAvatar"), click: () => pickAvatar(m) });
+        menu.addItem({
+            label: m.contactSnapshot ? t("members.contactUnlink") : t("members.contactLink"),
+            click: () => (m.contactSnapshot ? unlinkContact(m) : linkContact(m)),
+        });
         // 17 组/197 波：上移/下移（拖拽排序的键盘可达替代）
         const idx = members.findIndex((x) => x.id === m.id);
         menu.addItem({ label: t("members.moveUp"), disabled: idx <= 0, click: () => move(m, -1) });
@@ -325,7 +332,7 @@
             ondrop={(e: DragEvent) => void onDrop(m, e)}
             ondragend={() => { dragId = null; dragOverId = null; }}
             style={dragOverId === m.id && dragId !== m.id ? "outline:2px dashed var(--lv-accent);outline-offset:-2px" : ""}>
-        <div class="head" style="display:flex;gap:10px;align-items:center;cursor:pointer" role="button" tabindex="0"
+        <div class="head" style="display:flex;gap:12px;align-items:center;cursor:pointer" role="button" tabindex="0"
             onkeydown={(e: KeyboardEvent) => e.key === "Enter" && toggleExpand(m.id)}
             oncontextmenu={(e: MouseEvent) => { e.preventDefault(); cardMenu(m, e.clientX, e.clientY); }}
             ontouchstart={(e: TouchEvent) => cardTouchStart(m, e)}
@@ -335,21 +342,20 @@
             {#if avatars[m.id]}
                 <!-- 17 组/192 波：头像图（资产相对路径 → 内核 origin） -->
                 <img class="lv-avatar lg" src={new URL(avatars[m.id], location.origin).href}
-                    alt={m.name} style="width:40px;height:40px;object-fit:cover;flex-shrink:0" />
+                    alt={m.name} style="width:44px;height:44px;object-fit:cover;flex-shrink:0" />
             {:else}
-                <span class="lv-avatar lg" style="background:linear-gradient(135deg,var(--lv-accent),var(--lv-accent-2))">{m.name.slice(0, 1)}</span>
+                <!-- 225 波：个性化色相（id 哈希 → 稳定渐变），与总览 chips 同源 -->
+                <span class="lv-avatar lg" style="background:linear-gradient(135deg, hsl({memberHue(m.id)} 62% 52%), hsl({(memberHue(m.id) + 42) % 360} 62% 40%))">{m.name.slice(0, 1)}</span>
             {/if}
-            <div><b>{m.name}</b><div class="lv-caption">{t(`role.${m.role}`)}{m.lunarBirthday ? " 🌙" : ""} {m.birthday ?? ""}</div></div>
+            <div style="min-width:0">
+                <b style="font-size:14px">{m.name}</b>
+                <div class="lv-caption">{t(`role.${m.role}`)}{m.lunarBirthday ? " 🌙" : ""} {m.birthday ?? ""}</div>
+            </div>
             <span style="flex:1"></span>
-            {#if m.contactSnapshot}
-                <span class="lv-caption" style="max-width:140px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title={m.contactSnapshot}>📞 {m.contactSnapshot.split(" [")[0]}</span>
-                <button class="b3-button b3-button--text" onclick={(e) => { e.stopPropagation(); unlinkContact(m); }}>{t("members.contactUnlink")}</button>
-            {:else}
-                <button class="b3-button b3-button--text" onclick={(e) => { e.stopPropagation(); linkContact(m); }}>{t("members.contactLink")}</button>
-            {/if}
-            <button class="b3-button b3-button--text" title={t("members.uploadAvatar")} onclick={(e) => { e.stopPropagation(); pickAvatar(m); }}>📷</button>
+            <!-- 225 波：头行只留 编辑；联系人/头像/删除经右键菜单与展开区（窄卡不再挤压） -->
+            <button class="lv-iconbtn" title={t("members.uploadAvatar")} aria-label={t("members.uploadAvatar")}
+                onclick={(e) => { e.stopPropagation(); pickAvatar(m); }}>📷</button>
             <button class="b3-button b3-button--text" onclick={(e) => { e.stopPropagation(); startEdit(m); }}>{t("members.edit")}</button>
-            <button class="b3-button b3-button--text" onclick={(e) => { e.stopPropagation(); confirmRemove(m); }}>{t("delete")}</button>
         </div>
         {#if m.syncError}
             <div class="lv-caption" role="alert" style="color:var(--lv-danger)">⚠ {t("members.syncError")}: {m.syncError}</div>
@@ -372,7 +378,17 @@
         {#if expandedId === m.id}
             <div style="border-top:1px solid var(--lv-line);padding-top:10px;display:flex;flex-direction:column;gap:6px">
                 {#if m.contactSnapshot}
-                    <span class="lv-caption">📞 {t("field.contact")}: {m.contactSnapshot}</span>
+                    <div style="display:flex;gap:8px;align-items:center">
+                        <span class="lv-caption" style="min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title={m.contactSnapshot}>📞 {t("field.contact")}: {m.contactSnapshot.split(" [")[0]}</span>
+                        <span style="flex:1"></span>
+                        <button class="b3-button b3-button--text" onclick={() => unlinkContact(m)}>{t("members.contactUnlink")}</button>
+                    </div>
+                {:else}
+                    <div style="display:flex;gap:8px;align-items:center">
+                        <span class="lv-caption">{t("members.contactLink")}</span>
+                        <span style="flex:1"></span>
+                        <button class="b3-button b3-button--text" onclick={() => linkContact(m)}>{t("members.contactLink")}</button>
+                    </div>
                 {/if}
                 {#if alertsFor(m.id).length === 0}
                     <span class="lv-caption">{t("dash.allClear")}</span>

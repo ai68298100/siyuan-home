@@ -16,6 +16,11 @@
     const initialScreen = (plugin.pendingScreen as ScreenId | undefined) ?? "overview";
     if (plugin.pendingScreen) plugin.pendingScreen = undefined;
     let screen: ScreenId = $state(initialScreen);
+    // 提醒页签待办红点（version 驱动重算，随扫描更新）
+    const pendingTotal = $derived.by(() => {
+        void version;
+        return plugin.scan?.reminders?.length ?? plugin.runtime?.cache?.reminders?.length ?? 0;
+    });
     const screens: { id: ScreenId; key: string }[] = [
         { id: "overview", key: "tab.overview" },
         { id: "reminders", key: "tab.reminders" },
@@ -53,12 +58,19 @@
 
 <div class="lv-home lv-tab">
     <header class="lv-tabbar">
-        <b class="lv-tabbar__title">🏠 {t("butler")}</b>
+        <div class="lv-appbrand">
+            <span class="lv-logo" aria-hidden="true">🏠</span>
+            <div class="lv-appbrand-t">
+                <b>{t("butler")}</b>
+                <span>LV HOME</span>
+            </div>
+        </div>
         <nav class="lv-tabs" bind:this={navEl} style="position:relative">
             <span class="lv-nav-pill" style="transform:translateX({pill.x}px);width:{pill.w}px"></span>
             {#each screens as s (s.id)}
                 <button data-s={s.id} class="lv-tabs__item" class:on={screen === s.id} aria-current={screen === s.id ? "page" : undefined} onclick={() => (screen = s.id)}>
                     {t(s.key)}
+                    {#if s.id === "reminders" && pendingTotal > 0}<i class="lv-dot" aria-hidden="true"></i>{/if}
                 </button>
             {/each}
         </nav>

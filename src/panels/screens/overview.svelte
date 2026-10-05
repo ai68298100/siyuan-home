@@ -5,6 +5,7 @@
     import { saveRuntime } from "@/core/hub/runtime";
     import { localDateKey } from "@/core/hub/rule";
     import { parseNaturalDate } from "@/core/dateparse";
+    import { memberHue } from "@/core/format";
     import { showMessage } from "siyuan";
     import { moduleIcon as icons } from "@/core/modules";
 
@@ -73,6 +74,13 @@
     });
     const scopeLabel = $derived(memberFilter ? (members.find((m) => m.id === memberFilter)?.name ?? "?") : t("dash.scopeAll"));
 
+    // 对齐原型 hero：按本地时段问候 + 日期·快照说明行（纯展示，随挂载取值）
+    const greet = $derived.by(() => {
+        const h = new Date().getHours();
+        return h < 11 ? t("dash.greet.morning") : h < 18 ? t("dash.greet.afternoon") : t("dash.greet.evening");
+    });
+    const dateLine = $derived(`${new Date().toLocaleDateString([], { month: "long", day: "numeric", weekday: "long" })} · ${t("dash.stripSnapshot")} ${snapshotLabel}`);
+
     // 17 组/196 波：统计卡下钻——待办徽章点击 → 提醒页并预筛选该模块（runtime.hubModuleId 为提醒页筛选持久态）
     function drillReminders(mid: string) {
         plugin.runtime.hubModuleId = mid;
@@ -117,7 +125,7 @@
 </div>
 
 <div class="lv-hero">
-    <div><h1>{t("dash.hello")}</h1><p>{t("dash.sub")}</p></div>
+    <div><h1>{greet}</h1><p>{dateLine}</p></div>
     <div class="lv-hero-count" title={t("dash.statScope").replace("${t}", snapshotLabel)}>
         <b class="lv-num">{reminders.length}</b><span>{t("dash.needAttention")}</span>
         {#if monthlyDone > 0}
@@ -148,7 +156,7 @@
     <button class="lv-chip {!memberFilter ? 'on' : ''}" aria-pressed={!memberFilter} onclick={() => setMemberFilter(undefined)}>{t("members.all")}</button>
     {#each members as m (m.id)}
         <button class="lv-chip {memberFilter === m.id ? 'on' : ''}" aria-pressed={memberFilter === m.id} onclick={() => setMemberFilter(m.id)}>
-            <span class="lv-avatar" aria-hidden="true" style="background:linear-gradient(135deg,var(--lv-accent),var(--lv-accent-2))">{m.name.slice(0, 1)}</span>{m.name}
+            <span class="lv-avatar" aria-hidden="true" style="background:linear-gradient(135deg, hsl({memberHue(m.id)} 62% 52%), hsl({(memberHue(m.id) + 42) % 360} 62% 40%))">{m.name.slice(0, 1)}</span>{m.name}
         </button>
     {/each}
     <button class="lv-chip" onclick={() => onGoto("members")}>＋</button>

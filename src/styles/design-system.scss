@@ -35,19 +35,23 @@
   --lv-ok-soft: var(--b3-card-success-background);
   --lv-inset: rgba(255, 255, 255, .05);
   --lv-aura: color-mix(in srgb, var(--b3-theme-primary) 7%, transparent);
-  --lv-shadow-1: 0 1px 2px rgba(0, 0, 0, .18);
-  --lv-shadow-2: 0 8px 28px rgba(0, 0, 0, .22), 0 2px 8px rgba(0, 0, 0, .14);
+  --lv-shadow-1: 0 1px 2px rgba(0, 0, 0, .16), 0 1px 6px rgba(0, 0, 0, .06);
+  --lv-shadow-2: 0 8px 28px rgba(0, 0, 0, .20), 0 2px 8px rgba(0, 0, 0, .12);
   --lv-shadow-3: 0 24px 64px rgba(0, 0, 0, .30), 0 6px 16px rgba(0, 0, 0, .20);
   --lv-z-topbar: 50; --lv-z-mask: 90; --lv-z-drawer: 100; --lv-z-modal: 110;
 
   position: relative;
   color: var(--lv-tx);
 
-  // 容器顶部环境辉光（胶片颗粒仅 Tab 全高容器启用，见 08 §7）
+  // 容器顶部环境辉光（对齐原型 ambient 光层：主色晕 + 顶部高光带，胶片颗粒仅 Tab 全高容器启用，见 08 §7）
   &::before {
-    content: ""; position: absolute; top: -120px; left: 50%; transform: translateX(-50%);
-    width: 720px; height: 380px; border-radius: 50%; pointer-events: none;
+    content: ""; position: absolute; top: -160px; left: 50%; transform: translateX(-50%);
+    width: 980px; height: 460px; border-radius: 50%; pointer-events: none;
     background: radial-gradient(closest-side, var(--lv-aura), transparent 72%);
+  }
+  &::after {
+    content: ""; position: absolute; top: 0; left: 0; right: 0; height: 1px; pointer-events: none;
+    background: linear-gradient(90deg, transparent, var(--lv-line-strong) 30%, var(--lv-line-strong) 70%, transparent);
   }
 
   ::selection { background: var(--lv-accent-soft); }
@@ -62,8 +66,17 @@
   .lv-mono { font-family: var(--b3-font-family-code); font-size: .86em; letter-spacing: .01em; }
 
   // ── 3. 页头与节奏 ───────────────────────────────────────
-  .lv-tabbar { display: flex; align-items: center; gap: 14px; padding: 10px 2px; margin-bottom: 8px;
-    border-bottom: 1px solid var(--lv-line); }
+  // 对齐原型：页头为悬浮应用条（品牌区 + 胶囊页签 + 元信息），不再是分隔线模式
+  .lv-tabbar { display: flex; align-items: center; gap: 14px; padding: 10px 14px; margin-bottom: 16px;
+    background: var(--b3-theme-surface); border: 1px solid var(--lv-line); border-radius: var(--lv-r-3);
+    box-shadow: var(--lv-shadow-1), inset 0 1px 0 var(--lv-inset); }
+  .lv-appbrand { display: flex; align-items: center; gap: 10px; flex: none; }
+  .lv-logo { width: 34px; height: 34px; border-radius: 10px; display: grid; place-items: center; font-size: 17px;
+    background: linear-gradient(135deg, var(--lv-accent), var(--lv-accent-2)); color: #fff;
+    box-shadow: 0 2px 10px var(--lv-accent-soft), inset 0 1px 0 rgba(255, 255, 255, .3); }
+  .lv-appbrand-t { display: flex; flex-direction: column; line-height: 1.18;
+    b { font-size: 14px; font-weight: 600; letter-spacing: -.01em; }
+    span { font-size: 9.5px; font-weight: 600; letter-spacing: .16em; color: var(--lv-tx-3); } }
   .lv-tabbar__title { font-size: 15px; font-weight: 600; }
   .lv-tabbar__meta { display: flex; gap: 6px; align-items: center; }
   .lv-tabs { display: flex; gap: 2px; background: var(--lv-surface-2); border: 1px solid var(--lv-line);
@@ -71,30 +84,41 @@
   .lv-nav-pill { position: absolute; top: 3px; left: 0; height: calc(100% - 6px); border-radius: 999px;
     background: var(--b3-theme-surface); box-shadow: var(--lv-shadow-1), inset 0 1px 0 var(--lv-inset);
     transition: transform var(--lv-t-sheet) var(--lv-spring), width var(--lv-t-sheet) var(--lv-spring); z-index: 0; }
-  .lv-tabs__item { position: relative; z-index: 1; padding: 5px 14px; border-radius: 999px; font-size: 13px;
+  .lv-tabs__item { position: relative; z-index: 1; padding: 6px 15px; border-radius: 999px; font-size: 13px;
     color: var(--lv-tx-2); background: none; border: none; cursor: pointer; transition: color var(--lv-t-med) var(--lv-ease);
-    &:hover { color: var(--lv-tx); } &.on { color: var(--lv-tx); font-weight: 500; } }
-  .lv-people { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 12px; }
+    &:hover { color: var(--lv-tx); } &.on { color: var(--lv-tx); font-weight: 600; }
+    // 待办红点（提醒页签，扫描计数 > 0 时出现）
+    .lv-dot { position: absolute; top: 5px; right: 7px; width: 6px; height: 6px; border-radius: 50%;
+      background: var(--lv-danger); box-shadow: 0 0 0 3px var(--lv-danger-soft); } }
+  .lv-people { display: grid; grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); gap: 14px; }
   /* 171 波（对齐原型质感，不低于）：context-strip 状态条 + focus-row 三重点卡 */
-  .lv-strip { display: flex; flex-wrap: wrap; gap: 4px 18px; margin: 14px 2px 0; padding: 6px 10px;
-    border: 1px solid var(--lv-line); border-radius: 10px; font-size: 12px; color: var(--lv-tx-3);
+  .lv-strip { display: flex; flex-wrap: wrap; gap: 4px 18px; align-items: center; margin: 0 2px;
+    padding: 8px 14px; border: 1px solid var(--lv-line); border-radius: var(--lv-r-2); font-size: 12px;
+    color: var(--lv-tx-3); background: color-mix(in srgb, var(--lv-surface-2) 55%, transparent);
     strong { color: var(--lv-tx-2); font-weight: 500; margin-right: 4px; } }
-  .lv-focus { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin: 14px 2px 2px; }
-  .lv-focus-card { display: flex; align-items: center; gap: 10px; padding: 12px 14px;
-    border: 1px solid var(--lv-line); border-radius: 12px; background: var(--b3-theme-background);
-    .lv-focus-icon { font-size: 18px; color: var(--lv-accent); }
+  .lv-focus { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin: 14px 2px 2px; }
+  .lv-focus-card { display: flex; align-items: center; gap: 12px; padding: 14px 16px;
+    border: 1px solid var(--lv-line); border-radius: var(--lv-r-3); background: var(--b3-theme-surface);
+    box-shadow: var(--lv-shadow-1), inset 0 1px 0 var(--lv-inset);
+    transition: transform var(--lv-t-med) var(--lv-ease), box-shadow var(--lv-t-med) var(--lv-ease),
+        border-color var(--lv-t-med) var(--lv-ease);
+    &:hover { transform: translateY(-2px); box-shadow: var(--lv-shadow-2), inset 0 1px 0 var(--lv-inset);
+      border-color: var(--lv-line-strong); }
+    .lv-focus-icon { width: 36px; height: 36px; border-radius: 11px; display: grid; place-items: center;
+      flex: none; font-size: 17px; color: var(--lv-accent); background: var(--lv-accent-soft);
+      border: 1px solid var(--lv-accent-line); }
     div { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px;
-      b { font-size: 13px; font-weight: 600; }
+      b { font-size: 13.5px; font-weight: 600; }
       span { font-size: 11.5px; color: var(--lv-tx-3); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; } }
     .b3-button { flex-shrink: 0; font-size: 12px; padding: 4px 8px; } }
   @media (max-width: 640px) {
     .lv-focus { grid-template-columns: 1fr; }
   }
-  .lv-hero { display: flex; align-items: flex-end; gap: 16px; margin: 10px 2px 4px; flex-wrap: wrap;
-    h1 { font-size: 26px; font-weight: 600; letter-spacing: -.02em; }
-    p { color: var(--lv-tx-3); font-size: 13px; margin-top: 2px; }
+  .lv-hero { display: flex; align-items: flex-end; gap: 16px; margin: 20px 2px 8px; flex-wrap: wrap;
+    h1 { font-size: 30px; font-weight: 700; letter-spacing: -.02em; }
+    p { color: var(--lv-tx-3); font-size: 12.5px; margin-top: 5px; }
     .lv-hero-count { margin-left: auto; display: flex; align-items: baseline; gap: 8px;
-      b { font-size: 32px; font-weight: 600; letter-spacing: -.03em; }
+      b { font-size: 46px; font-weight: 700; letter-spacing: -.04em; }
       span { color: var(--lv-tx-3); font-size: 12.5px; } }
   }
   .lv-sec { display: flex; align-items: baseline; gap: 10px; margin: 26px 2px 12px;
@@ -158,20 +182,20 @@
 
   // ── 7. 提醒行（色轨四级）───────────────────────────────
   .lv-rems { display: flex; flex-direction: column; overflow: hidden; border-radius: var(--lv-r-3); }
-  .lv-rem { display: flex; align-items: center; gap: 14px; padding: 13px 18px 13px 14px; position: relative;
+  .lv-rem { display: flex; align-items: center; gap: 14px; padding: 14px 18px 14px 16px; position: relative;
     border-bottom: 1px solid var(--lv-line); transition: background var(--lv-t-fast) var(--lv-ease);
     &:last-child { border-bottom: none; }
-    &::before { content: ""; position: absolute; left: 0; top: 10px; bottom: 10px; width: 3px;
+    &::before { content: ""; position: absolute; left: 0; top: 12px; bottom: 12px; width: 3px;
       border-radius: 3px; background: var(--lv-line); transition: box-shadow var(--lv-t-med) var(--lv-ease); }
     &:hover { background: var(--lv-surface-2); }
-    .lv-rem-ic { width: 34px; height: 34px; border-radius: 10px; display: grid; place-items: center;
-      flex: none; font-size: 15px; background: var(--lv-surface-2); border: 1px solid var(--lv-line);
+    .lv-rem-ic { width: 36px; height: 36px; border-radius: 11px; display: grid; place-items: center;
+      flex: none; font-size: 16px; background: var(--lv-surface-2); border: 1px solid var(--lv-line);
       box-shadow: inset 0 1px 0 var(--lv-inset); }
     .lv-rem-t { min-width: 0; b { font-weight: 500; font-size: 13.5px; display: block;
         white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
       span { font-size: 12px; color: var(--lv-tx-3); } }
     .lv-rem-when { margin-left: auto; text-align: right; flex: none;
-      b { font-size: 13px; font-weight: 600; display: block; }
+      b { font-size: 15px; font-weight: 700; display: block; letter-spacing: -.01em; }
       span { font-size: 11.5px; color: var(--lv-tx-3); } }
     .lv-rem-ops { display: flex; gap: 4px; flex: none; opacity: 0; transform: translateX(6px);
       transition: all var(--lv-t-med) var(--lv-ease); }
@@ -307,7 +331,8 @@
     .qi { width: 22px; height: 22px; border-radius: 7px; display: grid; place-items: center; font-size: 12px;
       background: var(--lv-surface-2);
       box-shadow: inset 0 -1px 2px rgba(0, 0, 0, .14), inset 0 1px 0 var(--lv-inset); } }
-  .lv-members { display: flex; gap: 8px; flex-wrap: wrap; }
+  .lv-members { display: flex; gap: 8px; flex-wrap: wrap;
+    .lv-avatar { width: 22px; height: 22px; font-size: 11px; } }
 
   // ── 14. 入场编排 / 动效降级 / 响应式 ───────────────────
   @keyframes lv-rise { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: none; } }

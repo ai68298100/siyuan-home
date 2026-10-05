@@ -29,3 +29,10 @@ export function optLabelText(t: (k: string) => string, colKey: string, joined: s
     if (!joined || joined === "—") return joined;
     return joined.split("、").map((x) => optLabel(t, colKey, x)).join("、");
 }
+
+/** 成员头像稳定色相（0-359）：id 哈希 → 同一成员恒定色相（总览 chips / 成员卡共用） */
+export function memberHue(id: string): number {
+    let h = 0;
+    for (let i = 0; i < id.length; i++) h = (h * 31 + id.charCodeAt(i)) % 360;
+    return h;
+}
