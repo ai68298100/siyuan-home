@@ -122,8 +122,10 @@ export default defineConfig(buildTarget === "kernel" ? {
 
             output: {
                 entryFileNames: "[name].js",
-                // 动态 chunk（如农历懒加载）强制 .js，避免 .cjs 后缀在插件加载器下的 MIME 问题
-                chunkFileNames: "chunks/[name]-[hash].js",
+                // 禁止分包（含农历等动态 import 一并内联）：思源前端用 window.eval 评估插件 JS，
+                // require 桩把相对路径交给 Electron window.require（以思源 app 根为基准），
+                // require("./chunks/...") 必然 MODULE_NOT_FOUND → onload 前即失败 → 全部入口消失（v0.3.0 教训）
+                inlineDynamicImports: true,
                 assetFileNames: (assetInfo) => assetInfo.name ?? "asset",
             },
         },

@@ -17,6 +17,7 @@
     "check:meta": "node scripts/check-meta.mjs",
     "check:audit": "pnpm audit --prod --audit-level moderate",
     "smoke": "node scripts/smoke-test.mjs",
+    "verify:loader": "node scripts/verify-loader-semantics.mjs",
     "dev:app": "cross-env NODE_ENV=development VITE_SOURCEMAP=inline VITE_BUILD_TARGET=app vite build --watch",
     "dev:kernel": "cross-env NODE_ENV=development VITE_SOURCEMAP=inline VITE_BUILD_TARGET=kernel vite build --watch",
     "check": "run-s check:types check:svelte check:i18n check:meta check:audit",

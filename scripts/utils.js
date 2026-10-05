@@ -16,9 +16,10 @@ import readline from 'node:readline';
 export const log = (info) => console.log(`\x1B[36m%s\x1B[0m`, info);
 export const error = (info) => console.log(`\x1B[31m%s\x1B[0m`, info);
 
-// HTTP POST headers
+// HTTP POST headers（内核开启访问鉴权时，用 SIYUAN_TOKEN 环境变量携带令牌）
 export const POST_HEADER = {
     "Content-Type": "application/json",
+    ...(process.env.SIYUAN_TOKEN ? { "Authorization": `Token ${process.env.SIYUAN_TOKEN}` } : {}),
 };
 
 // Fetch function compatible with older Node.js versions
