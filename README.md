@@ -102,7 +102,7 @@ The current release is in a trust-and-validation phase: complete the real SiYuan
 
 | Phase | Content |
 |---|---|
-| ✅ v0.3.5 (current) | 31 module ledgers · reminder hub (list + calendar views) · growth charts (WHO bands) · smart date parsing · pinyin search · QR labels · Webhook push (Bark/ntfy) · bulk CSV import · .ics/.vcf export · member avatars & drag order · mobile entry · sanitized diagnostics |
+| ✅ v0.3.6 (current) | 31 module ledgers · reminder hub (list + calendar views) · growth charts (WHO bands) · smart date parsing · pinyin search · QR labels · Webhook push (Bark/ntfy) · bulk CSV import · .ics/.vcf export · member avatars & drag order · mobile entry · sanitized diagnostics |
 | 🔜 Next | Task workbench, evidence center, inbox, health recovery |
 | 🔭 Later | Family collaboration, template packs, yearly family report, AI capabilities |
 
