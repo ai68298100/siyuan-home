@@ -1,4 +1,4 @@
-import { Plugin, showMessage, openTab, Custom } from "siyuan";
+import { Plugin, showMessage, openTab, Custom, Dialog, getFrontend } from "siyuan";
 import { mount, unmount } from "svelte";
 import "./index.scss";
 
@@ -58,6 +58,12 @@ export default class LvHomePlugin extends Plugin {
     private speedSwitchRetry?: number;
     /** EC17：家庭摘要模块 disposer */
     private homeModuleDisposer?: (() => void) | undefined;
+    /** DEVICE-07（227 波）：移动前端标识与顶栏入口（petal addTopBar 在移动端不渲染，参照 checkin 直接注入 #mobileTopBar） */
+    private isMobileFrontend = false;
+    private mobileTopBarBtn?: HTMLElement;
+    private mobileTopBarRetry?: number;
+    private mobileDialog?: Dialog;
+    private mobileDialogUnmount?: () => void;
     /** PF13/15 组：可见性恢复补扫（休眠错过心跳的场景）；10 分钟最小间隔合并重复触发 */
     private visibilityHandler?: () => void;
     private lastScanAt = 0;
@@ -82,6 +88,16 @@ export default class LvHomePlugin extends Plugin {
         const self = this;
         this.settings = await loadSettings(this);
         this.runtime = await loadRuntime(this);
+
+        // DEVICE-07（227 波）：移动前端标识 + 顶栏入口注入（petal addTopBar 在移动端不渲染；
+        // 参照 checkin ensureMobileTopBarButtonFor 的注入+重试方案，点击弹全屏 Dialog 面板）
+        this.isMobileFrontend = getFrontend() === "mobile" || getFrontend() === "browser-mobile";
+        if (this.isMobileFrontend) {
+            this.addIcons(`<symbol id="iconLvHomeApp" viewBox="0 0 32 32">
+                <path d="M5 14 16 4l11 10v13a1.5 1.5 0 0 1-1.5 1.5h-6V20h-7v8.5h-6A1.5 1.5 0 0 1 5 27V14Z" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linejoin="round"/>
+            </symbol>`);
+            this.ensureMobileTopBarButton();
+        }
 
         // Tab 面板：init 时挂载 Svelte，destroy 时卸载（同一 Tab 可多次打开）
         const unmounts = new WeakMap<Element, () => void>();
@@ -531,6 +547,64 @@ export default class LvHomePlugin extends Plugin {
         });
     }
 
+    /** 移动前端顶栏入口（DEVICE-07）：petal addTopBar 在移动端不渲染，直接注入 #mobileTopBar；
+     *  顶栏未就绪时 800ms 重试（参照 checkin ensureMobileTopBarButtonFor）。
+     *  227 波实测两处坑：① 移动工具栏在插件 onload 之后异步重建，会吞掉先注入的按钮 → 启动后
+     *  30s 内轻量自查重挂；② 不得回退挂 #toolbar（桌面元素，移动端隐藏且先于 mobileTopBar 出现）。 */
+    private ensureMobileTopBarButton() {
+        if (!this.isMobileFrontend) return;
+        const topBar = document.getElementById("mobileTopBar");
+        if (!topBar) {
+            this.mobileTopBarRetry = window.setTimeout(() => {
+                this.mobileTopBarRetry = undefined;
+                this.ensureMobileTopBarButton();
+            }, 800);
+            return;
+        }
+        if (this.mobileTopBarBtn?.isConnected || topBar.querySelector("#lvHomeMobileTopBarButton")) return;
+        const button = document.createElement("button");
+        button.type = "button";
+        button.id = "lvHomeMobileTopBarButton";
+        button.className = "toolbar__button";
+        const label = this.i18nText("entry.mobile");
+        button.setAttribute("aria-label", label);
+        button.setAttribute("title", label);
+        button.innerHTML = `<svg aria-hidden="true"><use xlink:href="#iconLvHomeApp"></use></svg>`;
+        button.addEventListener("click", () => this.openMobilePanel());
+        topBar.appendChild(button);
+        this.mobileTopBarBtn = button;
+        for (const delay of [1500, 4000, 10000, 20000, 30000]) {
+            window.setTimeout(() => this.ensureMobileTopBarButton(), delay);
+        }
+    }
+
+    /** 移动端面板：全屏 Dialog 承载同一 TabPanel（移动端自定义页签不可达，fail-closed 走弹层）。 */
+    private openMobilePanel() {
+        if (this.mobileDialog) {
+            this.mobileDialog.destroy();
+            return;
+        }
+        const self = this;
+        const dialog = new Dialog({
+            title: this.i18nText("butler"),
+            content: `<div class="lv-mobile-host"></div>`,
+            width: "100vw",
+            height: "100dvh",
+            destroyCallback: () => {
+                if (self.mobileDialogUnmount) {
+                    try { self.mobileDialogUnmount(); } catch { /* 已卸载 */ }
+                    self.mobileDialogUnmount = undefined;
+                }
+                if (self.mobileDialog === dialog) self.mobileDialog = undefined;
+            },
+        });
+        const host = dialog.element.querySelector(".lv-mobile-host") as HTMLElement;
+        // 全屏化样式钩子（100vw/100dvh、无圆角、内容滚动）
+        dialog.element.classList.add("b3-dialog--lvmobile");
+        this.mobileDialogUnmount = mount(TabPanel, { target: host, props: { plugin: self } }) as () => void;
+        this.mobileDialog = dialog;
+    }
+
     /** 打开台账文档（R5 降级定位） */
     showTabDocs(docId?: string) {
         const docId0 = docId ?? this.settings.dbRefs[this.activeLedger]?.docId;
@@ -622,6 +696,17 @@ export default class LvHomePlugin extends Plugin {
     onunload() {
         if (this.heartbeat) window.clearInterval(this.heartbeat);
         this.heartbeat = undefined;
+        // DEVICE-07：移动顶栏按钮/重试计时器/全屏面板清理
+        if (this.mobileTopBarRetry !== undefined) {
+            window.clearTimeout(this.mobileTopBarRetry);
+            this.mobileTopBarRetry = undefined;
+        }
+        this.mobileTopBarBtn?.remove();
+        this.mobileTopBarBtn = undefined;
+        if (this.mobileDialog) {
+            try { this.mobileDialog.destroy(); } catch { /* 已销毁 */ }
+            this.mobileDialog = undefined;
+        }
         // 18 组清理审计：面板 destroy 时自行移除 listener，此处兜底清空；
         // scanSeq 自增使在途扫描结果失效（H11：卸载后不落盘/不通知/不更新 UI）；
         // 块菜单监听与状态栏角标解绑/移除；可见性补扫解绑；ws 补扫解绑

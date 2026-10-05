@@ -110,3 +110,30 @@
         font-size: 1.2rem;
     }
 }
+
+// DEVICE-07（227 波）：移动端全屏面板 Dialog——顶栏按钮点击后以整屏弹层承载同一 TabPanel
+.lv-mobile-host {
+    height: 100%;
+    overflow: auto;
+    -webkit-overflow-scrolling: touch;
+}
+
+.b3-dialog--lvmobile {
+    .b3-dialog__scrim { background: var(--b3-theme-background); }
+    .b3-dialog__container {
+        width: 100vw !important;
+        height: 100dvh !important;
+        max-width: none !important;
+        max-height: none !important;
+        right: 0 !important;
+        bottom: 0 !important;
+        border-radius: 0 !important;
+        display: flex;
+        flex-direction: column;
+        .b3-dialog__content {
+            flex: 1;
+            overflow: auto;
+            padding: 0 10px 12px;
+        }
+    }
+}
