@@ -1,5 +1,5 @@
 <script lang="ts">
-    import { renderLedger, renderLedgerAll, addDetachedRow, setCell, RowIdentityPendingError } from "@/core/siyuan";
+    import { renderLedgerAll, addDetachedRow, setCell, RowIdentityPendingError } from "@/core/siyuan";
     import { buildShoppingList } from "@/core/shopping";
     import { AMOUNT_KEYS, formatAmount, optLabel, optLabelText } from "@/core/format";
     import { parseCsv } from "@/core/csv";
@@ -9,6 +9,7 @@
     import { showMessage, Dialog, confirm } from "siyuan";
     import type { HomePluginLike } from "@/types/plugin";
     import { saveRuntime } from "@/core/hub/runtime";
+    import { ensurePinyin, pinyinReady, searchMatch } from "@/core/pinyin";
     import { openContactPicker } from "@/libs/contact-picker";
 
     let { plugin, t, version }: { plugin: HomePluginLike; t: (k: string) => string; version?: number } = $props();
@@ -27,8 +28,15 @@
     let avCols: any[] = $state([]);
     let loading = $state(false);
     let rebuilding = $state(false);
-    // 17 组：台账内搜索（标题/备注 contains，与成员过滤不叠加——本页无成员过滤）
+    // 17 组：台账内搜索（标题/备注 contains + 拼音全拼/首字母，与成员过滤不叠加——本页无成员过滤）
     let searchText = $state("");
+    // 提案 C（227 波）：拼音字典懒加载，就绪后 pyTick 驱动筛选重算（一次性）
+    let pyTick = $state(0);
+    $effect(() => {
+        ensurePinyin().then(() => {
+            if (pinyinReady()) pyTick += 1;
+        });
+    });
     // 17 组：排序偏好记忆（表头点击切换列/方向，跨会话持久化）
     // svelte-ignore state_referenced_locally
     let sortKey = $state<string>(plugin.runtime.ledgerSortKey ?? "");
@@ -45,10 +53,12 @@
         const q = searchText.trim().toLowerCase();
         let list = rows;
         if (q) {
+            // 提案 C（227 波）：拼音检索——全拼/首字母；字典懒加载完成后 pyTick 驱动重算
+            void pyTick;
             list = list.filter((r) => {
                 const nameCol = ref?.columns?.name ? (r.cells[ref.columns.name]?.text?.content ?? r.cells[ref.columns.name]?.block?.content ?? "") : "";
                 const noteCol = ref?.columns?.note ? (r.cells[ref.columns.note]?.text?.content ?? "") : "";
-                return nameCol.toLowerCase().includes(q) || noteCol.toLowerCase().includes(q);
+                return searchMatch(nameCol, q) || searchMatch(noteCol, q);
             });
         }
         const keyID = sortKey ? ref?.columns?.[sortKey] : undefined;
