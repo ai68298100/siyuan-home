@@ -29,6 +29,13 @@
             : allReminders,
     );
     const top = $derived(reminders.slice(0, 4));
+    // 218 波性能（176 波 alertsByMember 同款）：模块卡 pending 计数预分组——
+    // 模板每卡 filter 全量提醒 O(模块×提醒)，预分组后单遍 O(提醒)。
+    const pendingByModule = $derived.by(() => {
+        const map = new Map<string, number>();
+        for (const r of reminders) map.set(r.moduleId, (map.get(r.moduleId) ?? 0) + 1);
+        return map;
+    });
     // EC09（D20）：打卡绑定 × 强度摘要求交——只展示有数据的绑定（成员名·习惯名·强度）；derived 免模板双重求值
     const healthBound = $derived.by(() => {
         void version;
@@ -195,7 +202,7 @@
 </div>
 <div class="lv-mods">
     {#each plugin.settings.enabledModules.filter((id: string) => id !== "members") as mid (mid)}
-        {@const pending = reminders.filter((r: Reminder) => r.moduleId === mid).length}
+        {@const pending = pendingByModule.get(mid) ?? 0}
         <div
             class="lv-card lv-card--hover lv-mod"
             role="button"
