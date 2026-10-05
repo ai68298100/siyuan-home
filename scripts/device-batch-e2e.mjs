@@ -331,15 +331,22 @@ const browser = await chromium.launch({ channel: "msedge", headless: true });
             const t0 = Date.now();
             const rv = await render();
             const apiMs = Date.now() - t0;
-            // 面板内：切到台账，量 DOM 行出现耗时
+            // 面板内：切到台账，量首屏 200 行可达耗时（230 波起渐进渲染：加载更多按需追加，全量语义不变）
             await pClickByText(page, ["总览"]); await sleep(600);
             const t1 = Date.now();
             await pClickByText(page, ["台账"]);
-            // 台账是插件自绘 .lv-table（非原生 .av 块 DOM）
-            await page.waitForFunction((n) => document.querySelectorAll(".lv-table tbody tr").length >= n, size, { timeout: 30000 }).catch(() => {});
+            await page.waitForFunction(() => document.querySelectorAll(".lv-table tbody tr").length >= 200, { timeout: 30000 }).catch(() => {});
             const domMs = Date.now() - t1;
-            const domRows = await page.evaluate(() => document.querySelectorAll(".lv-table tbody tr").length);
-            rec(stage, `${size} 行：API render ${apiMs}ms；面板 DOM 挂表 ${domMs}ms（DOM 行 ${domRows}）`, domRows >= size, `api=${apiMs}ms dom=${domMs}ms`);
+            let domRows = await page.evaluate(() => document.querySelectorAll(".lv-table tbody tr").length);
+            for (let click = 0; click < 10 && domRows < size; click++) {
+                await page.evaluate(() => {
+                    const btn = document.querySelector(".lv-more button");
+                    btn?.click();
+                });
+                await sleep(1500);
+                domRows = await page.evaluate(() => document.querySelectorAll(".lv-table tbody tr").length);
+            }
+            rec(stage, `${size} 行：面板首屏 ${domMs}ms（渐进 200 行）+ 加载更多至 ${domRows} 行`, domRows >= size, `firstPaint=${domMs}ms rows=${domRows}`);
             await page.screenshot({ path: `${OUT}/s6-perf-${size}.png` });
         }
         // 清理：render.rows 有 pageSize 封顶（每次最多 50）→ 循环清到空
