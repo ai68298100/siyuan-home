@@ -23,8 +23,11 @@ export function setTransport(t: Transport | null): void {
 }
 
 async function defaultTransport(endpoint: string, payload: object): Promise<IRawResponse> {
-    // 懒加载：单测注入 transport 时不必加载 siyuan 包
-    const { fetchSyncPost } = await import("siyuan");
+    // 裸 require("siyuan")：vite external 保留为 CJS require 调用，运行时由思源插件加载器的
+    // require 桩映射到 petal 包。动态 import("siyuan") 裸说明符在该环境无法解析
+    // （"Failed to resolve module specifier"，225 波实测），与 chunks 事故同源。
+    // 单测经 setTransport 注入 transport，不触达此路径。
+    const { fetchSyncPost } = require("siyuan") as { fetchSyncPost: Transport };
     return fetchSyncPost(endpoint, payload) as unknown as Promise<IRawResponse>;
 }
 
