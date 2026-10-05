@@ -67,3 +67,6 @@ interface IResForwardProxy {
 interface IResExportResources {
     path: string;
 }
+
+/** 构建注入（vite define ← plugin.json version）：诊断/关于的版本显示单源，禁止字面量（REL-01） */
+declare const __PLUGIN_VERSION__: string;

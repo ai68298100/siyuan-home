@@ -18,8 +18,8 @@ import { SCHEMA_CATALOG, validateSchema } from "@/core/schema";
 import type { HomeSettings } from "@/types";
 
 const TAB_TYPE = "hub-tab";
-/** 版本显示（诊断/关于）；发布时与 package.json/plugin.json 同步（update-version script 覆盖 dist 元数据） */
-const PLUGIN_VERSION = "0.2.0";
+/** 版本显示（诊断/关于）：构建时由 vite define 从 plugin.json 注入（REL-01 版本单源，勿写字面量） */
+const PLUGIN_VERSION = __PLUGIN_VERSION__;
 
 /**
  * 小驴管家（Lv Home）

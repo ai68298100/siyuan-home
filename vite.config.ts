@@ -92,7 +92,9 @@ export default defineConfig(buildTarget === "kernel" ? {
 
     define: {
         "process.env.DEV_MODE": JSON.stringify(isDev),
-        "process.env.NODE_ENV": JSON.stringify(env.NODE_ENV)
+        "process.env.NODE_ENV": JSON.stringify(env.NODE_ENV),
+        // REL-01 版本单源：诊断/关于显示的版本从 plugin.json 构建注入，杜绝字面量漂移
+        "__PLUGIN_VERSION__": JSON.stringify(pluginManifest.version),
     },
 
     build: {
