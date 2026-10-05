@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { monthGrid, daysInMonth } from "@/core/calendar";
+import { monthGrid, daysInMonth, weekGrid } from "@/core/calendar";
 
 describe("月历网格（原生日历视图）", () => {
     it("2026-10：31 天，周一起首（10-01 周四 → 前导 3 天为 9 月末真实日期）", () => {
@@ -39,5 +39,21 @@ describe("月历网格（原生日历视图）", () => {
         const cells = monthGrid(2026, 5);
         expect(cells[0].inMonth).toBe(true);
         expect(cells[0].key).toBe("2026-06-01");
+    });
+});
+
+describe("周视图（weekGrid）", () => {
+    it("锚点周四 → 从本周周一起 7 天", () => {
+        const cells = weekGrid(new Date(2026, 9, 8)); // 2026-10-08 周四
+        expect(cells.length).toBe(7);
+        expect(cells[0].key).toBe("2026-10-05"); // 周一
+        expect(cells[6].key).toBe("2026-10-11"); // 周日
+        expect(cells.every((c) => c.inMonth)).toBe(true);
+    });
+
+    it("锚点周日 → 仍从本周周一起（跨月不断轴）", () => {
+        const cells = weekGrid(new Date(2026, 10, 1)); // 2026-11-01 周日
+        expect(cells[0].key).toBe("2026-10-26");
+        expect(cells[6].key).toBe("2026-11-01");
     });
 });

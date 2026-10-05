@@ -39,3 +39,16 @@ export function monthGrid(year: number, month0: number): CalCell[] {
 export function daysInMonth(year: number, month0: number): number {
     return new Date(year, month0 + 1, 0).getDate();
 }
+
+/** 周视图：含锚点日期那一周（周一起始）的 7 天 */
+export function weekGrid(anchor: Date): CalCell[] {
+    const monday = new Date(anchor);
+    monday.setDate(monday.getDate() - ((monday.getDay() + 6) % 7));
+    const cells: CalCell[] = [];
+    for (let i = 0; i < 7; i++) {
+        const d = new Date(monday);
+        d.setDate(monday.getDate() + i);
+        cells.push({ key: localDateKey(d), day: d.getDate(), inMonth: true });
+    }
+    return cells;
+}
