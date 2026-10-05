@@ -74,11 +74,10 @@
             <div class="lv-cal-wk">{t(wk)}</div>
         {/each}
         {#each cells as c, i (c.key ?? `pad-${i}`)}
-            <button class="lv-cal-cell" class:out={!c.inMonth} class:sel={!!c.key && c.key === selected}
-                disabled={!c.key}
-                aria-label={c.key ?? ""}
-                onclick={() => { if (c.key) selected = c.key; }}>
-                <span class="d" class:today={c.key === todayKey}>{c.inMonth ? c.day : ""}</span>
+            <button class="lv-cal-cell" class:out={!c.inMonth} class:sel={c.key === selected}
+                aria-label={c.key}
+                onclick={() => (selected = c.key)}>
+                <span class="d" class:today={c.key === todayKey}>{c.day}</span>
                 <span class="dots">
                     {#each (c.key ? byDate.get(c.key) ?? [] : []) as r (r.id)}
                         <i class={dotCls(r)} title={r.title}></i>

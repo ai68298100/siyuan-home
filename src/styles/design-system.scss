@@ -397,8 +397,9 @@
         background: var(--b3-theme-surface); display: flex; flex-direction: column; align-items: flex-start;
         gap: 3px; padding: 6px; cursor: pointer; font: inherit; color: var(--lv-tx-2); text-align: left;
         transition: border var(--lv-t-fast) var(--lv-ease), background var(--lv-t-fast) var(--lv-ease);
-        &:hover:not(:disabled) { border-color: var(--lv-line-strong); }
-        &:disabled { opacity: .3; cursor: default; }
+        &:hover { border-color: var(--lv-line-strong); }
+        // 233 波：跨月真实日期（相邻月弱化显示但仍可点选看提醒）
+        &.out { opacity: .45; }
         &.sel { border-color: var(--lv-accent-line); background: var(--lv-accent-soft); }
         .d { font-size: 12px; font-weight: 600; min-width: 20px; text-align: center; padding: 1px 4px; }
         .d.today { background: var(--lv-accent); color: var(--b3-theme-on-primary); border-radius: 999px; }
