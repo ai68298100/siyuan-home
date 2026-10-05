@@ -1,5 +1,7 @@
 # 术语表（小驴管家）
 
+> English version: [glossary.en.md](glossary.en.md)
+
 > 给非技术家庭成员的速查表：管家界面里出现的词，用一句话说清。按拼音排序。
 
 | 术语 | 是什么 |

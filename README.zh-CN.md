@@ -8,7 +8,7 @@
 
 家庭私有资料 · 成员视角 · 到期提醒 · 可继续办理
 
-[⬇️ 下载安装](https://github.com/ai68298100/siyuan-home/releases/latest) · [📖 使用文档](./docs/FAQ.md) · [🗺 路线图](./ROADMAP.md) · [🌐 English](./README.md)
+[⬇️ 下载安装](https://github.com/ai68298100/siyuan-home/releases/latest) · [📖 使用文档](./docs/FAQ.md) · [📖 术语表](./docs/glossary.md) · [🗺 路线图](./ROADMAP.md) · [🌐 English](./README.md)
 
 *本地优先 · 默认无遥测 · 数据保存在你的思源工作区*
 
