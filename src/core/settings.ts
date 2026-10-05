@@ -123,6 +123,7 @@ export function normalizeImportedSettings(data: Record<string, any>): Normalized
         return sanitizeMemberSex(fixed);
     });
 
+    const clampH = (v: unknown, fb: number) => (Number.isFinite(v as number) ? Math.min(23, Math.max(0, Math.round(v as number))) : fb);
     const settings: HomeSettings = {
         ...defaults,
         ...data,
@@ -131,6 +132,10 @@ export function normalizeImportedSettings(data: Record<string, any>): Normalized
         leadOverrides: isPlainObject(data.leadOverrides) ? (data.leadOverrides as Record<string, number>) : defaults.leadOverrides,
         dbRefs: isPlainObject(data.dbRefs) ? data.dbRefs : defaults.dbRefs,
         checkinBindings: normalizeCheckinBindings(data.checkinBindings),
+        // 229 波恢复 e2e：导入路径钳制时刻（敌意/手改文件曾可把摘要时刻设为 99 → 摘要永不触发）
+        notifyHour: clampH(data.notifyHour, defaults.notifyHour),
+        silentFrom: clampH(data.silentFrom, defaults.silentFrom),
+        silentTo: clampH(data.silentTo, defaults.silentTo),
     };
     return { settings, droppedModules, repairedMembers };
 }

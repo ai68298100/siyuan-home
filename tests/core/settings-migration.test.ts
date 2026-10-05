@@ -212,3 +212,19 @@ describe("saveSettings 写入重试（§15/186 波）", () => {
         expect(calls).toBe(2);
     });
 });
+
+describe("导入钳制（229 波恢复 e2e 发现）", () => {
+    it("敌意时刻被钳制到 0-23（notifyHour=99 曾致摘要永不触发）", () => {
+        const { settings } = normalizeImportedSettings({
+            enabledModules: ["certs"],
+            members: [],
+            dbRefs: {},
+            notifyHour: 99,
+            silentFrom: -5,
+            silentTo: "8",
+        });
+        expect(settings.notifyHour).toBe(23);
+        expect(settings.silentFrom).toBe(0);
+        expect(settings.silentTo).toBe(8); // 非数值回退默认
+    });
+});
