@@ -14,8 +14,16 @@
 #    curl 的 -o/-F 文件参数需 cygpath 转 Windows 路径
 LOG=/tmp/lvh-e2e.log
 sy="C:\Users\sunku\.zcode\skills\siyuan-kernel-api\scripts\sy"
-TOKEN=$(grep SIYUAN_TOKEN "$APPDATA/siyuan/env" | cut -d= -f2)
-BASE=http://127.0.0.1:6806
+# 靶场参数化（约定 1）：SIYUAN_BASE_URL / SIYUAN_TOKEN 环境变量优先，缺 token 明确 SKIP；
+# sy 包装器同样优先读 SIYUAN_URL/SIYUAN_TOKEN 环境变量（缺省回落 env 文件）
+TOKEN="${SIYUAN_TOKEN:-$(grep SIYUAN_TOKEN "$APPDATA/siyuan/env" 2>/dev/null | cut -d= -f2)}"
+BASE="${SIYUAN_BASE_URL:-${SIYUAN_URL:-http://127.0.0.1:6806}}"
+export SIYUAN_URL="$BASE" SIYUAN_TOKEN="$TOKEN"
+if [ -z "$TOKEN" ]; then
+  echo "SKIP：缺 SIYUAN_TOKEN（靶场 token 从该实例 设置→关于 获取）；绝不使用默认凭据"
+  exit 0
+fi
+SCRIPT_DIR=$(cd "$(dirname "$0")" && pwd)
 echo "=== $(date '+%H:%M:%S') start" >> "$LOG"
 
 # 1) 等内核稳定且工作区是我们的（带鉴权探测：token 只对本工作区有效）
@@ -29,12 +37,15 @@ done
 if [ $ok -lt 3 ]; then echo "RESULT: kernel/workspace never stabilized (auth probe)" >> "$LOG"; exit 1; fi
 echo "kernel+workspace stable (waited ~$((i*20))s)" >> "$LOG"
 
+# 1.5) 靶场守卫（约定 2/3）：清扫本插件前缀的崩溃残留；存在非冒烟笔记本即拒跑
+node "$SCRIPT_DIR/lib/smoke-kernel.mjs" "$BASE" "$TOKEN" || { echo "RESULT: guard rejected target" >> "$LOG"; exit 1; }
+
 # 2) 测试笔记本（幂等）。注意：/api/query/sql 不暴露 notebooks 表（2026-10-04 实测），
 #    只能走 lsNotebooks JSON 反查 id（node 解析，UTF-8 安全）
-nbid() { node -e "try{const d=JSON.parse(require('fs').readFileSync(0,'utf8'));const list=(d.data&&d.data.notebooks)||(d.notebooks)||[];const n=list.find(n=>n.name==='LVH-端点实测'&&(!n.closed));console.log(n?n.id:'')}catch(e){}" 2>/dev/null; }
+nbid() { node -e "try{const d=JSON.parse(require('fs').readFileSync(0,'utf8'));const list=(d.data&&d.data.notebooks)||(d.notebooks)||[];const n=list.find(n=>n.name==='siyuan-home-smoke-端点实测'&&(!n.closed));console.log(n?n.id:'')}catch(e){}" 2>/dev/null; }
 NB=$("$sy" /api/notebook/lsNotebooks -d '{}' --max 50000 2>/dev/null | nbid)
 if [ -z "$NB" ]; then
-  "$sy" /api/notebook/createNotebook -d '{"name":"LVH-端点实测"}' >> "$LOG" 2>&1
+  "$sy" /api/notebook/createNotebook -d '{"name":"siyuan-home-smoke-端点实测"}' >> "$LOG" 2>&1
   NB=$("$sy" /api/notebook/lsNotebooks -d '{}' --max 50000 2>/dev/null | nbid)
 fi
 # 复用的笔记本可能是关闭态（removeDoc 等操作要求打开）→ 无条件 open
@@ -103,5 +114,9 @@ echo "upload: $(echo "$UP" | grep -o '"code":[0-9-]*' | head -1) $(echo "$UP" | 
 #    包装器对 HIGH 不可逆操作要求 -y（对象是本脚本自建的测试文档）
 sleep 3
 "$sy" /api/filetree/removeDocByID -y -d "{\"id\":\"$DOC\"}" >> "$LOG" 2>&1
+# 9.1) 测试笔记本一并移除（约定：结束时不留任何临时笔记本；对象是本脚本自建的 siyuan-home-smoke- 前缀库）
+"$sy" /api/notebook/removeNotebook -y -d "{\"notebook\":\"$NB\"}" >> "$LOG" 2>&1
+LEFT=$("$sy" /api/notebook/lsNotebooks -d '{}' 2>/dev/null | node -e "try{const d=JSON.parse(require('fs').readFileSync(0,'utf8'));const l=(d.data&&d.data.notebooks)||(d.notebooks)||[];console.log(l.filter(n=>n.name.startsWith('siyuan-home-smoke-')).length)}catch(e){console.log('?')}")
+echo "temp notebooks left: $LEFT (expect 0)" >> "$LOG"
 echo "=== $(date '+%H:%M:%S') done" >> "$LOG"
 echo "RESULT: render 行 rowCount vs rows.len——不相等即默认分页成立（250 行只回 50）；pk 应 200+50 且 overlap=0（循环终止条件成立）" >> "$LOG"

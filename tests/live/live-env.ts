@@ -1,11 +1,13 @@
 /**
  * 活体集成测试助手（第一百七十七波）：真实 HTTP transport + 工作区门禁。
  * 纪律：单次探测不重试（鉴权失败严禁循环——429/401 直接 skip 整套件）；
- * 测试数据全部落在专用笔记本 LVH-真机批 内，afterAll 清理。
+ * 测试数据全部落在专用笔记本 siyuan-home-smoke-真机批 内，afterAll 清理。
+ * 写型套件只打隔离靶场（CONTRIBUTING「内核靶场约定」）；e2e-core.sh 启动时跑
+ * scripts/lib/smoke-kernel.mjs 守卫（清残留 + 拒共享内核）。
  */
-export const LIVE_URL = process.env.SIYUAN_URL ?? "http://127.0.0.1:6806";
+export const LIVE_URL = process.env.SIYUAN_BASE_URL ?? process.env.SIYUAN_URL ?? "http://127.0.0.1:6806";
 export const LIVE_TOKEN = process.env.SIYUAN_TOKEN ?? "";
-export const LIVE_NOTEBOOK = "LVH-真机批";
+export const LIVE_NOTEBOOK = "siyuan-home-smoke-真机批";
 
 export interface RawEnvelope { code: number; msg: string; data: any }
 
