@@ -102,7 +102,7 @@ pnpm run make-link   # 软链到思源工作空间 data/plugins/
 | **只读走查** | `device-batch-preflight.sh`、`smoke-test.mjs`（离线） | 不调写 API、不改 petal 存储；可在在用工作区随时跑、可并发 |
 | **写型冒烟/基准** | `e2e-core.sh`、`e2e-endpoints.sh` | **禁直打在用工作区**：其他插件的事件监听会把测试写入当真实事件反应；并发索引放大 flakiness；同步工作区会被临时库建删搅动 |
 
-写型脚本统一经 `scripts/lib/smoke-kernel.mjs` 三层防护（改自小驴考试 @fa57d6a）：
+写型脚本统一经 `scripts/lib/smoke-kernel.mjs` 三层防护（改自小驴考试 @fa57d6a）；独立 e2e 走查四套快捷方式：`pnpm run e2e:device`（真机批 40 断言）/ `e2e:recovery` / `e2e:value01` / `e2e:import`（均需 SIYUAN_TOKEN 指向靶场实例）。
 
 1. **目标参数化**：`SIYUAN_BASE_URL` / `SIYUAN_TOKEN` 环境变量（argv 优先）；缺 token 明确退出或 SKIP，绝不内置默认凭据；
 2. **靶场防呆**：启动 `lsNotebooks`，存在任何非 `siyuan-home-smoke-*` 前缀的笔记本 → 判定非隔离靶场并拒跑（附处理指引）；确需豁免 `SIYUAN_E2E_ALLOW_SHARED=1`；
