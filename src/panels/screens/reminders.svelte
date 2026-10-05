@@ -246,17 +246,31 @@
             const ref = plugin.settings.dbRefs[mod];
             if (!ref?.avId) { showMessage(t("triage.noTarget"), 3000, "error"); return; }
             const itemID = await addDetachedRow(ref.avId, title);
-            const nameKey = ref.columns?.name;
-            if (nameKey) await setCell(ref.avId, nameKey, itemID, { type: "text", text: { content: title } });
-            // 日期写入目标模块首个 date 列（提醒规则字段因模块而异，先保"行有到期日"）
-            const dateCol = (plugin.schemaCatalog?.[mod]?.columns ?? []).find((c: any) => c.type === "date");
-            const dateKeyID = dateCol ? ref.columns?.[dateCol.key] : undefined;
-            if (dateKeyID && r.dueDate) {
-                await setCell(ref.avId, dateKeyID, itemID, { type: "date", date: { content: new Date(`${r.dueDate}T00:00:00`).getTime(), isNotEmpty: true, isNotTime: true } });
-            }
+            // 新建行身份确认存在延迟：setCell 失败受控重试（同格重写不会重复建行）
+            const setCellSafe = async (key: string, value: unknown) => {
+                const keyID = ref.columns?.[key];
+                if (!keyID) return;
+                for (let attempt = 0; ; attempt++) {
+                    try { await setCell(ref.avId, keyID, itemID, value); return; }
+                    catch (e) {
+                        if (attempt >= 2) throw e;
+                        await new Promise((r2) => setTimeout(r2, 400));
+                    }
+                }
+            };
+            await setCellSafe("name", { type: "text", text: { content: title } });
+            // 日期写入提醒规则所用字段（如 certs→expiry）——写入无关日期列会导致转行后不派生提醒；
+            // 无规则字段的模块回退首个 date 列（行仍有到期日信息）
+            const schemaCols = plugin.schemaCatalog?.[mod]?.columns ?? [];
+            const ruleFields = (plugin.schemaCatalog?.[mod]?.reminders ?? []).map((x: any) => x.field);
+            const dateCol = schemaCols.find((c: any) => c.type === "date" && ruleFields.includes(c.key))
+                ?? schemaCols.find((c: any) => c.type === "date");
+            if (dateCol && r.dueDate) await setCellSafe(dateCol.key, { type: "date", date: { content: new Date(`${r.dueDate}T00:00:00`).getTime(), isNotEmpty: true, isNotTime: true } });
             dlg.destroy();
             showMessage(t("triage.done").replace("${mod}", modLabel(mod)), 4000, "info");
             await plugin.complete(r);
+            // 转行改变了台账数据：全量重扫让新行立即派生提醒（缓存派生不含新行）
+            await plugin.refreshHub();
         };
         ok.addEventListener("click", () => { ok.disabled = true; doCreate().finally(() => { ok.disabled = false; }); });
         box.append(row1, row2, row3, ok);
