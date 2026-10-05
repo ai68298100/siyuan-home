@@ -4,6 +4,7 @@
     import { saveRuntime } from "@/core/hub/runtime";
     import { buildDisplay as display } from "@/core/hub/display";
     import { relativeDue, weekdayKey } from "@/core/hub/rule";
+    import Calendar from "@/panels/screens/calendar.svelte";
     import { moduleIcon } from "@/core/modules";
     import type { Reminder } from "@/types";
     let { plugin, t, version }: { plugin: HomePluginLike; t: (k: string) => string; version?: number } = $props();
@@ -108,6 +109,8 @@
 
     // 17 组：批量操作——选择模式下逐条勾选，批量完成/延后 7 天/忽略（H01 串行队列逐条落盘）
     let batchMode = $state(false);
+    // 230 波：原生日历视图切换（列表 ⇄ 日历；批量模式仅在列表生效）
+    let viewMode = $state<"list" | "calendar">("list");
     let selected = $state<Set<string>>(new Set());
     let batchBusy = $state(false);
     const selectedCount = $derived(selected.size);
@@ -299,6 +302,12 @@
     </select>
     <button class="b3-button b3-button--outline" onclick={exportIcs}>{t("hub.icsExport")}</button>
     <span class="fn__flex-1"></span>
+    <span class="lv-tabs" style="padding:2px" role="group" aria-label={t("view.list") + "/" + t("view.calendar")}>
+        <button class="lv-tabs__item" class:on={viewMode === "list"} style="min-height:28px;padding:4px 12px"
+            aria-pressed={viewMode === "list"} onclick={() => (viewMode = "list")}>{t("view.list")}</button>
+        <button class="lv-tabs__item" class:on={viewMode === "calendar"} style="min-height:28px;padding:4px 12px"
+            aria-pressed={viewMode === "calendar"} onclick={() => (viewMode = "calendar")}>{t("view.calendar")}</button>
+    </span>
     <button class="b3-button b3-button--outline" class:b3-button--text={batchMode} onclick={() => (batchMode ? clearSelection() : (batchMode = true))}>{t("hub.batch")}</button>
     <button class="b3-button b3-button--outline" onclick={() => plugin.refreshHub(undefined, true)}>{t("hub.rescan")}</button>
 </div>
@@ -339,6 +348,9 @@
     {/if}
 {:else if filtered.length === 0}
     <div class="lv-card"><div class="lv-empty"><div class="eic">🌤</div><b>{t("dash.allClear")}</b><span>{t("hub.emptyHint")}</span></div></div>
+{:else if viewMode === "calendar"}
+    <!-- 230 波：原生日历视图（数据同列表筛选口径；动作仅"完成"，其余回列表） -->
+    <Calendar items={filtered} {t} {version} onComplete={(r: Reminder) => plugin.complete(r)} />
 {:else}
     {@const groups = filter === "all"
         ? [

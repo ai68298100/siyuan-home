@@ -385,3 +385,35 @@
     .lv-tabs__item { padding: 6px 8px; font-size: 12px; flex: 1; text-align: center; min-height: 34px; }
   }
 }
+
+// ── 15. 原生日历视图（230 波，路线图"下一阶段"）──────────
+.lv-cal {
+    &-head { display: flex; align-items: center; gap: 10px; margin: 4px 2px 10px;
+        b { font-size: 16px; font-weight: 600; letter-spacing: -.01em; }
+        .lv-iconbtn { font-size: 18px; } }
+    &-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; }
+    &-wk { text-align: center; font-size: 11px; color: var(--lv-tx-3); padding: 4px 0; font-weight: 500; }
+    &-cell { min-height: 64px; border: 1px solid var(--lv-line); border-radius: 10px;
+        background: var(--b3-theme-surface); display: flex; flex-direction: column; align-items: flex-start;
+        gap: 3px; padding: 6px; cursor: pointer; font: inherit; color: var(--lv-tx-2); text-align: left;
+        transition: border var(--lv-t-fast) var(--lv-ease), background var(--lv-t-fast) var(--lv-ease);
+        &:hover:not(:disabled) { border-color: var(--lv-line-strong); }
+        &:disabled { opacity: .3; cursor: default; }
+        &.sel { border-color: var(--lv-accent-line); background: var(--lv-accent-soft); }
+        .d { font-size: 12px; font-weight: 600; min-width: 20px; text-align: center; padding: 1px 4px; }
+        .d.today { background: var(--lv-accent); color: var(--b3-theme-on-primary); border-radius: 999px; }
+        .dots { display: flex; gap: 3px; flex-wrap: wrap;
+            i { width: 7px; height: 7px; border-radius: 50%; display: block;
+                &.danger { background: var(--lv-danger); }
+                &.warn { background: var(--lv-warn); }
+                &.amber { background: var(--lv-amber); } } } }
+    &-day-panel { margin-top: 12px; padding: 12px 14px; }
+    &-items { margin-top: 8px; display: flex; flex-direction: column; gap: 8px; }
+    &-item { display: flex; align-items: center; gap: 10px;
+        .lv-rem-ic { width: 30px; height: 30px; border-radius: 9px; display: grid; place-items: center;
+            flex: none; font-size: 14px; background: var(--lv-surface-2); border: 1px solid var(--lv-line); } }
+}
+@media (max-width: 640px) {
+    .lv-home .lv-cal-cell { min-height: 46px; padding: 4px; }
+    .lv-home .lv-cal-cell .dots i { width: 5px; height: 5px; }
+}
