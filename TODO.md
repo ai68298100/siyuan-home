@@ -1,4 +1,5 @@
 # 小驴管家（Lv Home）· 项目待办总清单
+| 2026-10-05 | 巡检 | 第二百二十一波：仓库维护巡检（PR/issue/依赖三清确认 + 全门禁） | gh 盘点：开放 PR 零、开放 issue 零、生产依赖零过时（Dependabot 无新候选）；全门禁复跑绿（check 五重/250 测试/build/smoke）、预检 10-11/0（readDir 瞬态波动，部署字节一致性 28 文件实测 0 失败）；工作区干净。结论：仓库处于零欠账稳态，等待真机批窗口 |
 | 2026-10-05 | 主线 | 第二百二十波：术语表英文化（UG09/N5 收尾）+ README 链接 | docs/glossary.en.md（14 术语对等翻译 + 三条路径 + 自救，中文版互链）；README.zh-CN 使用文档行补术语表链接（en README 206 波已链）；术语表至此双语；UG09 离线面维持 ◐（剩余=人工验证）；纯文档波 |
 | 2026-10-05 | 主线 | 第二百一十九波：成员页 memberStats 单遍预计算（218 波同款收敛）+ 生日 0/1 天文案修正 | statChips/birthdaySoon 每成员每渲染重复 filter+sort → memberStats 单遍派生 Map（chips top-3 + 生日倒计时文案一起算）；**顺带文案修正**：生日倒计时原"0 天后/1 天后"改"今天到期/明天到期"（days.* 键族复用）；模板 statsOf 读取（{@const} 移入 {#if} 内合规）；250 测试持平、活体 11/11 |
 | 2026-10-05 | 主线 | 第二百一十八波：总览模块卡计数预分组（性能，176 波 alertsByMember 同款） | 模板每模块卡 `reminders.filter(mid).length` → pendingByModule 预分组 Map（单遍 O(提醒)，31 模块×数百提醒的每渲染双重循环消除）；derived 依赖 reminders/version 与原语义一致；250 测试持平、活体 11/11 |
