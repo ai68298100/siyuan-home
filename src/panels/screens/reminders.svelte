@@ -371,6 +371,11 @@
         <option value="30">{t("hub.due30")}</option>
     </select>
     <button class="b3-button b3-button--outline" onclick={exportIcs}>{t("hub.icsExport")}</button>
+    <!-- 243 波（收件箱分诊）：一键切片到备忘项集合（转行/完成/延后集中处理） -->
+    <button class="b3-button b3-button--outline {filterModule === "adhoc" ? "b3-button--text" : ""}"
+        onclick={() => { filterModule = filterModule === "adhoc" ? undefined : "adhoc"; persistFilter(); }}>
+        {t("hub.triageChip")}{#if filterModule === "adhoc"} ✓{/if}
+    </button>
     <span class="fn__flex-1"></span>
     <span class="lv-tabs" style="padding:2px" role="group" aria-label={t("view.list") + "/" + t("view.calendar")}>
         <button class="lv-tabs__item" class:on={viewMode === "list"} style="min-height:28px;padding:4px 12px"

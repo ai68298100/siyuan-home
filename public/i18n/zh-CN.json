@@ -560,6 +560,7 @@
     "diag.ambigTitle": "同名成员选择",
     "diag.ambigNoInfo": "（无附加信息）",
     "diag.ambigDone": "已人工关联 ${n} 个成员",
+    "hub.triageChip": "待分诊",
     "hub.filterAllModule": "全部模块",
     "tabReminders": "提醒设置",
     "settings.remindersHint": "每日摘要时刻、静默时段，以及各模块提醒的提前天数（留空 = 用默认值）。",
