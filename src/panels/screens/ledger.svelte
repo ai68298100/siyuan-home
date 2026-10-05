@@ -778,9 +778,20 @@
                     const saved = entries.reduce((s, e) => s + (Number(e.amount) || 0), 0);
                     if (target !== undefined || entries.length > 0) {
                         const head = document.createElement("div");
-                        head.className = "lv-caption";
                         head.style.cssText = "margin-top:10px;font-size:12px";
-                        head.textContent = `${t("ledger.savedOf").replace("${s}", String(Math.round(saved * 100) / 100)).replace("${t2}", target !== undefined ? String(target) : "—")}${target !== undefined && target > 0 ? `（${Math.min(999, Math.round((saved / target) * 100))}%）` : ""}`;
+                        const line = document.createElement("div");
+                        line.className = "lv-caption";
+                        line.textContent = `${t("ledger.savedOf").replace("${s}", formatAmount(saved)).replace("${t2}", target !== undefined ? formatAmount(target) : "—")}${target !== undefined && target > 0 ? `（${Math.min(999, Math.round((saved / target) * 100))}%）` : ""}`;
+                        head.appendChild(line);
+                        // 215 波：进度条可视化（>100% 封顶显示满条）
+                        if (target !== undefined && target > 0) {
+                            const bar = document.createElement("div");
+                            bar.style.cssText = "height:6px;border-radius:3px;background:var(--b3-theme-background-light);overflow:hidden;margin-top:4px";
+                            const fill = document.createElement("div");
+                            fill.style.cssText = `height:100%;width:${Math.min(100, Math.round((saved / target) * 100))}%;background:var(--lv-accent)`;
+                            bar.appendChild(fill);
+                            head.appendChild(bar);
+                        }
                         body.appendChild(head);
                     }
                 })();
@@ -813,7 +824,7 @@
                         return true;
                     },
                     remove: async (e) => { await rl.saveRowLogs(plugin as any, rl.removeEntry(await fresh(), ref!.avId!, row.itemID, "prices", e)); },
-                    format: (e) => `${e.date} · ${e.price}${e.channel ? ` · ${e.channel}` : ""}`,
+                    format: (e) => `${e.date} · ${formatAmount(Number(e.price))}${e.channel ? ` · ${e.channel}` : ""}`,
                 });
             } else if (active === "schooling") {
                 await addRowLogSection({

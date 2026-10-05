@@ -31,6 +31,15 @@
         return map;
     });
     const alertsFor = (id: string) => alertsByMember.get(id) ?? [];
+    // 17 组/215 波：生日倒计时 chip——提醒中枢已派生的 birthday 提醒里取 30 天内的最迫近一条，
+    // 显示"N 天后/N 天前"；零新增扫描（数据来自既有 HubState）。
+    function birthdaySoon(id: string): string | null {
+        const hit = alertsFor(id)
+            .filter((r) => r.ruleKey === "birthday" && r.daysLeft <= 30)
+            .sort((a, b) => a.daysLeft - b.daysLeft)[0];
+        if (!hit) return null;
+        return hit.daysLeft < 0 ? t("days.overdue").replace("${n}", String(-hit.daysLeft)) : t("days.after").replace("${n}", String(hit.daysLeft));
+    }
 
     // 17 组/192 波：成员头像（E14/E15 实测形状）——资产存成员台账行 mAsset 列（台账为事实源，settings 不存）。
     // avatars: memberId → 资产相对路径；version 驱动加载（成员行量小，全量读）。
@@ -332,11 +341,15 @@
         {#if m.syncError}
             <div class="lv-caption" role="alert" style="color:var(--lv-danger)">⚠ {t("members.syncError")}: {m.syncError}</div>
         {/if}
-        {#if statChips(m.id).length > 0}
+        {#if statChips(m.id).length > 0 || birthdaySoon(m.id)}
             <div style="display:flex;gap:6px;flex-wrap:wrap;padding-top:6px">
                 {#each statChips(m.id) as c (c.label)}
                     <span class="b3-chip b3-chip--small b3-chip--secondary">{c.label} {c.n}</span>
                 {/each}
+                {#if birthdaySoon(m.id)}
+                    <!-- 17 组/215 波：生日倒计时 chip（数据来自提醒中枢既有派生，零新增扫描） -->
+                    <span class="b3-chip b3-chip--small" style="background:var(--lv-accent);color:var(--b3-theme-surface)">🎂 {birthdaySoon(m.id)}</span>
+                {/if}
             </div>
         {/if}
         {#if alertsFor(m.id).length > 0}
