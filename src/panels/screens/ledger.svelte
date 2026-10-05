@@ -30,8 +30,17 @@
     let rebuilding = $state(false);
     // 17 组：台账内搜索（标题/备注 contains + 拼音全拼/首字母，与成员过滤不叠加——本页无成员过滤）
     let searchText = $state("");
+    // 229 波性能（真机批 S6：1000 行挂表 3.7-7.3s）：渐进渲染——首屏 200 行 + "加载更多"按需追加；
+    // 排序/筛选在切片前作用于全量，CSV 导出与详情不受影响；切模块/改搜索时重置页大小
+    const RENDER_PAGE = 200;
+    let renderLimit = $state(RENDER_PAGE);
     // 提案 C（227 波）：拼音字典懒加载，就绪后 pyTick 驱动筛选重算（一次性）
     let pyTick = $state(0);
+    $effect(() => {
+        void active;
+        void searchText;
+        renderLimit = RENDER_PAGE;
+    });
     $effect(() => {
         ensurePinyin().then(() => {
             if (pinyinReady()) pyTick += 1;
@@ -72,6 +81,8 @@
             return sortAsc ? cmp : -cmp;
         });
     });
+    // 229 波性能：渐进渲染切片（排序/筛选已作用于全量，这里只切显示窗口）
+    const visibleRows = $derived(filteredRows.slice(0, renderLimit));
 
     const ref = $derived(plugin.settings.dbRefs[active]);
     const schemaKeys = $derived<string[]>(ref?.columns ? Object.keys(ref.columns) : []);
@@ -1476,7 +1487,7 @@
                 {/each}
             </tr></thead>
             <tbody>
-                {#each filteredRows as r (r.itemID)}
+                {#each visibleRows as r (r.itemID)}
                     <tr class="lv-row-link" role="button" tabindex="0"
                         onkeydown={(e: KeyboardEvent) => e.key === "Enter" && openDetail(r)}
                         onclick={() => openDetail(r)} title={t("ledger.detail")}>
@@ -1488,6 +1499,17 @@
                         {/each}
                     </tr>
                 {/each}
+                {#if filteredRows.length > visibleRows.length}
+                    <!-- 229 波性能：渐进渲染加载更多 -->
+                    <tr class="lv-more">
+                        <td colspan={schemaKeys.filter((k) => ["name", "status", "expiry", "due"].includes(k)).length}>
+                            <button class="b3-button b3-button--outline" style="margin:0 auto;display:block"
+                                onclick={() => (renderLimit += RENDER_PAGE)}>
+                                {t("ledger.loadMore").replace("${n}", String(filteredRows.length - visibleRows.length))}
+                            </button>
+                        </td>
+                    </tr>
+                {/if}
             </tbody>
         </table>
     </div>
