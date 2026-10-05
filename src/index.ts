@@ -510,11 +510,22 @@ export default class LvHomePlugin extends Plugin {
     }
 
     showTab() {
+        // 已有管家页签时聚焦而非新开（重复点顶栏/命令不再堆叠页签，225 波真机发现）。
+        // 前端无公开的"聚焦已开自定义页签"API——走页签头 DOM 事件（与用户点击同源行为）；
+        // 多开的旧页签逐个点其关闭钮回收（对象全部是本插件的页签）。
+        const title = this.i18nText("butler");
+        const heads = Array.from(document.querySelectorAll<HTMLElement>(".layout-tab-bar .item"));
+        const mine = heads.filter((h) => h.querySelector(".item__text")?.textContent?.trim() === title);
+        if (mine.length) {
+            for (const h of mine.slice(0, -1)) h.querySelector(".item__close")?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+            mine[mine.length - 1].dispatchEvent(new MouseEvent("click", { bubbles: true }));
+            return;
+        }
         openTab({
             app: this.app,
             custom: {
                 id: `${this.name}${TAB_TYPE}`,
-                title: this.i18nText("butler"),
+                title,
                 icon: "iconHome",
             },
         });
