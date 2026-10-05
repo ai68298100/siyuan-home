@@ -10,7 +10,8 @@
 import fs from 'fs';
 import { log, error, getSiYuanDir, chooseTarget, copyDirectory, getThisPluginName } from './utils.js';
 
-let targetDir = '';
+// 目标 data/plugins 目录：优先 SIYUAN_TARGET_DIR 环境变量（思源未运行/内核鉴权时可用），否则留空走自动探测
+let targetDir = process.env.SIYUAN_TARGET_DIR || '';
 
 /**
  * 1. Get the parent directory to install the plugin
