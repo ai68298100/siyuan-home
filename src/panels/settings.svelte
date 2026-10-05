@@ -46,6 +46,29 @@
     let draftLeads = $state<Record<string, string>>(
         Object.fromEntries(Object.entries(settings.leadOverrides ?? {}).map(([k, v]) => [k, String(v)])),
     );
+    // 229 波：Webhook 推送 draft（Bark / ntfy；发送测试用 draft 值，无需先保存）
+    // svelte-ignore state_referenced_locally
+    let draftWebhookEnabled = $state(settings.webhookEnabled ?? false);
+    // svelte-ignore state_referenced_locally
+    let draftWebhookMode = $state<"bark" | "ntfy">(settings.webhookMode === "ntfy" ? "ntfy" : "bark");
+    // svelte-ignore state_referenced_locally
+    let draftWebhookUrl = $state(settings.webhookUrl ?? "");
+    let testingWebhook = $state(false);
+    async function testWebhook() {
+        testingWebhook = true;
+        try {
+            const { sendWebhook } = await import("@/core/webhook");
+            const r = await sendWebhook({
+                ...settings,
+                webhookEnabled: true,
+                webhookUrl: draftWebhookUrl,
+                webhookMode: draftWebhookMode,
+            } as HomeSettings, { title: t("hub.title"), body: t("settings.webhookTestBody") });
+            showMessage(r === "ok" ? t("settings.webhookTestOk") : t("settings.webhookTestFail"), 3000, r === "ok" ? "info" : "error");
+        } finally {
+            testingWebhook = false;
+        }
+    }
     /** C8c：枚举所有模块的提醒规则（leadOverrides 编辑行） */
     const leadRules = $derived.by(() => {
         const catalog = plugin.schemaCatalog ?? {};
@@ -307,6 +330,10 @@
             plugin.settings.notifyHour = clampHour(draftNotifyHour, 8);
             plugin.settings.silentFrom = clampHour(draftSilentFrom, 22);
             plugin.settings.silentTo = clampHour(draftSilentTo, 8);
+            // 229 波：Webhook 落盘（URL 归一去尾斜杠/空白；空串=不推送）
+            plugin.settings.webhookEnabled = draftWebhookEnabled && draftWebhookUrl.trim() !== "";
+            plugin.settings.webhookUrl = draftWebhookUrl.trim().replace(/\/+$/, "");
+            plugin.settings.webhookMode = draftWebhookMode;
             plugin.settings.leadOverrides = Object.fromEntries(
                 Object.entries(draftLeads)
                     .map(([k, v]) => [k, v.trim() === "" ? null : Number(v)] as [string, number | null])
@@ -425,6 +452,30 @@
             <span class="lv-caption" style="margin:0 6px">→</span>
             <input class="b3-text-field" style="width:70px" type="number" min="0" max="23" bind:value={draftSilentTo} />
             <span class="lv-caption fn__flex-1">{t("settings.silentHoursHint")}</span>
+        </div>
+        <div style="margin-top:12px;border-top:1px solid var(--b3-border-color);padding-top:8px">
+            <p class="lv-caption">{t("settings.webhookTitle")}</p>
+            <p class="lv-caption ft__on-surface">{t("settings.webhookHint")}</p>
+            <div class="fn__flex lv-settings__row">
+                <span style="min-width:180px">{t("settings.webhookEnable")}</span>
+                <input type="checkbox" class="b3-switch" bind:checked={draftWebhookEnabled} />
+                <span class="lv-caption fn__flex-1"></span>
+            </div>
+            <div class="fn__flex lv-settings__row">
+                <span style="min-width:180px">{t("settings.webhookMode")}</span>
+                <select class="b3-select" bind:value={draftWebhookMode}>
+                    <option value="bark">Bark</option>
+                    <option value="ntfy">ntfy</option>
+                </select>
+                <span class="lv-caption fn__flex-1"></span>
+            </div>
+            <div class="fn__flex lv-settings__row">
+                <span style="min-width:180px">{t("settings.webhookUrl")}</span>
+                <input class="b3-text-field fn__flex-1" style="min-width:0" bind:value={draftWebhookUrl}
+                    placeholder="https://api.day.app/yourkey" />
+            </div>
+            <button class="b3-button b3-button--outline" style="margin-top:6px" disabled={testingWebhook || !draftWebhookUrl.trim()}
+                onclick={testWebhook}>{testingWebhook ? t("settings.webhookTesting") : t("settings.webhookTest")}</button>
         </div>
         <div style="margin-top:12px;border-top:1px solid var(--b3-border-color);padding-top:8px">
             <p class="lv-caption">{t("settings.leadsTitle")}</p>

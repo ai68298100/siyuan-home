@@ -419,9 +419,22 @@ export default class LvHomePlugin extends Plugin {
             // B3b：逾期事项每日首次发现立即提示（H12：与摘要共用静默判断）
             const { localDateKey } = await import("@/core/hub/rule");
             const today = localDateKey(new Date());
+            let pushedOverdueAlert = false;
             if (scan.counts.overdue > 0 && !inSilentHours(this.settings, this.runtime) && this.runtime.lastOverdueAlertDate !== today) {
                 this.runtime.lastOverdueAlertDate = today;
                 showMessage(this.i18nText("notify.overdue").replace("${n}", String(scan.counts.overdue)), 6000, "error");
+                pushedOverdueAlert = true;
+            }
+            // 229 波：Webhook 推送（路线图"下一阶段"）——随摘要/逾期首报两个既定时点外发一次；
+            // 用户显式配置才启用；失败静默（sendWebhook 内部吞错），绝不阻断本地提醒
+            if (digest.shouldNotify || pushedOverdueAlert) {
+                const { sendWebhook, buildDigestBody } = await import("@/core/webhook");
+                const topTitles = scan.reminders
+                    .filter((r) => r.level === "overdue" || (r.level === "soon" && r.daysLeft <= 7))
+                    .sort((a, b) => a.daysLeft - b.daysLeft)
+                    .slice(0, 3)
+                    .map((r) => r.title);
+                await sendWebhook(this.settings, buildDigestBody(scan.counts, topTitles));
             }
             // 29 组：每周预告（周日一次，未来 7 天清单计数；ISO 周去重）
             const weekly = weeklyPreview(scan, this.settings, this.runtime);

@@ -149,6 +149,10 @@ export interface HomeSettings {
     corruptedSettings?: boolean;
     /** EC09（D20）：打卡习惯 → 成员指标绑定（settings 驱动映射 v1；只读消费，不写打卡数据） */
     checkinBindings?: CheckinBinding[];
+    /** Webhook 推送（路线图"下一阶段"，229 波）：用户显式配置并启用后才外发；空 URL 不推送 */
+    webhookEnabled?: boolean;
+    webhookUrl?: string;
+    webhookMode?: "bark" | "ntfy";
 }
 
 /** EC09：打卡绑定。metric 显式区分（不把次数当体重）；itemName 为绑定时点快照（展示用） */

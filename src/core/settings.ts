@@ -19,6 +19,9 @@ export function defaultSettings(): HomeSettings {
         silentTo: 8,
         dbRefs: {},
         onboarded: false,
+        webhookEnabled: false,
+        webhookUrl: "",
+        webhookMode: "bark",
     };
 }
 
