@@ -7,7 +7,7 @@
 用户实测 v0.3.0 安装后找不到任何入口。根因：v0.3.0 构建为压缩体积引入代码分包（14 个 chunks），而思源前端加载插件时把除 `"siyuan"` 外的 `require` 全部转交给 Electron 的 `window.require`——相对路径以思源 app 根目录为基准解析，`require("./chunks/...")` 必然 MODULE_NOT_FOUND，加载器静默吞掉异常后插件从未实例化，顶栏/命令面板/快捷键/状态栏/块菜单全部不存在。该缺陷未被既有门禁发现：单测走 vitest 模块解析、smoke 只查包内容、活体测试只覆盖内核 API，真机 UI 六阶段走查尚未执行。
 
 **修复**
-- **零入口（主要）**：构建改回单文件 bundle（`inlineDynamicImports`，农历等动态 import 一并内联；index.js gzip 仍在体积预算内）
+- **零入口（主要）**：构建改回单文件 bundle（`inlineDynamicImports`，农历等动态 import 一并内联）。单文件 gzip 182.9KB：旧 100KB 预算按"chunks 不计首屏"标定，而分包已被证实不可用，CI 包体预算相应调整为 200KB
 - 宠物模块驱虫周期提醒引用了不存在的 `cycle` 列（每次启动控制台报 schema 违规）——补列（day/week/month/quarter/year）并纳入快速表单；旧库由"只增不改"补列自动修复，周期留空按一次性提醒降级
 - 诊断/关于页版本号硬编码漂移（显示 0.2.0）——改为构建时从 plugin.json 注入（REL-01 版本单源）
 
