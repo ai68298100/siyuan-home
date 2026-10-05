@@ -350,7 +350,8 @@
     <div class="lv-card"><div class="lv-empty"><div class="eic">🌤</div><b>{t("dash.allClear")}</b><span>{t("hub.emptyHint")}</span></div></div>
 {:else if viewMode === "calendar"}
     <!-- 230 波：原生日历视图（数据同列表筛选口径；动作仅"完成"，其余回列表） -->
-    <Calendar items={filtered} {t} {version} onComplete={(r: Reminder) => plugin.complete(r)} />
+    <Calendar items={filtered} {t} {version} onComplete={(r: Reminder) => plugin.complete(r)}
+        onAddMemo={(title: string, due: string) => plugin.addMemo(title, due)} />
 {:else}
     {@const groups = filter === "all"
         ? [

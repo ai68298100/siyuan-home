@@ -6,11 +6,12 @@
     import { localDateKey } from "@/core/hub/rule";
     import { moduleIcon } from "@/core/modules";
 
-    let { items, t, version, onComplete }: {
+    let { items, t, version, onComplete, onAddMemo }: {
         items: Reminder[];
         t: (k: string) => string;
         version?: number;
         onComplete: (r: Reminder) => void;
+        onAddMemo: (title: string, due: string) => void;
     } = $props();
 
     const now = new Date();
@@ -50,6 +51,14 @@
         return r.level === "overdue" ? "danger" : r.level === "soon" ? "warn" : "amber";
     }
     const weekdays = ["cal.wk.mo", "cal.wk.tu", "cal.wk.we", "cal.wk.th", "cal.wk.fr", "cal.wk.sa", "cal.wk.su"];
+    // 233 波：当日面板快捷新增备忘（预设选中日；回车或按钮提交后清空）
+    let memoTitle = $state("");
+    function addMemoForDay() {
+        const title = memoTitle.trim();
+        if (!title) return;
+        onAddMemo(title, selected);
+        memoTitle = "";
+    }
 </script>
 
 <div class="lv-cal">
@@ -97,5 +106,12 @@
                 {/each}
             </div>
         {/if}
+        <!-- 233 波：当日快捷新增备忘（日期预设为选中日） -->
+        <div style="display:flex;gap:6px;margin-top:10px;padding-top:10px;border-top:1px solid var(--lv-line)">
+            <input class="b3-text-field fn__flex-1" style="min-width:0" placeholder={t("cal.memoPlaceholder")}
+                bind:value={memoTitle}
+                onkeydown={(e: KeyboardEvent) => e.key === "Enter" && addMemoForDay()} />
+            <button class="b3-button b3-button--outline" style="flex:none" disabled={!memoTitle.trim()} onclick={addMemoForDay}>＋ {t("memo.add")}</button>
+        </div>
     </div>
 </div>

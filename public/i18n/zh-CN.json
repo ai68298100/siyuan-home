@@ -740,6 +740,7 @@
     "cal.wk.fr": "五",
     "cal.wk.sa": "六",
     "cal.wk.su": "日",
+    "cal.memoPlaceholder": "在此日期新增备忘",
     "cal.itemsUnit": "条",
     "cal.emptyDay": "当日没有提醒；回列表页可新增备忘。",
     "ledger.search": "搜索名称 / 备注 / 拼音",

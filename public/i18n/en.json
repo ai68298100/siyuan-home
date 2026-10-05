@@ -740,6 +740,7 @@
     "cal.wk.fr": "Fr",
     "cal.wk.sa": "Sa",
     "cal.wk.su": "Su",
+    "cal.memoPlaceholder": "Add a memo for this day",
     "cal.itemsUnit": "items",
     "cal.emptyDay": "Nothing due this day; switch to List to add a memo.",
     "ledger.search": "Search name / note / pinyin",
