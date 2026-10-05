@@ -40,8 +40,14 @@
     $effect(() => {
         const listener = () => { version += 1; };
         (plugin.hubListeners as Set<() => void>).add(listener);
-        void plugin.refreshHub();
-        return () => { (plugin.hubListeners as Set<() => void>).delete(listener); };
+        // 225 波修复：refreshHub 必须延后到 effect 同步作用域之外——其缓存路径会在本次 flush 内
+        // 同步触发 hubListeners（version++），在 effect 依赖跟踪未定型时形成
+        // effect_update_depth_exceeded 无限循环（真机首启即崩、页签全冻结）
+        const timer = window.setTimeout(() => { void plugin.refreshHub(); }, 0);
+        return () => {
+            window.clearTimeout(timer);
+            (plugin.hubListeners as Set<() => void>).delete(listener);
+        };
     });
 </script>
 
