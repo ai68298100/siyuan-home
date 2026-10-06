@@ -199,6 +199,7 @@
     "memo.quick": "快速备忘",
     "memo.placeholder": "例如：周三给老师打电话",
     "memo.dateParsed": "已识别日期：${d}",
+    "memo.edit": "编辑备忘",
     "memo.add": "备忘",
     "adhoc.name": "备忘",
     "mod.inLedger": "在台账中查看",

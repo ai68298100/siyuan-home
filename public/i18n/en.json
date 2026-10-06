@@ -199,6 +199,7 @@
     "memo.quick": "Quick memo",
     "memo.placeholder": "e.g. Call the teacher on Wednesday",
     "memo.dateParsed": "Date recognized: ${d}",
+    "memo.edit": "Edit memo",
     "memo.add": "Memo",
     "adhoc.name": "Memo",
     "mod.inLedger": "View in ledger",
