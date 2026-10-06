@@ -138,3 +138,14 @@ export function removeMemo(plugin: Plugin, reminderId: string) {
         rt.memos = rt.memos.filter((m) => m.id !== memoId);
     });
 }
+
+/** 编辑备忘（246 波，收件箱深化）：标题/到期日修正；完成后仍可改（历史留痕不变） */
+export function updateMemo(plugin: Plugin, memoId: string, patch: { title?: string; dueDate?: string }) {
+    return withRuntime(plugin, (rt) => {
+        const id = memoId.startsWith("adhoc::") ? memoId.slice("adhoc::".length) : memoId;
+        const m = rt.memos.find((x) => x.id === id);
+        if (!m) return;
+        if (patch.title !== undefined && patch.title.trim()) m.title = patch.title.trim();
+        if (patch.dueDate !== undefined && patch.dueDate) m.dueDate = patch.dueDate;
+    });
+}

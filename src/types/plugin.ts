@@ -41,4 +41,5 @@ export interface HomePluginLike extends Plugin {
     renew(r: Reminder, iso: string): Promise<unknown>;
     addMemo(title: string, due: string): Promise<void>;
     removeMemo(id: string): Promise<void>;
+    updateMemo(id: string, patch: { title?: string; dueDate?: string }): Promise<void>;
 }

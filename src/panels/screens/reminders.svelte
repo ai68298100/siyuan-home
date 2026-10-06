@@ -207,6 +207,34 @@
         menu.open({ x: ev.clientX, y: ev.clientY });
     }
 
+    // 246 波（收件箱深化）：备忘编辑对话框（标题/到期日修正 → updateMemo 落盘）
+    function editMemoDialog(r: Reminder) {
+        const dlg = new Dialog({ title: t("memo.edit"), content: `<div id="lv-memoedit" style="display:flex;flex-direction:column;gap:10px"></div>`, width: "460px" });
+        const box = dlg.element.querySelector("#lv-memoedit") as HTMLElement;
+        const row1 = document.createElement("div");
+        row1.style.cssText = "display:flex;gap:8px;align-items:center";
+        const l1 = document.createElement("span"); l1.className = "ft__on-surface"; l1.style.minWidth = "72px"; l1.textContent = t("triage.name");
+        const titleInput = document.createElement("input"); titleInput.className = "b3-text-field"; titleInput.style.flex = "1"; titleInput.value = r.title;
+        row1.append(l1, titleInput);
+        const row2 = document.createElement("div");
+        row2.style.cssText = "display:flex;gap:8px;align-items:center";
+        const l2 = document.createElement("span"); l2.className = "ft__on-surface"; l2.style.minWidth = "72px"; l2.textContent = t("triage.due");
+        const dateInput = document.createElement("input"); dateInput.className = "b3-text-field"; dateInput.type = "date"; dateInput.value = r.dueDate;
+        row2.append(l2, dateInput);
+        const save = document.createElement("button"); save.className = "b3-button b3-button--text"; save.textContent = t("save");
+        save.addEventListener("click", async () => {
+            const title = titleInput.value.trim();
+            if (!title) return;
+            await plugin.updateMemo(r.id, { title, dueDate: dateInput.value });
+            dlg.destroy();
+        });
+        const row3 = document.createElement("div");
+        row3.style.cssText = "display:flex;gap:8px;justify-content:flex-end";
+        row3.append(save);
+        box.append(row1, row2, row3);
+        titleInput.focus();
+    }
+
     // 29 组：同成员同日多条合并为一条可展开卡；175 波 O(n) 分组、179 波抽纯函数（core/hub/display，带单测）
     // 181 波：DisplayEntry 平铺化（key/row/items 恒有值），模板无需联合收窄。
     const buildDisplay = (items: Reminder[]) => display(items);
@@ -333,6 +361,8 @@
             <button class="b3-button b3-button--text" onclick={(e) => snoozeMenu(r, e)}>{t("act.snooze")} ▾</button>
             <button class="b3-button b3-button--text" onclick={() => plugin.mute(r.id)}>{t("act.mute")}</button>
             {#if r.moduleId === "adhoc"}
+                <!-- 246 波（收件箱深化）：备忘编辑（标题/到期日） -->
+                <button class="b3-button b3-button--text" onclick={() => editMemoDialog(r)}>{t("memo.edit")}</button>
                 <!-- H03：备忘的显式删除（唯一物理删除路径；未处理项不自动清理） -->
                 <button class="b3-button b3-button--text" onclick={() => confirmDeleteMemo(r)}>{t("delete")}</button>
                 <!-- 240 波（收件箱分诊）：备忘 → 正式台账行 -->

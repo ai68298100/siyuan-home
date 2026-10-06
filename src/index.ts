@@ -10,7 +10,7 @@ import { loadRuntime, saveRuntime, purgeHandled, listHandled, type HubRuntime } 
 import { runScan, deriveVisible, type ScanResult } from "@/core/hub/scanner";
 import { buildScanProviders } from "@/core/hub/registry";
 import { dailyDigest, markNotified, inSilentHours, weeklyPreview, markWeeklyNotified } from "@/core/hub/notify";
-import { complete, snooze, mute, unmute, renew, restore, addMemo, removeMemo } from "@/core/hub/actions";
+import { complete, snooze, mute, unmute, renew, restore, addMemo, removeMemo, updateMemo } from "@/core/hub/actions";
 import { provisionModule } from "@/core/provisioner";
 import { addDetachedRow, setCell } from "@/core/siyuan";
 import { mountLvHomeBridge } from "@/bridge/external-bridge";
@@ -662,6 +662,7 @@ export default class LvHomePlugin extends Plugin {
             .then(() => this.refreshHub(r.moduleId));
     }
     async addMemo(title: string, due: string) { await addMemo(this, title, due); await this.notifyHubChanged(); }
+    async updateMemo(id: string, patch: { title?: string; dueDate?: string }) { await updateMemo(this, id, patch); await this.notifyHubChanged(); }
     /** 删除备忘（显式动作，H03：未处理备忘只经此删除） */
     async removeMemo(id: string) { await removeMemo(this, id); await this.notifyHubChanged(); }
     /** 已处理视图数据（H07） */

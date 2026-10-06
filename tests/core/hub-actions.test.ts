@@ -12,7 +12,7 @@ import {
     applyRuntime, defaultRuntime, listHandled, purgeHandled, type HubRuntime,
 } from "@/core/hub/runtime";
 import { runScan, deriveVisible } from "@/core/hub/scanner";
-import { snooze, mute, complete, restore, withRuntime, renew } from "@/core/hub/actions";
+import { snooze, mute, complete, restore, withRuntime, renew, updateMemo } from "@/core/hub/actions";
 import { CertsProvider, leadFor } from "@/core/hub/providers";
 import { inSilentHours, dailyDigest, weeklyPreview, markWeeklyNotified, isoWeekKey } from "@/core/hub/notify";
 import { setTransport } from "@/core/siyuan";
@@ -400,5 +400,22 @@ describe("29 组每周预告", () => {
         const rt: HubRuntime = { ...defaultRuntime() };
         expect(weeklyPreview(scanWith(3), settings(), rt, sundayNight).shouldNotify).toBe(false);
         expect(weeklyPreview(scanWith(0), settings(), rt, new Date(2026, 9, 4, 10, 0)).shouldNotify).toBe(false);
+    });
+});
+
+describe("updateMemo（246 波收件箱深化）", () => {
+    it("标题/到期日修正经写队列落盘；未知 id 不动", async () => {
+        const { plugin, store } = memoryPlugin();
+        const { updateMemo } = await import("@/core/hub/actions");
+        await withRuntime(plugin, (rt) => {
+            rt.memos = [{ id: "m1", title: "旧标题", dueDate: "2026-10-01", createdAt: "t" }];
+        });
+        await updateMemo(plugin, "m1", { title: "新标题", dueDate: "2026-11-01" });
+        const saved = JSON.parse(store["hub-runtime.json"]);
+        expect(saved.memos[0].title).toBe("新标题");
+        expect(saved.memos[0].dueDate).toBe("2026-11-01");
+        await updateMemo(plugin, "m-不存在", { title: "幽灵" });
+        const after = JSON.parse(store["hub-runtime.json"]);
+        expect(after.memos[0].title).toBe("新标题");
     });
 });
