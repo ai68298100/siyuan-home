@@ -5,6 +5,7 @@
     import { buildDisplay as display } from "@/core/hub/display";
     import { relativeDue, weekdayKey } from "@/core/hub/rule";
     import { addDetachedRow, setCell } from "@/core/siyuan";
+    import { provisionModule } from "@/core/provisioner";
     import { toggleMemoPin } from "@/core/hub/actions";
     import Calendar from "@/panels/screens/calendar.svelte";
     import { moduleIcon } from "@/core/modules";
@@ -251,19 +252,24 @@
     // 236 波（收件箱分诊）：备忘 → 正式台账行。目标限已建库的非成员模块；
     // 名称带入备忘标题、日期带入目标模块首个日期列；创建后完成备忘（可在"已处理"恢复）。
     async function toLedgerDialog(r: Reminder) {
+        // 247 波：目标扩展到已启用未建库模块（选中后自动建库再入行）
         const targets = (plugin.settings.enabledModules ?? [])
             .filter((id) => id !== "adhoc" && id !== "members")
-            .map((id) => ({ id, ref: plugin.settings.dbRefs[id] }))
-            .filter((x) => x.ref?.avId);
+            .map((id) => ({ id, ref: plugin.settings.dbRefs[id] }));
         if (!targets.length) { showMessage(t("triage.noTarget"), 3500, "error"); return; }
         const modLabel = (id: string) => (t(`module.${id}`) !== `module.${id}` ? t(`module.${id}`) : id);
+        const needProvision = (id: string) => !plugin.settings.dbRefs[id]?.avId;
         const dlg = new Dialog({ title: t("triage.title"), content: `<div id="lv-triage" style="display:flex;flex-direction:column;gap:10px"></div>`, width: "460px" });
         const box = dlg.element.querySelector("#lv-triage") as HTMLElement;
         const row1 = document.createElement("div");
         row1.style.cssText = "display:flex;gap:8px;align-items:center";
         const l1 = document.createElement("span"); l1.className = "ft__on-surface"; l1.style.minWidth = "72px"; l1.textContent = t("triage.module");
         const sel = document.createElement("select"); sel.className = "b3-select"; sel.style.flex = "1";
-        for (const x of targets) { const o = document.createElement("option"); o.value = x.id; o.textContent = modLabel(x.id); sel.append(o); }
+        for (const x of targets) {
+            const o = document.createElement("option"); o.value = x.id;
+            o.textContent = modLabel(x.id) + (needProvision(x.id) ? t("triage.needProvision") : "");
+            sel.append(o);
+        }
         row1.append(l1, sel);
         // 246 波（收件箱深化）：成员分配（relation 写入同台账快速表单；未分配=不写成员列）
         const rowM = document.createElement("div");
@@ -292,8 +298,14 @@
             const title = nameInput.value.trim();
             if (!title) return;
             const mod = sel.value;
-            const ref = plugin.settings.dbRefs[mod];
-            if (!ref?.avId) { showMessage(t("triage.noTarget"), 3000, "error"); return; }
+            let ref = plugin.settings.dbRefs[mod];
+            // 247 波：未建库模块自动建库（provisionModule 幂等；登记写入 settings 后 ref 即有效）
+            if (!ref?.avId) {
+                ok.textContent = t("triage.provisioning");
+                await provisionModule(plugin.settings, mod, plugin.schemaCatalog?.[mod], t("module." + mod), { resolveName: (key: string) => String(plugin.i18n[`field.${key}`] ?? key) });
+                ref = plugin.settings.dbRefs[mod];
+                if (!ref?.avId) { showMessage(t("triage.noTarget"), 3000, "error"); return; }
+            }
             const itemID = await addDetachedRow(ref.avId, title);
             // 新建行身份确认存在延迟：setCell 失败受控重试（同格重写不会重复建行）
             const setCellSafe = async (key: string, value: unknown) => {
