@@ -256,6 +256,18 @@
         const sel = document.createElement("select"); sel.className = "b3-select"; sel.style.flex = "1";
         for (const x of targets) { const o = document.createElement("option"); o.value = x.id; o.textContent = modLabel(x.id); sel.append(o); }
         row1.append(l1, sel);
+        // 246 波（收件箱深化）：成员分配（relation 写入同台账快速表单；未分配=不写成员列）
+        const rowM = document.createElement("div");
+        rowM.style.cssText = "display:flex;gap:8px;align-items:center";
+        const lM = document.createElement("span"); lM.className = "ft__on-surface"; lM.style.minWidth = "72px"; lM.textContent = t("field.member");
+        const memberSel = document.createElement("select"); memberSel.className = "b3-select"; memberSel.style.flex = "1";
+        const none = document.createElement("option"); none.value = ""; none.textContent = t("members.unassigned");
+        memberSel.append(none);
+        for (const m of plugin.settings.members ?? []) {
+            const o = document.createElement("option"); o.value = m.avItemId ?? m.id; o.textContent = m.name;
+            memberSel.append(o);
+        }
+        rowM.append(lM, memberSel);
         const row2 = document.createElement("div");
         row2.style.cssText = "display:flex;gap:8px;align-items:center";
         const l2 = document.createElement("span"); l2.className = "ft__on-surface"; l2.style.minWidth = "72px"; l2.textContent = t("triage.name");
@@ -294,6 +306,9 @@
             const dateCol = schemaCols.find((c: any) => c.type === "date" && ruleFields.includes(c.key))
                 ?? schemaCols.find((c: any) => c.type === "date");
             if (dateCol && r.dueDate) await setCellSafe(dateCol.key, { type: "date", date: { content: new Date(`${r.dueDate}T00:00:00`).getTime(), isNotEmpty: true, isNotTime: true } });
+            // 成员分配（246 波）：relation 写入（选了成员才写）
+            const member = memberSel.value;
+            if (member) await setCellSafe("member", { type: "relation", relation: { blockIDs: [member], contents: null } });
             dlg.destroy();
             showMessage(t("triage.done").replace("${mod}", modLabel(mod)), 4000, "info");
             await plugin.complete(r);
@@ -301,7 +316,7 @@
             await plugin.refreshHub();
         };
         ok.addEventListener("click", () => { ok.disabled = true; doCreate().finally(() => { ok.disabled = false; }); });
-        box.append(row1, row2, row3, ok);
+        box.append(row1, rowM, row2, row3, ok);
         nameInput.focus();
     }
 
