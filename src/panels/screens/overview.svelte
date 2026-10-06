@@ -7,7 +7,7 @@
     import { parseNaturalDate } from "@/core/dateparse";
     import { memberHue } from "@/core/format";
     import { showMessage } from "siyuan";
-    import { moduleIcon as icons } from "@/core/modules";
+    import { moduleIcon as icons, moduleTone } from "@/core/modules";
 
     let { plugin, t, onGoto, version }: { plugin: HomePluginLike; t: (k: string) => string; onGoto: (s: string) => void; version?: number } = $props();
 
@@ -176,7 +176,11 @@
     <div class="lv-card lv-rems">
         {#each top as r (r.id)}
             <div class="lv-rem {r.level}">
-                <div class="lv-rem-ic">{r.moduleId === "adhoc" ? "📝" : moduleIcon(r.moduleId)}</div>
+                <div class="lv-rem-ic" class:tone-blue={r.moduleId !== "adhoc" && moduleTone(r.moduleId) === "t-blue"}
+                    class:tone-green={r.moduleId !== "adhoc" && moduleTone(r.moduleId) === "t-green"}
+                    class:tone-rose={r.moduleId !== "adhoc" && moduleTone(r.moduleId) === "t-rose"}
+                    class:tone-amber={r.moduleId !== "adhoc" && moduleTone(r.moduleId) === "t-amber"}
+                >{r.moduleId === "adhoc" ? "📝" : moduleIcon(r.moduleId)}</div>
                 <div class="lv-rem-t"><b>{r.title}</b><span>{t(`module.${r.moduleId}`) !== `module.${r.moduleId}` ? t(`module.${r.moduleId}`) : t("adhoc.name")}{r.lunar ? " 🌙" : ""}{r.autoRenew ? " 🔄" : ""}</span></div>
                 <div class="lv-rem-when"><b class="lv-num" style="color:var(--lv-{r.level === 'overdue' ? 'danger' : r.level === 'soon' ? 'warn' : 'amber'})">
                     {r.daysLeft < 0 ? t("days.overdue").replace("${n}", String(-r.daysLeft)) : r.daysLeft === 0 ? t("days.today") : t("days.after").replace("${n}", String(r.daysLeft))}
@@ -219,7 +223,9 @@
             onkeydown={(e: KeyboardEvent) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); plugin.setActiveLedger(mid); onGoto("ledger"); } }}
             onclick={() => { plugin.setActiveLedger(mid); onGoto("ledger"); }}
         >
-            <div class="lv-mi t-blue" aria-hidden="true">{moduleIcon(mid)}</div><b>{t(`module.${mid}`)}</b>
+            <div class="lv-mi" class:tone-blue={moduleTone(mid) === "t-blue"} class:tone-green={moduleTone(mid) === "t-green"}
+                class:tone-rose={moduleTone(mid) === "t-rose"} class:tone-amber={moduleTone(mid) === "t-amber"}
+                aria-hidden="true">{moduleIcon(mid)}</div><b>{t(`module.${mid}`)}</b>
             <div class="lv-stat" title={t("dash.statScope").replace("${t}", snapshotLabel)}>
             {#if pending > 0}
                 <!-- 17 组/196 波：徽章=独立下钻目标（stopPropagation，卡片本体仍进台账） -->

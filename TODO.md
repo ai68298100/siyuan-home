@@ -35,6 +35,7 @@
 - [ ] 拼音/首字母检索、已有文档块进台账、Webhook、rollup、提醒双日期、QR、语音、AI、家庭共享权限、更多模块深化；每项先写用户结果、依赖、停止条件和证据等级。
 
 
+| 2026-10-06 | 主线 | 第二百四十九波：**UI 质感精修（原型对齐二轮，截图驱动）** | 原型浅色主题逐屏截图 vs 生产截图逐项对比（差距九项：边框过重/阴影不可感知/section 节奏紧/色砖缺失/meta 缺模块名/section 标题弱/qbtn 闷底/strip 闷底/磁贴偏小）→ design-system.scss 系统性打磨（阴影三级多层低透明度重标定、卡片边框 7% 半透明化、lv-sec 26→30、lv-title-sec 13px 深色化、lv-strip/lv-qbtn 白底面板化+shadow-1、磁贴 36→38px）+ 模块色砖体系（core/modules moduleTone 映射 31 模块→5 色 tone-*，CSS 变量消费无优先级冲突，reminders 行磁贴/overview 模块卡+即将到期/提醒行 meta 补模块名三段式）；**调试教训**：Svelte5 模板 attr 内含引号嵌套的复杂 class 表达式被静默丢弃（产物里 moduleTone=0 无报错）——改 class: 指令后生效，编译产物 grep 必查；真机截图复核全部收敛；门禁全绿（272 测试/i18n 878 键/smoke/loader） |
 | 2026-10-06 | 主线 | 第二百四十八波：🏁 **v0.3.7 发版**（打包 246 波：QR 打印标签页） | CHANGELOG v0.3.7 段 → 版本 0.3.7（package/plugin）→ README 双语路线图行 → 全门禁 → tag v0.3.7 → CI 发布 → 发布包核验 → 装回工作区 |
 | 2026-10-06 | 主线 | 第二百四十八波：🏁 **v0.3.8 发版**（打包 247 波：备忘置顶）+ v0.3.7 变更说明补全（成员分配/备忘编辑） | CHANGELOG v0.3.8 段 → 版本 0.3.8（package/plugin）→ README 双语路线图行 → 全门禁 → tag v0.3.8 → CI 发布 → 发布包核验 → 装回工作区 |
 | 2026-10-06 | 主线 | 第二百四十七波：**备忘置顶（收件箱深化）** | actions.toggleMemoPin（写队列串行、runtime.pinnedMemoIds 切换）+ HomePluginLike 类型 + 提醒中枢 adhoc 行 📌 置顶/取消置顶按钮（refreshHub 触发重排）；组内置顶排序（pinnedFirst：置顶项排最前）；i18n +2 键；真机验证：同组内置顶甲排乙前 ✓；门禁全绿（272 测试/i18n 880 键/smoke/loader） |

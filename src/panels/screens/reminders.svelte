@@ -8,7 +8,7 @@
     import { provisionModule } from "@/core/provisioner";
     import { toggleMemoPin } from "@/core/hub/actions";
     import Calendar from "@/panels/screens/calendar.svelte";
-    import { moduleIcon } from "@/core/modules";
+    import { moduleIcon, moduleTone } from "@/core/modules";
     import type { Reminder } from "@/types";
     let { plugin, t, version }: { plugin: HomePluginLike; t: (k: string) => string; version?: number } = $props();
 
@@ -375,10 +375,15 @@
             <input type="checkbox" class="b3-checkbox" aria-label={t("hub.select")}
                 checked={selected.has(r.id)} onchange={() => toggleSelect(r.id)} style="flex-shrink:0" />
         {/if}
-        <div class="lv-rem-ic">{r.moduleId === "adhoc" ? "📝" : moduleIcon(r.moduleId)}</div>
+        <div class="lv-rem-ic" class:tone-blue={r.moduleId !== "adhoc" && moduleTone(r.moduleId) === "t-blue"}
+            class:tone-green={r.moduleId !== "adhoc" && moduleTone(r.moduleId) === "t-green"}
+            class:tone-rose={r.moduleId !== "adhoc" && moduleTone(r.moduleId) === "t-rose"}
+            class:tone-amber={r.moduleId !== "adhoc" && moduleTone(r.moduleId) === "t-amber"}
+        >{r.moduleId === "adhoc" ? "📝" : moduleIcon(r.moduleId)}</div>
         <div class="lv-rem-t" title={(r.autoRenew ? `${t("hub.autoRenew")} · ` : "") + r.dueDate}>
             <b>{r.title}{r.ruleKey === "reciprocate" ? ` · ${t("rule.reciprocate")}` : ""}</b>
-            <span class="lv-num">{r.dueDate}{r.lunar ? " 🌙" : ""}{r.autoRenew ? " 🔄" : ""}</span>
+            <!-- 249 波：meta 补模块名（对齐原型三段 meta），模块名与日期并列 -->
+            <span class="lv-num">{r.moduleId !== "adhoc" ? (t(`module.${r.moduleId}`) !== `module.${r.moduleId}` ? t(`module.${r.moduleId}`) : r.moduleId) + " · " : ""}{r.dueDate}{r.lunar ? " 🌙" : ""}{r.autoRenew ? " 🔄" : ""}</span>
         </div>
         <!-- 对齐原型：相对到期大字居右（颜色随级别；文字本身已承载逾期/N天后语义，级别徽章不再重复） -->
         <div class="lv-rem-when">

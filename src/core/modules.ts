@@ -64,3 +64,19 @@ export const MODULE_ICONS: Record<string, string> = {
 };
 
 export const moduleIcon = (mid: string): string => MODULE_ICONS[mid] ?? "🗂";
+
+/** 249 波（UI 质感对齐）：模块 → 色调砖 class（t-blue/t-green/t-warn/t-rose/t-amber），
+ *  图标磁贴按模块着色（对齐原型模块色砖）；未映射模块回退 t-blue。 */
+const MODULE_TONES: Record<string, string> = {
+    members: "t-rose", certs: "t-blue", health: "t-green", insurance: "t-blue", exams: "t-amber",
+    pets: "t-green", social: "t-rose", "assets-real": "t-amber", "assets-virtual": "t-blue",
+    shopping: "t-rose", memberships: "t-blue", contracts: "t-blue", medicine: "t-rose",
+    stock: "t-green", favors: "t-rose", chores: "t-green", food: "t-amber", address: "t-blue",
+    snippets: "t-amber", house: "t-green", parenting: "t-amber", schooling: "t-blue",
+    allowance: "t-green", bookmarks: "t-amber", vehicles: "t-blue", transit: "t-green",
+    "travel-plan": "t-blue", "travel-booking": "t-amber", "travel-packing": "t-green",
+    "travel-log": "t-rose", media: "t-rose",
+};
+
+export const moduleTone = (mid: string): string => MODULE_TONES[mid] ?? "t-blue";
+

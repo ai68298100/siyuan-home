@@ -35,9 +35,10 @@
   --lv-ok-soft: var(--b3-card-success-background);
   --lv-inset: rgba(255, 255, 255, .05);
   --lv-aura: color-mix(in srgb, var(--b3-theme-primary) 7%, transparent);
-  --lv-shadow-1: 0 1px 2px rgba(0, 0, 0, .16), 0 1px 6px rgba(0, 0, 0, .06);
-  --lv-shadow-2: 0 8px 28px rgba(0, 0, 0, .20), 0 2px 8px rgba(0, 0, 0, .12);
-  --lv-shadow-3: 0 24px 64px rgba(0, 0, 0, .30), 0 6px 16px rgba(0, 0, 0, .20);
+  // 阴影三级（249 波对齐原型：多层低透明度叠加，浅色下可感知柔和分层）
+  --lv-shadow-1: 0 1px 2px rgba(0, 0, 0, .07), 0 2px 8px rgba(0, 0, 0, .05), 0 8px 24px rgba(0, 0, 0, .04);
+  --lv-shadow-2: 0 2px 6px rgba(0, 0, 0, .08), 0 8px 28px rgba(0, 0, 0, .10);
+  --lv-shadow-3: 0 8px 20px rgba(0, 0, 0, .12), 0 24px 64px rgba(0, 0, 0, .18);
   --lv-z-topbar: 50; --lv-z-mask: 90; --lv-z-drawer: 100; --lv-z-modal: 110;
 
   position: relative;
@@ -59,9 +60,17 @@
   // 触屏命中区下限（26.7/227 波移动走查回归项）：面板内全部文本按钮 ≥32px
   .b3-button--text { min-height: 32px; }
 
+  // ── 模块色砖变量（249 波）：图标磁贴按模块着色（对齐原型模块色砖）；
+  // tone-* 只定义变量，磁贴自身 background/border 消费（无优先级冲突）
+  .tone-blue { --tile-bg: color-mix(in srgb, var(--b3-theme-primary) 11%, transparent); --tile-border: color-mix(in srgb, var(--b3-theme-primary) 24%, transparent); }
+  .tone-green { --tile-bg: var(--lv-ok-soft); --tile-border: color-mix(in srgb, var(--lv-ok) 24%, transparent); }
+  .tone-rose { --tile-bg: var(--lv-danger-soft); --tile-border: color-mix(in srgb, var(--lv-danger) 24%, transparent); }
+  .tone-amber { --tile-bg: var(--lv-amber-soft); --tile-border: color-mix(in srgb, var(--lv-amber) 24%, transparent); }
+
   // ── 2. 排版 ─────────────────────────────────────────────
   .lv-title-page { font-size: 26px; font-weight: 600; letter-spacing: -.02em; }
-  .lv-title-sec { font-size: 12.5px; font-weight: 600; letter-spacing: .05em; color: var(--lv-tx-2); }
+  // 249 波：section 标题深色化（对齐原型：深色加粗小标题，非浅色大写风）
+  .lv-title-sec { font-size: 13px; font-weight: 600; letter-spacing: .01em; color: var(--lv-tx); }
   .lv-sub { font-size: 12px; color: var(--lv-tx-3); }
   .lv-caption { font-size: 11.5px; color: var(--lv-tx-3); }
   .lv-num { font-variant-numeric: tabular-nums; font-feature-settings: "tnum"; }
@@ -98,8 +107,10 @@
   .lv-people { display: grid; grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); gap: 14px; }
   /* 171 波（对齐原型质感，不低于）：context-strip 状态条 + focus-row 三重点卡 */
   .lv-strip { display: flex; flex-wrap: wrap; gap: 4px 18px; align-items: center; margin: 0 2px;
-    padding: 8px 14px; border: 1px solid var(--lv-line); border-radius: var(--lv-r-2); font-size: 12px;
-    color: var(--lv-tx-3); background: color-mix(in srgb, var(--lv-surface-2) 55%, transparent);
+    padding: 8px 14px; border: 1px solid color-mix(in srgb, var(--b3-theme-on-background) 6%, transparent);
+    border-radius: var(--lv-r-2); font-size: 12px;
+    color: var(--lv-tx-3); background: var(--b3-theme-surface);
+    box-shadow: var(--lv-shadow-1);
     strong { color: var(--lv-tx-2); font-weight: 500; margin-right: 4px; } }
   .lv-focus { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin: 14px 2px 2px; }
   .lv-focus-card { display: flex; align-items: center; gap: 12px; padding: 14px 16px;
@@ -126,7 +137,7 @@
       b { font-size: 46px; font-weight: 700; letter-spacing: -.04em; }
       span { color: var(--lv-tx-3); font-size: 12.5px; } }
   }
-  .lv-sec { display: flex; align-items: baseline; gap: 10px; margin: 26px 2px 12px;
+  .lv-sec { display: flex; align-items: baseline; gap: 10px; margin: 30px 2px 12px; // 249 波：section 节奏 26→30（对齐原型呼吸）
     .lv-link { margin-left: auto; font-size: 12.5px; color: var(--lv-accent); text-decoration: none;
       transition: opacity var(--lv-t-fast) var(--lv-ease); }
     .lv-link:hover { opacity: .75; } }
@@ -135,7 +146,9 @@
     &::after { content: ""; flex: 1; height: 1px; background: var(--lv-line); } }
 
   // ── 4. 卡片与容器 ───────────────────────────────────────
-  .lv-card { background: var(--b3-theme-surface); border: 1px solid var(--lv-line);
+  // 249 波：卡片边框淡化（阴影承担分层），对齐原型"1px 半透明描边"
+  .lv-card { background: var(--b3-theme-surface);
+    border: 1px solid color-mix(in srgb, var(--b3-theme-on-background) 7%, transparent);
     border-radius: var(--lv-r-3); box-shadow: var(--lv-shadow-1), inset 0 1px 0 var(--lv-inset); }
   .lv-card--hover { cursor: pointer; transition: transform var(--lv-t-med) var(--lv-ease),
       box-shadow var(--lv-t-med) var(--lv-ease), border var(--lv-t-med) var(--lv-ease);
@@ -193,8 +206,9 @@
     &::before { content: ""; position: absolute; left: 0; top: 12px; bottom: 12px; width: 3px;
       border-radius: 3px; background: var(--lv-line); transition: box-shadow var(--lv-t-med) var(--lv-ease); }
     &:hover { background: var(--lv-surface-2); }
-    .lv-rem-ic { width: 36px; height: 36px; border-radius: 11px; display: grid; place-items: center;
-      flex: none; font-size: 16px; background: var(--lv-surface-2); border: 1px solid var(--lv-line);
+    .lv-rem-ic { width: 38px; height: 38px; border-radius: 11px; display: grid; place-items: center;
+      flex: none; font-size: 16px; background: var(--tile-bg, var(--lv-surface-2));
+      border: 1px solid var(--tile-border, var(--lv-line));
       box-shadow: inset 0 1px 0 var(--lv-inset); }
     .lv-rem-t { min-width: 0; b { font-weight: 500; font-size: 13.5px; display: block;
         white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
@@ -213,8 +227,11 @@
     &.lead::before { background: var(--lv-amber); } &.lead:hover::before { box-shadow: 0 0 8px 1px var(--lv-amber); } }
 
   // ── 8. 模块卡 / 色砖 / 趋势条 / 进度条 ──────────────────
-  .lv-mi { width: 34px; height: 34px; border-radius: 10px; display: grid; place-items: center;
-    font-size: 16px; transition: transform var(--lv-t-med) var(--lv-spring); }
+  .lv-mi { width: 38px; height: 38px; border-radius: 11px; display: grid; place-items: center;
+    font-size: 16px; background: var(--tile-bg, var(--lv-surface-2));
+    border: 1px solid var(--tile-border, var(--lv-line));
+    box-shadow: inset 0 1px 0 var(--lv-inset);
+    transition: transform var(--lv-t-med) var(--lv-spring); }
   .lv-mod { padding: 16px; display: flex; flex-direction: column; gap: 10px; min-height: 118px;
     &:hover .lv-mi { transform: scale(1.08) rotate(-4deg); }
     b { font-size: 13.5px; font-weight: 500; }
@@ -329,8 +346,10 @@
   // ── 13. 快速记录 / 成员行 ──────────────────────────────
   .lv-quick { display: flex; gap: 8px; flex-wrap: wrap; }
   .lv-qbtn { display: inline-flex; align-items: center; gap: 8px; padding: 9px 16px; border-radius: var(--lv-r-2);
-    background: var(--b3-theme-surface); border: 1px solid var(--lv-line); font-size: 13px; color: var(--lv-tx-2);
-    box-shadow: inset 0 1px 0 var(--lv-inset); transition: all var(--lv-t-fast) var(--lv-ease);
+    background: var(--b3-theme-surface);
+    border: 1px solid color-mix(in srgb, var(--b3-theme-on-background) 8%, transparent);
+    font-size: 13px; color: var(--lv-tx-2);
+    box-shadow: var(--lv-shadow-1), inset 0 1px 0 var(--lv-inset); transition: all var(--lv-t-fast) var(--lv-ease);
     &:hover { color: var(--lv-tx); border-color: var(--lv-accent-line); transform: translateY(-2px);
       box-shadow: var(--lv-shadow-2), inset 0 1px 0 var(--lv-inset); }
     &:active { transform: none; }
