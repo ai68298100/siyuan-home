@@ -92,6 +92,48 @@
     // G1（UG12 研究产出）：高后果模块导出前点名确认——健康/证件/财务/儿童相关
     const HIGH_CONSEQUENCE_MODULES = new Set(["health", "parenting", "certs", "insurance", "assets-real", "assets-virtual", "contracts", "medicine", "schooling"]);
 
+    // 246 波（QR 标签打印页）：当前模块全量行 → QR（块深链，无绑定行回退台账文档深链）+ 名称，隐藏 iframe 调起打印
+    async function printLabels() {
+        if (!ref?.avId || !ref.docId) return;
+        const all = await renderLedgerAll(ref.avId);
+        const q = searchText.trim().toLowerCase();
+        let list = all.rows;
+        if (q) {
+            list = list.filter((r) => {
+                const nameCol = ref?.columns?.name ? (r.cells[ref.columns.name]?.text?.content ?? r.cells[ref.columns.name]?.block?.content ?? "") : "";
+                const noteCol = ref?.columns?.note ? (r.cells[ref.columns.note]?.text?.content ?? "") : "";
+                return nameCol.toLowerCase().includes(q) || noteCol.toLowerCase().includes(q);
+            });
+        }
+        if (list.length === 0) { showMessage(t("ledger.printNoRows"), 3000, "info"); return; }
+        const labels = await Promise.all(list.map(async (r) => {
+            const nameCol = ref.columns?.name;
+            const nameVal = nameCol ? r.cells?.[nameCol] : undefined;
+            const blockId = nameVal?.type === "block" ? nameVal.block?.id : undefined;
+            const name = cellText(nameVal, "name");
+            const link = blockDeepLink(blockId || ref.docId!);
+            let qr = "";
+            try { qr = await generateQRDataUrl(link, 160); } catch { qr = ""; }
+            return { name, qr };
+        }));
+        const esc = (s: string) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+        const html = `<!doctype html><html><head><meta charset="utf-8"><title>${t("ledger.printTitle")}</title>
+<style>body{font-family:system-ui,sans-serif;margin:0;padding:16px}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:12px}
+.label{border:1px dashed #999;border-radius:8px;padding:12px;text-align:center;page-break-inside:avoid}
+.label img{width:140px;height:140px}
+.label .nm{font-size:13px;font-weight:600;margin-top:6px;word-break:break-all}
+.label .tip{font-size:10px;color:#666;margin-top:2px}
+@media print{.noprint{display:none}}</style></head><body>
+<div class="noprint" style="text-align:center;margin-bottom:12px"><button onclick="window.print()">打印</button></div>
+<div class="grid">${labels.map((l) => `<div class="label"><img src="${l.qr}" alt="QR"><div class="nm">${esc(l.name)}</div><div class="tip">${t("ledger.printScanTip")}</div></div>`).join("")}</div>
+<script>window.print()<\/script></body></html>`;
+        const w = window.open("", "_blank");
+        if (!w) { showMessage(t("ledger.printBlocked"), 4000, "error"); return; }
+        w.document.write(html);
+        w.document.close();
+    }
+
     function exportCsv() {
         if (!ref?.columns || filteredRows.length === 0) return;
         const download = async () => {
@@ -1422,6 +1464,9 @@
             bind:value={searchText} title={t("ledger.search")} />
         <button class="b3-button b3-button--outline" title={t("ledger.exportCsvTip")}
             disabled={filteredRows.length === 0} onclick={exportCsv}>{t("ledger.exportCsv")}</button>
+        <!-- 246 波：QR 标签打印页（扫码直达对应行） -->
+        <button class="b3-button b3-button--outline" title={t("ledger.printLabels")}
+            disabled={filteredRows.length === 0} onclick={printLabels}>{t("ledger.printLabels")}</button>
         {#if active === "parenting"}
             <button class="b3-button b3-button--outline" onclick={openGrowthChart}>{t("ledger.growthChart")}</button>
         {/if}
