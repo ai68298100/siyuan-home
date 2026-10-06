@@ -193,6 +193,8 @@
     "week.sat": "周六",
     "act.done": "完成",
     "act.snooze7": "延后7天",
+    "act.pin": "置顶",
+    "act.unpin": "取消置顶",
     "act.mute": "忽略",
     "act.renew": "续期…",
     "act.renewPrompt": "新的到期日（YYYY-MM-DD）",

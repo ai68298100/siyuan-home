@@ -78,6 +78,8 @@ export interface HubRuntime {
     renewHistory: Record<string, { from: string; to: string; at: string }[]>;
     /** 快速备忘 */
     memos: AdhocMemo[];
+    /** 置顶备忘 id 清单（246 波收件箱深化）：列表组内置顶排序 */
+    pinnedMemoIds?: string[];
     /** 每日摘要去重：最后通知日期 */
     lastNotifiedDate?: string;
     /** 逾期即时提醒去重：最后提示日期（B3b） */

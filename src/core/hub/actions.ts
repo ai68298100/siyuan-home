@@ -149,3 +149,14 @@ export function updateMemo(plugin: Plugin, memoId: string, patch: { title?: stri
         if (patch.dueDate !== undefined && patch.dueDate) m.dueDate = patch.dueDate;
     });
 }
+
+/** 备忘置顶切换（246 波收件箱深化）：置顶项在提醒列表组内始终排最前 */
+export function toggleMemoPin(plugin: Plugin, memoId: string) {
+    return withRuntime(plugin, (rt) => {
+        const id = memoId.startsWith("adhoc::") ? memoId.slice("adhoc::".length) : memoId;
+        rt.pinnedMemoIds = rt.pinnedMemoIds ?? [];
+        const i = rt.pinnedMemoIds.indexOf(id);
+        if (i >= 0) rt.pinnedMemoIds.splice(i, 1);
+        else rt.pinnedMemoIds.push(id);
+    });
+}

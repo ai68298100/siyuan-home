@@ -193,6 +193,8 @@
     "week.sat": "Sat",
     "act.done": "Done",
     "act.snooze7": "Snooze 7d",
+    "act.pin": "Pin",
+    "act.unpin": "Unpin",
     "act.mute": "Mute",
     "act.renew": "Renew…",
     "act.renewPrompt": "New expiry (YYYY-MM-DD)",

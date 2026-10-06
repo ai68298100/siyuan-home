@@ -5,6 +5,7 @@
     import { buildDisplay as display } from "@/core/hub/display";
     import { relativeDue, weekdayKey } from "@/core/hub/rule";
     import { addDetachedRow, setCell } from "@/core/siyuan";
+    import { toggleMemoPin } from "@/core/hub/actions";
     import Calendar from "@/panels/screens/calendar.svelte";
     import { moduleIcon } from "@/core/modules";
     import type { Reminder } from "@/types";
@@ -235,6 +236,14 @@
         titleInput.focus();
     }
 
+    // 246 波（收件箱深化）：备忘置顶——置顶项在所属分组内排最前
+    function isPinned(r: Reminder): boolean {
+        const id = r.id.startsWith("adhoc::") ? r.id.slice("adhoc::".length) : r.id;
+        return (plugin.runtime?.pinnedMemoIds ?? []).includes(id);
+    }
+    function pinnedFirst(items: Reminder[]): Reminder[] {
+        return [...items].sort((a, b) => Number(isPinned(b)) - Number(isPinned(a)));
+    }
     // 29 组：同成员同日多条合并为一条可展开卡；175 波 O(n) 分组、179 波抽纯函数（core/hub/display，带单测）
     // 181 波：DisplayEntry 平铺化（key/row/items 恒有值），模板无需联合收窄。
     const buildDisplay = (items: Reminder[]) => display(items);
@@ -376,6 +385,9 @@
             <button class="b3-button b3-button--text" onclick={(e) => snoozeMenu(r, e)}>{t("act.snooze")} ▾</button>
             <button class="b3-button b3-button--text" onclick={() => plugin.mute(r.id)}>{t("act.mute")}</button>
             {#if r.moduleId === "adhoc"}
+                <!-- 246 波（收件箱深化）：备忘置顶（置顶项组内排最前） -->
+                <button class="b3-button b3-button--text" title={isPinned(r) ? t("act.unpin") : t("act.pin")}
+                    onclick={() => toggleMemoPin(plugin, r.id).then(() => plugin.refreshHub())}>{isPinned(r) ? t("act.unpin") : t("act.pin")}</button>
                 <!-- 246 波（收件箱深化）：备忘编辑（标题/到期日） -->
                 <button class="b3-button b3-button--text" onclick={() => editMemoDialog(r)}>{t("memo.edit")}</button>
                 <!-- H03：备忘的显式删除（唯一物理删除路径；未处理项不自动清理） -->
@@ -476,11 +488,11 @@
 {:else}
     {@const groups = filter === "all"
         ? [
-            { key: "overdue", label: t("hub.groupOverdue"), items: filtered.filter((r: Reminder) => r.level === "overdue") },
-            { key: "soon", label: t("hub.groupSoon"), items: filtered.filter((r: Reminder) => r.level === "soon") },
-            { key: "lead", label: t("hub.groupLead"), items: filtered.filter((r: Reminder) => r.level === "lead") },
+            { key: "overdue", label: t("hub.groupOverdue"), items: pinnedFirst(filtered.filter((r: Reminder) => r.level === "overdue")) },
+            { key: "soon", label: t("hub.groupSoon"), items: pinnedFirst(filtered.filter((r: Reminder) => r.level === "soon")) },
+            { key: "lead", label: t("hub.groupLead"), items: pinnedFirst(filtered.filter((r: Reminder) => r.level === "lead")) },
         ].filter((g) => g.items.length > 0)
-        : [{ key: filter, label: "", items: filtered }]}
+        : [{ key: filter, label: "", items: pinnedFirst(filtered) }]}
     {#each groups as g (g.key)}
         {#if g.label}<div class="lv-group-label">{g.label} · {g.items.length}</div>{/if}
         <div class="lv-card lv-rems">
