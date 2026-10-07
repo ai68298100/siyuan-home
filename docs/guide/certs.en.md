@@ -10,11 +10,19 @@ Ledger page → Certificates → fill in the quick form:
 |---|---|
 | Name | document name (e.g. "ID card") |
 | Member | owner (optional) |
-| Category | ID card / household register / passport / visa… |
+| Category | ID card / passport / HK-Macao permit / Taiwan permit / driving licence / vocational or professional qualification / graduation / degree / professional title… |
 | Expiry | validity end date |
 | Renewal rule | every 6 years / every 10 years / long-term / endorsement separately |
 | Storage location | where it is physically kept |
 | Notes | free text |
+
+After a category is selected, the quick form adds fields for that document. ID cards expose an address summary, issuing authority and front/back scans; passports expose nationality, birth place and data page; driving licences expose class, first issue date and review date; academic, qualification and title certificates expose school, major, level and issuer. Store only the last four digits of a document number when possible.
+
+## Quick upload and download
+
+The quick form provides a “Choose photo/PDF” action. On a phone it can open the camera; desktop browsers can choose images or PDFs. ID and driving licence profiles expose separate front/back or scan actions. The row and its selected attachments are saved together, and failed uploads remain selected for retry.
+
+Each attachment in the detail drawer has **Preview** and **Download** buttons. Both use same-origin `/assets/` resources from the current SiYuan instance, and downloads keep the uploaded filename. Attachments remain subject to SiYuan workspace permissions and backups; the plugin does not send certificate images to AI services.
 
 ## Reminder rules
 

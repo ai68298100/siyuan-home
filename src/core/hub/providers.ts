@@ -79,7 +79,14 @@ export class CertsProvider implements DataProvider {
         const out: Reminder[] = [];
         const read = await renderLedgerAll(ref.avId);
         if (!read.complete) throw new Error(`ledger read incomplete (${read.rows.length}/${read.rowCount} rows)`);
-        requireReminderColumns(ref.columns!, CERTS_SCHEMA);
+        // `expiry` and shared `due` are the stable columns required by every
+        // existing certs database. Type-specific deadline columns are additive
+        // and may be absent on older databases; those rules are skipped until
+        // provisioning has added the column or the row has a value.
+        requireReminderColumns(ref.columns!, {
+            ...schema,
+            reminders: (schema.reminders ?? []).filter((rule) => rule.field === "expiry" || rule.field === "due"),
+        });
         const { rows } = read;
         // relation 列（成员）→ 行 itemID → settings.members（avItemId 反查，成员过滤键）
         const members = this.deps.settings.members ?? [];
@@ -98,6 +105,7 @@ export class CertsProvider implements DataProvider {
                 memberId: member?.id,
             };
             for (const rule of schema.reminders ?? []) {
+                if (!ref.columns[rule.field]) continue;
                 const v = cell(rule.field);
                 const fieldValue = v?.type === "date" ? dateFromValue(v) : textFromValue(v);
                 if (!fieldValue) continue;

@@ -12,6 +12,8 @@
     import { saveRuntime } from "@/core/hub/runtime";
     import { ensurePinyin, pinyinReady, searchMatch } from "@/core/pinyin";
     import { openContactPicker } from "@/libs/contact-picker";
+    import { getCertificateProfile, getCertificateReminderField } from "@/core/schema";
+    import { assetHref, downloadAsset } from "@/core/assets";
 
     let { plugin, t, version }: { plugin: HomePluginLike; t: (k: string) => string; version?: number } = $props();
 
@@ -485,20 +487,85 @@
     // asset/mAsset/mSelect 列快速表单不支持，显式说明（不静默省略）。
     const captureCols = $derived.by(() => {
         const schema = plugin.schemaCatalog?.[active];
-        if (!schema?.capture) return [] as { key: string; type: string; options?: string[] }[];
+        if (!schema?.capture) return [] as { key: string; type: string; options?: string[]; labelKey?: string }[];
         const cols: any[] = schema.columns ?? [];
-        const out: { key: string; type: string; options?: string[] }[] = [];
+        const out: { key: string; type: string; options?: string[]; labelKey?: string }[] = [];
         for (const key of schema.capture as string[]) {
             const col = cols.find((c: any) => c.key === key);
-            if (col) out.push({ key: col.key, type: col.type, options: col.options });
+            if (col) out.push({ key: col.key, type: col.type, options: col.options, labelKey: col.labelKey });
         }
         return out;
     });
     const UNSUPPORTED_TYPES = ["asset", "mAsset", "mSelect"];
     const supportableCols = $derived(captureCols.filter((e) => !UNSUPPORTED_TYPES.includes(e.type)));
-    const unsupportedCount = $derived(captureCols.filter((e) => UNSUPPORTED_TYPES.includes(e.type)).length);
+    const unsupportedCount = $derived(captureCols.filter((e) => UNSUPPORTED_TYPES.includes(e.type) && e.type !== "mAsset").length);
     // 表单值：列 key → 输入值（select/relation 为字符串值，checkbox 为布尔）
     let form: Record<string, any> = $state({});
+    const certificateProfile = $derived(active === "certs" && form.category ? getCertificateProfile(String(form.category)) : null);
+    const certificateScalarCols = $derived.by(() => {
+        if (!certificateProfile) return [] as { key: string; type: string; options?: string[] }[];
+        const schemaCols: any[] = plugin.schemaCatalog?.certs?.columns ?? [];
+        const keys = new Set(["x_cert_holder_name", "holder_no", "issue_date", "x_cert_valid_from", "issuance_rule", "store_place", "location", "copy_location", "note", ...certificateProfile.fieldKeys]);
+        if (!getCertificateReminderField(certificateProfile.category)) keys.add("due");
+        return schemaCols.filter((col: any) => keys.has(col.key) && col.type !== "mAsset")
+            .map((col: any) => ({ key: col.key, type: col.type, options: col.options }));
+    });
+    const certificateAssetCols = $derived.by(() => active === "certs"
+        ? [
+            ...(captureCols.find((col) => col.key === "attachments") ? [{ key: "attachments", type: "mAsset", labelKey: "field.attachments" }] : []),
+            ...(certificateProfile?.columns.filter((col) => col.type === "mAsset") ?? []),
+        ]
+        : []);
+    const quickAssetCols = $derived.by(() => {
+        const seen = new Set<string>();
+        const out: { key: string; type: string; labelKey?: string }[] = [];
+        for (const col of [...captureCols.filter((entry) => entry.type === "mAsset"), ...certificateAssetCols]) {
+            if (seen.has(col.key)) continue;
+            seen.add(col.key);
+            out.push({ key: col.key, type: "mAsset", labelKey: col.labelKey });
+        }
+        return out;
+    });
+    // 上传缓存跨部分失败保留：File 仅在上传前暂存，上传成功后以 assets 路径暂存，重试不会重复上传。
+    let certificateFiles: Record<string, File[]> = $state({});
+    let uploadedCertificateFiles: Record<string, { name: string; content: string }[]> = $state({});
+    let lastCertificateCategory = $state("");
+    function fileFingerprint(file: File): string {
+        return `${file.name}:${file.size}:${file.lastModified}`;
+    }
+    function setCertificateFiles(key: string, files: File[]) {
+        const previous = certificateFiles[key] ?? [];
+        const seen = new Set(previous.map(fileFingerprint));
+        const unique = files.filter((file) => {
+            const fingerprint = fileFingerprint(file);
+            if (seen.has(fingerprint)) return false;
+            seen.add(fingerprint);
+            return true;
+        });
+        certificateFiles = { ...certificateFiles, [key]: [...previous, ...unique] };
+    }
+    function selectedFileText(key: string): string {
+        const count = certificateFiles[key]?.length ?? 0;
+        return count > 0 ? t("ledger.selectedFiles").replace("${n}", String(count)) : t("ledger.chooseAttachment");
+    }
+    function handleCertificateCategoryChange(category: string) {
+        const hasDraft = active === "certs" && (
+            supportableCols.some((entry) => entry.key !== "category" && form[entry.key] !== undefined && form[entry.key] !== "" && form[entry.key] !== false)
+            || Object.keys(form).some((key) => key.startsWith("x_cert_") && form[key] !== undefined && form[key] !== "" && form[key] !== false)
+            || quickAssetCols.some((entry) => (certificateFiles[entry.key]?.length ?? 0) > 0 || (uploadedCertificateFiles[entry.key]?.length ?? 0) > 0)
+            || !!pendingItemID
+        );
+        if (lastCertificateCategory && category !== lastCertificateCategory && hasDraft) {
+            showMessage(t("ledger.categoryChangeBlocked"), 5000, "error");
+            form = { ...form, category: lastCertificateCategory };
+            return;
+        }
+        lastCertificateCategory = category;
+        const keep = new Set(["name", "member", "expiry", "status", "x_cert_holder_name", "holder_no", "issue_date", "x_cert_valid_from", "issuance_rule", "store_place", "location", "copy_location", "note"]);
+        form = { ...Object.fromEntries(Object.entries(form).filter(([key]) => keep.has(key))), category };
+        certificateFiles = Object.fromEntries(Object.entries(certificateFiles).filter(([key]) => key === "attachments"));
+        uploadedCertificateFiles = Object.fromEntries(Object.entries(uploadedCertificateFiles).filter(([key]) => key === "attachments"));
+    }
             // D03：保存状态与恢复——saving 防双击；失败保留输入；已建行 itemID 保留，重试补写同一行
     let saving = $state(false);
     let saveError = $state("");
@@ -520,12 +587,16 @@
     const hasAnyInput = $derived(supportableCols.some((e) => {
         const v = form[e.key];
         return e.key === "name" ? !!(v && String(v).trim()) : v !== undefined && v !== "" && v !== false;
-    }));
+    }) || certificateScalarCols.some((e) => form[e.key] !== undefined && form[e.key] !== "" && form[e.key] !== false)
+        || quickAssetCols.some((e) => (certificateFiles[e.key]?.length ?? 0) > 0 || (uploadedCertificateFiles[e.key]?.length ?? 0) > 0));
     // UI05：name 必填——为空但有其他字段时阻止提交（不允许"（未命名）"兜底）
     const nameMissing = $derived(hasAnyInput && !(form.name && String(form.name).trim()));
 
     function resetForm() {
         form = {};
+        lastCertificateCategory = "";
+        certificateFiles = {};
+        uploadedCertificateFiles = {};
         saveError = ""; identityPending = false; pendingItemID = null;
     }
 
@@ -549,6 +620,7 @@
             case "checkbox": return v.checkbox?.checked ? "✓" : "—";
             case "block": return v.block?.content ?? "—";
             case "relation": return (v.relation?.contents ?? []).map((c: any) => c.block?.content ?? "").join("、") || "—";
+            case "mAsset": return (v.mAsset ?? []).map((asset: any) => asset?.name ?? asset?.content ?? "").filter(Boolean).join("、") || "—";
             default: return "—";
         }
     }
@@ -620,7 +692,10 @@
             width: "520px",
         });
         const body = dlg.element.querySelector("#lv-detail-body") as HTMLElement;
-        const schemaCols: any[] = plugin.schemaCatalog?.[active]?.columns ?? [];
+        const rowCategory = active === "certs" ? row.cells[ref.columns.category ?? ""]?.select?.content : undefined;
+        const activeCertFields = active === "certs" ? new Set(getCertificateProfile(rowCategory).fieldKeys) : null;
+        const schemaCols: any[] = (plugin.schemaCatalog?.[active]?.columns ?? []).filter((col: any) =>
+            active !== "certs" || !String(col.key).startsWith("x_cert_") || activeCertFields?.has(col.key));
         // A5 行编辑 UI 层：可编辑类型（relation/mAsset 等复杂类型仍在台账文档编辑）
         const EDITABLE = new Set(["text", "number", "date", "select", "url", "checkbox"]);
         const colLabel = (col: any) => (t(`field.${col.key}`) !== `field.${col.key}` ? t(`field.${col.key}`) : col.key);
@@ -647,68 +722,106 @@
             }
         }
         function addAttachmentsSection() {
-            const attCol: any = schemaCols.find((c) => c.key === "attachments");
-            const attKeyID = ref!.columns.attachments;
-            if (!attCol || !attKeyID) return;
-            const attHead = document.createElement("div");
-            attHead.className = "ft__on-surface";
-            attHead.style.cssText = "margin-top:10px;padding-top:8px;border-top:1px solid var(--b3-border-color);font-size:12px";
-            attHead.textContent = t("field.attachments");
-            body.appendChild(attHead);
-            const existing = (row.cells[attKeyID]?.mAsset ?? []) as { name?: string; content?: string }[];
-            for (const f of existing) {
-                const line = document.createElement("div");
-                line.style.cssText = "padding:2px 0;font-size:12.5px;word-break:break-all";
-                line.textContent = `📎 ${f.name ?? f.content ?? "?"}`;
-                body.appendChild(line);
-            }
-            if (existing.length === 0) {
-                const none = document.createElement("div");
-                none.className = "ft__on-surface";
-                none.style.cssText = "font-size:12.5px";
-                none.textContent = t("ledger.noAttachments");
-                body.appendChild(none);
-            }
-            const uploadBtn = document.createElement("button");
-            uploadBtn.className = "b3-button b3-button--outline";
-            uploadBtn.style.cssText = "margin-top:6px;font-size:12px";
-            uploadBtn.textContent = t("ledger.upload");
-            const fileInput = document.createElement("input");
-            fileInput.type = "file";
-            fileInput.multiple = true;
-            fileInput.style.display = "none";
-            uploadBtn.onclick = () => fileInput.click();
-            fileInput.onchange = async () => {
-                const files = Array.from(fileInput.files ?? []);
-                if (files.length === 0) return;
-                const failed: string[] = [];
-                const appended = [...existing];
-                for (const f of files) {
-                    try {
-                        const { uploadAsset } = await import("@/core/siyuan");
-                        const { name, path } = await uploadAsset(f);
-                        appended.push({ name, content: path });
-                    } catch (e) {
-                        failed.push(`${f.name}: ${e instanceof Error ? e.message : String(e)}`);
+            const assetCols = schemaCols.filter((col) => col.type === "mAsset" && ref!.columns[col.key]);
+            const pendingDetailAssets: Record<string, { name?: string; content?: string }[]> = {};
+            for (const attCol of assetCols) {
+                const attKeyID = ref!.columns[attCol.key];
+                const attHead = document.createElement("div");
+                attHead.className = "ft__on-surface";
+                attHead.style.cssText = "margin-top:10px;padding-top:8px;border-top:1px solid var(--b3-border-color);font-size:12px";
+                attHead.textContent = colLabel(attCol);
+                body.appendChild(attHead);
+                const existing = (row.cells[attKeyID]?.mAsset ?? []) as { name?: string; content?: string }[];
+                for (const f of existing) {
+                    const line = document.createElement("div");
+                    line.style.cssText = "padding:4px 0;font-size:12.5px;display:flex;gap:8px;align-items:center;flex-wrap:wrap";
+                    const name = document.createElement("span");
+                    name.style.cssText = "word-break:break-all;flex:1;min-width:120px";
+                    name.textContent = `📎 ${f.name ?? f.content ?? "?"}`;
+                    line.appendChild(name);
+                    if (f.content) {
+                        try {
+                            const preview = document.createElement("a");
+                            preview.className = "b3-button b3-button--text";
+                            preview.style.cssText = "padding:2px 4px;font-size:12px";
+                            preview.textContent = t("ledger.previewAttachment");
+                            preview.href = assetHref(f.content);
+                            preview.target = "_blank";
+                            preview.rel = "noopener noreferrer";
+                            line.appendChild(preview);
+                        } catch {
+                            // A malformed/legacy path remains visible by name but cannot become a navigation target.
+                        }
+                        const download = document.createElement("button");
+                        download.className = "b3-button b3-button--text";
+                        download.style.cssText = "padding:2px 4px;font-size:12px";
+                        download.textContent = t("ledger.downloadAttachment");
+                        download.onclick = async () => {
+                            download.disabled = true;
+                            try {
+                                await downloadAsset(f);
+                            } catch (e) {
+                                showMessage(t("ledger.downloadFailed").replace("${msg}", e instanceof Error ? e.message : String(e)), 6000, "error");
+                            } finally {
+                                download.disabled = false;
+                            }
+                        };
+                        line.appendChild(download);
                     }
+                    body.appendChild(line);
                 }
-                if (appended.length !== existing.length) {
-                    try {
-                        await setCell(ref!.avId!, attKeyID, row.itemID, { type: "mAsset", mAsset: appended });
-                        const msg = failed.length ? `${t("ledger.uploadFailed").replace("${msg}", failed.join("; "))}` : t("ledger.uploadDone");
-                        showMessage(msg, 5000, failed.length ? "error" : "info");
-                    } catch (e) {
-                        showMessage(t("ledger.uploadFailed").replace("${msg}", e instanceof Error ? e.message : String(e)), 6000, "error");
+                if (existing.length === 0) {
+                    const none = document.createElement("div");
+                    none.className = "ft__on-surface";
+                    none.style.cssText = "font-size:12.5px";
+                    none.textContent = t("ledger.noAttachments");
+                    body.appendChild(none);
+                }
+                const uploadBtn = document.createElement("button");
+                uploadBtn.className = "b3-button b3-button--outline";
+                uploadBtn.style.cssText = "margin-top:6px;font-size:12px";
+                uploadBtn.textContent = t("ledger.upload");
+                const fileInput = document.createElement("input");
+                fileInput.type = "file";
+                fileInput.accept = "image/*,.pdf";
+                fileInput.multiple = attCol.key === "attachments";
+                if (active === "certs" && attCol.key !== "attachments") fileInput.setAttribute("capture", "environment");
+                fileInput.style.display = "none";
+                uploadBtn.onclick = () => fileInput.click();
+                fileInput.onchange = async () => {
+                    const files = Array.from(fileInput.files ?? []);
+                    if (files.length === 0) return;
+                    const failed: string[] = [];
+                    const pending = pendingDetailAssets[attCol.key] ?? [];
+                    const appended = [...existing, ...pending];
+                    for (const f of files) {
+                        try {
+                            const { uploadAsset } = await import("@/core/siyuan");
+                            const { name, path } = await uploadAsset(f);
+                            appended.push({ name, content: path });
+                        } catch (e) {
+                            failed.push(`${f.name}: ${e instanceof Error ? e.message : String(e)}`);
+                        }
                     }
-                } else if (failed.length) {
-                    showMessage(t("ledger.uploadFailed").replace("${msg}", failed.join("; ")), 6000, "error");
-                }
-                dlg.destroy();
-                await load();
-                // 附件写入不影响提醒派生——无需扫描（PF06：无相关变更不重扫）
-            };
-            body.appendChild(uploadBtn);
-            body.appendChild(fileInput);
+                    if (appended.length !== existing.length) {
+                        try {
+                            await setCell(ref!.avId!, attKeyID, row.itemID, { type: "mAsset", mAsset: appended });
+                            delete pendingDetailAssets[attCol.key];
+                            const msg = failed.length ? t("ledger.uploadFailed").replace("${msg}", failed.join("; ")) : t("ledger.uploadDone");
+                            showMessage(msg, 5000, failed.length ? "error" : "info");
+                            dlg.destroy();
+                            await load();
+                        } catch (e) {
+                            pendingDetailAssets[attCol.key] = appended.slice(existing.length);
+                            showMessage(t("ledger.uploadFailed").replace("${msg}", e instanceof Error ? e.message : String(e)), 6000, "error");
+                        }
+                    } else if (failed.length) {
+                        showMessage(t("ledger.uploadFailed").replace("${msg}", failed.join("; ")), 6000, "error");
+                    }
+                    // 附件写入不影响提醒派生——无需扫描（PF06：无相关变更不重扫）
+                };
+                body.append(uploadBtn, fileInput);
+            }
         }
         // 查看模式：kv 行 + 历史 + 附件
         function buildView() {
@@ -1444,7 +1557,10 @@
             const cols = ref.columns ?? {};
             const failed: string[] = [];
             const tryCell = async (label: string, key: string | undefined, value: unknown) => {
-                if (!key) return;
+                if (!key) {
+                    failed.push(label);
+                    return;
+                }
                 try {
                     await setCell(ref.avId!, key, itemID, value);
                 } catch {
@@ -1457,6 +1573,42 @@
                 if (e.key === "name" && !(v && String(v).trim()) && pendingItemID) continue; // 重试时不写空名
                 if (e.type === "number" && (v === undefined || isNaN(Number(v)))) continue;
                 await tryCell(t(`field.${e.key}`), cols[e.key], cellValue(e.type, e.key === "name" ? String(v ?? "").trim() : v));
+            }
+            for (const e of certificateScalarCols) {
+                const v = form[e.key];
+                if (v === undefined || v === "" || v === false) continue;
+                if (e.type === "number" && isNaN(Number(v))) continue;
+                await tryCell(t(`field.${e.key}`), cols[e.key], cellValue(e.type, v));
+            }
+            // 证件快速上传：先把照片/扫描件放入 assets，再把引用写回对应 mAsset 列。
+            // 上传与写回均逐项容错；失败时保留已上传引用和 File 选择，重试不会重复上传成功项。
+            if (active === "certs") {
+                for (const target of quickAssetCols) {
+                    const previous = uploadedCertificateFiles[target.key] ?? [];
+                    const uploaded = [...previous];
+                    const failedFiles: File[] = [];
+                    if (!cols[target.key]) {
+                        failed.push(t(`field.${target.key}`));
+                        continue;
+                    }
+                    for (const file of certificateFiles[target.key] ?? []) {
+                        try {
+                            const { uploadAsset } = await import("@/core/siyuan");
+                            const { name, path } = await uploadAsset(file);
+                            uploaded.push({ name, content: path });
+                        } catch (e) {
+                            failed.push(`${t(`field.${target.key}`)}: ${file.name} (${e instanceof Error ? e.message : String(e)})`);
+                            failedFiles.push(file);
+                        }
+                    }
+                    certificateFiles = { ...certificateFiles, [target.key]: failedFiles };
+                    if (uploaded.length === 0) continue;
+                    uploadedCertificateFiles = { ...uploadedCertificateFiles, [target.key]: uploaded };
+                    await tryCell(t(`field.${target.key}`), cols[target.key], {
+                        type: "mAsset",
+                        mAsset: uploaded.map(({ name, content }) => ({ name, content })),
+                    });
+                }
             }
             // C6a 增量 3：自动写入默认状态（schema 显式声明优先，否则枚举首值；D11）
             const statusCol = (plugin.schemaCatalog?.[active]?.columns ?? []).find((c: any) => c.key === "status");
@@ -1528,7 +1680,7 @@
 <div class="lv-card lv-toolbar" style="padding:14px">
     {#each supportableCols as e (e.key)}
         {#if e.type === "select"}
-            <select class="b3-select" bind:value={form[e.key]} title={t(`field.${e.key}`)}>
+            <select class="b3-select" bind:value={form[e.key]} onfocus={active === "certs" && e.key === "category" ? () => { lastCertificateCategory = String(form.category ?? ""); } : undefined} onchange={active === "certs" && e.key === "category" ? (event) => handleCertificateCategoryChange((event.currentTarget as HTMLSelectElement).value) : undefined} title={t(`field.${e.key}`)}>
                 <option value="">{t(`field.${e.key}`)}</option>
                 {#each e.options ?? [] as opt (opt)}
                     <option value={opt}>{t(`field.${e.key}.opt.${opt}`) !== `field.${e.key}.opt.${opt}` ? t(`field.${e.key}.opt.${opt}`) : opt}</option>
@@ -1557,6 +1709,37 @@
             <input class="b3-text-field" style="min-width:140px" placeholder={t(`field.${e.key}`)} bind:value={form[e.key]} />
         {/if}
     {/each}
+    {#each certificateScalarCols as e (e.key)}
+        {#if e.type === "select"}
+            <select class="b3-select" bind:value={form[e.key]} title={t(`field.${e.key}`)}>
+                <option value="">{t(`field.${e.key}`)}</option>
+                {#each e.options ?? [] as opt (opt)}
+                    <option value={opt}>{t(`field.${e.key}.opt.${opt}`) !== `field.${e.key}.opt.${opt}` ? t(`field.${e.key}.opt.${opt}`) : opt}</option>
+                {/each}
+            </select>
+        {:else if e.type === "date"}
+            <input class="b3-text-field" type="date" title={t(`field.${e.key}`)} bind:value={form[e.key]} />
+        {:else if e.type === "number"}
+            <input class="b3-text-field" type="number" style="width:90px" placeholder={t(`field.${e.key}`)} bind:value={form[e.key]} />
+        {:else}
+            <input class="b3-text-field" style="min-width:140px" placeholder={t(`field.${e.key}`)} bind:value={form[e.key]} />
+        {/if}
+    {/each}
+    {#if active === "certs" && quickAssetCols.length > 0}
+        <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;flex-basis:100%">
+            {#each quickAssetCols as e (e.key)}
+                <label class="b3-button b3-button--outline" style="position:relative;overflow:hidden;font-size:12px">
+                    <input type="file" accept="image/*,.pdf" multiple={e.key === "attachments"}
+                        capture={e.key === "attachments" ? undefined : "environment"}
+                        aria-label={t(`field.${e.key}`)}
+                        style="position:absolute;inset:0;width:100%;height:100%;opacity:0;cursor:pointer"
+                        onchange={(event) => setCertificateFiles(e.key, Array.from((event.currentTarget as HTMLInputElement).files ?? []))} />
+                    {t(`field.${e.key}`)} · {selectedFileText(e.key)}
+                </label>
+            {/each}
+            <span class="lv-caption">{t("ledger.photoUploadTip")}</span>
+        </div>
+    {/if}
     {#if unsupportedCount > 0}
         <span class="lv-caption" title={t("ledger.unsupportedInForm")}>ⓘ {t("ledger.unsupportedInForm")}</span>
     {/if}

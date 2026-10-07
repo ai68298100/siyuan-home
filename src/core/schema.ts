@@ -93,9 +93,176 @@ const d = (...keys: string[]): ColumnDef[] => keys.map((k) => FIELD_DICT[k]);
 
 // ── certs 证件管理（02 §4.2①）──────────────────────────────
 
+/**
+ * 证件分类值。
+ *
+ * Existing values (`permit`/`license`) are intentionally retained so old rows
+ * keep their meaning after upgrading. New, more specific values are additive.
+ */
+export const CERTIFICATE_CATEGORY_OPTIONS = [
+    "id", "hukou", "passport", "visa", "permit", "hkmo_permit", "tw_permit",
+    "license", "driver_license", "vehicle_lic", "birth_cert", "vocational_qualification",
+    "professional_qualification", "graduation_cert", "degree_cert", "professional_title", "other",
+] as const;
+
+export type CertificateCategory = typeof CERTIFICATE_CATEGORY_OPTIONS[number];
+
+/** Category-specific fields. All keys use the x_cert_ prefix so they are
+ * clearly module-private and can be added without changing the shared field
+ * dictionary. The UI can use this profile to render only relevant fields. */
+export interface CertificateProfile {
+    category: CertificateCategory;
+    fieldKeys: readonly string[];
+    columns: readonly ColumnDef[];
+}
+
+const CERTIFICATE_PROFILE_COLUMNS: Record<CertificateCategory, readonly ColumnDef[]> = {
+    id: [
+        { key: "x_cert_id_address", type: "text", labelKey: "field.x_cert_id_address" },
+        { key: "x_cert_id_authority", type: "text", labelKey: "field.x_cert_id_authority" },
+        { key: "x_cert_id_gender", type: "select", labelKey: "field.x_cert_id_gender", options: ["male", "female"] },
+        { key: "x_cert_id_front", type: "mAsset", labelKey: "field.x_cert_id_front" },
+        { key: "x_cert_id_back", type: "mAsset", labelKey: "field.x_cert_id_back" },
+    ],
+    hukou: [
+        { key: "x_cert_hukou_location", type: "text", labelKey: "field.x_cert_hukou_location" },
+        { key: "x_cert_hukou_head_name", type: "text", labelKey: "field.x_cert_hukou_head_name" },
+        { key: "x_cert_hukou_scan", type: "mAsset", labelKey: "field.x_cert_hukou_scan" },
+    ],
+    passport: [
+        { key: "x_cert_passport_name_pinyin", type: "text", labelKey: "field.x_cert_passport_name_pinyin" },
+        { key: "x_cert_passport_nationality", type: "text", labelKey: "field.x_cert_passport_nationality" },
+        { key: "x_cert_passport_birth_place", type: "text", labelKey: "field.x_cert_passport_birth_place" },
+        { key: "x_cert_passport_authority", type: "text", labelKey: "field.x_cert_passport_authority" },
+        { key: "x_cert_passport_scan", type: "mAsset", labelKey: "field.x_cert_passport_scan" },
+    ],
+    visa: [
+        { key: "x_cert_visa_country", type: "text", labelKey: "field.x_cert_visa_country" },
+        { key: "x_cert_visa_type", type: "text", labelKey: "field.x_cert_visa_type" },
+        { key: "x_cert_visa_scan", type: "mAsset", labelKey: "field.x_cert_visa_scan" },
+    ],
+    permit: [
+        { key: "x_cert_permit_region", type: "text", labelKey: "field.x_cert_permit_region" },
+        { key: "x_cert_permit_endorsement", type: "text", labelKey: "field.x_cert_permit_endorsement" },
+        { key: "x_cert_permit_endorsement_expiry", type: "date", labelKey: "field.x_cert_permit_endorsement_expiry" },
+        { key: "x_cert_permit_scan", type: "mAsset", labelKey: "field.x_cert_permit_scan" },
+    ],
+    hkmo_permit: [
+        { key: "x_cert_hkmo_region", type: "select", labelKey: "field.x_cert_hkmo_region", options: ["hong_kong", "macao"] },
+        { key: "x_cert_hkmo_endorsement", type: "text", labelKey: "field.x_cert_hkmo_endorsement" },
+        { key: "x_cert_hkmo_endorsement_expiry", type: "date", labelKey: "field.x_cert_hkmo_endorsement_expiry" },
+        { key: "x_cert_hkmo_scan", type: "mAsset", labelKey: "field.x_cert_hkmo_scan" },
+    ],
+    tw_permit: [
+        { key: "x_cert_tw_endorsement", type: "text", labelKey: "field.x_cert_tw_endorsement" },
+        { key: "x_cert_tw_endorsement_expiry", type: "date", labelKey: "field.x_cert_tw_endorsement_expiry" },
+        { key: "x_cert_tw_scan", type: "mAsset", labelKey: "field.x_cert_tw_scan" },
+    ],
+    /** Legacy value retained for rows created when this option meant a generic license. */
+    license: [
+        { key: "x_cert_legacy_type", type: "text", labelKey: "field.x_cert_legacy_type" },
+        { key: "x_cert_legacy_issuer", type: "text", labelKey: "field.x_cert_legacy_issuer" },
+        { key: "x_cert_legacy_scan", type: "mAsset", labelKey: "field.x_cert_legacy_scan" },
+    ],
+    driver_license: [
+        { key: "x_cert_driver_class", type: "text", labelKey: "field.x_cert_driver_class" },
+        { key: "x_cert_driver_authority", type: "text", labelKey: "field.x_cert_driver_authority" },
+        { key: "x_cert_driver_first_issue_date", type: "date", labelKey: "field.x_cert_driver_first_issue_date" },
+        { key: "x_cert_driver_review_due", type: "date", labelKey: "field.x_cert_driver_review_due" },
+        { key: "x_cert_driver_scan", type: "mAsset", labelKey: "field.x_cert_driver_scan" },
+    ],
+    vehicle_lic: [
+        { key: "x_cert_vehicle_plate", type: "text", labelKey: "field.x_cert_vehicle_plate" },
+        { key: "x_cert_vehicle_owner", type: "text", labelKey: "field.x_cert_vehicle_owner" },
+        { key: "x_cert_vehicle_scan", type: "mAsset", labelKey: "field.x_cert_vehicle_scan" },
+    ],
+    birth_cert: [
+        { key: "x_cert_birth_place", type: "text", labelKey: "field.x_cert_birth_place" },
+        { key: "x_cert_birth_registration_no_last4", type: "text", labelKey: "field.x_cert_birth_registration_no_last4" },
+        { key: "x_cert_birth_scan", type: "mAsset", labelKey: "field.x_cert_birth_scan" },
+    ],
+    vocational_qualification: [
+        { key: "x_cert_vocational_name", type: "text", labelKey: "field.x_cert_vocational_name" },
+        { key: "x_cert_vocational_level", type: "text", labelKey: "field.x_cert_vocational_level" },
+        { key: "x_cert_vocational_issuer", type: "text", labelKey: "field.x_cert_vocational_issuer" },
+        { key: "x_cert_vocational_registration_last4", type: "text", labelKey: "field.x_cert_vocational_registration_last4" },
+        { key: "x_cert_vocational_education_due", type: "date", labelKey: "field.x_cert_vocational_education_due" },
+        { key: "x_cert_vocational_scan", type: "mAsset", labelKey: "field.x_cert_vocational_scan" },
+    ],
+    professional_qualification: [
+        { key: "x_cert_professional_name", type: "text", labelKey: "field.x_cert_professional_name" },
+        { key: "x_cert_professional_level", type: "text", labelKey: "field.x_cert_professional_level" },
+        { key: "x_cert_professional_issuer", type: "text", labelKey: "field.x_cert_professional_issuer" },
+        { key: "x_cert_professional_registration_last4", type: "text", labelKey: "field.x_cert_professional_registration_last4" },
+        { key: "x_cert_professional_education_due", type: "date", labelKey: "field.x_cert_professional_education_due" },
+        { key: "x_cert_professional_scan", type: "mAsset", labelKey: "field.x_cert_professional_scan" },
+    ],
+    graduation_cert: [
+        { key: "x_cert_school", type: "text", labelKey: "field.x_cert_school" },
+        { key: "x_cert_major", type: "text", labelKey: "field.x_cert_major" },
+        { key: "x_cert_education_level", type: "text", labelKey: "field.x_cert_education_level" },
+        { key: "x_cert_admission_date", type: "date", labelKey: "field.x_cert_admission_date" },
+        { key: "x_cert_graduation_date", type: "date", labelKey: "field.x_cert_graduation_date" },
+        { key: "x_cert_graduation_no_last4", type: "text", labelKey: "field.x_cert_graduation_no_last4" },
+        { key: "x_cert_graduation_scan", type: "mAsset", labelKey: "field.x_cert_graduation_scan" },
+    ],
+    degree_cert: [
+        { key: "x_cert_degree", type: "text", labelKey: "field.x_cert_degree" },
+        { key: "x_cert_degree_school", type: "text", labelKey: "field.x_cert_degree_school" },
+        { key: "x_cert_degree_award_date", type: "date", labelKey: "field.x_cert_degree_award_date" },
+        { key: "x_cert_degree_no_last4", type: "text", labelKey: "field.x_cert_degree_no_last4" },
+        { key: "x_cert_degree_scan", type: "mAsset", labelKey: "field.x_cert_degree_scan" },
+    ],
+    professional_title: [
+        { key: "x_cert_title_level", type: "text", labelKey: "field.x_cert_title_level" },
+        { key: "x_cert_title_specialty", type: "text", labelKey: "field.x_cert_title_specialty" },
+        { key: "x_cert_title_issuer", type: "text", labelKey: "field.x_cert_title_issuer" },
+        { key: "x_cert_title_review_due", type: "date", labelKey: "field.x_cert_title_review_due" },
+        { key: "x_cert_title_scan", type: "mAsset", labelKey: "field.x_cert_title_scan" },
+    ],
+    other: [
+        { key: "x_cert_other_type", type: "text", labelKey: "field.x_cert_other_type" },
+        { key: "x_cert_other_issuer", type: "text", labelKey: "field.x_cert_other_issuer" },
+        { key: "x_cert_other_scan", type: "mAsset", labelKey: "field.x_cert_other_scan" },
+    ],
+};
+
+const certificateProfiles = CERTIFICATE_CATEGORY_OPTIONS.reduce((profiles, category) => {
+    const columns = CERTIFICATE_PROFILE_COLUMNS[category];
+    profiles[category] = { category, fieldKeys: columns.map((column) => column.key), columns };
+    return profiles;
+}, {} as Record<CertificateCategory, CertificateProfile>);
+
+export const CERTIFICATE_PROFILES: Readonly<Record<CertificateCategory, CertificateProfile>> = certificateProfiles;
+
+/** Unknown/legacy category values deliberately fall back to `other`; callers
+ * can still preserve and display the raw category value separately. */
+export function getCertificateProfile(category: string | undefined): CertificateProfile {
+    return CERTIFICATE_PROFILES[category as CertificateCategory] ?? CERTIFICATE_PROFILES.other;
+}
+
+/** Type-specific deadline fields already registered as their own reminder rules. */
+const CERTIFICATE_REMINDER_FIELDS: Partial<Record<CertificateCategory, string>> = {
+    permit: "x_cert_permit_endorsement_expiry",
+    hkmo_permit: "x_cert_hkmo_endorsement_expiry",
+    tw_permit: "x_cert_tw_endorsement_expiry",
+    driver_license: "x_cert_driver_review_due",
+    vocational_qualification: "x_cert_vocational_education_due",
+    professional_qualification: "x_cert_professional_education_due",
+    professional_title: "x_cert_title_review_due",
+};
+
+export function getCertificateReminderField(category: string | undefined): string | undefined {
+    return CERTIFICATE_REMINDER_FIELDS[category as CertificateCategory];
+}
+
+const CERT_PROFILE_COLUMNS: ColumnDef[] = Object.values(CERTIFICATE_PROFILE_COLUMNS).flatMap((columns) => [...columns]);
+
 const CERT_PRIVATE: ColumnDef[] = [
+    { key: "x_cert_holder_name", type: "text", labelKey: "field.x_cert_holder_name" },
     { key: "holder_no", type: "text", labelKey: "field.holder_no" },      // 证件号后四位，脱敏
     { key: "issue_date", type: "date", labelKey: "field.issue_date" },
+    { key: "x_cert_valid_from", type: "date", labelKey: "field.x_cert_valid_from" },
     { key: "issuance_rule", type: "select", labelKey: "field.issuance_rule",
       options: ["y6", "y10", "longterm", "endorsement"] },
     { key: "store_place", type: "text", labelKey: "field.store_place" },
@@ -104,13 +271,14 @@ const CERT_PRIVATE: ColumnDef[] = [
 export const CERTS_SCHEMA: ModuleSchema = {
     columns: [
         ...d("name", "member"),
-        { ...FIELD_DICT.category, options: ["id", "hukou", "passport", "visa", "permit", "license", "vehicle_lic", "birth_cert", "other"] },
+        { ...FIELD_DICT.category, options: [...CERTIFICATE_CATEGORY_OPTIONS] },
         { ...FIELD_DICT.status, options: ["valid", "expired", "renewed", "void"], default: "valid" },
         ...d("date"),
         ...CERT_PRIVATE,
         ...d("expiry", "due", "remind_before", "location", "attachments", "note"),
         { key: "copy_location", type: "text", labelKey: "field.copy_location" }, // 16 组：复印件/电子版存放位置
         { key: "renewed_to", type: "relation", labelKey: "field.renewed_to" }, // 16 组：换证链——旧证行 → 新证行
+        ...CERT_PROFILE_COLUMNS,
     ],
     capture: ["name", "member", "category", "expiry", "attachments"],
     views: [
@@ -121,6 +289,13 @@ export const CERTS_SCHEMA: ModuleSchema = {
         { key: "expiry", field: "expiry", kind: "oneoff", leadDays: 90 },
         // 签注/下次审验日（港澳台通行证签注另计）——due 列已在 columns 中（契约 33.2）
         { key: "endorsement", field: "due", kind: "oneoff", leadDays: 60 },
+        { key: "permit_endorsement", field: "x_cert_permit_endorsement_expiry", kind: "oneoff", leadDays: 60 },
+        { key: "hkmo_endorsement", field: "x_cert_hkmo_endorsement_expiry", kind: "oneoff", leadDays: 60 },
+        { key: "tw_endorsement", field: "x_cert_tw_endorsement_expiry", kind: "oneoff", leadDays: 60 },
+        { key: "driver_review", field: "x_cert_driver_review_due", kind: "oneoff", leadDays: 60 },
+        { key: "vocational_education", field: "x_cert_vocational_education_due", kind: "oneoff", leadDays: 60 },
+        { key: "professional_education", field: "x_cert_professional_education_due", kind: "oneoff", leadDays: 60 },
+        { key: "title_review", field: "x_cert_title_review_due", kind: "oneoff", leadDays: 60 },
     ],
 };
 
