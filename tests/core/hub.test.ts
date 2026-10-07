@@ -153,6 +153,37 @@ describe("CertsProvider（mock transport，读路径）", () => {
         const p = new CertsProvider({ settings: settings(), getDbRef: () => undefined });
         expect(await p.collect(TODAY)).toEqual([]);
     });
+
+    it("读取已补齐的类型专属日期 → 派生对应提醒规则", async () => {
+        const cols = {
+            name: "k-name", status: "k-status", expiry: "k-exp", due: "k-due",
+            x_cert_hkmo_endorsement_expiry: "k-hkmo",
+        };
+        setTransport(async (endpoint: string) => {
+            if (endpoint === "/api/av/renderAttributeView") return {
+                code: 0, msg: "", data: { view: {
+                    columns: Object.values(cols).map((id) => ({ id, type: "text", name: id })),
+                    rowCount: 1,
+                    rows: [{ id: "row-hkmo", cells: Object.entries(cols).map(([keyID, id]) => ({
+                        value: keyID === "name"
+                            ? { keyID: id, type: "text", text: { content: "港澳通行证" } }
+                            : keyID === "status"
+                                ? { keyID: id, type: "select", select: { content: "valid" } }
+                                : keyID === "x_cert_hkmo_endorsement_expiry"
+                                    ? { keyID: id, type: "date", date: { content: new Date(2026, 9, 20).getTime(), isNotEmpty: true } }
+                                    : { keyID: id },
+                    })) }],
+                } },
+            };
+            if (endpoint === "/api/av/getAttributeViewPrimaryKeyValues") return { code: 0, msg: "", data: { rows: { values: [] } } };
+            throw new Error("unexpected endpoint " + endpoint);
+        });
+        const p = new CertsProvider({ settings: settings(), getDbRef: () => ({ avId: AV, columns: cols }) });
+        const out = await p.collect(TODAY);
+        expect(out).toEqual(expect.arrayContaining([
+            expect.objectContaining({ rowId: "row-hkmo", ruleKey: "hkmo_endorsement", daysLeft: 19 }),
+        ]));
+    });
 });
 
 describe("SchemaLedgerProvider favors 回礼（16 组/190 波：after kind + onlyIf）", () => {

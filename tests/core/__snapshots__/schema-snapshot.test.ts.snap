@@ -124,9 +124,17 @@ exports[`31 模块 schema 契约快照（21 组） > 每个 schema 的结构快�
         "passport",
         "visa",
         "permit",
+        "hkmo_permit",
+        "tw_permit",
         "license",
+        "driver_license",
         "vehicle_lic",
         "birth_cert",
+        "vocational_qualification",
+        "professional_qualification",
+        "graduation_cert",
+        "degree_cert",
+        "professional_title",
         "other",
       ],
       "type": "select",
@@ -149,6 +157,11 @@ exports[`31 模块 schema 契约快照（21 组） > 每个 schema 的结构快�
       "type": "date",
     },
     {
+      "key": "x_cert_holder_name",
+      "labelKey": "field.x_cert_holder_name",
+      "type": "text",
+    },
+    {
       "key": "holder_no",
       "labelKey": "field.holder_no",
       "type": "text",
@@ -156,6 +169,11 @@ exports[`31 模块 schema 契约快照（21 组） > 每个 schema 的结构快�
     {
       "key": "issue_date",
       "labelKey": "field.issue_date",
+      "type": "date",
+    },
+    {
+      "key": "x_cert_valid_from",
+      "labelKey": "field.x_cert_valid_from",
       "type": "date",
     },
     {
@@ -214,6 +232,379 @@ exports[`31 模块 schema 契约快照（21 组） > 每个 schema 的结构快�
       "labelKey": "field.renewed_to",
       "type": "relation",
     },
+    {
+      "key": "x_cert_id_address",
+      "labelKey": "field.x_cert_id_address",
+      "type": "text",
+    },
+    {
+      "key": "x_cert_id_authority",
+      "labelKey": "field.x_cert_id_authority",
+      "type": "text",
+    },
+    {
+      "key": "x_cert_id_gender",
+      "labelKey": "field.x_cert_id_gender",
+      "options": [
+        "male",
+        "female",
+      ],
+      "type": "select",
+    },
+    {
+      "key": "x_cert_id_front",
+      "labelKey": "field.x_cert_id_front",
+      "type": "mAsset",
+    },
+    {
+      "key": "x_cert_id_back",
+      "labelKey": "field.x_cert_id_back",
+      "type": "mAsset",
+    },
+    {
+      "key": "x_cert_hukou_location",
+      "labelKey": "field.x_cert_hukou_location",
+      "type": "text",
+    },
+    {
+      "key": "x_cert_hukou_head_name",
+      "labelKey": "field.x_cert_hukou_head_name",
+      "type": "text",
+    },
+    {
+      "key": "x_cert_hukou_scan",
+      "labelKey": "field.x_cert_hukou_scan",
+      "type": "mAsset",
+    },
+    {
+      "key": "x_cert_passport_name_pinyin",
+      "labelKey": "field.x_cert_passport_name_pinyin",
+      "type": "text",
+    },
+    {
+      "key": "x_cert_passport_nationality",
+      "labelKey": "field.x_cert_passport_nationality",
+      "type": "text",
+    },
+    {
+      "key": "x_cert_passport_birth_place",
+      "labelKey": "field.x_cert_passport_birth_place",
+      "type": "text",
+    },
+    {
+      "key": "x_cert_passport_authority",
+      "labelKey": "field.x_cert_passport_authority",
+      "type": "text",
+    },
+    {
+      "key": "x_cert_passport_scan",
+      "labelKey": "field.x_cert_passport_scan",
+      "type": "mAsset",
+    },
+    {
+      "key": "x_cert_visa_country",
+      "labelKey": "field.x_cert_visa_country",
+      "type": "text",
+    },
+    {
+      "key": "x_cert_visa_type",
+      "labelKey": "field.x_cert_visa_type",
+      "type": "text",
+    },
+    {
+      "key": "x_cert_visa_scan",
+      "labelKey": "field.x_cert_visa_scan",
+      "type": "mAsset",
+    },
+    {
+      "key": "x_cert_permit_region",
+      "labelKey": "field.x_cert_permit_region",
+      "type": "text",
+    },
+    {
+      "key": "x_cert_permit_endorsement",
+      "labelKey": "field.x_cert_permit_endorsement",
+      "type": "text",
+    },
+    {
+      "key": "x_cert_permit_endorsement_expiry",
+      "labelKey": "field.x_cert_permit_endorsement_expiry",
+      "type": "date",
+    },
+    {
+      "key": "x_cert_permit_scan",
+      "labelKey": "field.x_cert_permit_scan",
+      "type": "mAsset",
+    },
+    {
+      "key": "x_cert_hkmo_region",
+      "labelKey": "field.x_cert_hkmo_region",
+      "options": [
+        "hong_kong",
+        "macao",
+      ],
+      "type": "select",
+    },
+    {
+      "key": "x_cert_hkmo_endorsement",
+      "labelKey": "field.x_cert_hkmo_endorsement",
+      "type": "text",
+    },
+    {
+      "key": "x_cert_hkmo_endorsement_expiry",
+      "labelKey": "field.x_cert_hkmo_endorsement_expiry",
+      "type": "date",
+    },
+    {
+      "key": "x_cert_hkmo_scan",
+      "labelKey": "field.x_cert_hkmo_scan",
+      "type": "mAsset",
+    },
+    {
+      "key": "x_cert_tw_endorsement",
+      "labelKey": "field.x_cert_tw_endorsement",
+      "type": "text",
+    },
+    {
+      "key": "x_cert_tw_endorsement_expiry",
+      "labelKey": "field.x_cert_tw_endorsement_expiry",
+      "type": "date",
+    },
+    {
+      "key": "x_cert_tw_scan",
+      "labelKey": "field.x_cert_tw_scan",
+      "type": "mAsset",
+    },
+    {
+      "key": "x_cert_legacy_type",
+      "labelKey": "field.x_cert_legacy_type",
+      "type": "text",
+    },
+    {
+      "key": "x_cert_legacy_issuer",
+      "labelKey": "field.x_cert_legacy_issuer",
+      "type": "text",
+    },
+    {
+      "key": "x_cert_legacy_scan",
+      "labelKey": "field.x_cert_legacy_scan",
+      "type": "mAsset",
+    },
+    {
+      "key": "x_cert_driver_class",
+      "labelKey": "field.x_cert_driver_class",
+      "type": "text",
+    },
+    {
+      "key": "x_cert_driver_authority",
+      "labelKey": "field.x_cert_driver_authority",
+      "type": "text",
+    },
+    {
+      "key": "x_cert_driver_first_issue_date",
+      "labelKey": "field.x_cert_driver_first_issue_date",
+      "type": "date",
+    },
+    {
+      "key": "x_cert_driver_review_due",
+      "labelKey": "field.x_cert_driver_review_due",
+      "type": "date",
+    },
+    {
+      "key": "x_cert_driver_scan",
+      "labelKey": "field.x_cert_driver_scan",
+      "type": "mAsset",
+    },
+    {
+      "key": "x_cert_vehicle_plate",
+      "labelKey": "field.x_cert_vehicle_plate",
+      "type": "text",
+    },
+    {
+      "key": "x_cert_vehicle_owner",
+      "labelKey": "field.x_cert_vehicle_owner",
+      "type": "text",
+    },
+    {
+      "key": "x_cert_vehicle_scan",
+      "labelKey": "field.x_cert_vehicle_scan",
+      "type": "mAsset",
+    },
+    {
+      "key": "x_cert_birth_place",
+      "labelKey": "field.x_cert_birth_place",
+      "type": "text",
+    },
+    {
+      "key": "x_cert_birth_registration_no_last4",
+      "labelKey": "field.x_cert_birth_registration_no_last4",
+      "type": "text",
+    },
+    {
+      "key": "x_cert_birth_scan",
+      "labelKey": "field.x_cert_birth_scan",
+      "type": "mAsset",
+    },
+    {
+      "key": "x_cert_vocational_name",
+      "labelKey": "field.x_cert_vocational_name",
+      "type": "text",
+    },
+    {
+      "key": "x_cert_vocational_level",
+      "labelKey": "field.x_cert_vocational_level",
+      "type": "text",
+    },
+    {
+      "key": "x_cert_vocational_issuer",
+      "labelKey": "field.x_cert_vocational_issuer",
+      "type": "text",
+    },
+    {
+      "key": "x_cert_vocational_registration_last4",
+      "labelKey": "field.x_cert_vocational_registration_last4",
+      "type": "text",
+    },
+    {
+      "key": "x_cert_vocational_education_due",
+      "labelKey": "field.x_cert_vocational_education_due",
+      "type": "date",
+    },
+    {
+      "key": "x_cert_vocational_scan",
+      "labelKey": "field.x_cert_vocational_scan",
+      "type": "mAsset",
+    },
+    {
+      "key": "x_cert_professional_name",
+      "labelKey": "field.x_cert_professional_name",
+      "type": "text",
+    },
+    {
+      "key": "x_cert_professional_level",
+      "labelKey": "field.x_cert_professional_level",
+      "type": "text",
+    },
+    {
+      "key": "x_cert_professional_issuer",
+      "labelKey": "field.x_cert_professional_issuer",
+      "type": "text",
+    },
+    {
+      "key": "x_cert_professional_registration_last4",
+      "labelKey": "field.x_cert_professional_registration_last4",
+      "type": "text",
+    },
+    {
+      "key": "x_cert_professional_education_due",
+      "labelKey": "field.x_cert_professional_education_due",
+      "type": "date",
+    },
+    {
+      "key": "x_cert_professional_scan",
+      "labelKey": "field.x_cert_professional_scan",
+      "type": "mAsset",
+    },
+    {
+      "key": "x_cert_school",
+      "labelKey": "field.x_cert_school",
+      "type": "text",
+    },
+    {
+      "key": "x_cert_major",
+      "labelKey": "field.x_cert_major",
+      "type": "text",
+    },
+    {
+      "key": "x_cert_education_level",
+      "labelKey": "field.x_cert_education_level",
+      "type": "text",
+    },
+    {
+      "key": "x_cert_admission_date",
+      "labelKey": "field.x_cert_admission_date",
+      "type": "date",
+    },
+    {
+      "key": "x_cert_graduation_date",
+      "labelKey": "field.x_cert_graduation_date",
+      "type": "date",
+    },
+    {
+      "key": "x_cert_graduation_no_last4",
+      "labelKey": "field.x_cert_graduation_no_last4",
+      "type": "text",
+    },
+    {
+      "key": "x_cert_graduation_scan",
+      "labelKey": "field.x_cert_graduation_scan",
+      "type": "mAsset",
+    },
+    {
+      "key": "x_cert_degree",
+      "labelKey": "field.x_cert_degree",
+      "type": "text",
+    },
+    {
+      "key": "x_cert_degree_school",
+      "labelKey": "field.x_cert_degree_school",
+      "type": "text",
+    },
+    {
+      "key": "x_cert_degree_award_date",
+      "labelKey": "field.x_cert_degree_award_date",
+      "type": "date",
+    },
+    {
+      "key": "x_cert_degree_no_last4",
+      "labelKey": "field.x_cert_degree_no_last4",
+      "type": "text",
+    },
+    {
+      "key": "x_cert_degree_scan",
+      "labelKey": "field.x_cert_degree_scan",
+      "type": "mAsset",
+    },
+    {
+      "key": "x_cert_title_level",
+      "labelKey": "field.x_cert_title_level",
+      "type": "text",
+    },
+    {
+      "key": "x_cert_title_specialty",
+      "labelKey": "field.x_cert_title_specialty",
+      "type": "text",
+    },
+    {
+      "key": "x_cert_title_issuer",
+      "labelKey": "field.x_cert_title_issuer",
+      "type": "text",
+    },
+    {
+      "key": "x_cert_title_review_due",
+      "labelKey": "field.x_cert_title_review_due",
+      "type": "date",
+    },
+    {
+      "key": "x_cert_title_scan",
+      "labelKey": "field.x_cert_title_scan",
+      "type": "mAsset",
+    },
+    {
+      "key": "x_cert_other_type",
+      "labelKey": "field.x_cert_other_type",
+      "type": "text",
+    },
+    {
+      "key": "x_cert_other_issuer",
+      "labelKey": "field.x_cert_other_issuer",
+      "type": "text",
+    },
+    {
+      "key": "x_cert_other_scan",
+      "labelKey": "field.x_cert_other_scan",
+      "type": "mAsset",
+    },
   ],
   "reminders": [
     {
@@ -225,6 +616,48 @@ exports[`31 模块 schema 契约快照（21 组） > 每个 schema 的结构快�
     {
       "field": "due",
       "key": "endorsement",
+      "kind": "oneoff",
+      "leadDays": 60,
+    },
+    {
+      "field": "x_cert_permit_endorsement_expiry",
+      "key": "permit_endorsement",
+      "kind": "oneoff",
+      "leadDays": 60,
+    },
+    {
+      "field": "x_cert_hkmo_endorsement_expiry",
+      "key": "hkmo_endorsement",
+      "kind": "oneoff",
+      "leadDays": 60,
+    },
+    {
+      "field": "x_cert_tw_endorsement_expiry",
+      "key": "tw_endorsement",
+      "kind": "oneoff",
+      "leadDays": 60,
+    },
+    {
+      "field": "x_cert_driver_review_due",
+      "key": "driver_review",
+      "kind": "oneoff",
+      "leadDays": 60,
+    },
+    {
+      "field": "x_cert_vocational_education_due",
+      "key": "vocational_education",
+      "kind": "oneoff",
+      "leadDays": 60,
+    },
+    {
+      "field": "x_cert_professional_education_due",
+      "key": "professional_education",
+      "kind": "oneoff",
+      "leadDays": 60,
+    },
+    {
+      "field": "x_cert_title_review_due",
+      "key": "title_review",
       "kind": "oneoff",
       "leadDays": 60,
     },

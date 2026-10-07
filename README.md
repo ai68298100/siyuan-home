@@ -27,7 +27,7 @@ Certificates expire, medicine expires, insurance needs renewal, subscriptions au
 | ⏰ **Unified expiry reminders** | Certificates, medicine, policies, subscriptions, inspections, birthdays (lunar supported) — all derived automatically, lead time configurable per type (passport 1 year, medicine 30 days), overdue shown in red on top |
 | 👥 **Members as first-class citizens** | Self / spouse / partner / children / elders / kin — every ledger is organized per member, filter "everything about my son" in one click |
 | 🗃 **31 life modules** | People & records · assets & shopping · daily living · parenting & school · travel · media (details below) |
-| 📋 **Rich detail drawer** | View all fields, edit inline, upload attachments, renewal history, replacement chains & timeline journals (valuations / prices / meter readings / lending / pre-trip checks), delete with double-confirm |
+| 📋 **Rich detail drawer** | Type-specific certificate fields (ID/passport/permits/licences/qualifications/degrees/titles), quick camera/photo/PDF upload, same-origin attachment preview/download, renewal history, replacement chains & timeline journals |
 | 📈 **Growth charts (parenting)** | Height/weight timelines with official WHO reference bands (P3–P97, 0–13 weeks weekly + 0–60 months), percentile on hover |
 | 🛒 **Smart lists** | Shopping suggestions from low stock (editable, copy-to-clipboard), media update reminders, reciprocation reminders for received gifts |
 | 📊 **Check-in & exam integration** | Display study streaks and accuracy from 小驴考试, check-in strength summaries from 小驴打卡 |
@@ -37,7 +37,7 @@ Certificates expire, medicine expires, insurance needs renewal, subscriptions au
 | 🧩 **Modules on demand** | Disabled modules create no data and stay out of the UI; parenting/school only suggested when you have kids |
 | 🔌 **Ecosystem ready** | Block menu quick capture, statusbar badge, service bridge (`window.LvHome`), contacts picker via 小驴人脉 |
 
-## 📦 Install (v0.3.11)
+## 📦 Install (v0.3.12)
 
 1. Download `package.zip` from [Releases](https://github.com/ai68298100/siyuan-home/releases/latest)
 2. SiYuan → Settings → Marketplace → Download → **Import** the zip
@@ -45,7 +45,7 @@ Certificates expire, medicine expires, insurance needs renewal, subscriptions au
 4. Press `Ctrl+Alt+H` anytime to open the hub
 
 > **Validation status:** core data paths have automated tests and live-kernel coverage. The six-stage real SiYuan UI batch, including Android WebView and accessibility checks, is still pending; marketplace submission remains paused. `icon.png` and `preview.png` use the v0.3.9 product assets.
-> **Version note:** the tagged v0.3.11 package is the current stable release artifact; `main` contains the latest dependency, release and e2e-tooling hardening and currently reports 282 unit tests.
+> **Version note:** the tagged v0.3.12 package is the current stable release artifact; `main` contains the latest dependency, release and e2e-tooling hardening and currently reports 293 unit tests.
 >
 > Family sharing depends on SiYuan's collaboration, permissions, sync and conflict behavior. Test with non-sensitive data before sharing; this plugin does not provide a separate permission system.
 >
@@ -103,7 +103,7 @@ The current release is in a trust-and-validation phase: complete the real SiYuan
 
 | Phase | Content |
 |---|---|
-| ✅ v0.3.11 (current) | v0.3.10 baseline plus Windows Corepack live-test startup fix, independent backend e2e evidence, and explicit AI outbound boundary |
+| ✅ v0.3.12 (current) | v0.3.10 baseline plus Windows Corepack live-test startup fix, independent backend e2e evidence, and explicit AI outbound boundary |
 | 🔜 Next | Task workbench, evidence center, inbox, health recovery |
 | 🔭 Later | Family collaboration, template packs, yearly family report, AI capabilities |
 
@@ -121,7 +121,7 @@ pnpm run dev      # dev (app + kernel watch)
 pnpm run build    # dist/ + package.zip
 pnpm run check    # 5-layer gate (types + svelte + i18n + meta + audit)
 pnpm run smoke    # release package and single-file loader smoke checks
-pnpm test         # unit tests (282)
+pnpm test         # unit tests (293)
 ```
 
 - Setup & conventions: [CONTRIBUTING.md](./CONTRIBUTING.md)
