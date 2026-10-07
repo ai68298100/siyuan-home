@@ -34,7 +34,7 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
-      - name: Check (types + svelte + i18n + meta)
+      - name: Check (types + svelte + i18n + meta + audit)
         run: pnpm run check
 
       - name: Unit tests
@@ -62,3 +62,4 @@ jobs:
           name: package
           path: package.zip
           retention-days: 14
+
