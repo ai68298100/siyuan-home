@@ -98,6 +98,8 @@ export interface HubRuntime {
     monthlyCompletions?: Record<string, number>;
     /** 29 组月度应到基数：月键 → 当月去重后到期提醒总数（全量扫描时更新） */
     monthlyDueTotals?: Record<string, number>;
+    /** 266 波模块卡趋势条：日期键（localDateKey）→ { 模块 id → 当日待办计数 }；滚动窗口由写入方裁剪 */
+    moduleHistory?: Record<string, Record<string, number>>;
 }
 
 export function defaultRuntime(): HubRuntime {
@@ -165,8 +167,25 @@ export function cleanupRowRuntimeData(rt: HubRuntime, rowId: string): boolean {
     return dirty;
 }
 
-export function purgeHandled(rt: HubRuntime, today: Date, keepDays = HANDLED_KEEP_DAYS): void {
-    const cutoff = today.getTime() - keepDays * 86400000;
+/** 266 波模块趋势条滚动窗口（天）：与 HANDLED_KEEP_DAYS 分开，控制 moduleHistory 体积 */
+export const MODULE_HISTORY_KEEP_DAYS = 14;
+
+/**
+ * 266 波（模块卡趋势条数据源）：全量扫描后记录当日各模块待办计数（同日覆盖），
+ * 并裁剪滚动窗口外的旧键。纯函数——写回由调用方经 saveRuntime 落盘。
+ */
+export function recordModuleHistory(rt: HubRuntime, reminders: Reminder[], today: Date, keepDays = MODULE_HISTORY_KEEP_DAYS): void {
+    const todayKey = localDateKey(today);
+    const counts: Record<string, number> = {};
+    for (const r of reminders) counts[r.moduleId] = (counts[r.moduleId] ?? 0) + 1;
+    rt.moduleHistory = { ...(rt.moduleHistory ?? {}), [todayKey]: counts };
+    const cutoff = localDateKey(new Date(today.getTime() - keepDays * 86400000));
+    for (const key of Object.keys(rt.moduleHistory)) {
+        if (key < cutoff) delete rt.moduleHistory[key];
+    }
+}
+
+export function purgeHandled(rt: HubRuntime, today: Date, keepDays = HANDLED_KEEP_DAYS): void {    const cutoff = today.getTime() - keepDays * 86400000;
     rt.memos = (rt.memos ?? []).filter((m) => !m.doneAt || new Date(m.doneAt).getTime() >= cutoff);
     for (const [id, rec] of Object.entries(rt.handled)) {
         if (new Date(rec.at).getTime() < cutoff) delete rt.handled[id];

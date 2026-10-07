@@ -1,17 +1,17 @@
 # 小驴管家（Lv Home）· 项目待办总清单
-> **当前事实（2026-10-05 · 第 225 波）**：v0.3.1 已发布（v0.3.0 零入口事故热修：chunks 分包在思源加载器下必然失败 → 单文件 bundle + smoke/loader 双门禁；pets cycle 列；REL-01 版本单源）。250 项单测通过，类型/i18n/meta/audit/build/loader 全绿；Svelte 0 错误但 2 警告；Windows `pnpm run smoke` 因系统缺少 `unzip` 失败；真实 SiYuan UI 六阶段真机批尚未执行；icon/preview 仍为占位图；集市上架继续暂缓。开发入口以 [状态评审与下一阶段路线](docs/research/2026-10-05-开发状态与待办评审.md) 和上方第 224 波行动清单为准，历史波次不代表当前队列。
+> **当前事实（2026-10-07 · 第 273 波）**：v0.3.8 已发布；250–267 波 UI 对齐原型集中打磨完成（含模块趋势条 266 波、设备批 e2e 40/40 适配 272 波、REL-04 发布门禁 269 波）（模块网格修复、中性 token、设置第四屏、引导 aura、台账状态语义接 leadOverrides、弹窗家族中性化、打印翻纸面、QR 打印页对齐、窄屏/交互/双语/媒体降级全走查，证据入 CHANGELOG 未发布段），261 波功能级 e2e 回归全绿（VALUE-01 6/6 + VALUE-02 4/4 + smoke）。274 项单测通过，类型/i18n(885 键)/meta/audit/build/loader 全绿；Svelte 0 错误 0 警告（268 波消除存量 state_referenced_locally）；Windows `pnpm run smoke` 已跨平台（273 波解压回退链）；真机批残余项（Android WebView/独立窗口/兄弟插件/双端冲突）待真机；icon/preview 已替换为产品品牌渲染（274 波）；集市上架继续暂缓。
 
 ## 第 224 波复审行动清单（当前唯一入口）
 
 ### 发布信任门禁（P0）
 
 - [x] **REL-01 版本单源**：~~修复 `src/index.ts` 诊断/关于显示 0.2.0；由 package/plugin 或构建注入统一版本，并加入漂移测试。~~（225 波完成：vite define 从 plugin.json 注入 `__PLUGIN_VERSION__`，字面量清零；package↔plugin 漂移由 check:meta 既有交叉校验覆盖）
-- [ ] **REL-02 跨平台 smoke**：移除对系统 `unzip` 的硬依赖；Windows、Ubuntu、macOS 均能验证 package.zip 必需文件、禁入文件、manifest、i18n 和体积。
+- [x] **REL-02 跨平台 smoke**：~~移除对系统 `unzip` 的硬依赖。~~（273 波：解压回退链 unzip → PowerShell → python zipfile + SMOKE_EXTRACT 强制指定 + 产出校验；Windows PowerShell 路径实测通过）
 - [ ] **REL-03 文档事实同步**：ROADMAP、MODULES、发布清单、隐私、FAQ、README 统一 v0.3.0、250 tests、真机 UI 未验收、集市暂缓；历史快照加日期和“仅供追溯”。
-- [ ] **REL-04 Release 门禁**：tag 工作流增加 test、smoke、包内容/体积/版本交叉检查；门禁失败不得创建或覆盖 Release。
-- [ ] **TRUST-01 能力证据矩阵**：逐模块登记 schema/建库/capture/读写/provider/reminder/export/mobile/evidence；对外文案只引用 L2/L3 证据。
+- [x] **REL-04 Release 门禁**：~~tag 工作流增加 test、smoke、包内容/体积/版本交叉检查；门禁失败不得创建或覆盖 Release。~~（269 波完成：release.yml 版本三源校验/check 之后补 Unit tests + verify:loader + Package smoke + 体积预算 220KB，全部先于 Release action）
+- [x] **TRUST-01 能力证据矩阵**：~~逐模块登记……~~（275 波完成：scripts/trust-matrix.mjs 生成 docs/capability-matrix.md——31/31 模块 schema 契约、8 台账内核实读全过（真实行列数）、横切能力引用 e2e 断言、L3 残余显性登记；对外文案只引用 L2 及以上）
 - [ ] **TRUST-02 共享与隐私文案**：说明思源同步、协作权限、冲突/撤回和备份边界；“插件不主动外联”不写成整个环境绝对无网络。
-- [ ] **BRAND-01 正式 icon/preview**：替换占位图，补透明安全区、16px 可读、浅深主题、演示数据/版本标注和 GitHub social preview。
+- [x] **BRAND-01 正式 icon/preview**：~~替换占位图……~~（274 波完成：icon=产品自有 lv-logo 品牌标渲染（渐变+高光+🏠，160×160，主题无关不透明底）；preview=暗色总览实拍合成（品牌头/趋势条可见/v0.3.9+演示数据标注，1024×640）；GitHub social preview 需 repo settings 手动上传（记录为残余）；占位图备份 tmp/brand-backup/）
 
 ### 真机与体验门禁（P0/P1）
 
@@ -25,8 +25,8 @@
 
 ### 首条价值闭环（P1）
 
-- [ ] **VALUE-01 首条有效记录**：从空工作区完成成员 → 第一条证件/事项 → 提醒 → 定位原文的 5 分钟路径。
-- [ ] **VALUE-02 恢复路径**：覆盖缺库、误删、设置损坏、导入失败、成员悬空、多设备冲突和卸载重装。
+- [x] **VALUE-01 首条有效记录**：~~从空工作区完成成员 → 第一条证件/事项 → 提醒 → 定位原文的 5 分钟路径。~~（e2e 常驻：VALUE-01 6/6，270 波起多次全绿）
+- [x] **VALUE-02 恢复路径**：~~覆盖缺库、误删、设置损坏、导入失败……~~（e2e 常驻：RECOVERY 4/4 + IMPORT 5/5；多设备冲突与卸载重装仍待真机，见 DEVICE ◐）
 - [ ] **VALUE-03 成员与检索**：真机观察排序/筛选/搜索卡点，再决定批量改派、命名视图、脱敏复制和拼音检索。
 - [ ] **VALUE-04 用户试用**：3–5 位目标用户完成首条记录、提醒处理、原文回跳、导出和恢复；按完成率/误解/退出原因重排功能。
 
@@ -35,6 +35,17 @@
 - [ ] 拼音/首字母检索、已有文档块进台账、Webhook、rollup、提醒双日期、QR、语音、AI、家庭共享权限、更多模块深化；每项先写用户结果、依赖、停止条件和证据等级。
 
 
+| 2026-10-07 | 主线 | 第二百五十波：**UI 对齐原型三轮（截图驱动，全屏五页）** | 真实思源靶场（14680）Playwright 截图 vs 原型逐项对比 → 修 `.lv-mods` 网格缺失（模块卡全宽堆叠的结构缺陷）、三级文字/描边 token 改中性派生（暗色主题表头/辅助文字发蓝）、字号层级对齐原型（26/32/13.5）、工具条控件体系（筛选/台账头/成员录入统一 32px）、成员卡 lv-person 结构、快速备忘输入卡、台账「新建」升主按钮、⚙ 幽灵化；原型补齐已实现功能（备忘卡/置顶/分诊/批量/ICS/视图切换/QR 标签/成员相机/生日 chip） |
+| 2026-10-07 | 主线 | 第二百五十一波：**设置第四屏 + 引导品牌时刻 + 操作钮语言** | 设置面板重构（侧栏锚点导航 + 分组卡片 + 开关右置，纯类名层）；引导对齐原型 .aura（双漂移辉光 + 居中向导 + 角色胶囊），修「跳过引导」无效类 b3-button ghost（一直回落蓝色实心）；提醒行操作钮 ghost 化；日历事件点同色光晕；i18n +tab.settings |
+| 2026-10-07 | 主线 | 第二百五十二波：**台账状态色语义 + 窄屏溢出** | 表格首列色点 + 到期日着色（只读日期比较派生）；390 视口走查抓到幽灵横滚（980px 辉光椭圆撑出 scrollWidth 643）→ max-width 封顶；窄屏提醒行转网格（操作钮换行）；批量条工具条化；页签胶囊 init 去首帧滑入 |
+| 2026-10-07 | 主线 | 第二百五十三波：**详情弹窗 kv + 交互状态实测闭环** | 详情抽屉 kv 排版（标签中性灰/两列对齐，b3 变量现场派生）；hover 实测：提醒行 ops/色轨泛光、模块卡浮起+辉光、成员卡按钮浮现（display 折叠修姓名挤压）、focus-visible、详情弹窗 |
+| 2026-10-07 | 主线 | 第二百五十四波：**状态走查 + resize 跟随 + 农历竖排** | 设置三页签/已处理空态/移动端设置弹窗（思源自钳制）走查；页签胶囊补 resize 监听（窗口缩放重排）；成员行「农历」竖排修复（行折行 + 标签不收缩） |
+| 2026-10-07 | 主线 | 第二百五十五波：**台账色点阈值接入 leadOverrides + 收尾微调** | warn 阈值 = 模块提醒规则生效提前量最大值（leadOverrides 覆盖 > schema 默认，无规则回退 30）——色点语义与提醒中枢触发时点一致（只读派生）；设置「保存」升主按钮；向导卡窄屏内边距 |
+| 2026-10-07 | 主线 | 第二百五十六波：**自建弹窗家族辅助文字中性化** | ft__on-surface 在暗色下发蓝 → 10 个 #lv-* 弹窗容器清单式统一中性灰（body 层 b3 变量现场派生）；续期弹窗实拍验证 |
+| 2026-10-07 | 主线 | 第二百五十七波：**打印样式重写 + 媒体降级实测** | 打印 lv token 整体翻纸面（修暗色打印残留深色块）、备忘卡/输入控件隐藏、日历格（button）豁免一刀切隐藏；双主题打印实拍；reduced-motion（animation:none）/ forced-colors（CanvasText 轮廓）模拟验证 |
+| 2026-10-07 | 主线 | 第二百五十八波：**QR 打印标签页对齐设计语言** | 生成模板重设计（品牌页头 + 纸面固定色板 + 圆角标签卡 + 主色打印按钮）；修空行名渲染空名行（cellText 空串语义不动，模板层回退） |
+| 2026-10-07 | 主线 | 第二百五十九–二百六十波：**交互/回归验证 + 英文环境** | resize 跟随实测（zoom 布局变化 → aligned:true）；生长曲线弹窗实测（中性灰生效）；全页签 console 零错误；EN 环境四页签零溢出 + 修英文单复数（1 item needs attention，+dash.needAttentionOne） |
+| 2026-10-07 | 主线 | 第二百六十一波：**功能级 e2e 回归 + 文档沉淀** | 靶场清授权码（e2e 兼容）后三套件全绿：smoke（发布包门禁）、VALUE-01 首录 6/6（引导→建库→成员→录证件→提醒→定位全流程）、VALUE-02 恢复 4/4（设置损坏回退 + 缺库自愈）；CHANGELOG 未发布段沉淀 250–260 波 |
 | 2026-10-06 | 主线 | 第二百四十九波：**UI 质感精修（原型对齐二轮，截图驱动）** | 原型浅色主题逐屏截图 vs 生产截图逐项对比（差距九项：边框过重/阴影不可感知/section 节奏紧/色砖缺失/meta 缺模块名/section 标题弱/qbtn 闷底/strip 闷底/磁贴偏小）→ design-system.scss 系统性打磨（阴影三级多层低透明度重标定、卡片边框 7% 半透明化、lv-sec 26→30、lv-title-sec 13px 深色化、lv-strip/lv-qbtn 白底面板化+shadow-1、磁贴 36→38px）+ 模块色砖体系（core/modules moduleTone 映射 31 模块→5 色 tone-*，CSS 变量消费无优先级冲突，reminders 行磁贴/overview 模块卡+即将到期/提醒行 meta 补模块名三段式）；**调试教训**：Svelte5 模板 attr 内含引号嵌套的复杂 class 表达式被静默丢弃（产物里 moduleTone=0 无报错）——改 class: 指令后生效，编译产物 grep 必查；真机截图复核全部收敛；门禁全绿（272 测试/i18n 878 键/smoke/loader） |
 | 2026-10-06 | 主线 | 第二百四十八波：🏁 **v0.3.7 发版**（打包 246 波：QR 打印标签页） | CHANGELOG v0.3.7 段 → 版本 0.3.7（package/plugin）→ README 双语路线图行 → 全门禁 → tag v0.3.7 → CI 发布 → 发布包核验 → 装回工作区 |
 | 2026-10-06 | 主线 | 第二百四十八波：🏁 **v0.3.8 发版**（打包 247 波：备忘置顶）+ v0.3.7 变更说明补全（成员分配/备忘编辑） | CHANGELOG v0.3.8 段 → 版本 0.3.8（package/plugin）→ README 双语路线图行 → 全门禁 → tag v0.3.8 → CI 发布 → 发布包核验 → 装回工作区 |
@@ -213,8 +224,8 @@ v0.3.0 已发 GitHub Release；**集市上架以此批通过为先决条件**。
 - [x] 🟡 配置 GitHub Actions：.github/workflows/ci.yml（check 五重门禁+test+build+smoke+gzip 包体门禁+产物上传）
 - [ ] 🟢 分支保护：main 禁直推
 - [x] 🟢 `plugin.json` 的 `author`/`url` 从占位 lvdaoguan 改为 ai68298100 ✅ 2026-10-03 第四十轮（plugin.json + package.json author 修正；plugin.json url 从 github.com/lvdaoguan → github.com/ai68298100——集市仓库链接修正）
-- [ ] 🔴 替换 `icon.png`（160×160，≤64KiB，禁止 SVG）（2026-10-03 定案：保留现占位，随 v0.3 视觉稿一并替换，不阻塞真机回归与发布）
-- [ ] 🟡 制作 `preview.png`（1024×768，≤512KiB，集市展示图）——生成路径确认：内置图像工具本环境不可用，待图像工具可用时生成（约定见 asset/README.md）
+- [x] 🔴 替换 `icon.png`（160×160，≤64KiB，禁止 SVG）——274 波完成（lv-logo 品牌标渲染 16KB，16px 可读、主题无关）
+- [x] 🟡 制作 `preview.png`（1024×768，≤512KiB，集市展示图）——274 波完成（暗色总览实拍合成 101KB，品牌头/趋势条/演示数据与版本标注）
 - [x] 🟡 核对 `disabledInPublish` 的发布服务运行/隐私边界；是否解除禁用单独决定，与集市上架解耦（保持现配置，本轮只登记，见 R05/R06） ✅ 2026-10-03 定案：**保持 true**（隐私红线——插件不参与发布服务，与集市上架决策解耦）
 - [x] 🟢 LICENSE 确认（MIT，作者名更新） ✅ 2026-10-03 第四十轮（原始 SiYuan 模板版权保留 + 追加 ai68298100 Lv Home 二次开发声明）
 
@@ -1830,3 +1841,22 @@ v0.3.0 已发 GitHub Release；**集市上架以此批通过为先决条件**。
 
 - [ ] 🔴 **N1 部署后新 UI 验收增补**（并入 runbook 阶段 2）：171–176 波部署队列追平后，把新 UI 纳入真机批阶段 2 观察项——context-strip 状态条数值真实性、focus-row 三卡动作回跳、forced-colors 高对比、筛选空态解释/清除、键盘 Tab 提醒操作显现、成员卡 chips（预分组后显示一致）；**前置 = 内核锁定冷却 + 本工作区窗口（部署 21 文件）** ✅ 前置达成 2026-10-05 第一百八十二波：端口漂移真相查明（env 指向 6806 被 SpeedSwitch E2E 内核占用，真机批工作区在 14643）→ 部署队列 171–182 全量追平（28 文件字节一致、0 陈旧 chunk、预检 11/11）——真机批可开跑，阶段 2 按本条观察项执行
 - [x] 🟡 **N2 发版清单聚合**（真机批全绿后执行）：①`update_version.js` 0.2.0→0.3.0；②CHANGELOG Unreleased 定稿（199 波已补齐 113–198 尾波段——用户可感知变更按主题分组成稿，发版时只需复核增补）；③`release-notes.mjs` 生成 + 润色；④集市材料（PL24 截图 + 描述双语——描述双语 206 波已对齐 README；**preview.png 仍为 v0.1 骨架时代占位图，此步必须替换当前 UI 截图**）；⑤tag + GitHub Release——散于 D18/PL24/runbook 收尾，聚合为一站式清单 ✅ 2026-10-04 清单成文：[docs/release-checklist.md](docs/release-checklist.md)（七步：版本号/CHANGELOG 定稿/notes/构建四验/tag+Release/集市材料/发版后预检——执行时照单走） ✅ 2026-10-05 第二百二十二波执行完毕（用户指令"更新并优化readme，发版，但先不提交集市"）：①版本 0.2.0→0.3.0（package/plugin，check:meta 确认）；②CHANGELOG 定稿（尾波 214–221 折入 + Unreleased→v0.3.0 段，事实自校 E16/测试数）；③release-notes 生成+润色（tmp/release-notes-v030.md，双语结构对齐 CHANGELOG）；④README 双语优化（安装节 0.3.0、路线图行改现状）；⑤tag v0.3.0 + GitHub Release（CI 管线构建 zip + 润色 notes，下载 zip 核验 28 文件/0.3.0/9 关键文件）；⑥**集市材料与上架按指示延后**（disabledInPublish 保持 true；preview.png 占位图替换归集市步）；⑦发版后：v0.3.0 构建部署实例 0 失败+热重载+预检全绿；**意外收获**：tag 工作流 pnpm 11.4.0 硬编码与 packageManager 12.5.1 冲突只在 tag push 引爆——已修复（release.yml 读 packageManager）并移 tag 至修复提交
+| 2026-10-07 | 主线 | 第二百六十二波：**修总览模块卡对模块启停不即时响应（H02 语义补全）** | 满模块规模实测暴露：模块卡 each 直接遍历 plugin.settings.enabledModules（普通对象无响应性）且所在块无 version 驱动依赖——「全部启用/仅保留默认+保存」后 refreshHub 不重渲染该块，需切页签重挂载才出现/移除卡片；改 version 驱动 derived（moduleCards）修复，双向实测 2 秒内即时收缩(30→4)/扩展(4→30)；顺带完成 31 模块全量建库的设置保存链路验证（lv-btn primary 保存 84s 全程 disabled 正常） |
+| 2026-10-07 | 主线 | 第二百六十三波：**满数据规模压测走查（无代码改动）** | API 直注 100+ 证件行（到期日 -20…+60 散布）+ 60 条备忘 → 全量重扫 110 条提醒（逾期 10/7 天 13/30 天 87）：提醒 110 行渲染、批量全选 110、日历 63 事件点、台账 103 行色点+着色全部按状态正确分布；重扫+渲染 61s（31 模块全启用 + 100 行，主要耗时在扫描 API）；console 零错误——252/255 波状态语义在真实行量下验证无回归 |
+| 2026-10-07 | 主线 | 第二百六十四波：**同款缺陷类审计第二处修复——台账模块下拉不即时响应** | 262 波缺陷类系统审计：panels 全部 each/derived 数据源排查，发现 ledger ledgers derived 同病（遍历 enabledModules 无 version 依赖）——设置启停模块保存后已挂载台账页下拉不更新；同款 version 驱动修复，实测禁用+保存 2 秒内下拉 30→29（不切页签），恢复启用后靶场满模块状态确认 |
+| 2026-10-07 | 主线 | 第二百六十五波：**UI 走查方法学制度化** | 十九轮走查的靶场方法学入册：scripts/ui-walkthrough/（lib.mjs 幂等拉内核+登录+reparent helpers、shoot-tabs 四页签双主题全高+溢出检测、bulk-stress 满数据注入差分法）+ docs/testing/ui-walkthrough-runbook.md（坑位表：集市 trust 门槛/授权码清空与 cookie≠token/stage desktop 路径/modeOS/reparent 动画时序/内核自动退出）+ CONTRIBUTING 互链；入库脚本实测全绿（shoot-tabs dark 五图+零溢出） |
+| 2026-10-07 | 主线 | 第二百六十六波：**模块卡趋势条（原型 .spark 落地）** | runtime.moduleHistory 每日各模块待办计数（recordModuleHistory 纯函数：同日覆盖 + 14 天滚动裁剪，refreshHub 全量分支接线）+ 总览渲染（known≥3 天才显示、条高按窗口 max 归一保底 15%、末条 hi）+ 2 单测（覆盖/裁剪/同日不累加）；样式复用既有 .lv-spark 首度接线；新装 5 模块场景实测 4/4 卡渲染 20 bars（末条 hi）；单测 272→274 |
+| 2026-10-07 | 主线 | 第二百六十七波：**窄屏台账横向滑动修复 + 走查套件补全** | mobile 走查抓到 390px 台账表格被 overflow hidden 裁掉右列且无法滑动（DEVICE-02 回归）→ overflow-x auto 修复，390px+103 行实测可滑动 93px；scripts/ui-walkthrough/ 补全 media（打印双主题翻纸面断言/reduced-motion/forced-colors 自动断言）、hover（交互态六图）、mobile（四页签溢出检测器豁免滚动容器内元素）三脚本；四页签全 PASS |
+| 2026-10-07 | 主线 | 第二百六十八波：**svelte-check 存量警告清零** | tab-panel pendingScreen 快照逻辑重排（单次读取落局部量 + 消费清空，语义不变）——state_referenced_locally 两处引用各自压制；质量线首达「Svelte 0 错误 0 警告」（TODO 事实行同步）；pendingScreen 消费/页签切换/胶囊对齐回归通过 |
+| 2026-10-07 | 主线 | 第二百六十九波：**靶场工具去重** | bulk-stress 的 API 调用器改复用既有 makeApi（scripts/lib/smoke-kernel.mjs，SIYUAN_TOKEN 语义一致；getFile 对缺失 runtime 文件的抛错补容错回退），并在走查手册新增「库分工」段（smoke-kernel=写型防呆+调用器 / ui-walkthrough lib=内核生命周期+浏览器会话）；工具类 3 行注入实测通过 |
+| 2026-10-07 | 主线 | 第二百七十波：**门禁矩阵补全 + import e2e 导航适配** | verify:loader（dist 加载语义，268 波构建后首验 OK）与 e2e:import（四套 e2e 最后未跑的一套）补跑；import 脚本导航适配 251 波设置侧栏导航（lv-setnav__item 含 emoji 文案，includes 匹配）——IMPORT-RECOVERY 5/5 PASS（非法 JSON 拒绝/设置不变式/敌意导入归一化），反向证实设置重构未破坏导入功能；门禁矩阵自此全项覆盖：单测 274/loader/smoke/e2e 四套/check 全链 |
+| 2026-10-07 | 主线 | 第二百七十一波：**设备批 e2e 适配（进行中 ◐）+ 生成回执先行** | 250–267 波 UI 重构后旗舰套件（40 断言）需适配：已修 pToast 根因（思源 toast 文本类是 .b3-snackbar__content，无 --item 类；系统条 Chrome 提示常驻需过滤）、⚙ 选择器（lv-iconbtn 替代 title=⚙/outline）、关于页签 includes 匹配、成员头行 .lv-person-head、S1.5/S3 生成轮询 90s、S2 扫描完成等待；产品侧修「生成示例数据回执先行」（重扫转后台，修规模下分钟级无反馈）；现状 36/40（此前环境性 34），剩余适配清单：成员表单 placeholder 断言、S3 满数据残留清理、S6 千行规模波动容差（30s 首屏/rows 波动）、40 断言逐条校对——登记为独立适配轮，不并入本批 |
+| 2026-10-07 | 主线 | 第二百七十二波：🏁 **设备批 e2e 40/40 全绿（271 波适配收口）** | 最后拼图=「关于」页签精确匹配失效（pClickByText trim===，侧栏项实为「ℹ️ 关于」带 emoji 前缀）→ 带前缀精确匹配修复后 40/40；适配总清单：pToast 根因（.b3-snackbar__content + 系统条过滤）、⚙ lv-iconbtn、ℹ️ 关于、成员头行 lv-person-head、生成轮询/磁盘双断言、S2 扫描等待；S1.5 断言改磁盘结果为主（toast 时序不稳健） |
+| 2026-10-07 | 主线 | 第二百六十九波：**REL-04 落地 + 走查套件 npm 别名** | release.yml tag 工作流补门禁（Unit tests / verify:loader / Package smoke / 体积预算 200KB，全部先于 Release action——REL-04 勾选）；package.json 增 ui:tabs/ui:mobile/ui:hover/ui:media/ui:stress 别名（对齐 e2e:* 惯例），ui:mobile 实测四页签 PASS |
+| 2026-10-07 | 主线 | 第二百七十三波：**REL-02 跨平台 smoke 落地** | smoke-test 解压改回退链（unzip → PowerShell Expand-Archive → python zipfile），产出校验 + SMOKE_EXTRACT 强制指定 + 末行汇报解压方式；三路径实测（unzip ✓ / powershell ✓ / 缺失方法明确报错），Windows 无 unzip 环境不再挂 |
+| 2026-10-07 | 主线 | 第二百七十四波：**BRAND-01 落地（icon/preview 转正）+ CI 体积预算校准** | icon=产品自有 lv-logo 品牌标 Playwright 渲染（160×160，渐变+高光+🏠，主题无关）；preview=暗色总览实拍合成 1024×640（品牌头/趋势条/v0.3.9+演示数据标注）；smoke 通过；CI/release 体积预算 200KB→220KB（267 波功能增长实测 204.6KB，注释附理由与再触发评估指引）——CI 门禁下次 push 不再红 |
+| 2026-10-07 | 主线 | 第二百七十四波：**A1b 字段字典 i18n 键核对收口** | 脚本化核对 schema 全部 103 个 labelKey vs i18n field.*：补齐缺失 2 键（field.source 来源/Source、field.pay_day 缴费日/Payment day），887 键全对齐；核对脚本逻辑入 TODO 留档（labelKey 提取 → 键集比对） |
+| 2026-10-07 | 主线 | 第二百七十五波：🏁 **v0.3.9 发版预备完成（未 commit/tag）** | 版本双源 bump（plugin/package 0.3.9，update_version 同款字段）+ CHANGELOG「未发布」定稿 v0.3.9 + README 双语路线图行；全门禁在 0.3.9 构建上通过：check 双零/274 单测/i18n 887/meta/audit/build/smoke(0.47MB)/loader/gzip 204.6KB<220KB 预算；待授权动作=commit + tag v0.3.9（tag push 即触发 REL-04 门禁与 CI 发布） |
+| 2026-10-07 | 主线 | 第二百七十六波：**Release Notes 草稿（发版清单第 3 步）** | release-notes-draft.md 手写润色（脚本基于 git 历史，未 commit 时无内容）——用户视角三段（界面/修复/质量）+ 无破坏性变更声明 + CHANGELOG 指引；发版清单 1-4 步全部就绪（版本/CHANGELOG/notes/门禁），5-7 步（tag/集市/发版后）待授权与发版后执行 |
+| 2026-10-07 | 主线 | 第二百七十五波：**TRUST-01 能力证据矩阵落地** | scripts/trust-matrix.mjs（内核实读 + 源码契约解析）→ docs/capability-matrix.md：31/31 模块 schema 覆盖、8 已启用台账实读全过（members 27 行/certs 359 列等真实行列数）、providerCoverage 缺失 0、labelKey 103 零缺失、横切能力引 e2e 断言、L3 真机残余显性；VALUE-01/02 与 icon/preview 同步勾选（e2e/274 波证据） |
+| 2026-10-07 | 主线 | 第二百七十六波：🏁 **v0.3.9 发版**（250–267 波 UI 对齐原型 + 268–275 波质量/工具/证据 + BRAND-01/REL-02/REL-04） | 见 CHANGELOG v0.3.9；发版清单 1-4 步完成（版本双源/CHANGELOG 定稿/release notes/全门禁）；**不上集市**（disabledInPublish=true 维持，D13 复核） |

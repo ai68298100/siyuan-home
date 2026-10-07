@@ -102,7 +102,7 @@ The current release is in a trust-and-validation phase: complete the real SiYuan
 
 | Phase | Content |
 |---|---|
-| ✅ v0.3.8 (current) | 31 module ledgers · reminder hub (list + calendar views) · growth charts (WHO bands) · smart date parsing · pinyin search · QR labels · Webhook push (Bark/ntfy) · bulk CSV import · .ics/.vcf export · member avatars & drag order · mobile entry · sanitized diagnostics |
+| ✅ v0.3.9 (current) | everything in v0.3.8, plus: UI aligned to the design spec (settings sidebar, onboarding brand page, ledger status dots, module sparklines, dialogs & theme polish), instant demo-generation receipts, horizontally scrollable ledger on narrow screens, proper icon & preview, dual release gates (CI + tag) |
 | 🔜 Next | Task workbench, evidence center, inbox, health recovery |
 | 🔭 Later | Family collaboration, template packs, yearly family report, AI capabilities |
 

@@ -451,6 +451,9 @@ export default class LvHomePlugin extends Plugin {
             const monthKey = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
             const dueIds = new Set(scan.reminders.filter((r) => r.daysLeft <= 0).map((r) => r.id));
             this.runtime.monthlyDueTotals = { ...(this.runtime.monthlyDueTotals ?? {}), [monthKey]: dueIds.size };
+            // 266 波模块趋势条：记录当日各模块待办计数（滚动 14 天，同日覆盖），供总览模块卡 spark 渲染
+            const { recordModuleHistory } = await import("@/core/hub/runtime");
+            recordModuleHistory(this.runtime, scan.reminders, now);
         }
         await saveRuntime(this, this.runtime);
         this.lastScanAt = Date.now();

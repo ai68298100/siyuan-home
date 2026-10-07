@@ -14,13 +14,38 @@ if (!existsSync(zip)) {
     process.exit(1);
 }
 
-// 解压（跨平台：用系统 unzip 或 PowerShell；Git Bash 环境下 unzip 可用）
+// 解压（REL-02 跨平台）：unzip（Linux/macOS/Git Bash）→ PowerShell Expand-Archive（Windows）
+// → python zipfile，任一成功即用；三者皆缺才失败。SMOKE_EXTRACT 可强制指定方法名。
+function extractZip(zipPath, dest) {
+    rmSync(dest, { recursive: true, force: true });
+    mkdirSync(dest, { recursive: true });
+    const quote = (p2) => (process.platform === "win32" ? `"${p2}"` : `'${p2}'`);
+    const methods = [
+        ["unzip", `unzip -o -q ${quote(zipPath)} -d ${quote(dest)}`],
+        ["powershell", `powershell -NoProfile -Command "Expand-Archive -LiteralPath ${zipPath.replace(/'/g, "''")} -DestinationPath ${dest.replace(/'/g, "''")} -Force"`],
+        ["python", `python -m zipfile -e ${quote(zipPath)} ${quote(dest)}`],
+    ];
+    const forced = process.env.SMOKE_EXTRACT;
+    const chain = forced ? methods.filter(([name]) => name === forced) : methods;
+    if (forced && chain.length === 0) throw new Error(`SMOKE_EXTRACT=${forced} 不存在（可选 unzip/powershell/python）`);
+    let lastErr;
+    for (const [name, cmd] of chain) {
+        try {
+            execSync(cmd, { stdio: "pipe" });
+            if (existsSync(path.join(dest, "plugin.json"))) return name;
+            lastErr = new Error(`${name} 执行成功但未产出 plugin.json`);
+        } catch (e) {
+            lastErr = e;
+        }
+    }
+    throw lastErr ?? new Error("no extraction method available");
+}
+
+let extractBy = "";
 try {
-    rmSync(tmp, { recursive: true, force: true });
-    mkdirSync(tmp, { recursive: true });
-    execSync(`unzip -o -q "${zip}" -d "${tmp}"`, { stdio: "pipe" });
+    extractBy = extractZip(zip, tmp);
 } catch (e) {
-    console.error("unzip failed:", e.message);
+    console.error("extract failed:", e.message);
     process.exit(1);
 }
 

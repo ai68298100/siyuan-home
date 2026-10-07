@@ -45,7 +45,8 @@ const openImport = async () => {
     });
     await sleep(2000);
     await p.evaluate(() => {
-        const el = Array.from(document.querySelectorAll(".b3-dialog button")).find((e) => e.textContent?.trim() === "关于");
+        // 268 波适配：设置面板改侧栏导航（lv-setnav），页签文案带 emoji 前缀
+        const el = Array.from(document.querySelectorAll(".lv-setnav__item, .b3-dialog button")).find((e) => (e.textContent || "").includes("关于"));
         el?.click();
     });
     await sleep(1200);

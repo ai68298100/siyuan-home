@@ -9,7 +9,7 @@
  */
 import { describe, it, expect, afterEach } from "vitest";
 import {
-    applyRuntime, defaultRuntime, listHandled, purgeHandled, type HubRuntime,
+    applyRuntime, defaultRuntime, listHandled, purgeHandled, recordModuleHistory, type HubRuntime,
 } from "@/core/hub/runtime";
 import { runScan, deriveVisible } from "@/core/hub/scanner";
 import { snooze, mute, complete, restore, withRuntime, renew, updateMemo } from "@/core/hub/actions";
@@ -85,6 +85,22 @@ describe("H03 备忘保留", () => {
         expect(applyRuntime([], rt, TODAY)).toHaveLength(1);
     });
 
+    it("recordModuleHistory：同日覆盖计数、跨模块分桶、滚动窗口裁剪", () => {
+        const rt: HubRuntime = { ...defaultRuntime(), moduleHistory: { "2026-09-01": { certs: 9 } } };
+        const today = new Date(2026, 9, 15);
+        recordModuleHistory(rt, [rem("a::certs.expiry", "2026-10-20"), rem("b::certs.expiry", "2026-10-21"), rem("c::medicine.expiry", "2026-10-22", "lead", undefined, "medicine")], today);
+        expect(rt.moduleHistory!["2026-10-15"]).toEqual({ certs: 2, medicine: 1 });
+        // 14 天窗口外的旧键（2026-09-01 距 10-15 为 44 天）被裁剪
+        expect(rt.moduleHistory!["2026-09-01"]).toBeUndefined();
+    });
+
+    it("recordModuleHistory：同日二次记录覆盖不累加（每日一个快照）", () => {
+        const rt: HubRuntime = defaultRuntime();
+        const today = new Date(2026, 9, 15);
+        recordModuleHistory(rt, [rem("a::certs.expiry", "2026-10-20")], today);
+        recordModuleHistory(rt, [rem("a::certs.expiry", "2026-10-20"), rem("b::certs.expiry", "2026-10-21")], today);
+        expect(rt.moduleHistory!["2026-10-15"]).toEqual({ certs: 2 });
+    });
     it("purgeHandled：done 超 30 天清除；未办同日到期保留", () => {
         const rt: HubRuntime = {
             ...defaultRuntime(),

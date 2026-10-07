@@ -17,32 +17,97 @@
 // 注意：思源原生 .b3-tab-bar 样式不得在此全局重定义（会污染主界面）——
 // settings 面板的页签样式改由 design-system 的 .lv-tabbar 承担（C1c 遗留已迁移）
 
+// 251 波（对齐原型设置屏）：侧栏锚点导航 + 右侧分组卡片（set-card），替代横排页签 + 平铺行
 .lv-settings {
-    min-height: 480px;
+    display: grid;
+    grid-template-columns: 176px minmax(0, 1fr);
+    gap: 18px;
+    align-items: start;
 }
 
-.lv-settings__group {
-    margin-bottom: 12px;
+// 侧栏导航（原型 .set-nav）：sticky 跟随，锚点式纵向页签
+.lv-setnav {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    position: sticky;
+    top: 0;
+
+    .lv-setnav__item {
+        text-align: left;
+        padding: 9px 14px;
+        border: none;
+        border-radius: var(--lv-r-2);
+        font-size: 13px;
+        color: var(--lv-tx-2);
+        background: none;
+        cursor: pointer;
+        min-height: 36px;
+        transition: background var(--lv-t-fast) var(--lv-ease), color var(--lv-t-fast) var(--lv-ease);
+
+        &:hover {
+            background: var(--lv-surface-2);
+            color: var(--lv-tx);
+        }
+
+        &.on {
+            background: var(--lv-accent-soft);
+            color: var(--lv-accent);
+            font-weight: 500;
+        }
+    }
 }
 
-.lv-settings__group-title {
-    font-weight: 600;
-    font-size: 14px;
-    opacity: 0.85;
-    margin: 4px 0 8px;
+// 右侧内容列：卡片纵排
+.lv-setpane {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    min-width: 0;
 }
 
-.lv-settings__hint {
-    font-size: 13px;
-    opacity: 0.75;
-    margin-bottom: 4px;
+// 分组卡片（原型 .set-card）：标题 + hint + 开关行分区
+.lv-setcard {
+    padding: 16px 18px;
+
+    .lv-setcard__title {
+        font-size: 13.5px;
+        font-weight: 600;
+        margin-bottom: 4px;
+    }
+
+    .lv-setcard__hint {
+        font-size: 12px;
+        color: var(--lv-tx-3);
+        margin-bottom: 10px;
+        line-height: 1.6;
+    }
+
+    .lv-setcard__actions {
+        display: flex;
+        gap: 8px;
+        margin-top: 8px;
+        flex-wrap: wrap;
+    }
+
+    .lv-setcard__action {
+        margin-top: 8px;
+    }
+}
+
+// hint 单条（模块页顶部的全局说明，轻量条而非卡片）
+.lv-setcard.lv-setcard--hint {
+    padding: 9px 14px;
+    font-size: 12px;
+    color: var(--lv-tx-3);
+    line-height: 1.6;
 }
 
 .lv-settings__row {
     align-items: flex-start;
     gap: 12px;
-    padding: 6px 0;
-    border-bottom: 1px solid var(--b3-border-color);
+    padding: 10px 0;
+    border-bottom: 1px solid var(--lv-line);
 
     .b3-card__info-meta {
         font-size: 12px;
@@ -55,19 +120,65 @@
     }
 }
 
+// 251 波：开关行的 switch 移到行尾（对齐原型 .togglerow 形态）——
+// 仅反转"switch 为直接子元素"的行；成员/提前量等输入行不受影响（switch 在 label 内）
+.lv-settings__row:has(> input.b3-switch) {
+    flex-direction: row-reverse;
+
+    > .fn__flex-column {
+        flex: 1;
+    }
+}
+
 .lv-settings__member {
     align-items: center;
+    // 255 波：控件多时允许折行；「农历」label 不收缩、文字不折行（此前被挤成竖排）
+    flex-wrap: wrap;
+    row-gap: 6px;
+
+    label.fn__flex {
+        flex: none;
+        gap: 6px;
+        align-items: center;
+
+        span {
+            white-space: nowrap;
+        }
+    }
 }
 
 .lv-settings__footer {
+    grid-column: 1 / -1;
     gap: 8px;
-    margin-top: 8px;
+    margin-top: 2px;
     align-items: center;
 }
 
 .lv-settings__about {
     line-height: 1.8;
     font-size: 13px;
+}
+
+// 窄屏：单列，侧栏转横向滚动页签（原型 760px 分支同款）
+@media (max-width: 760px) {
+    .lv-settings {
+        grid-template-columns: minmax(0, 1fr);
+    }
+
+    .lv-setnav {
+        position: static;
+        flex-direction: row;
+        overflow-x: auto;
+        scrollbar-width: none;
+
+        &::-webkit-scrollbar {
+            display: none;
+        }
+
+        .lv-setnav__item {
+            flex: none;
+        }
+    }
 }
 
 // C4b：台账行点击进详情（键盘/指针可达提示）
@@ -84,25 +195,96 @@
     }
 }
 
-// 17 组：紧急信息卡打印样式——隐藏导航/操作按钮，保留核心数据
+// 253 波：台账详情抽屉 kv 排版（对齐原型 .kv：标签列定宽、中性灰、行距舒适）。
+// b3-dialog 挂在 body 层、拿不到 .lv-home 作用域的 lv token——按 07 §1 用 b3 变量现场派生；
+// 插件专属 id 前缀（lv-*）保证不污染思源其他弹窗
+#lv-detail-body {
+    > .fn__flex {
+        gap: 12px;
+        padding: 7px 0;
+        align-items: baseline;
+
+        > span:first-child {
+            flex-shrink: 0;
+            font-size: 12px;
+            color: color-mix(in srgb, var(--b3-theme-on-background) 52%, var(--b3-theme-background));
+        }
+
+        > span:not(:first-child) {
+            word-break: break-all;
+        }
+    }
+
+    > .ft__on-surface {
+        color: color-mix(in srgb, var(--b3-theme-on-background) 52%, var(--b3-theme-background));
+        letter-spacing: .02em;
+    }
+}
+
+// 257 波：插件自建弹窗家族（body 层、无 .lv-home 作用域）内的辅助文字统一中性化——
+// ft__on-surface 在思源默认暗色主题下发蓝，与主面板的中性灰语言冲突。
+// 全部弹窗内容容器遵循 #lv-* id 约定，按清单收敛；新增弹窗记得把容器 id 加进来
+#lv-renew-sub,
+#lv-memoedit,
+#lv-triage,
+#lv-shop-body,
+#lv-csvimp-body,
+#lv-ambig-body,
+#lv-growth-body,
+#lv-pick-body,
+#lv-pick-list {
+    .ft__on-surface {
+        color: color-mix(in srgb, var(--b3-theme-on-background) 52%, var(--b3-theme-background));
+    }
+}
+
+// 17 组：紧急信息卡打印样式——隐藏导航/操作/输入，保留核心数据。
+// 258 波重写：① lv token 在打印媒介下整体翻纸面（此前只覆写根节点，暗色主题会留下
+//   深色卡片块+浅字）；② 打印色板为独立媒介固定色值，不跟随屏幕主题（07 §1 豁免的
+//   边界=打印输出，注释在此声明）；③ button 一刀切隐藏会连日历格（.lv-cal-cell 本身
+//   是 button）一起杀掉，补豁免。
 @media print {
     .lv-tabbar,
     .filters,
+    .lv-toolbar,
     .lv-rem-ops,
     .lv-qbtn,
+    .lv-memo,
     .lv-settings__footer,
+    .b3-text-field,
+    .b3-select,
     button {
         display: none !important;
     }
 
-    .lv-home,
-    .lv-screen {
-        background: white !important;
-        color: black !important;
+    // 日历格豁免（见上）：格子是可点 button，打印需保留网格
+    .lv-cal-cell {
+        display: flex !important;
+    }
+
+    .lv-home {
+        --lv-tx: #000;
+        --lv-tx-2: #1f2328;
+        --lv-tx-3: #57606a;
+        --lv-surface: #fff;
+        --lv-surface-2: #f6f8fa;
+        --lv-line: #d0d7de;
+        --lv-accent: #0969da;
+        --lv-accent-soft: rgba(9, 105, 218, .1);
+        --lv-accent-line: rgba(9, 105, 218, .32);
+        --lv-inset: transparent;
+        background: #fff !important;
+        color: #000 !important;
+
+        // 环境辉光/顶部光线不参与打印
+        &::before,
+        &::after {
+            display: none !important;
+        }
     }
 
     .lv-card {
-        border: 1px solid #ccc !important;
+        border: 1px solid #d0d7de !important;
         break-inside: avoid;
     }
 

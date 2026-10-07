@@ -372,18 +372,20 @@
 </script>
 
 <div class="lv-home lv-settings">
-    <div class="fn__flex b3-tab-bar">
-        <button class="b3-button {tab === 'modules' ? 'b3-button--text' : ''}" onclick={() => (tab = "modules")}>{t("tabModules")}</button>
-        <button class="b3-button {tab === 'members' ? 'b3-button--text' : ''}" onclick={() => (tab = "members")}>{t("tabMembers")}</button>
-        <button class="b3-button {tab === 'reminders' ? 'b3-button--text' : ''}" onclick={() => (tab = "reminders")}>{t("tabReminders")}</button>
-        <button class="b3-button {tab === 'about' ? 'b3-button--text' : ''}" onclick={() => (tab = "about")}>{t("tabAbout")}</button>
-    </div>
+    <!-- 251 波（对齐原型设置屏）：左侧锚点导航 + 右侧分组卡片；b3-tab-bar 横排页签退役 -->
+    <nav class="lv-setnav" aria-label={t("settingsTitle")}>
+        <button class="lv-setnav__item {tab === 'modules' ? 'on' : ''}" aria-current={tab === 'modules' ? 'true' : undefined} onclick={() => (tab = "modules")}>🧩 {t("tabModules")}</button>
+        <button class="lv-setnav__item {tab === 'members' ? 'on' : ''}" aria-current={tab === 'members' ? 'true' : undefined} onclick={() => (tab = "members")}>👪 {t("tabMembers")}</button>
+        <button class="lv-setnav__item {tab === 'reminders' ? 'on' : ''}" aria-current={tab === 'reminders' ? 'true' : undefined} onclick={() => (tab = "reminders")}>⏰ {t("tabReminders")}</button>
+        <button class="lv-setnav__item {tab === 'about' ? 'on' : ''}" aria-current={tab === 'about' ? 'true' : undefined} onclick={() => (tab = "about")}>ℹ️ {t("tabAbout")}</button>
+    </nav>
 
+    <div class="lv-setpane">
     {#if tab === "modules"}
-        <div class="lv-settings__hint">{t("settings.modulesHint")}</div>
+        <div class="lv-card lv-setcard lv-setcard--hint">{t("settings.modulesHint")}</div>
         {#each MODULE_GROUPS as gid (gid)}
-            <div class="lv-settings__group">
-                <div class="lv-settings__group-title">{t(`group.${gid}`)}</div>
+            <div class="lv-card lv-setcard">
+                <div class="lv-setcard__title">{t(`group.${gid}`)}</div>
                 {#each modulesByGroup(gid) as mod (mod.id)}
                     <div class="fn__flex lv-settings__row">
                         <input
@@ -412,50 +414,55 @@
             </div>
         {/each}
     {:else if tab === "members"}
-        <div class="lv-settings__hint">{t("settings.membersHint")}</div>
-        {#if draftMembers.length === 0}
-            <div class="lv-settings__hint ft__on-surface">{t("members.empty")}</div>
-        {/if}
-        {#each draftMembers as m, i (m.id)}
-            <div class="fn__flex lv-settings__row lv-settings__member">
-                <input class="b3-text-field fn__size200" placeholder={t("members.name")} bind:value={draftMembers[i].name} />
-                <select class="b3-select" bind:value={draftMembers[i].role}>
-                    {#each ROLES as r (r)}
-                        <option value={r}>{t(`role.${r}`)}</option>
-                    {/each}
-                </select>
-                <select class="b3-select" bind:value={draftMembers[i].sex} title={t("members.sex")}>
-                    <option value={undefined}>{t("members.sex.unknown")}</option>
-                    <option value="male">{t("members.sex.male")}</option>
-                    <option value="female">{t("members.sex.female")}</option>
-                </select>
-                <input class="b3-text-field" type="date" bind:value={draftMembers[i].birthday} title={t("members.birthday")} />
-                <label class="fn__flex">
-                    <input type="checkbox" class="b3-switch" bind:checked={draftMembers[i].lunarBirthday} />
-                    <span>{t("members.lunar")}</span>
-                </label>
-                <span class="fn__flex-1"></span>
-                <button class="b3-button b3-button--outline" onclick={() => removeMember(m.id)}>{t("delete")}</button>
-            </div>
-        {/each}
-        <button class="b3-button b3-button--outline" onclick={addMember}>＋ {t("add")}</button>
+        <div class="lv-card lv-setcard">
+            <div class="lv-setcard__hint">{t("settings.membersHint")}</div>
+            {#if draftMembers.length === 0}
+                <div class="lv-setcard__hint ft__on-surface">{t("members.empty")}</div>
+            {/if}
+            {#each draftMembers as m, i (m.id)}
+                <div class="fn__flex lv-settings__row lv-settings__member">
+                    <input class="b3-text-field fn__size200" placeholder={t("members.name")} bind:value={draftMembers[i].name} />
+                    <select class="b3-select" bind:value={draftMembers[i].role}>
+                        {#each ROLES as r (r)}
+                            <option value={r}>{t(`role.${r}`)}</option>
+                        {/each}
+                    </select>
+                    <select class="b3-select" bind:value={draftMembers[i].sex} title={t("members.sex")}>
+                        <option value={undefined}>{t("members.sex.unknown")}</option>
+                        <option value="male">{t("members.sex.male")}</option>
+                        <option value="female">{t("members.sex.female")}</option>
+                    </select>
+                    <input class="b3-text-field" type="date" bind:value={draftMembers[i].birthday} title={t("members.birthday")} />
+                    <label class="fn__flex">
+                        <input type="checkbox" class="b3-switch" bind:checked={draftMembers[i].lunarBirthday} />
+                        <span>{t("members.lunar")}</span>
+                    </label>
+                    <span class="fn__flex-1"></span>
+                    <button class="b3-button b3-button--outline" onclick={() => removeMember(m.id)}>{t("delete")}</button>
+                </div>
+            {/each}
+            <button class="b3-button b3-button--outline lv-setcard__action" onclick={addMember}>＋ {t("add")}</button>
+        </div>
     {:else if tab === "reminders"}
-        <div class="lv-settings__hint">{t("settings.remindersHint")}</div>
-        <div class="fn__flex lv-settings__row">
-            <span style="min-width:180px">{t("settings.notifyHour")}</span>
-            <input class="b3-text-field" style="width:90px" type="number" min="0" max="23" bind:value={draftNotifyHour} />
-            <span class="lv-caption fn__flex-1">{t("settings.notifyHourHint")}</span>
+        <div class="lv-card lv-setcard">
+            <div class="lv-setcard__title">{t("tabReminders")}</div>
+            <div class="lv-setcard__hint">{t("settings.remindersHint")}</div>
+            <div class="fn__flex lv-settings__row">
+                <span style="min-width:180px">{t("settings.notifyHour")}</span>
+                <input class="b3-text-field" style="width:90px" type="number" min="0" max="23" bind:value={draftNotifyHour} />
+                <span class="lv-caption fn__flex-1">{t("settings.notifyHourHint")}</span>
+            </div>
+            <div class="fn__flex lv-settings__row">
+                <span style="min-width:180px">{t("settings.silentHours")}</span>
+                <input class="b3-text-field" style="width:70px" type="number" min="0" max="23" bind:value={draftSilentFrom} />
+                <span class="lv-caption" style="margin:0 6px">→</span>
+                <input class="b3-text-field" style="width:70px" type="number" min="0" max="23" bind:value={draftSilentTo} />
+                <span class="lv-caption fn__flex-1">{t("settings.silentHoursHint")}</span>
+            </div>
         </div>
-        <div class="fn__flex lv-settings__row">
-            <span style="min-width:180px">{t("settings.silentHours")}</span>
-            <input class="b3-text-field" style="width:70px" type="number" min="0" max="23" bind:value={draftSilentFrom} />
-            <span class="lv-caption" style="margin:0 6px">→</span>
-            <input class="b3-text-field" style="width:70px" type="number" min="0" max="23" bind:value={draftSilentTo} />
-            <span class="lv-caption fn__flex-1">{t("settings.silentHoursHint")}</span>
-        </div>
-        <div style="margin-top:12px;border-top:1px solid var(--b3-border-color);padding-top:8px">
-            <p class="lv-caption">{t("settings.webhookTitle")}</p>
-            <p class="lv-caption ft__on-surface">{t("settings.webhookHint")}</p>
+        <div class="lv-card lv-setcard">
+            <div class="lv-setcard__title">{t("settings.webhookTitle")}</div>
+            <div class="lv-setcard__hint">{t("settings.webhookHint")}</div>
             <div class="fn__flex lv-settings__row">
                 <span style="min-width:180px">{t("settings.webhookEnable")}</span>
                 <input type="checkbox" class="b3-switch" bind:checked={draftWebhookEnabled} />
@@ -474,153 +481,158 @@
                 <input class="b3-text-field fn__flex-1" style="min-width:0" bind:value={draftWebhookUrl}
                     placeholder="https://api.day.app/yourkey" />
             </div>
-            <button class="b3-button b3-button--outline" style="margin-top:6px" disabled={testingWebhook || !draftWebhookUrl.trim()}
+            <button class="b3-button b3-button--outline lv-setcard__action" disabled={testingWebhook || !draftWebhookUrl.trim()}
                 onclick={testWebhook}>{testingWebhook ? t("settings.webhookTesting") : t("settings.webhookTest")}</button>
         </div>
-        <div style="margin-top:12px;border-top:1px solid var(--b3-border-color);padding-top:8px">
-            <p class="lv-caption">{t("settings.leadsTitle")}</p>
-            <p class="lv-caption ft__on-surface">{t("settings.leadsHint")}</p>
+        <div class="lv-card lv-setcard">
+            <div class="lv-setcard__title">{t("settings.leadsTitle")}</div>
+            <div class="lv-setcard__hint">{t("settings.leadsHint")}</div>
             {#if enabledLeadRules.length < leadRules.length}
-                <button class="b3-button b3-button--text" style="margin-top:2px" onclick={() => (showAllLeads = !showAllLeads)}>
+                <button class="b3-button b3-button--text lv-setcard__action" onclick={() => (showAllLeads = !showAllLeads)}>
                     {showAllLeads ? t("settings.leadsEnabledOnly") : t("settings.leadsShowAll").replace("${n}", String(leadRules.length - enabledLeadRules.length))}
                 </button>
             {/if}
-        </div>
-        {#each visibleLeadRules as lr (lr.key)}
-            <div class="fn__flex lv-settings__row" style={enabledIds.has(lr.moduleId) ? "" : "opacity:.55"}>
-                <span style="min-width:220px">{t(`module.${lr.moduleId}`)} · {t(`rule.${lr.ruleKey}`) !== `rule.${lr.ruleKey}` ? t(`rule.${lr.ruleKey}`) : lr.ruleKey}</span>
-                <input class="b3-text-field" style="width:90px" type="number" min="0" max="3650"
-                    placeholder={String(lr.def)}
-                    bind:value={draftLeads[lr.key]} />
-                <span class="lv-caption fn__flex-1">{t("settings.leadDefault").replace("${n}", String(lr.def))}{#if !enabledIds.has(lr.moduleId)} · {t("settings.leadDisabled")}{/if}</span>
-            </div>
-        {/each}
-        <!-- EC09（D20）：打卡习惯 → 成员指标绑定（只读消费） -->
-        <div style="margin-top:12px;border-top:1px solid var(--b3-border-color);padding-top:8px">
-            <p class="lv-caption">{t("settings.checkinBindingsTitle")}</p>
-            <p class="lv-caption ft__on-surface">{t("settings.checkinBindingsHint")}</p>
-        </div>
-        {#if checkinPresent === false}
-            <p class="lv-caption" style="color:var(--lv-warn)">{t("settings.checkinAbsent")}</p>
-        {:else if checkinPresent === true}
-            {#each draftBindings as b, i}
-                <div class="fn__flex lv-settings__row" style="gap:6px">
-                    <select class="b3-select" style="width:auto" bind:value={b.memberId} aria-label={t("settings.metricMember")}>
-                        {#each draftMembers as m (m.id)}<option value={m.id}>{m.name}</option>{/each}
-                    </select>
-                    <span class="lv-caption">·</span>
-                    <select class="b3-select" style="width:auto" bind:value={b.itemId} onchange={() => syncBindingItem(b)} aria-label={t("settings.metricItem")}>
-                        {#each checkinItems as it (it.id)}<option value={it.id}>{it.name}</option>{/each}
-                    </select>
-                    <select class="b3-select" style="width:auto" bind:value={b.metric} aria-label={t("settings.metricKind")}>
-                        {#each METRICS as mt (mt)}<option value={mt}>{t(`settings.metric.${mt}`)}</option>{/each}
-                    </select>
-                    <button class="b3-button b3-button--text" title={t("delete")} onclick={() => removeBinding(i)}>✕</button>
+            {#each visibleLeadRules as lr (lr.key)}
+                <div class="fn__flex lv-settings__row" style={enabledIds.has(lr.moduleId) ? "" : "opacity:.55"}>
+                    <span style="min-width:220px">{t(`module.${lr.moduleId}`)} · {t(`rule.${lr.ruleKey}`) !== `rule.${lr.ruleKey}` ? t(`rule.${lr.ruleKey}`) : lr.ruleKey}</span>
+                    <input class="b3-text-field" style="width:90px" type="number" min="0" max="3650"
+                        placeholder={String(lr.def)}
+                        bind:value={draftLeads[lr.key]} />
+                    <span class="lv-caption fn__flex-1">{t("settings.leadDefault").replace("${n}", String(lr.def))}{#if !enabledIds.has(lr.moduleId)} · {t("settings.leadDisabled")}{/if}</span>
                 </div>
             {/each}
-            {#if draftBindings.length === 0}
-                <p class="lv-caption ft__on-surface">{t("settings.checkinEmpty")}</p>
-            {/if}
-            <button class="b3-button b3-button--outline" style="margin-top:4px" disabled={!checkinItems.length} onclick={addBinding}>＋ {t("settings.checkinAdd")}</button>
-        {/if}
-    {:else}
-        <div class="lv-settings__about">
-            <p>{t("about.line1")}</p>
-            <p>{t("about.tagline")}</p>
-            <p class="ft__on-surface">{t("about.principles")}</p>
-            <button class="b3-button b3-button--outline" style="margin-top:8px"
-                onclick={async () => {
-                    plugin.settings.onboarded = false;
-                    await import("@/core/settings").then((m) => m.saveSettings(plugin as any, plugin.settings));
-                    showMessage(t("wiz.rerunHint"), 3000, "info");
-                }}>{t("wiz.rerun")}</button>
-            <!-- C8e：关于区仓库链接（SDK 无 open 导出，走浏览器新窗口） -->
-            <button class="b3-button b3-button--outline" style="margin-top:8px;margin-left:6px"
-                onclick={() => window.open("https://github.com/ai68298100/siyuan-home", "_blank")}>{t("about.repo")}</button>
-            <!-- 24 组：设置导出/导入（跨设备/重装迁移辅助） -->
-            <div style="margin-top:14px;border-top:1px solid var(--b3-border-color);padding-top:10px">
-                <p class="lv-caption">{t("settings.migrateTitle")}</p>
-                <p class="lv-caption ft__on-surface" style="color:var(--lv-warn)">⚠ {t("settings.migratePrivacy")}</p>
-                <div style="display:flex;gap:8px;margin-top:6px;flex-wrap:wrap">
-                    <button class="b3-button b3-button--outline" onclick={exportSettings}>{t("settings.export")}</button>
-                    <button class="b3-button b3-button--outline" onclick={() => importInput?.click()}>{t("settings.import")}</button>
-                    <input type="file" accept="application/json,.json" style="display:none"
-                        bind:this={importInput} onchange={(e) => importSettings(e)} />
-                    {#if preImportBackupExists}
-                        <!-- UG03/DL07：导入前自动备份的回滚入口 -->
-                        <button class="b3-button b3-button--outline" onclick={restorePreImport}>{t("settings.restoreBtn")}</button>
-                    {/if}
-                </div>
-            </div>
-            <!-- 24 组/CM07：示例数据一键生成/清除（新用户体验与截图；【示例】前缀可识别可回滚） -->
-            <div style="margin-top:14px;border-top:1px solid var(--b3-border-color);padding-top:10px">
-                <p class="lv-caption">{t("settings.demoTitle")}</p>
-                <p class="lv-caption ft__on-surface">{t("settings.demoHint")}</p>
-                <div style="display:flex;gap:8px;margin-top:6px;flex-wrap:wrap">
-                    <button class="b3-button b3-button--outline" onclick={async () => {
-                        const { generateDemoData } = await import("@/core/demo");
-                        const res = await generateDemoData(plugin as any, plugin.settings, plugin.schemaCatalog ?? {});
-                        await plugin.refreshHub?.();
-                        showMessage(res.errors.length ? t("settings.demoPartial").replace("${n}", String(res.errors.length)) : t("settings.demoDone").replace("${n}", String(res.created)), 5000, res.errors.length ? "error" : "info");
-                    }}>{t("settings.demoGenerate")}</button>
-                    <button class="b3-button b3-button--outline" onclick={async () => {
-                        confirm(t("settings.demoClearTitle"), t("settings.demoClearBody"), async () => {
-                            const { clearDemoData } = await import("@/core/demo");
-                            const res = await clearDemoData(plugin as any, plugin.settings);
-                            await plugin.refreshHub?.();
-                            showMessage(res.errors.length
-                                ? t("settings.demoClearPartial").replace("${n}", String(res.cleared)).replace("${m}", String(res.errors.length))
-                                : t("settings.demoClearDone").replace("${n}", String(res.cleared)), 6000, res.errors.length ? "error" : "info");
-                        });
-                    }}>{t("settings.demoClear")}</button>
-                </div>
-            </div>
-            <!-- C8d：生态分区占位（v0.3 接线；开关仅展示，不可用） -->
-            <div style="margin-top:14px;border-top:1px solid var(--b3-border-color);padding-top:10px">
-                <p class="lv-caption">{t("settings.ecoTitle")}</p>
-                <p class="lv-caption ft__on-surface">{t("settings.ecoHint")}</p>
-                {#each ["qiandao", "contacts", "glean", "exam", "flashcard", "leiqie"] as eco (eco)}
-                    <div class="fn__flex lv-settings__row">
-                        <input type="checkbox" class="b3-switch" disabled />
-                        <span class="fn__flex-1">{t(`eco.${eco}`)} <span class="b3-chip b3-chip--small">{t("settings.ecoPlanned")}</span></span>
+        </div>
+        <!-- EC09（D20）：打卡习惯 → 成员指标绑定（只读消费） -->
+        <div class="lv-card lv-setcard">
+            <div class="lv-setcard__title">{t("settings.checkinBindingsTitle")}</div>
+            <div class="lv-setcard__hint">{t("settings.checkinBindingsHint")}</div>
+            {#if checkinPresent === false}
+                <p class="lv-setcard__hint" style="color:var(--lv-warn)">{t("settings.checkinAbsent")}</p>
+            {:else if checkinPresent === true}
+                {#each draftBindings as b, i}
+                    <div class="fn__flex lv-settings__row" style="gap:6px">
+                        <select class="b3-select" style="width:auto" bind:value={b.memberId} aria-label={t("settings.metricMember")}>
+                            {#each draftMembers as m (m.id)}<option value={m.id}>{m.name}</option>{/each}
+                        </select>
+                        <span class="lv-caption">·</span>
+                        <select class="b3-select" style="width:auto" bind:value={b.itemId} onchange={() => syncBindingItem(b)} aria-label={t("settings.metricItem")}>
+                            {#each checkinItems as it (it.id)}<option value={it.id}>{it.name}</option>{/each}
+                        </select>
+                        <select class="b3-select" style="width:auto" bind:value={b.metric} aria-label={t("settings.metricKind")}>
+                            {#each METRICS as mt (mt)}<option value={mt}>{t(`settings.metric.${mt}`)}</option>{/each}
+                        </select>
+                        <button class="b3-button b3-button--text" title={t("delete")} onclick={() => removeBinding(i)}>✕</button>
                     </div>
                 {/each}
+                {#if draftBindings.length === 0}
+                    <p class="lv-setcard__hint ft__on-surface">{t("settings.checkinEmpty")}</p>
+                {/if}
+                <button class="b3-button b3-button--outline lv-setcard__action" disabled={!checkinItems.length} onclick={addBinding}>＋ {t("settings.checkinAdd")}</button>
+            {/if}
+        </div>
+    {:else}
+        <div class="lv-card lv-setcard">
+            <div class="lv-settings__about">
+                <p>{t("about.line1")}</p>
+                <p>{t("about.tagline")}</p>
+                <p class="ft__on-surface">{t("about.principles")}</p>
+                <button class="b3-button b3-button--outline lv-setcard__action"
+                    onclick={async () => {
+                        plugin.settings.onboarded = false;
+                        await import("@/core/settings").then((m) => m.saveSettings(plugin as any, plugin.settings));
+                        showMessage(t("wiz.rerunHint"), 3000, "info");
+                    }}>{t("wiz.rerun")}</button>
+                <!-- C8e：关于区仓库链接（SDK 无 open 导出，走浏览器新窗口） -->
+                <button class="b3-button b3-button--outline" style="margin-top:8px;margin-left:6px"
+                    onclick={() => window.open("https://github.com/ai68298100/siyuan-home", "_blank")}>{t("about.repo")}</button>
             </div>
-            <div style="margin-top:10px;border-top:1px solid var(--b3-border-color);padding-top:8px">
-                <p class="lv-caption">⌨ {t("faq.shortcuts")}</p>
-                <p class="lv-caption">· {t("openButler")}：{t("faq.topbarOrCommand")}</p>
-                <p class="lv-caption">· {t("faq.quickCapture")}：{t("faq.topbarBolt")}</p>
+        </div>
+        <!-- 24 组：设置导出/导入（跨设备/重装迁移辅助） -->
+        <div class="lv-card lv-setcard">
+            <div class="lv-setcard__title">{t("settings.migrateTitle")}</div>
+            <div class="lv-setcard__hint" style="color:var(--lv-warn)">⚠ {t("settings.migratePrivacy")}</div>
+            <div class="lv-setcard__actions">
+                <button class="b3-button b3-button--outline" onclick={exportSettings}>{t("settings.export")}</button>
+                <button class="b3-button b3-button--outline" onclick={() => importInput?.click()}>{t("settings.import")}</button>
+                <input type="file" accept="application/json,.json" style="display:none"
+                    bind:this={importInput} onchange={(e) => importSettings(e)} />
+                {#if preImportBackupExists}
+                    <!-- UG03/DL07：导入前自动备份的回滚入口 -->
+                    <button class="b3-button b3-button--outline" onclick={restorePreImport}>{t("settings.restoreBtn")}</button>
+                {/if}
             </div>
-            {#if tab === "about"}
-                {@const diag = plugin.getDiagnostics?.()}
-                {#if diag}
-                    <div style="margin-top:14px;border-top:1px solid var(--b3-border-color);padding-top:10px">
-                        <p class="lv-caption">{t("diag.title")} · v{diag.version} · {t("hub.scannedAt")} {diag.scannedAt ? new Date(diag.scannedAt).toLocaleString() : "—"}</p>
-                        {#each diag.ledgers as l (l.id)}
-                            <p class="lv-caption">
-                                {t(`module.${l.id}`)}：
-                                {l.provisioned ? (l.provisional ? t("diag.provisional") : t("diag.ok")) : t("diag.missing")}
-                                · {t("diag.columns")} {l.columns}
-                            </p>
+        </div>
+        <!-- 24 组/CM07：示例数据一键生成/清除（新用户体验与截图；【示例】前缀可识别可回滚） -->
+        <div class="lv-card lv-setcard">
+            <div class="lv-setcard__title">{t("settings.demoTitle")}</div>
+            <div class="lv-setcard__hint">{t("settings.demoHint")}</div>
+            <div class="lv-setcard__actions">
+                <button class="b3-button b3-button--outline" onclick={async () => {
+                    const { generateDemoData } = await import("@/core/demo");
+                    const res = await generateDemoData(plugin as any, plugin.settings, plugin.schemaCatalog ?? {});
+                    // 268 波：回执先行——重扫（31 模块+千行规模可达分钟级）转后台执行，
+                    // 完成时 version 广播照常驱动各屏刷新；此前 await 阻塞让用户点按钮后分钟级无反馈
+                    showMessage(res.errors.length ? t("settings.demoPartial").replace("${n}", String(res.errors.length)) : t("settings.demoDone").replace("${n}", String(res.created)), 5000, res.errors.length ? "error" : "info");
+                    plugin.refreshHub?.().catch((e) => console.warn("[siyuan-home] demo rescan failed:", e));
+                }}>{t("settings.demoGenerate")}</button>
+                <button class="b3-button b3-button--outline" onclick={async () => {
+                    confirm(t("settings.demoClearTitle"), t("settings.demoClearBody"), async () => {
+                        const { clearDemoData } = await import("@/core/demo");
+                        const res = await clearDemoData(plugin as any, plugin.settings);
+                        await plugin.refreshHub?.();
+                        showMessage(res.errors.length
+                            ? t("settings.demoClearPartial").replace("${n}", String(res.cleared)).replace("${m}", String(res.errors.length))
+                            : t("settings.demoClearDone").replace("${n}", String(res.cleared)), 6000, res.errors.length ? "error" : "info");
+                    });
+                }}>{t("settings.demoClear")}</button>
+            </div>
+        </div>
+        <!-- C8d：生态分区占位（v0.3 接线；开关仅展示，不可用） -->
+        <div class="lv-card lv-setcard">
+            <div class="lv-setcard__title">{t("settings.ecoTitle")}</div>
+            <div class="lv-setcard__hint">{t("settings.ecoHint")}</div>
+            {#each ["qiandao", "contacts", "glean", "exam", "flashcard", "leiqie"] as eco (eco)}
+                <div class="fn__flex lv-settings__row">
+                    <input type="checkbox" class="b3-switch" disabled />
+                    <span class="fn__flex-1">{t(`eco.${eco}`)} <span class="b3-chip b3-chip--small">{t("settings.ecoPlanned")}</span></span>
+                </div>
+            {/each}
+        </div>
+        <div class="lv-card lv-setcard">
+            <div class="lv-setcard__title">⌨ {t("faq.shortcuts")}</div>
+            <p class="lv-caption" style="margin:2px 0">· {t("openButler")}：{t("faq.topbarOrCommand")}</p>
+            <p class="lv-caption" style="margin:2px 0">· {t("faq.quickCapture")}：{t("faq.topbarBolt")}</p>
+        </div>
+        {#if tab === "about"}
+            {@const diag = plugin.getDiagnostics?.()}
+            {#if diag}
+                <div class="lv-card lv-setcard">
+                    <div class="lv-setcard__title">{t("diag.title")} · v{diag.version}</div>
+                    <p class="lv-caption" style="margin:2px 0 8px">{t("hub.scannedAt")} {diag.scannedAt ? new Date(diag.scannedAt).toLocaleString() : "—"}</p>
+                    {#each diag.ledgers as l (l.id)}
+                        <p class="lv-caption">
+                            {t(`module.${l.id}`)}：
+                            {l.provisioned ? (l.provisional ? t("diag.provisional") : t("diag.ok")) : t("diag.missing")}
+                            · {t("diag.columns")} {l.columns}
+                        </p>
+                    {/each}
+                    {#each diag.ledgers.filter((l) => l.error) as l (l.id)}
+                        <p class="lv-caption" style="color:var(--lv-danger)">{t(`module.${l.id}`)}: {l.error}</p>
+                    {/each}
+                    {#if diag.errors.length > 0}
+                        {#each diag.errors as e (e.moduleId)}
+                            <p class="lv-caption" style="color:var(--lv-danger)">{e.moduleId}: {e.message}</p>
                         {/each}
-                        {#each diag.ledgers.filter((l) => l.error) as l (l.id)}
-                            <p class="lv-caption" style="color:var(--lv-danger)">{t(`module.${l.id}`)}: {l.error}</p>
+                    {/if}
+                    {#if diag.contracts.length > 0}
+                        {#each diag.contracts as c (c)}
+                            <p class="lv-caption" style="color:var(--lv-danger)">{c}</p>
                         {/each}
-                        {#if diag.errors.length > 0}
-                            {#each diag.errors as e (e.moduleId)}
-                                <p class="lv-caption" style="color:var(--lv-danger)">{e.moduleId}: {e.message}</p>
-                            {/each}
-                        {/if}
-                        {#if diag.contracts.length > 0}
-                            {#each diag.contracts as c (c)}
-                                <p class="lv-caption" style="color:var(--lv-danger)">{c}</p>
-                            {/each}
-                        {/if}
-                        <div style="margin-top:8px">
-                            <button class="b3-button b3-button--outline" onclick={exportDiagnostics}>{t("settings.diagExport")}</button>
-                        </div>
+                    {/if}
+                    <div class="lv-setcard__actions" style="margin-top:8px">
+                        <button class="b3-button b3-button--outline" onclick={exportDiagnostics}>{t("settings.diagExport")}</button>
                         {#if (plugin.settings.members ?? []).some((m) => !m.avItemId || m.syncError)}
-                            <button class="b3-button b3-button--outline" style="margin-top:6px"
+                            <button class="b3-button b3-button--outline"
                                 onclick={async () => {
                                     const { backfillMemberLinks } = await import("@/core/members");
                                     const res = await backfillMemberLinks(plugin as any, plugin.settings);
@@ -632,14 +644,14 @@
                                     if (res.ambiguous.length > 0) openAmbiguityDialog(res.ambiguous);
                                 }}>{t("diag.backfill")}</button>
                         {/if}
-                        <button class="b3-button b3-button--outline" style="margin-top:6px"
+                        <button class="b3-button b3-button--outline"
                             onclick={async () => {
                                 const { findDuplicateLedgers } = await import("@/core/provisioner");
                                 const dups = await findDuplicateLedgers(plugin.settings);
                                 showMessage(dups.length === 0 ? t("diag.dupNone") : t("diag.dupFound").replace("${n}", String(dups.length)) + ": " + dups.map((d) => d.hpath).join(", "), 6000, dups.length ? "error" : "info");
                             }}>{t("diag.dupCheck")}</button>
                         <!-- D12 最小健康检查：实际读取每个启用模块，登记存在≠健康 -->
-                        <button class="b3-button b3-button--outline" style="margin-top:6px"
+                        <button class="b3-button b3-button--outline"
                             onclick={async () => {
                                 const { runHealthCheck } = await import("@/core/health");
                                 const report = await runHealthCheck(plugin.settings, plugin.schemaCatalog ?? {});
@@ -652,10 +664,11 @@
                                     7000, bad.length ? "error" : "info");
                             }}>{t("diag.health")}</button>
                     </div>
-                {/if}
+                </div>
             {/if}
-        </div>
+        {/if}
     {/if}
+    </div>
 
     <div class="fn__flex lv-settings__footer">
         {#if tab === "modules"}
@@ -663,6 +676,7 @@
             <button class="b3-button b3-button--text" onclick={coreOnly}>{t("coreOnly")}</button>
         {/if}
         <span class="fn__flex-1"></span>
-        <button class="b3-button b3-button--outline" disabled={saving} onclick={save}>{t("save")}</button>
+        <!-- 256 波：保存是设置视图唯一核心动作，升为主按钮（对齐原型"主按钮每视图 ≤1 个"） -->
+        <button class="lv-btn primary" disabled={saving} onclick={save}>{t("save")}</button>
     </div>
 </div>

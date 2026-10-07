@@ -11,11 +11,13 @@
     const t = (key: string) => String(plugin.i18n[key] ?? key);
 
     type ScreenId = "overview" | "reminders" | "ledger" | "members";
-    // 状态栏/通知入口可预选页签（plugin.pendingScreen，消费后清空）——初始快照为设计意图
+    // 状态栏/通知入口可预选页签（plugin.pendingScreen，消费后清空）——初始快照为设计意图。
+    // 单次读取落局部量：快照语义不变，且消除同逻辑两处 state_referenced_locally 警告
     // svelte-ignore state_referenced_locally
-    const initialScreen = (plugin.pendingScreen as ScreenId | undefined) ?? "overview";
-    if (plugin.pendingScreen) plugin.pendingScreen = undefined;
-    let screen: ScreenId = $state(initialScreen);
+    const pendingScreen = plugin.pendingScreen as ScreenId | undefined;
+    // svelte-ignore state_referenced_locally
+    plugin.pendingScreen = undefined;
+    let screen: ScreenId = $state(pendingScreen ?? "overview");
     // 提醒页签待办红点（version 驱动重算，随扫描更新）
     const pendingTotal = $derived.by(() => {
         void version;
@@ -37,6 +39,11 @@
     }
     $effect(() => {
         movePill(navEl?.querySelector(`[data-s="${screen}"]`) as HTMLElement | undefined);
+        // 254 波：窗口 resize 后重新测量（对齐原型的 resize 监听）——否则胶囊停在旧坐标、
+        // 与当前页签错位
+        const onResize = () => movePill(navEl?.querySelector(`[data-s="${screen}"]`) as HTMLElement | undefined);
+        window.addEventListener("resize", onResize, { passive: true });
+        return () => window.removeEventListener("resize", onResize);
     });
 
     // Tab 挂载即注册刷新回调（扫描完成 → version 递增驱动各屏 $derived 重算，H02：
@@ -66,7 +73,8 @@
             </div>
         </div>
         <nav class="lv-tabs" bind:this={navEl} style="position:relative">
-            <span class="lv-nav-pill" style="transform:translateX({pill.x}px);width:{pill.w}px"></span>
+            <!-- 252 波：首次定位不带过渡（pill.w===0 时挂 init），避免挂载瞬间胶囊从左滑入 -->
+            <span class="lv-nav-pill" class:init={pill.w === 0} style="transform:translateX({pill.x}px);width:{pill.w}px"></span>
             {#each screens as s (s.id)}
                 <button data-s={s.id} class="lv-tabs__item" class:on={screen === s.id} aria-current={screen === s.id ? "page" : undefined} onclick={() => (screen = s.id)}>
                     {t(s.key)}
@@ -79,7 +87,7 @@
             {t("hub.scannedAt")} {plugin.scan ? new Date(plugin.scan.scannedAt).toLocaleTimeString() : "—"}
             {#if plugin.scan?.stale}<span class="lv-badge orange" title={plugin.scan.errors.map((e) => e.moduleId).join(", ")}>{t("hub.stale")}</span>{/if}
         </span>
-        <button class="b3-button b3-button--outline" onclick={() => plugin.openSetting()}>⚙</button>
+        <button class="lv-iconbtn" aria-label={t("tab.settings")} title={t("tab.settings")} style="font-size:15px" onclick={() => plugin.openSetting()}>⚙</button>
     </header>
 
     {#key screen}

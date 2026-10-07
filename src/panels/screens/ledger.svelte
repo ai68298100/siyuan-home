@@ -16,11 +16,14 @@
     let { plugin, t, version }: { plugin: HomePluginLike; t: (k: string) => string; version?: number } = $props();
 
     // 台账页模块下拉：已建库 + 已启用但未建库的模块（26.7：后者可从页面直接触发重建）
-    const ledgers = $derived(
-        plugin.settings.enabledModules
+    // 263 波（262 波同款缺陷类）：enabledModules 无响应性——设置保存新启用模块后，
+    // 已挂载台账页的下拉不出现新模块；version 驱动重算修复
+    const ledgers = $derived.by(() => {
+        void version;
+        return plugin.settings.enabledModules
             .filter((id: string) => id !== "members")
-            .map((id: string) => ({ id, ref: plugin.settings.dbRefs[id] })),
-    );
+            .map((id: string) => ({ id, ref: plugin.settings.dbRefs[id] }));
+    });
     // 初始快照为设计意图（activeLedger 由模块卡/快速记录预选）
     // svelte-ignore state_referenced_locally
     let active = $state(plugin.activeLedger ?? "certs");
@@ -117,16 +120,23 @@
             return { name, qr };
         }));
         const esc = (s: string) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
-        const html = `<!doctype html><html><head><meta charset="utf-8"><title>${t("ledger.printTitle")}</title>
-<style>body{font-family:system-ui,sans-serif;margin:0;padding:16px}
-.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:12px}
-.label{border:1px dashed #999;border-radius:8px;padding:12px;text-align:center;page-break-inside:avoid}
-.label img{width:140px;height:140px}
-.label .nm{font-size:13px;font-weight:600;margin-top:6px;word-break:break-all}
-.label .tip{font-size:10px;color:#666;margin-top:2px}
-@media print{.noprint{display:none}}</style></head><body>
-<div class="noprint" style="text-align:center;margin-bottom:12px"><button onclick="window.print()">打印</button></div>
-<div class="grid">${labels.map((l) => `<div class="label"><img src="${l.qr}" alt="QR"><div class="nm">${esc(l.name)}</div><div class="tip">${t("ledger.printScanTip")}</div></div>`).join("")}</div>
+        // 259 波：打印页对齐设计语言（纸面固定色板，独立于屏幕主题——同 index.scss 打印豁免边界）
+        const html = `<!doctype html><html lang="zh-CN"><head><meta charset="utf-8"><title>${t("ledger.printTitle")}</title>
+<style>body{font-family:system-ui,-apple-system,"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif;margin:0;padding:20px;color:#1f2328;background:#fff}
+.head{display:flex;align-items:baseline;gap:10px;flex-wrap:wrap;border-bottom:1px solid #d0d7de;padding-bottom:10px;margin-bottom:16px}
+.head b{font-size:16px;font-weight:600}
+.head .sub{font-size:11px;color:#57606a}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:12px}
+.label{border:1px solid #d0d7de;border-radius:10px;padding:14px 12px;text-align:center;page-break-inside:avoid}
+.label img{width:132px;height:132px}
+.label .nm{font-size:13px;font-weight:600;margin-top:8px;word-break:break-all}
+.label .tip{font-size:10px;color:#57606a;margin-top:3px}
+.printbtn{padding:7px 18px;border:none;border-radius:8px;background:#0969da;color:#fff;font-size:13px;cursor:pointer}
+.printbtn:hover{background:#0860c4}
+@media print{.noprint{display:none}body{padding:0}}</style></head><body>
+<div class="head"><b>${t("ledger.printTitle")}</b><span class="sub">${t("ledger.printScanTip")} · ${new Date().toLocaleString()}</span></div>
+<div class="noprint" style="text-align:center;margin-bottom:14px"><button class="printbtn" onclick="window.print()">打印</button></div>
+<div class="grid">${labels.map((l) => `<div class="label"><img src="${l.qr}" alt="QR">${l.name ? `<div class="nm">${esc(l.name)}</div>` : ""}<div class="tip">${t("ledger.printScanTip")}</div></div>`).join("")}</div>
 <script>window.print()<\/script></body></html>`;
         const w = window.open("", "_blank");
         if (!w) { showMessage(t("ledger.printBlocked"), 4000, "error"); return; }
@@ -541,6 +551,39 @@
             case "relation": return (v.relation?.contents ?? []).map((c: any) => c.block?.content ?? "").join("、") || "—";
             default: return "—";
         }
+    }
+
+    // 252 波（对齐原型台账状态语义）：由到期日推导展示级色调——只读日期比较，
+    // 不写数据、不参与提醒派生
+    type LedgerTone = "danger" | "warn" | "ok" | "none";
+    // 256 波：warn 阈值跟随该模块提醒规则的生效提前量（leadOverrides 覆盖 > schema 默认，
+    // 取最大值 = 最早的提醒时点），色点语义与提醒中枢的触发时点一致；无规则模块回退 30 天
+    const warnDays = $derived.by(() => {
+        void version;
+        const rules = (plugin.schemaCatalog?.[active]?.reminders ?? []) as { key: string; leadDays: number }[];
+        let max = 0;
+        for (const rule of rules) {
+            const lead = plugin.settings.leadOverrides?.[`${active}.${rule.key}`] ?? rule.leadDays;
+            if (typeof lead === "number" && lead > max) max = lead;
+        }
+        return max > 0 ? max : 30;
+    });
+    function ledgerTone(r: any): LedgerTone {
+        const col = ref?.columns?.expiry ?? ref?.columns?.due;
+        if (!col) return "none";
+        const v = r.cells?.[col];
+        const s = v?.type === "date" && v.date?.isNotEmpty ? localDateKey(new Date(v.date.content)) : "";
+        if (!s) return "none";
+        const today = localDateKey(new Date());
+        if (s < today) return "danger";
+        const end = localDateKey(new Date(Date.now() + warnDays * 86400000));
+        return s <= end ? "warn" : "ok";
+    }
+    function toneCls(tone: LedgerTone): string {
+        return tone === "danger" ? "red" : tone === "warn" ? "orange" : tone === "ok" ? "green" : "gray";
+    }
+    function toneColor(tone: LedgerTone): string {
+        return tone === "danger" ? "var(--lv-danger)" : tone === "warn" ? "var(--lv-warn)" : "";
     }
 
     // 详情抽屉：值 ↔ 编辑态互转（A5 行编辑 UI 层；relation 复杂编辑暂不开放）
@@ -1448,7 +1491,7 @@
 
 <div class="lv-hero"><h1>{t("ledger.title")}</h1><p>{t("ledger.subtitle")}</p></div>
 
-<div style="display:flex;gap:10px;align-items:center;margin:14px 0;flex-wrap:wrap">
+<div class="lv-toolbar" style="margin:14px 0">
     <select class="b3-select" bind:value={active} onchange={() => (plugin.activeLedger = active)}>
         {#each ledgers as l (l.id)}
             <option value={l.id}>{t(`module.${l.id}`)}{l.ref?.avId ? "" : `（${t("diag.missing")}）`}</option>
@@ -1482,7 +1525,7 @@
     {/if}
 </div>
 
-<div class="lv-card" style="padding:14px;display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+<div class="lv-card lv-toolbar" style="padding:14px">
     {#each supportableCols as e (e.key)}
         {#if e.type === "select"}
             <select class="b3-select" bind:value={form[e.key]} title={t(`field.${e.key}`)}>
@@ -1529,7 +1572,8 @@
     {:else if nameMissing}
         <div class="lv-caption" role="status" style="color:var(--lv-warn);flex-basis:100%">{t("ledger.nameRequired")}</div>
     {/if}
-    <button class="b3-button b3-button--text" onclick={createRow} disabled={!ref?.avId || saving || identityPending || !hasAnyInput || nameMissing}>
+    <!-- 主 CTA：台账快速录入是本视图唯一核心动作（对齐原型"主按钮每视图 ≤1 个"） -->
+    <button class="lv-btn primary" onclick={createRow} disabled={!ref?.avId || saving || identityPending || !hasAnyInput || nameMissing}>
         {saving ? t("ledger.saving") : `＋ ${t("ledger.add")}`}
     </button>
 </div>
@@ -1549,6 +1593,8 @@
     <div class="lv-card lv-table-wrap lv-table" style="margin-top:12px">
         <table>
             <thead><tr>
+                <!-- 252 波：色点列（对齐原型表格首列 sev） -->
+                <th class="lv-sev-col"></th>
                 {#each schemaKeys.filter((k) => ["name", "status", "expiry", "due"].includes(k)) as k (k)}
                     <th>
                         <button class="b3-button b3-button--text" style="padding:0 2px;font-weight:600" title={t("ledger.sortTip")}
@@ -1560,12 +1606,14 @@
             </tr></thead>
             <tbody>
                 {#each visibleRows as r (r.itemID)}
+                    {@const tone = ledgerTone(r)}
                     <tr class="lv-row-link" role="button" tabindex="0"
                         onkeydown={(e: KeyboardEvent) => e.key === "Enter" && openDetail(r)}
                         onclick={() => openDetail(r)} title={t("ledger.detail")}>
+                        <td class="lv-sev-cell"><span class="lv-sev {toneCls(tone)}" title={tone === "danger" ? t("level.overdue") : tone === "warn" ? t("level.soon") : tone === "ok" ? t("level.lead") : ""}></span></td>
                         {#each schemaKeys.filter((k) => ["name", "status", "expiry", "due"].includes(k)) as k (k)}
                             {@const v = r.cells[ref.columns[k]]}
-                            <td class="lv-num">
+                            <td class="lv-num" style={k === "expiry" || k === "due" ? `color:${toneColor(tone)}` : ""}>
                                 {cellText(v, k)}
                             </td>
                         {/each}
@@ -1574,7 +1622,7 @@
                 {#if filteredRows.length > visibleRows.length}
                     <!-- 229 波性能：渐进渲染加载更多 -->
                     <tr class="lv-more">
-                        <td colspan={schemaKeys.filter((k) => ["name", "status", "expiry", "due"].includes(k)).length}>
+                        <td colspan={schemaKeys.filter((k) => ["name", "status", "expiry", "due"].includes(k)).length + 1}>
                             <button class="b3-button b3-button--outline" style="margin:0 auto;display:block"
                                 onclick={() => (renderLimit += RENDER_PAGE)}>
                                 {t("ledger.loadMore").replace("${n}", String(filteredRows.length - visibleRows.length))}

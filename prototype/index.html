@@ -436,6 +436,29 @@ tbody tr.sel{background:var(--lv-accent-soft);box-shadow:inset 2px 0 0 var(--lv-
 .live-region{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
 .context-strip{display:flex;align-items:center;gap:14px;flex-wrap:wrap;margin:8px 0 2px;padding:9px 12px;border:1px solid var(--lv-line);
   border-radius:var(--lv-r-2);background:color-mix(in srgb,var(--lv-surface) 84%,transparent);color:var(--lv-tx-3);font-size:11.5px}
+/* 快速备忘卡（总览，对齐实现 lv-memo）：surface-2 输入 + 定宽日期 + 幽灵添加钮 */
+.memo-card{display:flex;align-items:center;gap:8px;flex-wrap:wrap;padding:12px 14px;margin-top:12px}
+.memo-card input[type=text]{flex:1;min-width:200px;padding:7px 12px;border-radius:var(--lv-r-2);border:1px solid var(--lv-line);
+  background:var(--lv-surface-2);color:var(--lv-tx);font:inherit;font-size:13px;box-shadow:inset 0 1px 2px rgba(0,0,0,.08);
+  transition:border var(--lv-t-fast) var(--lv-ease)}
+.memo-card input[type=text]:focus{outline:none;border-color:var(--lv-accent-line)}
+.memo-card input[type=date]{width:150px;padding:7px 12px;border-radius:var(--lv-r-2);border:1px solid var(--lv-line);
+  background:var(--lv-surface-2);color:var(--lv-tx);font:inherit;font-size:13px}
+/* 提醒中枢：视图切换胶囊 / 批量条 / 备忘置顶标记（对齐实现新增能力） */
+.viewtoggle{margin-left:auto}
+.pin-flag{display:inline-flex;align-items:center;gap:4px;margin-left:8px;padding:1px 8px;border-radius:999px;
+  font-size:10.5px;font-weight:500;color:var(--lv-amber);background:var(--lv-amber-soft);vertical-align:2px}
+.batchbar{display:flex;align-items:center;gap:8px;flex-wrap:wrap;padding:9px 14px;margin-bottom:12px;font-size:12.5px;color:var(--lv-tx-2)}
+/* 日历视图小样（组件库）：月网格 · 色点事件 · 今日胶囊 */
+.mini-cal{display:grid;grid-template-columns:repeat(7,1fr);gap:4px;margin-top:12px}
+.mini-cal .wk{text-align:center;font-size:11px;color:var(--lv-tx-3);padding:4px 0;font-weight:500}
+.mini-cal .cell{min-height:52px;border:1px solid var(--lv-line);border-radius:10px;background:var(--lv-surface);
+  padding:6px;font-size:12px;font-weight:600;color:var(--lv-tx-2);display:flex;flex-direction:column;gap:3px;align-items:flex-start}
+.mini-cal .cell.out{opacity:.45}
+.mini-cal .cell .today{background:var(--lv-accent);color:#fff;border-radius:999px;padding:1px 6px;margin:-1px 0}
+.mini-cal .dots{display:flex;gap:3px}
+.mini-cal .dots i{width:7px;height:7px;border-radius:50%}
+.mini-cal .dots .danger{background:var(--lv-danger)}.mini-cal .dots .warn{background:var(--lv-warn)}.mini-cal .dots .amber{background:var(--lv-amber)}
 .context-strip strong{color:var(--lv-tx-2);font-weight:500}
 .context-strip .context-action{margin-left:auto;color:var(--lv-accent);cursor:pointer}
 .context-strip .context-action:hover{text-decoration:underline}
@@ -617,6 +640,12 @@ tbody tr.sel{background:var(--lv-accent-soft);box-shadow:inset 2px 0 0 var(--lv-
         <div class="when"><b class="num" style="color:var(--lv-amber)">25 天后</b><span class="num">10-26</span></div>
         <div class="ops"><button class="btn ghost">续期…</button><button class="btn ghost">延后</button></div>
       </div>
+      <div class="rem lead">
+        <div class="ic">📝</div>
+        <div class="t"><b>周三给老师打电话<span class="pin-flag">📌 已置顶</span></b><span>我 · 备忘 · 收件箱分诊</span></div>
+        <div class="when"><b class="num" style="color:var(--lv-amber)">5 天后</b><span class="num">10-08</span></div>
+        <div class="ops"><button class="btn ghost">完成</button><button class="btn ghost">延后</button><button class="btn ghost">转台账…</button></div>
+      </div>
     </div>
 
     <div class="card assistant-entry" id="assistant-entry">
@@ -631,6 +660,13 @@ tbody tr.sel{background:var(--lv-accent-soft);box-shadow:inset 2px 0 0 var(--lv-
       <button class="qbtn" onclick="openModal('media')"><span class="qi">🎬</span>看过 / 读完</button>
       <button class="qbtn" onclick="openModal('favors')"><span class="qi">🧧</span>人情往来</button>
       <button class="qbtn" onclick="openModal()"><span class="qi">✏️</span>更多…</button>
+    </div>
+
+    <div class="sec-title"><h2>快速备忘</h2><span class="sub">收件箱 · 稍后分诊进台账</span></div>
+    <div class="card memo-card">
+      <input type="text" placeholder="例如：周三给老师打电话（支持「下周五」等日期表达）" aria-label="备忘内容">
+      <input type="date" aria-label="到期日（可选）">
+      <button class="btn ghost" onclick="demoFeedback('备忘已加入收件箱')">＋ 备忘</button>
     </div>
 
     <div class="sec-title"><h2>模块样例</h2><span class="sub">独立合成统计 · 不随提醒范围汇总</span><a class="link" href="#" onclick="go('settings');return false">查看设置样例 →</a></div>
@@ -677,10 +713,17 @@ tbody tr.sel{background:var(--lv-accent-soft);box-shadow:inset 2px 0 0 var(--lv-
     <div class="state-banner" id="reminder-state-summary" role="status" hidden></div>
     <div id="reminder-content">
     <div class="filters">
-      <select class="select" id="demo-filter-module" aria-label="提醒模块筛选" onchange="setDemoFilter('module',this.value)"><option value="all">全部模块</option><option value="certs">证件</option><option value="parenting">疫苗</option><option value="memberships">订阅</option><option value="insurance">保单</option></select>
+      <select class="select" id="demo-filter-module" aria-label="提醒模块筛选" onchange="setDemoFilter('module',this.value)"><option value="all">全部模块</option><option value="certs">证件</option><option value="parenting">疫苗</option><option value="memberships">订阅</option><option value="insurance">保单</option><option value="adhoc">备忘</option></select>
       <select class="select" id="demo-filter-member" aria-label="提醒成员筛选" onchange="setDemoFilter('member',this.value)"><option value="all">全部成员</option><option value="self">我</option><option value="spouse">老婆</option><option value="child">儿子</option><option value="mom">妈妈</option></select>
       <select class="select" id="demo-filter-days" aria-label="提醒时间筛选" onchange="setDemoFilter('days',this.value)"><option value="30">30 天内与逾期</option><option value="7">7 天内与逾期</option><option value="overdue">已逾期</option><option value="all">全部</option></select>
-      <label class="chip" style="margin-left:auto;cursor:pointer"><input type="checkbox" style="accent-color:var(--lv-accent)">显示已处理</label>
+      <button class="btn" onclick="demoFeedback('导出当前范围提醒为 .ics（高后果模块先确认）')">导出日历（ics）</button>
+      <button class="btn ghost" onclick="demoFeedback('收件箱切片：只看备忘')">📥 待分诊</button>
+      <label class="chip" style="cursor:pointer"><input type="checkbox" style="accent-color:var(--lv-accent)">显示已处理</label>
+      <span class="viewtoggle" role="group" aria-label="视图切换">
+        <span class="nav" style="padding:2px"><button class="on" onclick="demoFeedback('列表视图')">列表</button><button onclick="demoFeedback('日历视图（月 / 周）')">日历</button></span>
+      </span>
+      <button class="btn ghost" onclick="demoFeedback('批量模式：勾选后批量完成 / 延后 / 忽略')">批量</button>
+      <button class="btn ghost" onclick="demoFeedback('重新扫描台账')">重新扫描</button>
     </div>
     <p class="ai-caption" id="reminder-filter-summary">当前演示范围 · 4 条提醒</p>
     <div class="state-banner" id="reminder-filter-empty" role="status" hidden><b>当前筛选没有匹配结果</b><p>资料已读取，但没有命中当前组合条件。</p><button class="btn" onclick="clearDemoFilters()">清除提醒筛选</button></div>
@@ -719,6 +762,12 @@ tbody tr.sel{background:var(--lv-accent-soft);box-shadow:inset 2px 0 0 var(--lv-
         <div class="when"><b class="num">25 天</b></div>
         <div class="ops"><button class="btn ghost">续期…</button><button class="btn ghost">延后 ▾</button><button class="btn ghost">定位</button></div>
       </div>
+      <div class="rem lead">
+        <div class="ic">📝</div>
+        <div class="t"><b>周三给老师打电话<span class="pin-flag">📌 已置顶</span></b><span>我 · 备忘 · 2026-10-08</span></div>
+        <div class="when"><b class="num">5 天</b></div>
+        <div class="ops"><button class="btn ghost">完成</button><button class="btn ghost">延后 ▾</button><button class="btn ghost">置顶</button><button class="btn ghost">转台账…</button><button class="btn ghost">定位</button></div>
+      </div>
     </div>
 
     <div class="group-label">已忽略 / 已处理</div>
@@ -739,6 +788,7 @@ tbody tr.sel{background:var(--lv-accent-soft);box-shadow:inset 2px 0 0 var(--lv-
       <span class="badge gray">合成表格 · 原生视图目标体验</span>
       <span style="flex:1"></span>
       <button class="btn ghost">📄 模板</button>
+      <button class="btn ghost" title="打印 QR 标签页，扫码直达对应行" onclick="demoFeedback('QR 标签打印页')">打印标签（QR）</button>
       <button class="btn">在文档中打开 ↗</button>
       <button class="btn primary" onclick="openModal('certs')">＋ 新建</button>
     </div>
@@ -818,7 +868,8 @@ tbody tr.sel{background:var(--lv-accent-soft);box-shadow:inset 2px 0 0 var(--lv-
       </div>
       <div class="card person">
         <div class="head"><span class="pava" style="background:linear-gradient(135deg,#58b98c,#7fd3a8)">仔</span>
-          <div><b>儿子</b><span class="role">child · 生日 03-14 · 中班</span></div></div>
+          <div><b>儿子</b><span class="role">child · 生日 03-14 · 中班</span></div>
+          <button class="iconbtn" style="margin-left:auto" title="上传头像" aria-label="上传头像" onclick="demoFeedback('头像上传（资产存成员台账行）')">📷</button></div>
         <div class="stats">
           <div><b class="num">2</b><span>证件</span></div>
           <div><b class="num">14/22</b><span>疫苗</span></div>
@@ -827,6 +878,9 @@ tbody tr.sel{background:var(--lv-accent-soft);box-shadow:inset 2px 0 0 var(--lv-
         <div>
           <div class="meter"><i style="width:64%"></i></div>
           <div class="meter-cap"><span>免疫规划程序</span><span class="num">14 / 22 剂</span></div>
+        </div>
+        <div style="display:flex;gap:6px;flex-wrap:wrap">
+          <span class="badge yellow">🎂 生日 3-14</span><span class="badge gray">育儿 1</span><span class="badge gray">上学 1</span>
         </div>
         <div class="alert">⚠ 百白破第 4 剂 10-04</div>
       </div>
@@ -991,6 +1045,26 @@ tbody tr.sel{background:var(--lv-accent-soft);box-shadow:inset 2px 0 0 var(--lv-
         <div class="meter"><i style="width:64%"></i></div>
         <div class="meter-cap"><span>免疫规划程序</span><span class="num">14 / 22 剂</span></div>
         <div class="sg-note">色点带 3px 光晕；细进度条用于长期进度（疫苗/退休/年计划）。</div>
+      </div>
+
+      <div class="card sg-cell">
+        <b>日历视图 · 批量条（收件箱深化）</b>
+        <div class="batchbar card" style="margin:0 0 6px">
+          <b style="font-size:12px">已选 2 项</b>
+          <button class="btn ghost">全选</button>
+          <span style="flex:1"></span>
+          <button class="btn">完成</button><button class="btn">延后 7 天</button><button class="btn">忽略</button>
+          <button class="btn ghost">取消</button>
+        </div>
+        <div class="mini-cal" aria-label="日历视图小样">
+          <div class="wk">一</div><div class="wk">二</div><div class="wk">三</div><div class="wk">四</div><div class="wk">五</div><div class="wk">六</div><div class="wk">日</div>
+          <div class="cell out">29</div><div class="cell out">30</div>
+          <div class="cell" style="background:var(--lv-accent-soft);border-color:var(--lv-accent-line)"><span class="today">1</span><span class="dots"><i class="danger"></i></span></div>
+          <div class="cell">2</div><div class="cell">3</div><div class="cell">4</div><div class="cell">5</div>
+          <div class="cell">6</div><div class="cell"><span class="today">7</span></div><div class="cell">8</div>
+          <div class="cell">9</div><div class="cell">10</div><div class="cell">11</div><div class="cell">12</div>
+        </div>
+        <div class="sg-note">月历看分布（色点=级别）、周视图看标题；今日胶囊唯一强色。批量条出现在勾选模式顶部，主按钮仍是「完成」。</div>
       </div>
 
       <div class="card sg-cell" style="grid-column:1/-1;padding:0;overflow:hidden">
@@ -1212,7 +1286,7 @@ function toggleTheme(){
 
 /* 只操作本页合成样例；以下状态和表单均不调用思源或模型。 */
 const moduleLabels={certs:'证件管理',medicine:'家庭药箱','assets-real':'实物资产',memberships:'会员与订阅',favors:'礼尚往来',schooling:'上学管理',media:'影音书库',shopping:'购物'};
-const demoReminderRows=[{module:'certs',member:'mom',days:-2},{module:'parenting',member:'child',days:3},{module:'memberships',member:'self',days:12},{module:'insurance',member:'self',days:25}];
+const demoReminderRows=[{module:'certs',member:'mom',days:-2},{module:'parenting',member:'child',days:3},{module:'memberships',member:'self',days:12},{module:'insurance',member:'self',days:25},{module:'adhoc',member:'self',days:5}];
 const demoFilters={member:'all',module:'all',days:'30'};
 const demoMemberNames={all:'全家',self:'我',spouse:'老婆',child:'儿子',mom:'妈妈'};
 function renderDemoFilters(){
@@ -1221,13 +1295,13 @@ function renderDemoFilters(){
   for(const selector of ['#s-overview .rem','#s-reminders .rem'])$$(selector).forEach((row,index)=>{row.hidden=!indices.has(index)});
   $('#heroCount').textContent=matches.length;$('#overview-reminders').hidden=!matches.length;
   $('#overview-filter-empty').hidden=!!matches.length;$('#reminder-filter-empty').hidden=!!matches.length;
-  $('#reminder-filter-summary').textContent=`当前合成快照范围 · ${matches.length} 条提醒（共 4 条样例）`;
+  $('#reminder-filter-summary').textContent=`当前合成快照范围 · ${matches.length} 条提醒（共 5 条样例）`;
   $('#focus-due-summary').textContent=`${matches.filter(row=>row.days<0).length} 件逾期 · ${matches.filter(row=>row.days>=0&&row.days<=7).length} 件 7 天内`;
   const includesMom=indices.has(0);$('#assistant-entry').hidden=!includesMom;$('#focus-review-open').disabled=!includesMom;
   $('#focus-review-summary').textContent=includesMom?'身份证资料需要核对':'当前范围没有待核对样例';
   $$('[data-overview-member]').forEach(button=>{const selected=button.dataset.overviewMember===demoFilters.member;button.classList.toggle('on',selected);button.setAttribute('aria-pressed',String(selected))});
   for(const key of ['member','module','days'])$('#demo-filter-'+key).value=demoFilters[key];
-  const moduleName={all:'全部样例模块',certs:'证件',parenting:'疫苗',memberships:'订阅',insurance:'保单'}[demoFilters.module];
+  const moduleName={all:'全部样例模块',certs:'证件',parenting:'疫苗',memberships:'订阅',insurance:'保单',adhoc:'备忘'}[demoFilters.module];
   const timeName={all:'全部样例日期',overdue:'仅逾期','7':'7 天内与逾期','30':'30 天内与逾期'}[demoFilters.days];
   $('#context-reminder-scope').textContent=`${demoMemberNames[demoFilters.member]} · ${moduleName} · ${timeName}`;
   const buckets=[row=>row.days<0,row=>row.days>=0&&row.days<=7,row=>row.days>7];

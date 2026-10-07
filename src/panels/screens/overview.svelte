@@ -59,6 +59,36 @@
         return plugin.runtime?.monthlyDueTotals?.[monthKey] ?? 0;
     });
 
+    // 262 波（H02 语义补全）：模块卡列表此前直接遍历 plugin.settings.enabledModules——
+    // 普通对象属性无响应性，且该模板块无任何 version 驱动依赖，导致「全部启用/保存」后
+    // 总览模块卡不即时刷新（需切一次页签重挂载）；改 version 驱动 derived 修复
+    const moduleCards = $derived.by(() => {
+        void version;
+        return plugin.settings.enabledModules.filter((id: string) => id !== "members");
+    });
+
+    // 266 波（模块卡趋势条）：近 5 日待办计数序列（数据源 moduleHistory，refreshHub 每日记录）。
+    // 已知天数 ≥3 才出趋势条（新装不足两日无趋势语义）；条高按窗口内最大值归一（保底 15%）。
+    const moduleHistory = $derived.by(() => {
+        void version;
+        return plugin.runtime?.moduleHistory ?? {};
+    });
+    function sparkOf(mid: string): number[] | null {
+        const days: number[] = [];
+        let known = 0;
+        let max = 0;
+        for (let i = 4; i >= 0; i--) {
+            const d = new Date(Date.now() - i * 86400000);
+            const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+            const v = moduleHistory[key]?.[mid];
+            if (typeof v === "number") known++;
+            days.push(typeof v === "number" ? v : 0);
+            if (v > max) max = v;
+        }
+        if (known < 3) return null;
+        return days.map((v) => (max > 0 ? Math.max(15, Math.round((v / max) * 100)) : 15));
+    }
+
     // B2（94 波走查）：模块图标共享表移至 core/modules（95 波起与提醒行共用，覆盖测试钉住）
     const moduleIcon = (mid: string) => icons(mid);
 
@@ -127,7 +157,7 @@
 <div class="lv-hero">
     <div><h1>{greet}</h1><p>{dateLine}</p></div>
     <div class="lv-hero-count" title={t("dash.statScope").replace("${t}", snapshotLabel)}>
-        <b class="lv-num">{reminders.length}</b><span>{t("dash.needAttention")}</span>
+        <b class="lv-num">{reminders.length}</b><span>{reminders.length === 1 ? t("dash.needAttentionOne") : t("dash.needAttention")}</span>
         {#if monthlyDone > 0}
             <span class="lv-caption" style="display:block;margin-top:2px">✓ {t("dash.monthlyDone").replace("${n}", monthlyDueTotal > 0 ? `${monthlyDone}/${monthlyDueTotal}` : String(monthlyDone))}</span>
         {/if}
@@ -203,7 +233,7 @@
     <button class="lv-qbtn" onclick={() => { plugin.setActiveLedger("favors"); onGoto("ledger"); }}><span class="qi">🧧</span>{t("module.favors")}</button>
     <button class="lv-qbtn" onclick={() => { plugin.setActiveLedger("members"); onGoto("members"); }}><span class="qi">👪</span>{t("tab.members")}</button>
 </div>
-<div class="lv-card" style="padding:14px;display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:8px">
+<div class="lv-card lv-memo" style="margin-top:8px">
     <input class="b3-text-field fn__flex-1" style="min-width:180px" placeholder={t("memo.placeholder")} bind:value={memoTitle} />
     <input class="b3-text-field" type="date" bind:value={memoDue} />
     <button class="b3-button b3-button--text" onclick={addMemo}>＋ {t("memo.add")}</button>
@@ -213,7 +243,7 @@
     <button class="b3-button b3-button--text" onclick={() => plugin.openSetting()}>{t("dash.enableMore")} →</button>
 </div>
 <div class="lv-mods">
-    {#each plugin.settings.enabledModules.filter((id: string) => id !== "members") as mid (mid)}
+    {#each moduleCards as mid (mid)}
         {@const pending = pendingByModule.get(mid) ?? 0}
         <div
             class="lv-card lv-card--hover lv-mod"
@@ -240,6 +270,14 @@
                     <span>{t("diag.provisional")}</span>
             {:else}
                     <span>{t("mod.inLedger")}</span>
+            {/if}
+            {#if sparkOf(mid)}
+                <!-- 266 波：近 5 日待办趋势（数据源 moduleHistory；末条高亮=原型 .spark hi） -->
+                <span class="lv-spark" aria-hidden="true" title={t("dash.sparkTip")}>
+                    {#each sparkOf(mid) as h, i (i)}
+                        <i class:hi={i === 4} style="height:{h}%"></i>
+                    {/each}
+                </span>
             {/if}
             </div>
             {#if mid === "exams" && plugin.runtime?.lastExamStats?.generatedAt}

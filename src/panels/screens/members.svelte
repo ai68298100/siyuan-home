@@ -299,7 +299,7 @@
 
 <div class="lv-hero"><h1>{t("members.title")}</h1><p>{t("settings.membersHint")}</p></div>
 
-<div class="lv-card" style="padding:14px;display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:14px">
+<div class="lv-card lv-toolbar" style="padding:14px;margin-bottom:14px">
     <input class="b3-text-field" style="width:140px" placeholder={t("members.name")} bind:value={name} />
     <select class="b3-select" bind:value={role}>
         {#each roles as r (r)}<option value={r}>{t(`role.${r}`)}</option>{/each}
@@ -324,7 +324,7 @@
 {:else}
     <div class="lv-people">
         {#each members as m (m.id)}
-            <div class="lv-card lv-mod" role="group" aria-label={m.name}
+            <div class="lv-card lv-card--hover lv-person" role="group" aria-label={m.name}
             draggable="true"
             ondragstart={(e: DragEvent) => onDragStart(m, e)}
             ondragover={(e: DragEvent) => { e.preventDefault(); dragOverId = m.id; }}
@@ -332,7 +332,7 @@
             ondrop={(e: DragEvent) => void onDrop(m, e)}
             ondragend={() => { dragId = null; dragOverId = null; }}
             style={dragOverId === m.id && dragId !== m.id ? "outline:2px dashed var(--lv-accent);outline-offset:-2px" : ""}>
-        <div class="head" style="display:flex;gap:12px;align-items:center;cursor:pointer" role="button" tabindex="0"
+        <div class="lv-person-head" role="button" tabindex="0"
             onkeydown={(e: KeyboardEvent) => e.key === "Enter" && toggleExpand(m.id)}
             oncontextmenu={(e: MouseEvent) => { e.preventDefault(); cardMenu(m, e.clientX, e.clientY); }}
             ontouchstart={(e: TouchEvent) => cardTouchStart(m, e)}
@@ -347,11 +347,10 @@
                 <!-- 225 波：个性化色相（id 哈希 → 稳定渐变），与总览 chips 同源 -->
                 <span class="lv-avatar lg" style="background:linear-gradient(135deg, hsl({memberHue(m.id)} 62% 52%), hsl({(memberHue(m.id) + 42) % 360} 62% 40%))">{m.name.slice(0, 1)}</span>
             {/if}
-            <div style="min-width:0">
-                <b style="font-size:14px">{m.name}</b>
+            <div class="lv-person-name">
+                <b>{m.name}</b>
                 <div class="lv-caption">{t(`role.${m.role}`)}{m.lunarBirthday ? " 🌙" : ""} {m.birthday ?? ""}</div>
             </div>
-            <span style="flex:1"></span>
             <!-- 225 波：头行只留 编辑；联系人/头像/删除经右键菜单与展开区（窄卡不再挤压） -->
             <button class="lv-iconbtn" title={t("members.uploadAvatar")} aria-label={t("members.uploadAvatar")}
                 onclick={(e) => { e.stopPropagation(); pickAvatar(m); }}>📷</button>
@@ -362,7 +361,7 @@
         {/if}
         {#if statsOf(m.id).chips.length > 0 || statsOf(m.id).birthday}
             {@const s = statsOf(m.id)}
-            <div style="display:flex;gap:6px;flex-wrap:wrap;padding-top:6px">
+            <div class="lv-person-info">
                 {#each s.chips as c (c.label)}
                     <span class="b3-chip b3-chip--small b3-chip--secondary">{c.label} {c.n}</span>
                 {/each}
@@ -373,7 +372,7 @@
             </div>
         {/if}
         {#if alertsFor(m.id).length > 0}
-            <div class="person-alert" style="font-size:12px;color:var(--lv-warn)">⚠ {alertsFor(m.id).length} {t("dash.needAttention")}</div>
+            <div class="lv-person-alert" role="status">⚠ {alertsFor(m.id).length} {alertsFor(m.id).length === 1 ? t("dash.needAttentionOne") : t("dash.needAttention")}</div>
         {/if}
         {#if expandedId === m.id}
             <div style="border-top:1px solid var(--lv-line);padding-top:10px;display:flex;flex-direction:column;gap:6px">

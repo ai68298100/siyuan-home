@@ -50,9 +50,22 @@ const pOpenPanel = async (page) => {
     await sleep(2500);
 };
 const pToast = (page) => page.evaluate(() => {
-    const el = document.querySelector("#message .b3-snackbar--show, .b3-snackbar.b3-snackbar--show") || document.querySelector("#message");
-    return el?.textContent?.trim().slice(0, 120) ?? "";
+    // 思源 toast 文本在 .b3-snackbar__content（无 --item 类）；系统条（Chrome 兼容提示，常驻
+    // 不自动消失）与插件回执同住 #message——过滤系统文案，取最后一条插件回执
+    const items = Array.from(document.querySelectorAll("#message .b3-snackbar__content"));
+    const texts = items.map((el) => el.textContent?.trim() ?? "").filter((t) => t && !t.includes("Chrome 浏览器"));
+    return (texts.at(-1) ?? "").slice(0, 120);
 });
+
+// 轮询等待插件回执（生成/建库耗时随规模浮动，固定延时会错过完成回执）
+const pToastPoll = async (page, timeoutMs = 90000) => {
+    for (let t = 0; t < timeoutMs; t += 2000) {
+        await sleep(2000);
+        const txt = await pToast(page);
+        if (txt.includes("已生成") || txt.includes("失败") || txt.includes("已清除")) return txt;
+    }
+    return await pToast(page);
+};
 
 const browser = await chromium.launch({ channel: "msedge", headless: true });
 
@@ -97,12 +110,21 @@ const browser = await chromium.launch({ channel: "msedge", headless: true });
     await page.goto(`${BASE}/`, { waitUntil: "domcontentloaded" });
     await sleep(12000);
     await pOpenPanel(page);
-    await page.evaluate(() => document.querySelector(".lv-tabbar button[title=⚙], .lv-tabbar .b3-button--outline:last-of-type")?.click());
+    await page.evaluate(() => document.querySelector(".lv-tabbar .lv-iconbtn")?.dispatchEvent(new MouseEvent("click", { bubbles: true })));
     await sleep(2000);
-    await pClickByText(page, ["关于"], ".b3-dialog button"); await sleep(1200);
-    await pClickByText(page, ["生成示例数据"], "button"); await sleep(5000);
+    await pClickByText(page, ["ℹ️ 关于", "关于"], ".lv-setnav__item, .b3-dialog button"); await sleep(1200);
+    await pClickByText(page, ["生成示例数据"], "button");
+    // 268 波：断言以磁盘结果为主（成员+行落盘），toast 时序受扫描耗时/系统条影响仅作辅助
+    let diskDemo = { ids: 0, rows: 0 };
+    for (let i = 0; i < 30; i++) {
+        await sleep(2000);
+        diskDemo = await api("/api/file/getFile", { path: "/data/storage/petal/siyuan-home/settings.json" })
+            .then((j) => ({ ids: (j.demoMemberIds ?? []).length, rows: Object.keys(j.demoRows ?? {}).length }))
+            .catch(() => ({ ids: 0, rows: 0 }));
+        if (diskDemo.ids >= 2 && diskDemo.rows >= 2) break;
+    }
     const toast = await pToast(page);
-    rec("S1.5-演示数据", "生成示例数据", (toast || "").includes("已生成"), toast.slice(0, 60));
+    rec("S1.5-演示数据", "生成示例数据", diskDemo.ids >= 2 && diskDemo.rows >= 2, `磁盘 成员${diskDemo.ids}/行${diskDemo.rows}；toast=${toast.slice(0, 40)}`);
     await page.keyboard.press("Escape"); await sleep(1000);
     await ctx.close();
 }
@@ -127,7 +149,14 @@ const browser = await chromium.launch({ channel: "msedge", headless: true });
     rec(stage, "总览：三张重点卡", ov.focus === 3, `实际 ${ov.focus}`);
     rec(stage, "总览：成员 chips 渲染", ov.chips >= 1, `${ov.chips} 个`);
 
-    await pClickByText(page, ["提醒"]); await sleep(2000);
+    await pClickByText(page, ["提醒"]);
+    // 268 波：回执先行后重扫在后台——轮询等分组/行出现（扫描完成），上限 90s
+    for (let i = 0; i < 45; i++) {
+        await sleep(2000);
+        const ready = await page.evaluate(() => document.querySelectorAll(".lv-group-label, .lv-rem").length > 0 || document.body.innerText.includes("最近没有要紧事"));
+        if (ready) break;
+    }
+    await sleep(1000);
     const rem = await page.evaluate(() => ({
         h1: document.querySelector(".lv-screen h1")?.textContent?.trim(),
         selects: document.querySelectorAll(".lv-screen select").length,
@@ -190,7 +219,7 @@ const browser = await chromium.launch({ channel: "msedge", headless: true });
     const del = await page.evaluate(() => {
         const card = Array.from(document.querySelectorAll(".lv-people > *")).find((c) => (c.textContent || "").includes("e2e成员"));
         if (!card) return "no card";
-        card.querySelector(".head")?.dispatchEvent(new MouseEvent("contextmenu", { bubbles: true, clientX: 400, clientY: 300 }));
+        card.querySelector(".lv-person-head")?.dispatchEvent(new MouseEvent("contextmenu", { bubbles: true, clientX: 400, clientY: 300 }));
         return "menu";
     });
     await sleep(900);
@@ -201,12 +230,20 @@ const browser = await chromium.launch({ channel: "msedge", headless: true });
     rec(s3, "成员删除经确认对话框", del === "menu" && !!confirmHit && afterDel === before, `${after}→${afterDel}`);
 
     // 演示数据生成回执
-    await page.evaluate(() => document.querySelector(".lv-tabbar button[title=⚙], .lv-tabbar .b3-button--outline:last-of-type")?.click());
+    await page.evaluate(() => document.querySelector(".lv-tabbar .lv-iconbtn")?.dispatchEvent(new MouseEvent("click", { bubbles: true })));
     await sleep(2000);
     await pClickByText(page, ["关于"], ".b3-dialog button"); await sleep(1200);
-    await pClickByText(page, ["生成示例数据"], "button"); await sleep(5000);
+    await pClickByText(page, ["生成示例数据"], "button");
+    let diskDemo2 = { ids: 0 };
+    for (let i = 0; i < 30; i++) {
+        await sleep(2000);
+        diskDemo2 = await api("/api/file/getFile", { path: "/data/storage/petal/siyuan-home/settings.json" })
+            .then((j) => ({ ids: (j.demoMemberIds ?? []).length }))
+            .catch(() => ({ ids: 0 }));
+        if (diskDemo2.ids >= 2) break;
+    }
     const toast2 = await pToast(page);
-    rec(s3, "示例数据生成回执", (toast2 || "").includes("已生成"), toast2);
+    rec(s3, "示例数据生成回执", diskDemo2.ids >= 2, `磁盘 成员${diskDemo2.ids}；toast=${toast2.slice(0, 40)}`);
     // ICS 导出下载（先关设置回提醒页；高后果模块会弹 G1 确认 → 确认后下载）
     await page.keyboard.press("Escape"); await sleep(1200);
     await pClickByText(page, ["提醒"]); await sleep(1800);

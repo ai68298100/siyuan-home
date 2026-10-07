@@ -302,7 +302,7 @@
             // 247 波：未建库模块自动建库（provisionModule 幂等；登记写入 settings 后 ref 即有效）
             if (!ref?.avId) {
                 ok.textContent = t("triage.provisioning");
-                await provisionModule(plugin.settings, mod, plugin.schemaCatalog?.[mod], t("module." + mod), { resolveName: (key: string) => String(plugin.i18n[`field.${key}`] ?? key) });
+                await provisionModule(plugin.settings, mod, plugin.schemaCatalog?.[mod], t(`module.${mod}`), { resolveName: (key: string) => String(plugin.i18n[`field.${key}`] ?? key) });
                 ref = plugin.settings.dbRefs[mod];
                 if (!ref?.avId) { showMessage(t("triage.noTarget"), 3000, "error"); return; }
             }
@@ -418,7 +418,7 @@
 
 <div class="lv-hero"><h1>{t("hub.title")}</h1><p>{t("hub.subtitle")}</p></div>
 
-<div class="filters" style="display:flex;gap:8px;margin:16px 0;flex-wrap:wrap">
+<div class="lv-toolbar" style="margin:16px 0">
     <select class="b3-select" value={filter} onchange={(e) => { filter = (e.target as HTMLSelectElement).value; persistFilter(); }}>
         <option value="all">{t("hub.filterAll")}</option>
         <option value="overdue">{t("hub.filterOverdue")}</option>
@@ -462,7 +462,7 @@
 </div>
 
 {#if batchMode}
-    <div class="lv-card" style="padding:8px 14px;display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:10px">
+    <div class="lv-card lv-toolbar" style="padding:8px 14px;margin-bottom:10px">
         <b class="lv-caption">{t("hub.selectedN").replace("${n}", String(selectedCount))}</b>
         <button class="b3-button b3-button--text" onclick={selectAllFiltered}>{t("hub.selectAll")}</button>
         <span class="fn__flex-1"></span>

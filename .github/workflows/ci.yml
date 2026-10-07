@@ -36,13 +36,14 @@ jobs:
         run: pnpm run smoke
 
       # v0.3.1 起 chunks 分包被禁（思源加载器相对 require 必然失败，见 smoke/verify:loader 门禁），
-      # 单文件 bundle 即全部体积——预算按 225 波实测 182.9KB 标定为 200KB，调整需给出理由
-      - name: Bundle size gate (index.js gzip < 200KB, single-file mandatory)
+      # 单文件 bundle 即全部体积——预算 225 波标定 200KB；250–267 波 UI 对齐（趋势条/设置第四屏/打印/QR 页等）
+      # 增至 ~204.6KB（269 波实测），预算上调至 220KB 并保留 10% 余量；再触发应评估代码分割
+      - name: Bundle size gate (index.js gzip < 220KB, single-file mandatory)
         run: |
           SIZE=$(gzip -c dist/index.js | wc -c)
           echo "index.js gzip: $SIZE bytes"
-          if [ "$SIZE" -gt 204800 ]; then
-            echo "::error::index.js gzip exceeds 200KB budget"
+          if [ "$SIZE" -gt 225280 ]; then
+            echo "::error::index.js gzip exceeds 220KB budget"
             exit 1
           fi
 

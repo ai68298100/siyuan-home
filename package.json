@@ -1,6 +1,6 @@
 {
   "name": "siyuan-home",
-  "version": "0.3.8",
+  "version": "0.3.9",
   "type": "module",
   "description": "Lv Home - family & life butler plugin for Siyuan (https://b3log.org/siyuan)",
   "repository": "github:ai68298100/siyuan-home",
@@ -37,7 +37,12 @@
     "make-install": "pnpm run build && node --no-warnings ./scripts/make_install.js",
     "test": "vitest run",
     "test:live": "vitest run --config vitest.live.config.ts",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "ui:tabs": "node scripts/ui-walkthrough/shoot-tabs.mjs",
+    "ui:mobile": "node scripts/ui-walkthrough/shoot-mobile.mjs",
+    "ui:hover": "node scripts/ui-walkthrough/shoot-hover.mjs",
+    "ui:media": "node scripts/ui-walkthrough/shoot-media.mjs",
+    "ui:stress": "node scripts/ui-walkthrough/bulk-stress.mjs"
   },
   "devDependencies": {
     "@sveltejs/vite-plugin-svelte": "^7.3.1",

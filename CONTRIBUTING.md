@@ -112,6 +112,8 @@ pnpm run make-link   # 软链到思源工作空间 data/plugins/
 
 **靶场做法**：用独立 workspace 目录起第二个思源实例（端口自动顺延为 6807），实例内只装被测插件；每个插件项目用自己的靶场 workspace，不跨项目共用；同一实例上的写型冒烟串行执行、不并发（只读走查可随时并发）。靶场实例 token 与主工作区不同，跑之前从该实例 设置→关于 获取。**靶场 workspace 放在仓库目录之外**（如 `D:\AI\思源笔记插件开发\靶场\<插件名>-ws`）——仓库内放置会让部署产物（dist 拷贝）落在源码树里，被安全扫描器反复误报，且构建产物本就不该入源码树。运维坑：**先启动内核后部署**会让内核把 `petals.json` 重写为空（启动时插件目录为空）——部署脚本需每次 upsert 注册表，部署后重启内核生效。
 
+**UI 走查（截图驱动）**：视觉/交互/规模走查的靶场手册与脚本见 [docs/testing/ui-walkthrough-runbook.md](docs/testing/ui-walkthrough-runbook.md) 与 `scripts/ui-walkthrough/`（264–265 波入册；含集市信任门槛、授权码/cookie、stage 路径、modeOS 等坑位表）。
+
 ## 发布
 
 - **版本策略（semver）**：

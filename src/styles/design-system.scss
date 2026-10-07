@@ -19,12 +19,17 @@
   --lv-accent-2: #9a7cff;
   --lv-accent-soft: color-mix(in srgb, var(--b3-theme-primary) 14%, transparent);
   --lv-accent-line: color-mix(in srgb, var(--b3-theme-primary) 32%, transparent);
-  --lv-surface-2: var(--b3-theme-surface-light);
-  --lv-line: var(--b3-border-color);
-  --lv-line-strong: color-mix(in srgb, var(--b3-theme-on-background) 14%, transparent);
+  // 三级文字从中性灰阶派生（on-background × background 调和）——250 波起不再直接引用
+  // b3-theme-on-surface/light：思源默认暗色主题的这两枚带蓝色相，表头/辅助文字整片偏蓝，
+  // 违反 07 §"三级文字层次之外不允许第四种颜色"的中性要求
   --lv-tx: var(--b3-theme-on-background);
-  --lv-tx-2: var(--b3-theme-on-surface);
-  --lv-tx-3: var(--b3-theme-on-surface-light);
+  --lv-tx-2: color-mix(in srgb, var(--b3-theme-on-background) 76%, var(--b3-theme-background));
+  --lv-tx-3: color-mix(in srgb, var(--b3-theme-on-background) 52%, var(--b3-theme-background));
+  // 1px 半透明描边承担暗色分层（对齐原型：卡片边框=on-background 10% 弱透线，非实色边）
+  --lv-line: color-mix(in srgb, var(--b3-theme-on-background) 10%, transparent);
+  --lv-line-strong: color-mix(in srgb, var(--b3-theme-on-background) 17%, transparent);
+  --lv-surface: var(--b3-theme-surface);
+  --lv-surface-2: var(--b3-theme-surface-light);
   --lv-danger: var(--b3-theme-error);
   --lv-danger-soft: var(--b3-card-error-background);
   --lv-warn: var(--b3-card-warning-color);
@@ -45,9 +50,11 @@
   color: var(--lv-tx);
 
   // 容器顶部环境辉光（对齐原型 ambient 光层：主色晕 + 顶部高光带，胶片颗粒仅 Tab 全高容器启用，见 08 §7）
+  // 252 波：max-width 封顶——窄面板（移动/分屏 <1000px）下 980px 椭圆会把横向可滚动区
+  // 撑到 643px（右缘 -337+980），产生幽灵横向滚动
   &::before {
     content: ""; position: absolute; top: -160px; left: 50%; transform: translateX(-50%);
-    width: 980px; height: 460px; border-radius: 50%; pointer-events: none;
+    width: 980px; max-width: 100%; height: 460px; border-radius: 50%; pointer-events: none;
     background: radial-gradient(closest-side, var(--lv-aura), transparent 72%);
   }
   &::after {
@@ -79,7 +86,7 @@
   // ── 3. 页头与节奏 ───────────────────────────────────────
   // 对齐原型：页头为悬浮应用条（品牌区 + 胶囊页签 + 元信息），不再是分隔线模式
   .lv-tabbar { display: flex; align-items: center; gap: 14px; padding: 10px 14px; margin-bottom: 16px;
-    background: var(--b3-theme-surface); border: 1px solid var(--lv-line); border-radius: var(--lv-r-3);
+    background: var(--lv-surface); border: 1px solid var(--lv-line); border-radius: var(--lv-r-3);
     box-shadow: var(--lv-shadow-1), inset 0 1px 0 var(--lv-inset); }
   .lv-appbrand { display: flex; align-items: center; gap: 10px; flex: none; }
   .lv-logo { width: 34px; height: 34px; border-radius: 10px; display: grid; place-items: center; font-size: 17px;
@@ -90,31 +97,35 @@
     span { font-size: 9.5px; font-weight: 600; letter-spacing: .16em; color: var(--lv-tx-3); } }
   .lv-tabbar__title { font-size: 15px; font-weight: 600; }
   .lv-tabbar__meta { display: flex; gap: 6px; align-items: center; }
-  // ⚙ 等顶栏图标按钮命中区 ≥34px（26.7 移动端走查回归项）
-  .lv-tabbar > .b3-button { min-height: 34px; min-width: 34px; display: inline-flex; align-items: center; justify-content: center; }
+  // ⚙ 等顶栏图标按钮：幽灵风（对齐原型 iconbtn——无描边、hover 才浮出底色），命中区 ≥34px（26.7 回归项）
+  .lv-tabbar > .b3-button { min-height: 34px; min-width: 34px; display: inline-flex; align-items: center; justify-content: center;
+    border: none; background: none; box-shadow: none; color: var(--lv-tx-2); font-size: 15px;
+    transition: background var(--lv-t-med) var(--lv-ease), color var(--lv-t-med) var(--lv-ease);
+    &:hover { background: var(--lv-surface-2); color: var(--lv-tx); } }
   .lv-tabs { display: flex; gap: 2px; background: var(--lv-surface-2); border: 1px solid var(--lv-line);
     border-radius: 999px; padding: 4px; }
   .lv-nav-pill { position: absolute; top: 4px; left: 0; height: calc(100% - 8px); border-radius: 999px;
-    background: var(--b3-theme-surface); box-shadow: var(--lv-shadow-1), inset 0 1px 0 var(--lv-inset);
-    transition: transform var(--lv-t-sheet) var(--lv-spring), width var(--lv-t-sheet) var(--lv-spring); z-index: 0; }
+    background: var(--lv-surface); box-shadow: var(--lv-shadow-1), inset 0 1px 0 var(--lv-inset);
+    transition: transform var(--lv-t-sheet) var(--lv-spring), width var(--lv-t-sheet) var(--lv-spring); z-index: 0;
+    &.init { transition: none; } }
   .lv-tabs__item { position: relative; z-index: 1; padding: 8px 16px; border-radius: 999px; font-size: 13px;
     display: inline-flex; align-items: center; justify-content: center; min-height: 34px;
     color: var(--lv-tx-2); background: none; border: none; cursor: pointer; transition: color var(--lv-t-med) var(--lv-ease);
-    &:hover { color: var(--lv-tx); } &.on { color: var(--lv-tx); font-weight: 600; }
+    &:hover { color: var(--lv-tx); } &.on { color: var(--lv-tx); font-weight: 500; }
     // 待办红点（提醒页签，扫描计数 > 0 时出现）
     .lv-dot { position: absolute; top: 6px; right: 8px; width: 6px; height: 6px; border-radius: 50%;
       background: var(--lv-danger); box-shadow: 0 0 0 3px var(--lv-danger-soft); } }
   .lv-people { display: grid; grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); gap: 14px; }
   /* 171 波（对齐原型质感，不低于）：context-strip 状态条 + focus-row 三重点卡 */
   .lv-strip { display: flex; flex-wrap: wrap; gap: 4px 18px; align-items: center; margin: 0 2px;
-    padding: 8px 14px; border: 1px solid color-mix(in srgb, var(--b3-theme-on-background) 6%, transparent);
+    padding: 8px 14px; border: 1px solid var(--lv-line);
     border-radius: var(--lv-r-2); font-size: 12px;
-    color: var(--lv-tx-3); background: var(--b3-theme-surface);
-    box-shadow: var(--lv-shadow-1);
+    color: var(--lv-tx-3); background: var(--lv-surface);
+    box-shadow: inset 0 1px 0 var(--lv-inset);
     strong { color: var(--lv-tx-2); font-weight: 500; margin-right: 4px; } }
   .lv-focus { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin: 14px 2px 2px; }
   .lv-focus-card { display: flex; align-items: center; gap: 12px; padding: 14px 16px;
-    border: 1px solid var(--lv-line); border-radius: var(--lv-r-3); background: var(--b3-theme-surface);
+    border: 1px solid var(--lv-line); border-radius: var(--lv-r-3); background: var(--lv-surface);
     box-shadow: var(--lv-shadow-1), inset 0 1px 0 var(--lv-inset);
     transition: transform var(--lv-t-med) var(--lv-ease), box-shadow var(--lv-t-med) var(--lv-ease),
         border-color var(--lv-t-med) var(--lv-ease);
@@ -131,10 +142,12 @@
     .lv-focus { grid-template-columns: 1fr; }
   }
   .lv-hero { display: flex; align-items: flex-end; gap: 16px; margin: 20px 2px 8px; flex-wrap: wrap;
-    h1 { font-size: 30px; font-weight: 700; letter-spacing: -.02em; }
+    // 250 波：对齐原型字号层级（26/600 标题 + 32/600 计数）——46px/700 的计数在中文面板里
+    // 喧宾夺主，且与 26px 页标题断层过大
+    h1 { font-size: 26px; font-weight: 600; letter-spacing: -.02em; }
     p { color: var(--lv-tx-3); font-size: 12.5px; margin-top: 5px; }
     .lv-hero-count { margin-left: auto; display: flex; align-items: baseline; gap: 8px;
-      b { font-size: 46px; font-weight: 700; letter-spacing: -.04em; }
+      b { font-size: 32px; font-weight: 600; letter-spacing: -.03em; }
       span { color: var(--lv-tx-3); font-size: 12.5px; } }
   }
   .lv-sec { display: flex; align-items: baseline; gap: 10px; margin: 30px 2px 12px; // 249 波：section 节奏 26→30（对齐原型呼吸）
@@ -146,10 +159,10 @@
     &::after { content: ""; flex: 1; height: 1px; background: var(--lv-line); } }
 
   // ── 4. 卡片与容器 ───────────────────────────────────────
-  // 249 波：卡片边框淡化（阴影承担分层），对齐原型"1px 半透明描边"
-  .lv-card { background: var(--b3-theme-surface);
-    border: 1px solid color-mix(in srgb, var(--b3-theme-on-background) 7%, transparent);
-    border-radius: var(--lv-r-3); box-shadow: var(--lv-shadow-1), inset 0 1px 0 var(--lv-inset); }
+  // 250 波：卡片统一 lv-surface + lv-line（on-background 10% 半透明描边）——
+  // 原 7% 描边在思源暗色主题下不可见，卡片与背景糊成一片，分层改由描边+内侧高光承担（对齐原型）
+  .lv-card { background: var(--lv-surface);
+    border: 1px solid var(--lv-line); border-radius: var(--lv-r-3); box-shadow: var(--lv-shadow-1), inset 0 1px 0 var(--lv-inset); }
   .lv-card--hover { cursor: pointer; transition: transform var(--lv-t-med) var(--lv-ease),
       box-shadow var(--lv-t-med) var(--lv-ease), border var(--lv-t-med) var(--lv-ease);
     &:hover { transform: translateY(-2px); box-shadow: var(--lv-shadow-2), inset 0 1px 0 var(--lv-inset);
@@ -158,7 +171,7 @@
   // ── 5. 按钮 ─────────────────────────────────────────────
   .lv-btn { display: inline-flex; align-items: center; gap: 6px; padding: 7px 14px;
     border-radius: var(--lv-r-2); border: 1px solid var(--lv-line-strong);
-    background: var(--b3-theme-surface); font-size: 13px; color: var(--lv-tx);
+    background: var(--lv-surface); font-size: 13px; color: var(--lv-tx);
     box-shadow: inset 0 1px 0 var(--lv-inset); transition: all var(--lv-t-fast) var(--lv-ease);
     &:hover { border-color: var(--lv-accent-line); color: var(--lv-accent); }
     &:active { transform: translateY(1px); }
@@ -174,10 +187,31 @@
     &:hover { background: var(--lv-surface-2); color: var(--lv-tx); border-color: var(--lv-line); }
     &:active { transform: scale(.94); } }
 
+  // ── 5b. 工具条（筛选/台账头/成员录入条等控件排）────────
+  // 250 波：面板内的 b3 原生控件统一进 lv 体系——同一 32px 控件高度、surface-2 底、
+  // 1px 半透明描边、r-2 圆角；蓝描边 outline 按钮降为 ghost 观感（主色只留给核心动作）
+  .lv-toolbar { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+  // b3-text-field/b3-select 的边框语义是 outline（非 border）——覆写 outline 而非叠 border，
+  // 否则双重描边
+  .lv-toolbar .b3-select,
+  .lv-toolbar .b3-text-field { min-height: 32px; padding: 4px 10px; font-size: 13px; border-radius: var(--lv-r-2);
+    border: none; outline: 1px solid var(--lv-line); outline-offset: -1px;
+    background: var(--lv-surface-2); color: var(--lv-tx);
+    box-shadow: none; transition: outline-color var(--lv-t-fast) var(--lv-ease), box-shadow var(--lv-t-fast) var(--lv-ease);
+    &:hover { outline-color: var(--lv-line-strong); box-shadow: none; }
+    &:focus { outline-color: var(--lv-accent-line); box-shadow: 0 0 0 .6px var(--lv-accent-soft); } }
+  .lv-toolbar .b3-select { cursor: pointer; }
+  .lv-toolbar .b3-button--outline { border-color: var(--lv-line); background: var(--lv-surface); color: var(--lv-tx-2);
+    box-shadow: inset 0 1px 0 var(--lv-inset); font-size: 13px; border-radius: var(--lv-r-2);
+    transition: all var(--lv-t-fast) var(--lv-ease);
+    &:hover { border-color: var(--lv-accent-line); color: var(--lv-accent); background: var(--lv-surface); }
+    &.b3-button--text { border-color: transparent; background: none; box-shadow: none; } }
+  .lv-toolbar .b3-button { min-height: 32px; }
+
   // ── 6. chips / 徽章 / 状态点 ────────────────────────────
   .lv-chip { display: inline-flex; align-items: center; gap: 6px; padding: 7px 13px; border-radius: 999px;
     font-size: 12.5px; color: var(--lv-tx-2); border: 1px solid var(--lv-line);
-    background: var(--b3-theme-surface); transition: all var(--lv-t-fast) var(--lv-ease); cursor: pointer;
+    background: var(--lv-surface); transition: all var(--lv-t-fast) var(--lv-ease); cursor: pointer;
     &:hover { border-color: var(--lv-line-strong); color: var(--lv-tx); transform: translateY(-1px); }
     &.on { background: var(--lv-accent-soft); border-color: var(--lv-accent-line);
       color: var(--lv-accent); font-weight: 500; } }
@@ -214,11 +248,16 @@
         white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
       span { font-size: 12px; color: var(--lv-tx-3); } }
     .lv-rem-when { margin-left: auto; text-align: right; flex: none;
-      b { font-size: 15px; font-weight: 700; display: block; letter-spacing: -.01em; }
+      // 250 波：13.5/600 对齐原型 .rem .when b（原 15/700 过重，压过左侧标题层级）
+      b { font-size: 13.5px; font-weight: 600; display: block; letter-spacing: -.01em; }
       span { font-size: 11.5px; color: var(--lv-tx-3); } }
     .lv-rem-ops { display: flex; gap: 4px; flex: none; opacity: 0; transform: translateX(6px);
       transition: all var(--lv-t-med) var(--lv-ease);
-      .b3-button { padding: 6px 10px; } }
+      // 251 波：操作钮 ghost 化（对齐原型 .rem .ops .btn.ghost）——中性灰、hover 才浮出底色；
+      // 之前 b3-button--text 的主色蓝字让整排操作过度用色
+      .b3-button { padding: 6px 10px; color: var(--lv-tx-2); border-radius: var(--lv-r-2);
+        transition: background var(--lv-t-fast) var(--lv-ease), color var(--lv-t-fast) var(--lv-ease);
+        &:hover { background: var(--lv-surface-2); color: var(--lv-tx); box-shadow: none; } } }
     // 173 波（13 §3.3 对齐原型）：键盘聚焦行时操作显现（触屏常显另有 hover:none 分支）
     &:hover .lv-rem-ops, &:focus-within .lv-rem-ops { opacity: 1; transform: none; }
     &.overdue { background: var(--lv-danger-soft);
@@ -227,15 +266,25 @@
     &.lead::before { background: var(--lv-amber); } &.lead:hover::before { box-shadow: 0 0 8px 1px var(--lv-amber); } }
 
   // ── 8. 模块卡 / 色砖 / 趋势条 / 进度条 ──────────────────
+  // 250 波：补上 .lv-mods 网格（此前模板使用但样式表从未定义，模块卡退化成全宽单列堆叠）
+  .lv-mods { display: grid; grid-template-columns: repeat(auto-fill, minmax(210px, 1fr)); gap: 12px; }
   .lv-mi { width: 38px; height: 38px; border-radius: 11px; display: grid; place-items: center;
     font-size: 16px; background: var(--tile-bg, var(--lv-surface-2));
     border: 1px solid var(--tile-border, var(--lv-line));
     box-shadow: inset 0 1px 0 var(--lv-inset);
     transition: transform var(--lv-t-med) var(--lv-spring); }
-  .lv-mod { padding: 16px; display: flex; flex-direction: column; gap: 10px; min-height: 118px;
+  .lv-mod { padding: 16px; display: flex; flex-direction: column; gap: 10px; min-height: 128px;
+    position: relative; overflow: hidden;
+    // 角落环境辉光（对齐原型 .mod::after：hover 时随浮起向内漂移、变亮）；
+    // 用 7% 的 --lv-aura 而非 14% accent-soft——浅色主题下后者会在白卡上留"污渍"感
+    &::after { content: ""; position: absolute; inset: auto -28px -42px auto; width: 112px; height: 112px;
+      border-radius: 50%; pointer-events: none; opacity: .8;
+      background: radial-gradient(circle, var(--lv-aura), transparent 68%);
+      transition: transform var(--lv-t-slow) var(--lv-spring), opacity var(--lv-t-med) var(--lv-ease); }
+    &:hover::after { transform: translate(-12px, -10px); opacity: 1; }
     &:hover .lv-mi { transform: scale(1.08) rotate(-4deg); }
-    b { font-size: 13.5px; font-weight: 500; }
-    .lv-stat { display: flex; align-items: baseline; gap: 6px;
+    > b { font-size: 13.5px; font-weight: 500; position: relative; }
+    .lv-stat { display: flex; align-items: baseline; gap: 6px; position: relative;
       b { font-size: 18px; font-weight: 600; letter-spacing: -.01em; }
       span { font-size: 11.5px; color: var(--lv-tx-3); }
       .up { margin-left: auto; } } }
@@ -262,12 +311,20 @@
   .lv-meter-cap { display: flex; justify-content: space-between; font-size: 11px; color: var(--lv-tx-3); margin-top: 5px; }
 
   // ── 9. 表格（原生数据库视图外围）────────────────────────
-  .lv-table-wrap { overflow: hidden; }
+  // 267 波：overflow-x auto 恢复窄容器横向滑动查看（DEVICE-02；hidden 会把右侧列直接裁掉且无法滑动）；
+  // y 轴 hidden 防双滚动条
+  .lv-table-wrap { overflow-x: auto; overflow-y: hidden; }
   .lv-table table { width: 100%; border-collapse: collapse; font-size: 13px;
-    thead th { position: sticky; top: 0; background: var(--b3-theme-surface); text-align: left;
+    thead th { position: sticky; top: 0; background: var(--lv-surface); text-align: left;
       font-size: 11.5px; font-weight: 500; color: var(--lv-tx-3); padding: 10px 16px;
-      border-bottom: 1px solid var(--lv-line); white-space: nowrap; letter-spacing: .03em; }
+      border-bottom: 1px solid var(--lv-line); white-space: nowrap; letter-spacing: .03em;
+      // 表头排序按钮（模板用 b3-button--text）：文字归入表头灰阶，不按链接色渲染
+      .b3-button { color: inherit; font-weight: inherit; font-size: inherit; min-height: 0; line-height: inherit;
+        &:hover { color: var(--lv-tx); } } }
     tbody td { padding: 11px 16px; border-bottom: 1px solid var(--lv-line); white-space: nowrap; }
+    // 252 波：首列状态色点（对齐原型表格窄色点列）
+    .lv-sev-col { width: 26px; padding-right: 0; }
+    tbody .lv-sev-cell { width: 26px; padding: 11px 4px 11px 16px; }
     tbody tr { cursor: pointer; transition: background var(--lv-t-fast) var(--lv-ease);
       &:hover { background: var(--lv-surface-2); }
       &.sel { background: var(--lv-accent-soft); box-shadow: inset 2px 0 0 var(--lv-accent); } } }
@@ -278,7 +335,7 @@
     pointer-events: none; transition: opacity var(--lv-t-slow) var(--lv-ease); z-index: var(--lv-z-mask);
     &.open { opacity: 1; pointer-events: auto; } }
   .lv-drawer { position: absolute; top: 0; right: 0; bottom: 0; width: 440px; max-width: 94%; z-index: var(--lv-z-drawer);
-    background: var(--b3-theme-surface); border-left: 1px solid var(--lv-line); box-shadow: var(--lv-shadow-3);
+    background: var(--lv-surface); border-left: 1px solid var(--lv-line); box-shadow: var(--lv-shadow-3);
     transform: translateX(36px); opacity: 0; pointer-events: none;
     transition: transform var(--lv-t-sheet) var(--lv-spring), opacity var(--lv-t-slow) var(--lv-ease);
     display: flex; flex-direction: column;
@@ -290,7 +347,7 @@
     .lv-drawer-foot { display: flex; gap: 8px; padding: 16px 22px; border-top: 1px solid var(--lv-line); } }
   .lv-modal { position: absolute; inset: 0; display: grid; place-items: center; z-index: var(--lv-z-modal);
     pointer-events: none;
-    .lv-sheet { width: 480px; max-width: 92%; background: var(--b3-theme-surface);
+    .lv-sheet { width: 480px; max-width: 92%; background: var(--lv-surface);
       border: 1px solid var(--lv-line-strong); border-radius: var(--lv-r-4);
       box-shadow: var(--lv-shadow-3), inset 0 1px 0 var(--lv-inset); opacity: 0;
       transform: translateY(16px) scale(.97);
@@ -307,7 +364,7 @@
   .lv-frow { display: grid; grid-template-columns: 76px 1fr; gap: 12px; align-items: center;
     > label { font-size: 12.5px; color: var(--lv-tx-3); } }
   .lv-select { appearance: none; padding: 7px 30px 7px 12px; border-radius: var(--lv-r-2);
-    border: 1px solid var(--lv-line); background: var(--b3-theme-surface); color: var(--lv-tx-2);
+    border: 1px solid var(--lv-line); background: var(--lv-surface); color: var(--lv-tx-2);
     font-size: 12.5px; cursor: pointer; transition: border var(--lv-t-fast) var(--lv-ease), color var(--lv-t-fast) var(--lv-ease);
     &:hover { border-color: var(--lv-line-strong); color: var(--lv-tx); } }
   .lv-togglerow { display: flex; align-items: center; gap: 12px; padding: 10px 0;
@@ -343,13 +400,13 @@
   .lv-kv { display: grid; grid-template-columns: 88px 1fr; gap: 8px 14px; font-size: 13px;
     dt { color: var(--lv-tx-3); } dd { color: var(--lv-tx); } }
 
-  // ── 13. 快速记录 / 成员行 ──────────────────────────────
+  // ── 13. 快速记录 / 备忘卡 / 成员卡 ─────────────────────
   .lv-quick { display: flex; gap: 8px; flex-wrap: wrap; }
   .lv-qbtn { display: inline-flex; align-items: center; gap: 8px; padding: 9px 16px; border-radius: var(--lv-r-2);
-    background: var(--b3-theme-surface);
-    border: 1px solid color-mix(in srgb, var(--b3-theme-on-background) 8%, transparent);
+    background: var(--lv-surface);
+    border: 1px solid var(--lv-line);
     font-size: 13px; color: var(--lv-tx-2);
-    box-shadow: var(--lv-shadow-1), inset 0 1px 0 var(--lv-inset); transition: all var(--lv-t-fast) var(--lv-ease);
+    box-shadow: inset 0 1px 0 var(--lv-inset); transition: all var(--lv-t-fast) var(--lv-ease);
     &:hover { color: var(--lv-tx); border-color: var(--lv-accent-line); transform: translateY(-2px);
       box-shadow: var(--lv-shadow-2), inset 0 1px 0 var(--lv-inset); }
     &:active { transform: none; }
@@ -358,6 +415,29 @@
       box-shadow: inset 0 -1px 2px rgba(0, 0, 0, .14), inset 0 1px 0 var(--lv-inset); } }
   .lv-members { display: flex; gap: 8px; flex-wrap: wrap;
     .lv-avatar { width: 22px; height: 22px; font-size: 11px; } }
+  // 250 波：快速备忘卡（总览）——备忘是后加功能，此前只有一行孤立的 b3 控件；
+  // 归置成与 lv 体系同构的输入卡：surface-2 输入、定宽日期、幽灵添加钮
+  .lv-memo { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; padding: 12px 14px;
+    .b3-text-field { min-height: 32px; border: none; outline: 1px solid var(--lv-line); outline-offset: -1px;
+      background: var(--lv-surface-2); border-radius: var(--lv-r-2); box-shadow: none; font-size: 13px;
+      &:hover { outline-color: var(--lv-line-strong); }
+      &:focus { outline-color: var(--lv-accent-line); } }
+    .b3-text-field[type="date"] { width: 150px; flex: none; }
+    .b3-button { min-height: 32px; } }
+  // 250 波：成员卡结构（对齐原型 .person：head 分区 + 顶部分隔的信息区 + 提醒行）
+  .lv-person { padding: 16px; display: flex; flex-direction: column; gap: 10px; position: relative; overflow: hidden;
+    .lv-person-head { display: flex; align-items: center; gap: 12px; cursor: pointer; border-radius: var(--lv-r-2);
+      // 头行操作钮浮现式（对齐原型 .rem .ops 交互语言）：静态只留头像+姓名。
+      // 用 display 折叠而非 opacity——opacity 不释放布局空间，250px 窄卡姓名仍被挤压；
+      // 键盘路径 focus-within 显现，触屏常显见 760px 分支
+      .lv-iconbtn, .b3-button { display: none; flex: none; }
+      &:hover .lv-iconbtn, &:hover .b3-button,
+      &:focus-within .lv-iconbtn, &:focus-within .b3-button { display: inline-flex; } }
+    .lv-person-name { min-width: 0; flex: 1;
+      b { font-size: 14px; font-weight: 600; display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+      .lv-caption { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; } }
+    .lv-person-info { display: flex; gap: 6px; flex-wrap: wrap; border-top: 1px solid var(--lv-line); padding-top: 10px; }
+    .lv-person-alert { font-size: 12px; color: var(--lv-warn); display: flex; align-items: center; gap: 6px; } }
 
   // ── 14. 入场编排 / 动效降级 / 响应式 ───────────────────
   @keyframes lv-rise { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: none; } }
@@ -386,12 +466,20 @@
   }
   @media (max-width: 760px) {
     .lv-hero h1 { font-size: 21px; }
+    // 252 波（对齐原型 760px 分支）：提醒行转网格——图标/标题/日期一行，操作钮换行铺满，
+    // 长标题允许折行；窄窗口与触屏都不再横向溢出
+    .lv-rem { display: grid; grid-template-columns: 38px minmax(0, 1fr) auto; gap: 8px 10px; }
+    .lv-rem .lv-rem-t b { white-space: normal; }
+    .lv-rem .lv-rem-ops { grid-column: 2 / -1; flex-wrap: wrap; }
     // 26.7 触屏设备：无 hover，操作按钮常显（替代长按实现）。
     // 184 波修复：原实现把 hover:none 常显规则放在 display:none 之前，被后续同特异性规则覆盖
     // （触屏操作全隐）；且一刀切 display:none 会连桌面窄窗口的 hover/键盘 focus-within 路径
     // 一起杀掉——现删去 display:none，窄屏沿用宽屏的 opacity 显现语义，仅触屏强制常显。
     @media (hover: none) {
       .lv-rem .lv-rem-ops { display: flex; opacity: 1; transform: none; }
+      // 250 波：成员卡头行操作钮触屏常显（同提醒行语义）
+      .lv-person .lv-person-head .lv-iconbtn,
+      .lv-person .lv-person-head .b3-button { display: inline-flex; }
     }
     // 26.7 窄屏 tabbar：标题隐藏，页签横向滚动
     .lv-tabbar { flex-wrap: wrap; }
@@ -413,7 +501,7 @@
     &-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; }
     &-wk { text-align: center; font-size: 11px; color: var(--lv-tx-3); padding: 4px 0; font-weight: 500; }
     &-cell { min-height: 64px; border: 1px solid var(--lv-line); border-radius: 10px;
-        background: var(--b3-theme-surface); display: flex; flex-direction: column; align-items: flex-start;
+        background: var(--lv-surface); display: flex; flex-direction: column; align-items: flex-start;
         gap: 3px; padding: 6px; cursor: pointer; font: inherit; color: var(--lv-tx-2); text-align: left;
         transition: border var(--lv-t-fast) var(--lv-ease), background var(--lv-t-fast) var(--lv-ease);
         &:hover { border-color: var(--lv-line-strong); }
@@ -423,10 +511,11 @@
         .d { font-size: 12px; font-weight: 600; min-width: 20px; text-align: center; padding: 1px 4px; }
         .d.today { background: var(--lv-accent); color: var(--b3-theme-on-primary); border-radius: 999px; }
         .dots { display: flex; gap: 3px; flex-wrap: wrap;
+            // 251 波：事件点带同色柔光晕（对齐原型 .sev 的 halo 语言），暗色下不再难以辨认
             i { width: 7px; height: 7px; border-radius: 50%; display: block;
-                &.danger { background: var(--lv-danger); }
-                &.warn { background: var(--lv-warn); }
-                &.amber { background: var(--lv-amber); } } } }
+                &.danger { background: var(--lv-danger); box-shadow: 0 0 0 2px color-mix(in srgb, var(--lv-danger) 22%, transparent); }
+                &.warn { background: var(--lv-warn); box-shadow: 0 0 0 2px color-mix(in srgb, var(--lv-warn) 22%, transparent); }
+                &.amber { background: var(--lv-amber); box-shadow: 0 0 0 2px color-mix(in srgb, var(--lv-amber) 22%, transparent); } } } }
     &-day-panel { margin-top: 12px; padding: 12px 14px; }
     &-items { margin-top: 8px; display: flex; flex-direction: column; gap: 8px; }
     &-item { display: flex; align-items: center; gap: 10px;
@@ -444,3 +533,27 @@
     .tt-line { font-size: 11px; line-height: 1.3; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
         &.overdue { color: var(--lv-danger); }
         &.soon { color: var(--lv-warn); } } }
+
+// ── 16. 首启引导（251 波，对齐原型 .aura 品牌时刻：双漂移辉光 + 居中向导）──
+.lv-aura { position: relative; overflow: hidden; border-radius: var(--lv-r-4); padding: 40px 36px;
+    &::before, &::after { content: ""; position: absolute; border-radius: 50%; pointer-events: none; }
+    &::before { top: -140px; left: 50%; transform: translateX(-60%); width: 520px; height: 320px;
+        background: radial-gradient(closest-side, var(--lv-accent-soft), transparent 70%);
+        animation: lv-drift 11s ease-in-out infinite alternate; }
+    &::after { top: -90px; left: 18%; width: 360px; height: 260px; opacity: .6;
+        background: radial-gradient(closest-side, color-mix(in srgb, var(--lv-accent-2) 12%, transparent), transparent 70%);
+        animation: lv-drift 13s ease-in-out infinite alternate-reverse; } }
+@keyframes lv-drift { from { transform: translate(-8px, 4px); } to { transform: translate(10px, -8px); } }
+.lv-wiz { max-width: 560px; margin: 0 auto; position: relative;
+    .lv-wiz__step { font-size: 12px; color: var(--lv-accent); font-weight: 600; letter-spacing: .08em; }
+    .lv-wiz__title { font-size: 20px; font-weight: 600; margin: 8px 0 6px; letter-spacing: -.01em; } }
+.lv-roles { display: flex; flex-wrap: wrap; gap: 9px; margin-bottom: 20px; }
+// 256 波：窄面板下向导内边距收窄（40/36 在 300px 容器里占比过大）
+@media (max-width: 760px) {
+    .lv-aura { padding: 26px 20px; }
+}
+.lv-rolechip { display: inline-flex; align-items: center; gap: 8px; padding: 9px 16px; border-radius: 999px;
+    border: 1px solid var(--lv-line-strong); font-size: 13.5px; color: var(--lv-tx); background: none; cursor: pointer;
+    transition: all var(--lv-t-med) var(--lv-spring);
+    &:hover { border-color: var(--lv-accent-line); transform: translateY(-1px); }
+    &.on { background: var(--lv-accent-soft); border-color: var(--lv-accent-line); color: var(--lv-accent); font-weight: 500; } }
