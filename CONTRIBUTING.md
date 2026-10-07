@@ -4,7 +4,7 @@
 
 ## 环境搭建
 
-- Node ≥ 24、pnpm ≥ 11
+- Node ≥ 24、pnpm 12.9.1（以 `package.json` 的 `packageManager` 为准）
 - 思源笔记 3.8.x（本机运行中，内核默认 `http://127.0.0.1:6806`）
 
 ```bash
@@ -94,6 +94,13 @@ pnpm run make-link   # 软链到思源工作空间 data/plugins/
 **UI 走查（截图驱动）**：视觉/交互/规模走查的靶场手册与脚本见 [docs/testing/ui-walkthrough-runbook.md](docs/testing/ui-walkthrough-runbook.md) 与 `scripts/ui-walkthrough/`（264–265 波入册；含集市信任门槛、授权码/cookie、stage 路径、modeOS 等坑位表）。
 
 ## 发布
+
+### 主线同步规则
+
+- 每个逻辑变更使用 Conventional Commits，并在本地完成 `pnpm check` 与 `pnpm test`。
+- 推送 `main` 后等待 GitHub CI、CodeQL 和必需的 `quality` 检查完成；不要用管理员权限绕过保护规则。
+- 正式发布前同步 `package.json`、`plugin.json`、CHANGELOG 和双语 README，确认 `disabledInPublish=true` 仍符合当前发布决策。
+- 只把版本 tag 推送到 GitHub 触发 Release workflow；集市发布是独立决策，不随 GitHub Release 自动发生。
 
 - **版本策略（semver）**：
   - **Major**（1.0→2.0）：破坏性变更（数据结构不兼容、模块移除、最低思源版本抬升）
