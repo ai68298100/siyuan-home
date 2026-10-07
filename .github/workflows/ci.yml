@@ -1,4 +1,4 @@
-# CI：PR 与 push 的质量门禁（TODO 25：check + build + smoke/包体检查）
+# CI：PR 与 main push 的质量门禁
 name: CI
 
 on:
@@ -6,16 +6,27 @@ on:
     branches: [main]
   pull_request:
 
+# CI never needs to write to the repository or publish a release.
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
 jobs:
   quality:
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
 
-      - uses: pnpm/action-setup@v4
+      - uses: pnpm/action-setup@f520eceda224fe1a4aed5a2a27a194379a409996 # v6
         # 版本由 package.json 的 packageManager 字段唯一声明（避免双源冲突）
 
-      - uses: actions/setup-node@v7
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
         with:
           node-version: 24
           cache: pnpm
@@ -35,9 +46,7 @@ jobs:
       - name: Package smoke test
         run: pnpm run smoke
 
-      # v0.3.1 起 chunks 分包被禁（思源加载器相对 require 必然失败，见 smoke/verify:loader 门禁），
-      # 单文件 bundle 即全部体积——预算 225 波标定 200KB；250–267 波 UI 对齐（趋势条/设置第四屏/打印/QR 页等）
-      # 增至 ~204.6KB（269 波实测），预算上调至 220KB 并保留 10% 余量；再触发应评估代码分割
+      # 思源加载器要求单文件 bundle；gzip 预算与 tag 发布门禁保持一致。
       - name: Bundle size gate (index.js gzip < 220KB, single-file mandatory)
         run: |
           SIZE=$(gzip -c dist/index.js | wc -c)
@@ -48,7 +57,7 @@ jobs:
           fi
 
       - name: Upload package artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: package
           path: package.zip

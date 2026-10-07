@@ -4,7 +4,7 @@
  */
 import { describe, it, expect, beforeEach } from "vitest";
 import { loadSettings, saveSettings, normalizeImportedSettings, normalizeCheckinBindings } from "@/core/settings";
-import { loadRuntime } from "@/core/hub/runtime";
+import { loadRuntime, saveRuntime, defaultRuntime } from "@/core/hub/runtime";
 import { coalescedNotify, resetNotifyState } from "@/libs/notify-queue";
 
 function pluginWithSettings(data: unknown) {
@@ -89,6 +89,67 @@ describe("坏文件容错（15 组）", () => {
         const s = await loadSettings(plugin);
         expect(s.corruptedSettings).toBe(true);
         expect((saved["settings.json.corrupted.json"] as any).reason).toContain("non-object");
+    });
+
+    it("设置字段逐项归一化：null/数组/错型不会穿透到运行时", async () => {
+        const plugin = pluginWithSettings({
+            enabledModules: ["certs", 42, null],
+            members: [null, ["bad"], { id: "m1", name: 42, role: "wizard", createdAt: 7, sex: "unknown" }],
+            leadOverrides: [],
+            dbRefs: { certs: null, members: { avId: 42, columns: { name: "k1", bad: 9 } } },
+            notifyHour: "8",
+            silentFrom: Infinity,
+            silentTo: null,
+            checkinBindings: "bad",
+            webhookEnabled: "yes",
+            webhookUrl: 9,
+        });
+        const settings = await loadSettings(plugin);
+        expect(settings.enabledModules).toEqual(["certs"]);
+        expect(settings.members).toEqual([expect.objectContaining({ id: "m1", name: "?", role: "other", createdAt: expect.any(String) })]);
+        expect(settings.leadOverrides).toEqual({});
+        expect(settings.dbRefs).toEqual({ members: { columns: { name: "k1" } } });
+        expect(settings.notifyHour).toBe(8);
+        expect(settings.silentFrom).toBe(22);
+        expect(settings.silentTo).toBe(8);
+        expect(settings.checkinBindings).toEqual([]);
+        expect(settings.webhookEnabled).toBe(false);
+        expect(settings.webhookUrl).toBe("");
+    });
+
+    it("运行态缓存逐项归一化：错误 map/list/cache 字段安全回退", async () => {
+        const plugin = pluginWithSettings(null);
+        plugin.loadData = async (name: string) => name === "hub-runtime.json" ? {
+            snoozed: null,
+            muted: [],
+            handledYear: { good: 2026, bad: "2026" },
+            handled: { good: { title: "t", moduleId: "certs", ruleKey: "expiry", dueDate: "2026-10-01", at: "2026-09-01" }, bad: null },
+            renewHistory: "bad",
+            memos: [null, { id: "m1", title: "memo", dueDate: "2026-10-01", createdAt: "2026-09-01" }, { id: "bad" }],
+            cache: { reminders: "bad", derived: [{ id: "r", moduleId: "certs", ruleKey: "expiry", rowId: "row", title: "r", dueDate: "2026-10-01", daysLeft: 1, level: "soon" }], byModule: [] },
+        } : null;
+        const rt = await loadRuntime(plugin);
+        expect(rt.snoozed).toEqual({});
+        expect(rt.muted).toEqual({});
+        expect(rt.handledYear).toEqual({ good: 2026 });
+        expect(Object.keys(rt.handled)).toEqual(["good"]);
+        expect(rt.renewHistory).toEqual({});
+        expect(rt.memos).toHaveLength(1);
+        expect(rt.cache?.reminders).toEqual([]);
+        expect(rt.cache?.derived).toHaveLength(1);
+        expect(rt.cache?.byModule).toEqual({});
+    });
+
+    it("运行态序列化去重按插件实例隔离：新实例的首写不会被旧实例跳过", async () => {
+        const writesA: unknown[] = [];
+        const writesB: unknown[] = [];
+        const a = { saveData: async (_name: string, value: unknown) => { writesA.push(value); } } as any;
+        const b = { saveData: async (_name: string, value: unknown) => { writesB.push(value); } } as any;
+        await saveRuntime(a, defaultRuntime());
+        await saveRuntime(a, defaultRuntime());
+        await saveRuntime(b, defaultRuntime());
+        expect(writesA).toHaveLength(1);
+        expect(writesB).toHaveLength(1);
     });
 });
 

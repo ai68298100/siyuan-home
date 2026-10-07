@@ -30,6 +30,8 @@ export default class LvHomePlugin extends Plugin {
     runtime: HubRuntime;
     scan: ScanResult;
     private heartbeat: number | undefined;
+    /** 所有延迟回调统一登记，确保卸载时没有匿名计时器继续访问插件实例。 */
+    private readonly timeoutIds = new Set<number>();
     /** moduleId → schema 目录（193 波收口为 SCHEMA_CATALOG 单源；UI 按需读取列定义/枚举，与 ensureCoreLedgers 同源） */
     schemaCatalog: Record<string, any> = SCHEMA_CATALOG;
     /** Tab 面板刷新回调（支持多实例，33.1：所有打开的管家面板同步刷新） */
@@ -82,6 +84,16 @@ export default class LvHomePlugin extends Plugin {
     /** i18n 取值（1.2.8 起 i18n 为 JSONValue，字符串位置统一转 string） */
     i18nText(key: string): string {
         return String(this.i18n[key] ?? key);
+    }
+
+    private scheduleTimeout(callback: () => void, delay: number): number {
+        let timer = 0;
+        timer = window.setTimeout(() => {
+            this.timeoutIds.delete(timer);
+            callback();
+        }, delay);
+        this.timeoutIds.add(timer);
+        return timer;
     }
 
     async onload() {
@@ -203,7 +215,7 @@ export default class LvHomePlugin extends Plugin {
         this.ensureSpeedSwitchActions();
 
         // EC09/EC10：启动时初始打卡摘要拉取（打卡可能已先于管家加载）
-        window.setTimeout(() => this.pullCheckinSummary(), 3000);
+        this.scheduleTimeout(() => this.pullCheckinSummary(), 3000);
 
         // EC03/v0.3 生态首批：管家服务桥 window.LvHome（对齐人脉 window.LvContacts 模式；卸载注销）
         this.disposeLvHomeBridge = mountLvHomeBridge({
@@ -241,7 +253,7 @@ export default class LvHomePlugin extends Plugin {
             window.addEventListener(evt, this.checkinEventHandler);
         }
         // 启动时拉取一次（打卡可能先于管家加载；SPA 中 load 已触发，用延迟替代）
-        window.setTimeout(() => this.pullCheckinSummary(), 5000);
+        this.scheduleTimeout(() => this.pullCheckinSummary(), 5000);
     }
 
     /** EC09/EC10：拉取打卡强度摘要（只读；写入 runtime 供模块卡展示）[待实测] */
@@ -311,7 +323,7 @@ export default class LvHomePlugin extends Plugin {
         if (!speedSwitch?.registerQuickAction) {
             // 未加载（或加载顺序靠后）：1200ms 重试，上限 10 次（约 12s）后放弃——雷切本会话内再启用则下次启动生效
             if (attempt < 10 && this.speedSwitchRetry === undefined) {
-                this.speedSwitchRetry = window.setTimeout(() => {
+                this.speedSwitchRetry = this.scheduleTimeout(() => {
                     this.speedSwitchRetry = undefined;
                     this.ensureSpeedSwitchActions(attempt + 1);
                 }, 1200);
@@ -521,17 +533,17 @@ export default class LvHomePlugin extends Plugin {
             await this.ensureCoreLedgers();
             const ref = this.settings.dbRefs[moduleId];
             if (!ref?.avId || !ref.columns) throw new Error("ledger not provisioned");
-            // 码点安全截断（Array.from 按 Unicode 码点切，emoji/生僻字不被劈成乱码）
-            const name = Array.from(text).length > 40 ? `${Array.from(text).slice(0, 40).join("")}…` : text;
-            const itemID = await addDetachedRow(ref.avId, name);
             const targetCol = moduleId === "bookmarks" ? ref.columns.url
                 : moduleId === "address" ? ref.columns.address_full
                 : ref.columns.content;
-            if (targetCol) {
-                await setCell(ref.avId, targetCol, itemID, moduleId === "bookmarks"
-                    ? { type: "url", url: { content: text } }
-                    : { type: "text", text: { content: text } });
-            }
+            // 目标列缺失时必须在建行前失败，避免留下无法写入正文的空行并误报成功。
+            if (!targetCol) throw new Error(`target column unavailable: ${moduleId}`);
+            // 码点安全截断（Array.from 按 Unicode 码点切，emoji/生僻字不被劈成乱码）
+            const name = Array.from(text).length > 40 ? `${Array.from(text).slice(0, 40).join("")}…` : text;
+            const itemID = await addDetachedRow(ref.avId, name);
+            await setCell(ref.avId, targetCol, itemID, moduleId === "bookmarks"
+                ? { type: "url", url: { content: text } }
+                : { type: "text", text: { content: text } });
             showMessage(this.i18nText("capture.saved").replace("${module}", this.i18nText(`module.${moduleId}`)), 3000, "info");
             // 常用语/书签/地址无提醒规则——写入不触发扫描（PF06：无相关变更不重扫）
         } catch (e) {
@@ -571,7 +583,7 @@ export default class LvHomePlugin extends Plugin {
         if (!this.isMobileFrontend) return;
         const topBar = document.getElementById("mobileTopBar");
         if (!topBar) {
-            this.mobileTopBarRetry = window.setTimeout(() => {
+            this.mobileTopBarRetry = this.scheduleTimeout(() => {
                 this.mobileTopBarRetry = undefined;
                 this.ensureMobileTopBarButton();
             }, 800);
@@ -590,7 +602,7 @@ export default class LvHomePlugin extends Plugin {
         topBar.appendChild(button);
         this.mobileTopBarBtn = button;
         for (const delay of [1500, 4000, 10000, 20000, 30000]) {
-            window.setTimeout(() => this.ensureMobileTopBarButton(), delay);
+            this.scheduleTimeout(() => this.ensureMobileTopBarButton(), delay);
         }
     }
 
@@ -615,6 +627,10 @@ export default class LvHomePlugin extends Plugin {
             },
         });
         const host = dialog.element.querySelector(".lv-mobile-host") as HTMLElement;
+        if (!host) {
+            dialog.destroy();
+            return;
+        }
         // 全屏化样式钩子（100vw/100dvh、无圆角、内容滚动）
         dialog.element.classList.add("b3-dialog--lvmobile");
         this.mobileDialogUnmount = mount(TabPanel, { target: host, props: { plugin: self } }) as () => void;
@@ -713,6 +729,8 @@ export default class LvHomePlugin extends Plugin {
     onunload() {
         if (this.heartbeat) window.clearInterval(this.heartbeat);
         this.heartbeat = undefined;
+        for (const timer of this.timeoutIds) window.clearTimeout(timer);
+        this.timeoutIds.clear();
         // DEVICE-07：移动顶栏按钮/重试计时器/全屏面板清理
         if (this.mobileTopBarRetry !== undefined) {
             window.clearTimeout(this.mobileTopBarRetry);

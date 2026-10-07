@@ -1608,7 +1608,9 @@
                 {#each visibleRows as r (r.itemID)}
                     {@const tone = ledgerTone(r)}
                     <tr class="lv-row-link" role="button" tabindex="0"
-                        onkeydown={(e: KeyboardEvent) => e.key === "Enter" && openDetail(r)}
+                        onkeydown={(e: KeyboardEvent) => {
+                            if (e.key === "Enter" || e.key === " ") { e.preventDefault(); openDetail(r); }
+                        }}
                         onclick={() => openDetail(r)} title={t("ledger.detail")}>
                         <td class="lv-sev-cell"><span class="lv-sev {toneCls(tone)}" title={tone === "danger" ? t("level.overdue") : tone === "warn" ? t("level.soon") : tone === "ok" ? t("level.lead") : ""}></span></td>
                         {#each schemaKeys.filter((k) => ["name", "status", "expiry", "due"].includes(k)) as k (k)}

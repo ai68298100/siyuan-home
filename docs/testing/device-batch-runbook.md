@@ -1,18 +1,25 @@
 # 真机批执行手册（Device Batch Runbook）
 
 > 一页编排：把散在 §7/§7.7/§8/B 类/UG 的真机验证按执行顺序串起来。**详细清单以链接为准，本文不复制**。
-> 编制：2026-10-04 第 118 波；执行前先核对"前置状态"是否仍成立。
-> **一键预检**：`bash scripts/device-batch-preflight.sh`——自动核对下表全部状态（工作区/凭据/部署字节/插件启用/兄弟在装/首启状态），全绿即开跑。
+> 编制：2026-10-07（v0.3.9）；下表只描述需要复核的前置条件，不把历史实例结果当作当前证据。
+> **一键预检**：在 Git Bash 中运行 `bash scripts/device-batch-preflight.sh`——核对工作区、凭据、dist 部署、插件启用、兄弟插件和首启状态；它不替代 Android/独立窗口的人机验收。
 
-## 前置状态（2026-10-04 已确认，执行时复核）
+## 执行前必须准备
+
+1. 一台隔离的 SiYuan 靶场实例（不要把写型脚本直打日常工作区），并取得该实例的 API token。Git Bash 中设置 `SIYUAN_URL`、`SIYUAN_TOKEN`，或通过 `SIYUAN_CONF` 指向包含这两个变量的 env 文件；不能只提供桌面浏览器登录态或授权码。
+2. Windows Git Bash、Node.js 24、pnpm 12、`curl`、`node`、`sha256sum`，以及 kernel-api skill 的 `sy` 包装器。若包装器不在默认路径，设置 `SIYUAN_SY=/path/to/sy`。
+3. 运行浏览器版独立 e2e 还需要安装 Playwright 依赖和 Edge；靶场地址必须显式传给脚本：`TEST_WS_URL="$SIYUAN_URL" SIYUAN_TOKEN="$SIYUAN_TOKEN" pnpm run e2e:device`。该脚本只覆盖 Chromium/Android UA 模拟，不能作为 Android WebView 通过证据。
+4. 阶段 5 需要实际安装并启用 `siyuan-checkin`、`siyuan-contacts`、`siyuan-glean`、`siyuan-exam`；阶段 6 的 S7 需要第二台设备或同一工作区的第二个独立前端会话。
+
+## 前置状态（2026-10-07，执行时复核）
 
 | 项 | 状态 |
 |---|---|
-| 构建部署 | ✅ 当前 dist 已部署（putFile 17 文件字节校验 0 差异）+ petal 已启用 |
-| 工作区 | ✅ 本工作区在线（lsNotebooks 鉴权探活通过） |
-| 端点脚本 | ✅ `bash scripts/e2e-endpoints.sh` 三轮全绿（auth 门/250 行分页/PK/上传） |
-| 兄弟插件 | ✅ checkin/contacts/glean/exam 均在 /data/plugins（desktop petals 已加载） |
-| 插件运行时 | ✅ settings.json 尚不存在 → **首次前端启动 = onboarding 向导**（§7 第 1 项），无需清场 |
+| 构建部署 | 待执行 `pnpm run build` 后，用预检对 `/data/plugins/siyuan-home/` 下 dist 全部文件做字节校验 |
+| 工作区 | 待用 `SIYUAN_URL`/`SIYUAN_TOKEN` 运行鉴权探活；当前工作区结果不能从历史记录推断 |
+| 端点脚本 | 待在同一隔离靶场运行 `bash scripts/e2e-endpoints.sh`；它会创建并删除临时笔记本 |
+| 兄弟插件 | 待预检确认四个插件目录和 desktop petals；缺失时阶段 5 不可执行 |
+| 插件运行时 | 由预检读取 `settings.json` 状态；不存在才执行首启向导，存在则改为恢复/复核路径 |
 
 ## 执行顺序
 
@@ -30,7 +37,7 @@
 
 ### 阶段 4 · 端点与集成收尾（§8，~20 分钟）
 1. 重跑 `bash scripts/e2e-endpoints.sh` 确认仍绿
-2. **活体集成测试**（177 波新增）：`bash scripts/e2e-core.sh`——插件自己的 core 代码路径（provisioner 语义/D01 分页/D02 行确认/删行/CertsProvider 真实派生/健康检查）打真实内核；门禁 401/429 优雅 skip；数据专用笔记本自清理
+2. **活体集成测试**（177 波新增）：先用严格门禁 `pnpm test:live`（缺凭据/不可达/401/429 会阻断），或在明确接受可选跳过语义时运行 `bash scripts/e2e-core.sh`——插件自己的 core 代码路径（provisioner 语义/D01 分页/D02 行确认/删行/CertsProvider 真实派生/健康检查）打真实内核；数据专用笔记本自清理
 3. IT-04（renderLedger rows==rowCount，≤50 行时）、IT-08（用户视图筛选影响）——见 [§8 清单](v0.2.md)
 
 ### 阶段 5 · B 类兄弟互测（EC30，~45 分钟）

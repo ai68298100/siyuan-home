@@ -2,7 +2,7 @@
  * 服务桥单测（EC03/v0.3）：capabilities/summary 计数/addMemo 转发与校验。
  */
 import { describe, it, expect } from "vitest";
-import { buildLvHomeBridge, type BridgeHost } from "@/bridge/external-bridge";
+import { buildLvHomeBridge, mountLvHomeBridge, type BridgeHost } from "@/bridge/external-bridge";
 import { defaultSettings } from "@/core/settings";
 
 function host(over: Partial<BridgeHost> = {}): BridgeHost {
@@ -42,6 +42,11 @@ describe("LvHome 服务桥（EC03/v0.3）", () => {
         expect(s.updatedAt).toBeTruthy();
     });
 
+    it("summary：扫描尚未就绪时返回空快照，不抛异常", () => {
+        const api = buildLvHomeBridge(host({ scan: undefined }));
+        expect(api.summary()).toMatchObject({ overdue: 0, soon: 0, today: 0 });
+    });
+
     it("openButler/openReminders 转发到宿主", () => {
         let butler = 0;
         let reminders = 0;
@@ -65,5 +70,43 @@ describe("LvHome 服务桥（EC03/v0.3）", () => {
 
     it("whenReady 恒 resolve true", async () => {
         expect(await buildLvHomeBridge(host()).whenReady()).toBe(true);
+    });
+
+    it("disposer 只移除自己挂载的桥，避免旧实例误删新桥", () => {
+        const previousWindow = (globalThis as any).window;
+        (globalThis as any).window = {};
+        let disposedA = 0;
+        let disposedB = 0;
+        const a = mountLvHomeBridge(host({ onBridgeDisposed: () => { disposedA++; } }));
+        const bridgeA = (globalThis as any).window.LvHome;
+        // 模拟其他实例接管窗口桥（真实 mount 会因已有桥而跳过覆盖）。
+        const bridgeB = { ...bridgeA };
+        (globalThis as any).window.LvHome = bridgeB;
+        expect(bridgeA).not.toBe(bridgeB);
+        a();
+        expect((globalThis as any).window.LvHome).toBe(bridgeB);
+        expect(disposedA).toBe(0);
+        expect(disposedB).toBe(0);
+        delete (globalThis as any).window.LvHome;
+        const b = mountLvHomeBridge(host({ onBridgeDisposed: () => { disposedB++; } }));
+        b();
+        b();
+        expect((globalThis as any).window.LvHome).toBeUndefined();
+        expect(disposedB).toBe(1);
+        (globalThis as any).window = previousWindow;
+    });
+
+    it("已有桥时后续实例 disposer 不应触发卸载钩子", () => {
+        const previousWindow = (globalThis as any).window;
+        (globalThis as any).window = {};
+        let disposed = 0;
+        const first = mountLvHomeBridge(host());
+        const second = mountLvHomeBridge(host({ onBridgeDisposed: () => { disposed++; } }));
+        second();
+        expect(disposed).toBe(0);
+        expect((globalThis as any).window.LvHome).toBeTruthy();
+        first();
+        expect((globalThis as any).window.LvHome).toBeUndefined();
+        (globalThis as any).window = previousWindow;
     });
 });

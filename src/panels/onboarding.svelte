@@ -49,23 +49,23 @@
 </script>
 
 <!-- 251 波（对齐原型 .aura 品牌时刻）：双漂移辉光容器 + 居中向导 + rolechip -->
-<div class="lv-card lv-aura" style="margin-bottom:16px">
+<div class="lv-card lv-aura" style="margin-bottom:16px" aria-labelledby="lv-wiz-title">
     <div class="lv-wiz">
-        <div class="lv-wiz__step">STEP {step} / 2</div>
+        <div class="lv-wiz__step" aria-live="polite">STEP {step} / 2</div>
         {#if step === 1}
-            <h3 class="lv-wiz__title">{t("wiz.s1Title")}</h3>
+            <h3 id="lv-wiz-title" class="lv-wiz__title">{t("wiz.s1Title")}</h3>
             <p class="lv-sub" style="margin-bottom:16px">{t("wiz.s1Hint")}</p>
             <div class="lv-roles">
                 {#each roleOptions as r (r)}
-                    <button class="lv-rolechip" class:on={picked.includes(r)} onclick={() => toggle(r)}>{t(`role.${r}`)}</button>
+                    <button class="lv-rolechip" class:on={picked.includes(r)} aria-pressed={picked.includes(r)} onclick={() => toggle(r)}>{t(`role.${r}`)}</button>
                 {/each}
             </div>
             {#if picked.includes("child")}
                 <div style="display:flex;gap:8px;align-items:center;margin-bottom:16px">
                     <span class="lv-sub">{t("wiz.children")}</span>
-                    <button class="b3-button b3-button--outline" onclick={() => (children = Math.max(0, children - 1))}>−</button>
-                    <b class="lv-num">{children}</b>
-                    <button class="b3-button b3-button--outline" onclick={() => (children += 1)}>＋</button>
+                    <button class="b3-button b3-button--outline" aria-label={t("wiz.childrenDecrease")} onclick={() => (children = Math.max(0, children - 1))}>−</button>
+                    <b class="lv-num" aria-live="polite">{children}</b>
+                    <button class="b3-button b3-button--outline" aria-label={t("wiz.childrenIncrease")} onclick={() => (children += 1)}>＋</button>
                 </div>
             {/if}
             <div style="display:flex;justify-content:flex-end;gap:8px">
@@ -73,7 +73,7 @@
                 <button class="lv-btn primary" onclick={() => (step = 2)}>{t("wiz.next")} →</button>
             </div>
         {:else}
-            <h3 class="lv-wiz__title">{t("wiz.s2Title")}</h3>
+            <h3 id="lv-wiz-title" class="lv-wiz__title">{t("wiz.s2Title")}</h3>
             <p class="lv-sub" style="margin-bottom:16px">{t("wiz.s2Hint")}</p>
             <div class="lv-roles">
                 {#each recommended as mid (mid)}
@@ -88,7 +88,7 @@
             <div style="display:flex;justify-content:space-between;align-items:center">
                 <button class="lv-btn" onclick={() => (step = 1)}>← {t("wiz.back")}</button>
                 {#if provisionError}
-                    <span class="lv-caption" style="color:var(--lv-danger);flex:1;margin:0 8px">⚠ {provisionError}</span>
+                    <span class="lv-caption" role="alert" style="color:var(--lv-danger);flex:1;margin:0 8px">⚠ {provisionError}</span>
                 {/if}
                 <button class="lv-btn primary" disabled={provisioning}
                     title={t("wiz.finishCta")} onclick={finishAndCapture}>

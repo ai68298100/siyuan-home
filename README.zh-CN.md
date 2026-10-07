@@ -4,7 +4,7 @@
 
 **思源笔记里的家庭事实、到期提醒与事务跟进层**
 
-[![CI](https://github.com/ai68298100/siyuan-home/actions/workflows/ci.yml/badge.svg)](https://github.com/ai68298100/siyuan-home/actions/workflows/ci.yml) [![Release](https://img.shields.io/github/v/release/ai68298100/siyuan-home)](https://github.com/ai68298100/siyuan-home/releases/latest) [![License](https://img.shields.io/github/license/ai68298100/siyuan-home)](./LICENSE) [![Tests](https://img.shields.io/badge/tests-passing-brightgreen)](./tests)
+[![CI](https://github.com/ai68298100/siyuan-home/actions/workflows/ci.yml/badge.svg)](https://github.com/ai68298100/siyuan-home/actions/workflows/ci.yml) [![Release](https://img.shields.io/github/v/release/ai68298100/siyuan-home)](https://github.com/ai68298100/siyuan-home/releases/latest) [![License](https://img.shields.io/github/license/ai68298100/siyuan-home)](./LICENSE)
 
 家庭私有资料 · 成员视角 · 到期提醒 · 可继续办理
 
@@ -30,7 +30,9 @@
 
 ## 当前版本能做什么
 
-当前仓库版本为 v0.3.2。生产界面是四个 Tab；250 项单测、类型/i18n/meta/audit/build 已通过，核心内核路径有活体验证，但真实 SiYuan UI 六阶段走查（含 Android WebView、无障碍和多端冲突）尚未完成，集市上架继续暂缓。用户可感知变更见 [CHANGELOG](./CHANGELOG.md) 的 v0.3.2 段。
+当前仓库版本为 v0.3.9。生产界面是四个 Tab；282 项单测、类型/Svelte/i18n/meta/audit/build/smoke/loader 已通过，核心内核路径有活体验证，但真实 SiYuan UI 六阶段走查（含 Android WebView、无障碍和多端冲突）尚未完成，集市上架继续暂缓。`pnpm test:live` 在缺少真实实例时会明确阻断，不把全量跳过计为通过。用户可感知变更见 [CHANGELOG](./CHANGELOG.md) 的 v0.3.9 段。
+
+带有 v0.3.9 标签的 package.zip 是稳定安装包；`main` 已包含发版后的质量加固，当前单测基线为 282 项，下一次版本发布时再纳入安装包。
 
 | 页面 | 当前能力 |
 |---|---|
@@ -176,7 +178,6 @@ AI 是后续体验的重要协作层，但当前版本**没有接入模型，也
 |---|---|
 | ✅ v0.3.9 当前 | 在 v0.3.8 全部能力之上：界面全面对齐设计稿（设置侧栏导航、引导品牌页、台账状态色点、模块趋势条、弹窗与深浅主题打磨）、示例生成即时回执、窄屏台账横滑、正式图标与预览图、发布门禁双工作流（CI + tag） |
 | 下一阶段 | 事项工作台、资料/依据中心、收件箱、健康恢复、移动端降级 |
-| 后续 | 事项工作台、资料/依据中心、收件箱、健康恢复、移动端降级 |
 | AI 阶段 | 证据问答、提醒解释、录入草稿、资料比较、办理准备、交接草稿和系列插件接力 |
 | 长期研究 | 家庭共享、模板包、定期回顾、年度报告和可携带性 |
 
@@ -219,6 +220,8 @@ pnpm test
 - 高保真目标体验：[v4 场景与 AI 协作原型](./prototype/index.html)；合成路径与验证记录见 [场景原型与 AI 协作验证](./docs/design/14-场景原型与AI协作验证.md)。
 - 隐私声明：[docs/privacy.md](./docs/privacy.md)
 - 常见问题：[docs/FAQ.md](./docs/FAQ.md)
+- 使用支持：[SUPPORT.md](./SUPPORT.md)
+- 安全问题：[SECURITY.md](./SECURITY.md)
 
 ## License
 

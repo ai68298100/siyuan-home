@@ -81,9 +81,14 @@ export function mountLvHomeBridge(host: BridgeHost): () => void {
         // 已有桥（多实例/重复加载）：不覆盖，跳过——首个实例持有窗口期
         return () => undefined;
     }
-    w.LvHome = buildLvHomeBridge(host);
+    const bridge = buildLvHomeBridge(host);
+    w.LvHome = bridge;
+    let disposed = false;
     return () => {
-        if ((w.LvHome as unknown) === undefined) return;
+        // 多实例/重复卸载时只能移除自己挂载的桥；新实例接管后旧 disposer
+        // 不得误删新桥，也不得重复触发宿主卸载钩子。
+        if (disposed || w.LvHome !== bridge) return;
+        disposed = true;
         delete w.LvHome;
         host.onBridgeDisposed();
     };

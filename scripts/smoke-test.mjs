@@ -83,11 +83,11 @@ if (mb > 10) errors.push(`package.zip too large: ${mb.toFixed(2)} MB`);
 
 // 5. 单文件门禁：思源前端 require 桩把相对路径交给 Electron window.require（以思源 app 根为基准），
 //    require("./...") 必然 MODULE_NOT_FOUND → 插件静默加载失败、零入口（v0.3.0 chunks 事故）。
-//    index.js 必须保持单文件（vite inlineDynamicImports），禁止任何相对 require。
+//    index.js 必须保持单文件（vite/rolldown codeSplitting=false），禁止任何相对 require。
 const bundledJs = readFileSync(path.join(tmp, "index.js"), "utf8");
 const relativeRequires = bundledJs.match(/require\("\.\//g) ?? [];
 if (relativeRequires.length) {
-    errors.push(`index.js contains ${relativeRequires.length} relative require(s) — code splitting breaks the SiYuan loader; rebuild with inlineDynamicImports`);
+    errors.push(`index.js contains ${relativeRequires.length} relative require(s) — code splitting breaks the SiYuan loader; rebuild with codeSplitting:false`);
 }
 const chunkFiles = existsSync(path.join(tmp, "chunks"));
 if (chunkFiles) errors.push("package.zip contains chunks/ directory — forbidden (single-file bundle only)");

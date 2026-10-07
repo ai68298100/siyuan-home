@@ -6,24 +6,32 @@ on:
       - "v*"
 
 permissions:
-  contents: write
+  contents: read
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
 
 jobs:
   build:
     runs-on: ubuntu-latest
+    timeout-minutes: 25
+    permissions:
+      contents: write
     steps:
       - name: Checkout
-        uses: actions/checkout@v7
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
 
       - name: Install pnpm
-        uses: pnpm/action-setup@v6
+        uses: pnpm/action-setup@f520eceda224fe1a4aed5a2a27a194379a409996 # v6
         with:
           run_install: false
-        # 版本取自 package.json 的 packageManager（217 波 pnpm 12.5 升级后与硬编码 11.4.0 冲突——
-        # 该矛盾只在 tag push 引爆；action-setup v6 会校验两者一致）
+        # 版本取自 package.json 的 packageManager，避免 CI 与发布流程漂移。
 
       - name: Install Node.js
-        uses: actions/setup-node@v7
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
         with:
           node-version: 24
           registry-url: "https://registry.npmjs.org"
@@ -59,7 +67,7 @@ jobs:
       - name: Check source
         run: pnpm check
 
-      # REL-04（269 波）：tag 工作流门禁与 CI 对齐——单测/加载语义不过不放行
+      # 发布门禁与 CI 对齐；单测失败时不创建 release。
       - name: Unit tests
         run: pnpm test
 
@@ -70,7 +78,7 @@ jobs:
           cd dist
           zip -r ../package.zip ./*
 
-      # REL-04：包内容/体积门禁（必需文件、禁入文件泄漏、i18n 键位、体积预算与 CI 同标）
+      # 包内容/体积门禁（必需文件、禁入文件泄漏、i18n 键位与体积预算）。
       - name: Verify loader semantics
         run: node scripts/verify-loader-semantics.mjs
 
@@ -87,7 +95,7 @@ jobs:
           fi
 
       - name: Release
-        uses: ncipollo/release-action@v1
+        uses: ncipollo/release-action@339a81892b84b4eeb0f6e744e4574d79d0d9b8dd # v1
         with:
           allowUpdates: true
           artifactErrorsFailBuild: true

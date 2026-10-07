@@ -5,6 +5,7 @@ updates:
     directory: "/"
     schedule:
       interval: "weekly"
+    open-pull-requests-limit: 5
     labels:
       - "dependencies"
     # 只开 patch/minor 自动 PR；major 升级由维护者手动评估（lunar/date-fns 等运行时依赖变更需跑回归）
@@ -14,6 +15,7 @@ updates:
   - package-ecosystem: "github-actions"
     directory: "/"
     schedule:
-      interval: "monthly"
+      interval: "weekly"
+    open-pull-requests-limit: 5
     labels:
       - "ci"

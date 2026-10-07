@@ -300,6 +300,25 @@ describe("H10 续期目标列分派", () => {
         await expect(renew(plugin, r, "2027-10-05", {})).rejects.toThrow("ledger not provisioned");
         expect(store["hub-runtime.json"]).toBeUndefined(); // 写回失败不落运行态（H10：失败保留现场）
     });
+
+    it("日期格式非法或日历上不存在 → 不调用内核，也不落运行态", async () => {
+        let calls = 0;
+        setTransport(async () => { calls++; throw new Error("should not call kernel"); });
+        const { plugin, store } = memoryPlugin();
+        const r = rem("row7::certs.expiry", "2026-10-05", "lead");
+        await expect(renew(plugin, r, "2026-02-31", { avId: "av-certs", columns: { expiry: "k-expiry" } })).rejects.toThrow("invalid due date");
+        await expect(renew(plugin, r, "2026/11/05", { avId: "av-certs", columns: { expiry: "k-expiry" } })).rejects.toThrow("invalid due date");
+        expect(calls).toBe(0);
+        expect(store["hub-runtime.json"]).toBeUndefined();
+    });
+
+    it("内核写回失败 → 运行态不落盘，保留可重试现场", async () => {
+        setTransport(async () => { throw new Error("kernel unavailable"); });
+        const { plugin, store } = memoryPlugin();
+        const r = rem("row6::certs.expiry", "2026-10-05", "lead");
+        await expect(renew(plugin, r, "2026-11-05", { avId: "av-certs", columns: { expiry: "k-expiry" } })).rejects.toThrow("kernel unavailable");
+        expect(store["hub-runtime.json"]).toBeUndefined();
+    });
 });
 
 describe("H04 缺列报错 + H14 提前量校验", () => {

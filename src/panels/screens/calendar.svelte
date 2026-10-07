@@ -82,6 +82,17 @@
         onAddMemo(title, selected);
         memoTitle = "";
     }
+    function moveDayFocus(event: KeyboardEvent, index: number) {
+        const key = event.key;
+        if (!["ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown", "Home", "End"].includes(key)) return;
+        event.preventDefault();
+        const cols = 7;
+        const next = key === "Home" ? 0 : key === "End" ? cells.length - 1
+            : key === "ArrowLeft" ? Math.max(0, index - 1) : key === "ArrowRight" ? Math.min(cells.length - 1, index + 1)
+                : key === "ArrowUp" ? Math.max(0, index - cols) : Math.min(cells.length - 1, index + cols);
+        selected = cells[next].key;
+        requestAnimationFrame(() => (document.querySelector(`[data-cal-day="${cells[next].key}"]`) as HTMLButtonElement | undefined)?.focus());
+    }
 </script>
 
 <div class="lv-cal">
@@ -100,11 +111,12 @@
     </div>
     <div class="lv-cal-grid" class:wk={mode === "week"} role="grid" aria-label={t("cal.title")}>
         {#each weekdays as wk (wk)}
-            <div class="lv-cal-wk">{t(wk)}</div>
+            <div class="lv-cal-wk" role="columnheader">{t(wk)}</div>
         {/each}
-        {#each cells as c (c.key)}
+        {#each cells as c, i (c.key)}
             <button class="lv-cal-cell" class:out={mode === "month" && !c.inMonth} class:sel={c.key === selected}
-                aria-label={c.key}
+                data-cal-day={c.key} role="gridcell" aria-selected={c.key === selected} aria-label={c.key}
+                tabindex={c.key === selected ? 0 : -1} onkeydown={(e) => moveDayFocus(e, i)}
                 onclick={() => (selected = c.key)}>
                 <span class="d" class:today={c.key === todayKey}>{c.day}</span>
                 <span class="dots">

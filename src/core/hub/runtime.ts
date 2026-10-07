@@ -106,37 +106,177 @@ export function defaultRuntime(): HubRuntime {
     return { schemaVersion: 1, snoozed: {}, muted: {}, handledYear: {}, handledUntil: {}, handled: {}, renewHistory: {}, memos: [] };
 }
 
+function isPlainObject(value: unknown): value is Record<string, any> {
+    if (!value || typeof value !== "object" || Array.isArray(value)) return false;
+    const prototype = Object.getPrototypeOf(value);
+    return prototype === Object.prototype || prototype === null;
+}
+
+function stringRecord(value: unknown): Record<string, string> {
+    if (!isPlainObject(value)) return {};
+    return Object.fromEntries(Object.entries(value).filter((entry): entry is [string, string] => typeof entry[1] === "string"));
+}
+
+function booleanRecord(value: unknown): Record<string, boolean> {
+    if (!isPlainObject(value)) return {};
+    return Object.fromEntries(Object.entries(value).filter((entry): entry is [string, boolean] => typeof entry[1] === "boolean"));
+}
+
+function numberRecord(value: unknown): Record<string, number> {
+    if (!isPlainObject(value)) return {};
+    return Object.fromEntries(Object.entries(value).filter((entry): entry is [string, number] => typeof entry[1] === "number" && Number.isFinite(entry[1])));
+}
+
+function normalizeReminder(value: unknown): Reminder | undefined {
+    if (!isPlainObject(value)) return undefined;
+    if ([value.id, value.moduleId, value.ruleKey, value.rowId, value.title, value.dueDate].some((field) => typeof field !== "string")) return undefined;
+    if (typeof value.daysLeft !== "number" || !Number.isFinite(value.daysLeft)) return undefined;
+    if (!["overdue", "soon", "lead", "later"].includes(value.level)) return undefined;
+    const reminder: Reminder = {
+        id: value.id,
+        moduleId: value.moduleId,
+        ruleKey: value.ruleKey,
+        rowId: value.rowId,
+        title: value.title,
+        dueDate: value.dueDate,
+        daysLeft: value.daysLeft,
+        level: value.level,
+    };
+    if (typeof value.memberId === "string") reminder.memberId = value.memberId;
+    if (["oneoff", "recurring", "anniversary", "after"].includes(value.kind)) reminder.kind = value.kind;
+    if (typeof value.lunar === "boolean") reminder.lunar = value.lunar;
+    if (typeof value.autoRenew === "boolean") reminder.autoRenew = value.autoRenew;
+    return reminder;
+}
+
+function normalizeReminders(value: unknown): Reminder[] {
+    return Array.isArray(value) ? value.map(normalizeReminder).filter((r): r is Reminder => !!r) : [];
+}
+
+function normalizeMemo(value: unknown): AdhocMemo | undefined {
+    if (!isPlainObject(value) || typeof value.id !== "string" || typeof value.title !== "string" || typeof value.dueDate !== "string" || typeof value.createdAt !== "string") return undefined;
+    return {
+        id: value.id,
+        title: value.title,
+        dueDate: value.dueDate,
+        createdAt: value.createdAt,
+        ...(typeof value.doneAt === "string" ? { doneAt: value.doneAt } : {}),
+    };
+}
+
+function normalizeCache(value: unknown): HubRuntime["cache"] {
+    if (!isPlainObject(value)) return undefined;
+    const reminders = normalizeReminders(value.reminders);
+    const derived = normalizeReminders(value.derived ?? value.reminders);
+    const counts = isPlainObject(value.counts) && ["overdue", "soon", "lead"].every((key) => typeof value.counts[key] === "number" && Number.isFinite(value.counts[key]) && value.counts[key] >= 0)
+        ? { overdue: value.counts.overdue, soon: value.counts.soon, lead: value.counts.lead }
+        : { overdue: reminders.filter((r) => r.level === "overdue").length, soon: reminders.filter((r) => r.level === "soon").length, lead: reminders.filter((r) => r.level === "lead").length };
+    const errors = Array.isArray(value.errors)
+        ? value.errors.filter((e) => isPlainObject(e) && typeof e.moduleId === "string" && typeof e.message === "string").map((e) => ({ moduleId: e.moduleId as string, message: e.message as string }))
+        : [];
+    const byModule: NonNullable<HubRuntime["cache"]>["byModule"] = {};
+    if (isPlainObject(value.byModule)) {
+        for (const [id, raw] of Object.entries(value.byModule)) {
+            if (isPlainObject(raw) && typeof raw.at === "string" && Array.isArray(raw.reminders)) {
+                byModule[id] = { reminders: normalizeReminders(raw.reminders), at: raw.at };
+            }
+        }
+    }
+    return { reminders, counts, errors, derived, byModule };
+}
+
+function normalizeRenewHistory(value: unknown): HubRuntime["renewHistory"] {
+    if (!isPlainObject(value)) return {};
+    return Object.fromEntries(Object.entries(value).map(([id, entries]) => [id, Array.isArray(entries)
+        ? entries.filter((e) => isPlainObject(e) && typeof e.from === "string" && typeof e.to === "string" && typeof e.at === "string").map((e) => ({ from: e.from as string, to: e.to as string, at: e.at as string }))
+        : []]));
+}
+
+function normalizeHandled(value: unknown): HubRuntime["handled"] {
+    if (!isPlainObject(value)) return {};
+    return Object.fromEntries(Object.entries(value).filter((entry) => {
+        const record = entry[1];
+        return isPlainObject(record) && [record.title, record.moduleId, record.ruleKey, record.dueDate, record.at].every((field) => typeof field === "string");
+    }).map(([id, record]) => [id, {
+        title: record.title,
+        moduleId: record.moduleId,
+        ruleKey: record.ruleKey,
+        dueDate: record.dueDate,
+        at: record.at,
+    }]));
+}
+
+function normalizeNestedCounts(value: unknown): Record<string, Record<string, number>> {
+    if (!isPlainObject(value)) return {};
+    return Object.fromEntries(Object.entries(value).filter((entry) => isPlainObject(entry[1])).map(([date, counts]) => [date, numberRecord(counts)]));
+}
+
 /** 旧缓存迁移（33.3）：缺字段补默认值；byModule/derived 为 H02/H04 新增。坏文件容错同 settings（15 组） */
 export async function loadRuntime(plugin: Plugin): Promise<HubRuntime> {
     const { data } = await import("../settings").then((m) => m.loadDataSafe(plugin, RUNTIME_NAME));
-    if (!data || typeof data !== "object") return defaultRuntime();
+    if (!isPlainObject(data)) return defaultRuntime();
     const base = defaultRuntime();
+    const optionalString = (key: string): string | undefined => typeof data[key] === "string" ? data[key] : undefined;
     const merged: HubRuntime = {
         ...base,
         ...data,
-        snoozed: data.snoozed ?? {},
-        muted: data.muted ?? {},
-        handledYear: data.handledYear ?? {},
-        handledUntil: data.handledUntil ?? {},
-        handled: data.handled ?? {},
-        renewHistory: data.renewHistory ?? {},
-        memos: data.memos ?? [],
+        schemaVersion: 1,
+        scannedAt: optionalString("scannedAt"),
+        filterMemberId: optionalString("filterMemberId"),
+        hubFilter: optionalString("hubFilter"),
+        hubMemberId: optionalString("hubMemberId"),
+        hubModuleId: optionalString("hubModuleId"),
+        hubDueWithin: optionalString("hubDueWithin"),
+        ledgerSortKey: optionalString("ledgerSortKey"),
+        ledgerSortAsc: typeof data.ledgerSortAsc === "boolean" ? data.ledgerSortAsc : undefined,
+        cache: normalizeCache(data.cache),
+        snoozed: stringRecord(data.snoozed),
+        muted: booleanRecord(data.muted),
+        handledYear: numberRecord(data.handledYear),
+        handledUntil: stringRecord(data.handledUntil),
+        handled: normalizeHandled(data.handled),
+        renewHistory: normalizeRenewHistory(data.renewHistory),
+        memos: Array.isArray(data.memos) ? data.memos.map(normalizeMemo).filter((m): m is AdhocMemo => !!m) : [],
+        pinnedMemoIds: Array.isArray(data.pinnedMemoIds) ? data.pinnedMemoIds.filter((id: unknown): id is string => typeof id === "string") : undefined,
+        lastNotifiedDate: optionalString("lastNotifiedDate"),
+        lastOverdueAlertDate: optionalString("lastOverdueAlertDate"),
+        lastWeeklyDigest: optionalString("lastWeeklyDigest"),
+        todaySilent: optionalString("todaySilent"),
+        favorSyncs: isPlainObject(data.favorSyncs) ? Object.fromEntries(Object.entries(data.favorSyncs).filter((entry) => isPlainObject(entry[1]) && typeof entry[1].docId === "string" && typeof entry[1].at === "string").map(([id, sync]) => [id, { docId: sync.docId, at: sync.at }])) : undefined,
+        monthlyCompletions: numberRecord(data.monthlyCompletions),
+        monthlyDueTotals: numberRecord(data.monthlyDueTotals),
+        moduleHistory: normalizeNestedCounts(data.moduleHistory),
     };
-    if (merged.cache) {
-        merged.cache.derived = merged.cache.derived ?? merged.cache.reminders ?? [];
-        merged.cache.byModule = merged.cache.byModule ?? {};
-    }
+    if (isPlainObject(data.lastExamStats)
+        && [data.lastExamStats.streak, data.lastExamStats.accuracy, data.lastExamStats.attempts, data.lastExamStats.generatedAt].every((n) => typeof n === "number" && Number.isFinite(n))) {
+        merged.lastExamStats = {
+            streak: data.lastExamStats.streak,
+            accuracy: data.lastExamStats.accuracy,
+            attempts: data.lastExamStats.attempts,
+            generatedAt: data.lastExamStats.generatedAt,
+        };
+    } else merged.lastExamStats = undefined;
+    if (isPlainObject(data.lastCheckinSummary)
+        && typeof data.lastCheckinSummary.windowDays === "number" && Number.isFinite(data.lastCheckinSummary.windowDays)
+        && typeof data.lastCheckinSummary.pulledAt === "number" && Number.isFinite(data.lastCheckinSummary.pulledAt)) {
+        const items = Array.isArray(data.lastCheckinSummary.items) ? data.lastCheckinSummary.items.filter((item) => isPlainObject(item)
+            && typeof item.itemId === "string" && typeof item.name === "string" && typeof item.score === "number" && Number.isFinite(item.score))
+            .map((item) => ({ itemId: item.itemId as string, name: item.name as string, score: item.score as number })) : [];
+        merged.lastCheckinSummary = { items, windowDays: data.lastCheckinSummary.windowDays, pulledAt: data.lastCheckinSummary.pulledAt };
+    } else merged.lastCheckinSummary = undefined;
     return merged;
 }
 
-let lastSerialized: string | undefined;
+// A plugin instance owns a single storage namespace. Sharing this cache globally can
+// skip the first write by a newly created instance when its data happens to match.
+const lastSerializedByPlugin = new WeakMap<object, string>();
 
 export async function saveRuntime(plugin: Plugin, rt: HubRuntime): Promise<void> {
     // PF09：序列化比对，无变化不落盘（筛选/动作频繁触发的场景减少全量写入）
     const json = JSON.stringify(rt);
-    if (json === lastSerialized) return;
+    if (lastSerializedByPlugin.get(plugin) === json) return;
     await plugin.saveData(RUNTIME_NAME, rt);
-    lastSerialized = json;
+    lastSerializedByPlugin.set(plugin, json);
 }
 
 /** 已完成运行态记录的保留期（天）：过期后才可被 purgeHandled 清除 */

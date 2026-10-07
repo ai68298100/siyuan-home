@@ -333,7 +333,9 @@
             ondragend={() => { dragId = null; dragOverId = null; }}
             style={dragOverId === m.id && dragId !== m.id ? "outline:2px dashed var(--lv-accent);outline-offset:-2px" : ""}>
         <div class="lv-person-head" role="button" tabindex="0"
-            onkeydown={(e: KeyboardEvent) => e.key === "Enter" && toggleExpand(m.id)}
+            onkeydown={(e: KeyboardEvent) => {
+                if (e.key === "Enter" || e.key === " ") { e.preventDefault(); toggleExpand(m.id); }
+            }}
             oncontextmenu={(e: MouseEvent) => { e.preventDefault(); cardMenu(m, e.clientX, e.clientY); }}
             ontouchstart={(e: TouchEvent) => cardTouchStart(m, e)}
             ontouchend={cardTouchEnd}

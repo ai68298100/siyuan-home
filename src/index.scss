@@ -12,6 +12,9 @@
     height: 100%;
     box-sizing: border-box;
     overflow: auto;
+    // 允许嵌入侧栏/分屏时按面板宽度应用响应式规则，而不是只看浏览器视口。
+    container-type: inline-size;
+    container-name: lv-home;
 }
 
 // 注意：思源原生 .b3-tab-bar 样式不得在此全局重定义（会污染主界面）——
@@ -23,6 +26,7 @@
     grid-template-columns: 176px minmax(0, 1fr);
     gap: 18px;
     align-items: start;
+    min-width: 0;
 }
 
 // 侧栏导航（原型 .set-nav）：sticky 跟随，锚点式纵向页签
@@ -66,6 +70,13 @@
     min-width: 0;
 }
 
+// 子项的默认 min-width 会把设置卡片撑出窄侧栏；表单行允许在容器内收缩和换行。
+.lv-settings .lv-setcard,
+.lv-settings .lv-settings__row,
+.lv-settings .lv-settings__row > * {
+    min-width: 0;
+}
+
 // 分组卡片（原型 .set-card）：标题 + hint + 开关行分区
 .lv-setcard {
     padding: 16px 18px;
@@ -106,6 +117,8 @@
 .lv-settings__row {
     align-items: flex-start;
     gap: 12px;
+    // 控件较多时在行内自然换行，避免窄容器依赖额外的横向滚动。
+    flex-wrap: wrap;
     padding: 10px 0;
     border-bottom: 1px solid var(--lv-line);
 
@@ -145,6 +158,59 @@
             white-space: nowrap;
         }
     }
+}
+
+@media (max-width: 480px) {
+    .lv-settings { gap: 8px; }
+    .lv-setnav { margin-inline: -4px; }
+    .lv-setcard { padding: 12px; }
+    .lv-settings__row { gap: 8px; }
+    // settings.svelte 的说明标签带有历史 inline min-width:180px；用 !important
+    // 在窄容器中覆盖它，并允许长的中文/URL 文案换行，避免行宽被撑出面板。
+    .lv-settings__row > span:first-child {
+        min-width: 0 !important;
+        max-width: 100%;
+        flex: 1 1 120px;
+        white-space: normal;
+        overflow-wrap: anywhere;
+    }
+    .lv-settings__member > .b3-text-field,
+    .lv-settings__member > .b3-select { flex: 1 1 130px; width: auto !important; }
+    .lv-settings__member > input[type="date"] { flex-basis: 145px; }
+}
+
+// 侧栏/分屏中浏览器 viewport 可能仍很宽，改用 .lv-home 的 inline-size 容器查询
+// 复用窄设置布局。viewport media 作为不支持 container queries 的旧宿主回退。
+@container lv-home (max-width: 480px) {
+    .lv-settings {
+        grid-template-columns: minmax(0, 1fr);
+        gap: 8px;
+    }
+    .lv-settings .lv-setnav {
+        position: static;
+        flex-direction: row;
+        overflow-x: auto;
+        scrollbar-width: none;
+        margin-inline: -4px;
+
+        &::-webkit-scrollbar { display: none; }
+        .lv-setnav__item { flex: none; }
+    }
+    .lv-settings .lv-setcard { padding: 12px; }
+    .lv-settings .lv-settings__row { gap: 8px; }
+    .lv-settings .lv-settings__row > span:first-child {
+        min-width: 0 !important;
+        max-width: 100%;
+        flex: 1 1 120px;
+        white-space: normal;
+        overflow-wrap: anywhere;
+    }
+    .lv-settings .lv-settings__member > .b3-text-field,
+    .lv-settings .lv-settings__member > .b3-select {
+        flex: 1 1 130px;
+        width: auto !important;
+    }
+    .lv-settings .lv-settings__member > input[type="date"] { flex-basis: 145px; }
 }
 
 .lv-settings__footer {

@@ -18,10 +18,11 @@ pnpm run make-link   # 软链到思源工作空间 data/plugins/
 | 命令 | 说明 |
 |---|---|
 | `pnpm run dev` | 开发（app + kernel 双目标 watch + livereload） |
-| `pnpm run check` | TypeScript + Svelte + **i18n 键位对齐**（三合一，必须零错零警） |
-| `pnpm test` | 单元测试（规则引擎/提醒中枢，30 个） |
+| `pnpm run check` | TypeScript + Svelte + i18n + 元数据 + audit（必须零错零警） |
+| `pnpm test` | 单元测试（当前 282 项） |
 | `pnpm run build` | 生产构建 + package.zip |
-| `pnpm run check:meta` | 元数据交叉校验 + zip 体积门禁 |
+| `pnpm run smoke` | 发布包内容、单文件加载器和泄漏检查 |
+| `pnpm run verify:loader` | 在思源加载器语义下验证入口注册 |
 
 ### 后台部署到运行中的思源实例（免可见浏览器、免 make-install 认证）
 
@@ -47,29 +48,7 @@ pnpm run make-link   # 软链到思源工作空间 data/plugins/
 ## 开发约定
 
 1. **Conventional Commits**：`feat/fix/docs/refactor/test/chore:` 前缀，一个逻辑变更一个提交
-2. **事实源**：`TODO.md`（35 组待办）——完成任务必须勾选并在 34 组"循环执行记录"表加行
-3. **设计遵循**：UI 见 `docs/design/07`（token 禁硬编码色值）与 `08`（组件契约/类名）；架构变更先改对应 ADR
-4. **i18n**：所有用户可见文案进 `public/i18n/zh-CN.json` 与 `en.json` 两份（`check:i18n` 会拦不一致）
-5. **内核 API**：一切 `/api` 调用收口在 `src/core/siyuan.ts`（transport 可注入，测试用 mock）
-6. **数据边界**：业务数据只进思源侧（数据库/文档）；插件存储只放设置与运行态（ADR-7）
-7. **隐私红线**：console 不输出用户数据；证件号等字段脱敏；不引入网络依赖
-8. **测试**：新逻辑带单测（`tests/`，vitest）；内核 API 改动同步更新 mock
-
-## 常用命令
-
-| 命令 | 说明 |
-|---|---|
-| `pnpm run dev` | 开发（app + kernel 双目标 watch + livereload） |
-| `pnpm run check` | TypeScript + Svelte + i18n 键位对齐 + 元数据校验 + **pnpm audit**（五合一，必须零错） |
-| `pnpm test` | 单元测试（**138 个**：规则引擎/读写层/成员 DAL/建库器/注册表/schema 快照/迁移/容错/EC 契约形状/桥/月历） |
-| `pnpm run build` | 生产构建 + package.zip |
-| `pnpm run check:meta` | 元数据交叉校验 + zip 体积门禁 |
-| `pnpm run check:audit` | pnpm audit（prod 依赖，moderate+ 级别拦截） |
-
-## 开发约定
-
-1. **Conventional Commits**：`feat/fix/docs/refactor/test/chore:` 前缀，一个逻辑变更一个提交
-2. **事实源**：`TODO.md`（35 组待办）——完成任务必须勾选并在 34 组"循环执行记录"表加行
+2. **事实源**：`TODO.md` 的当前待办——完成任务必须勾选，并在对应的循环执行记录表加行
 3. **设计遵循**：UI 见 `docs/design/07`（token 禁硬编码色值）与 `08`（组件契约/类名）；架构变更先改对应 ADR
 4. **i18n**：所有用户可见文案进 `public/i18n/zh-CN.json` 与 `en.json` 两份（`check:i18n` 会拦不一致）
 5. **内核 API**：一切 `/api` 调用收口在 `src/core/siyuan.ts`（transport 可注入，测试用 mock）

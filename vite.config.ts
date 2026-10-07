@@ -127,7 +127,9 @@ export default defineConfig(buildTarget === "kernel" ? {
                 // 禁止分包（含农历等动态 import 一并内联）：思源前端用 window.eval 评估插件 JS，
                 // require 桩把相对路径交给 Electron window.require（以思源 app 根为基准），
                 // require("./chunks/...") 必然 MODULE_NOT_FOUND → onload 前即失败 → 全部入口消失（v0.3.0 教训）
-                inlineDynamicImports: true,
+                // Rolldown/Vite 8 replaced the deprecated inlineDynamicImports flag
+                // with the equivalent codeSplitting switch.
+                codeSplitting: false,
                 assetFileNames: (assetInfo) => assetInfo.name ?? "asset",
             },
         },

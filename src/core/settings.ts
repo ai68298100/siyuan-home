@@ -29,9 +29,9 @@ export function defaultSettings(): HomeSettings {
 export async function loadDataSafe(plugin: Plugin, name: string): Promise<{ data: any; corrupted: boolean }> {
     try {
         const data = await plugin.loadData(name);
-        if (data !== null && data !== undefined && typeof data !== "object") {
+        if (data !== null && data !== undefined && !isPlainObject(data)) {
             // 非 JSON 对象（手工改坏/老版本残留）→ 视为损坏
-            await backupCorruptMarker(plugin, name, `non-object: ${typeof data}`);
+            await backupCorruptMarker(plugin, name, `non-object: ${Array.isArray(data) ? "array" : typeof data}`);
             return { data: null, corrupted: true };
         }
         return { data, corrupted: false };
@@ -50,16 +50,57 @@ async function backupCorruptMarker(plugin: Plugin, name: string, reason: string)
     }
 }
 
-/** D23：成员 sex 可选字段清洗——仅 male/female 合法，其余移除（加载迁移与导入归一化共用） */
-function sanitizeMemberSex(m: any): any {
-    if (m.sex !== "male" && m.sex !== "female") delete m.sex;
-    return m;
+const MEMBER_ROLES = new Set<MemberRole>(["self", "spouse", "partner", "child", "elder", "kin", "other"]);
+
+/** 成员记录迁移：不让损坏的单条记录拖垮整份设置，同时补齐下游必需字段。 */
+function normalizeMember(raw: unknown): FamilyMember | undefined {
+    if (!isPlainObject(raw)) return undefined;
+    const m = { ...raw } as Record<string, unknown>;
+    const id = typeof m.id === "string" && m.id.trim() ? m.id : `m-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 7)}`;
+    const name = typeof m.name === "string" && m.name.trim() ? m.name : "?";
+    const role = typeof m.role === "string" && MEMBER_ROLES.has(m.role as MemberRole) ? m.role as MemberRole : "other";
+    const createdAt = typeof m.createdAt === "string" && m.createdAt ? m.createdAt : new Date().toISOString();
+    const out: Record<string, unknown> = { ...m, id, name, role, createdAt };
+    for (const key of ["birthday", "avItemId", "syncError", "contactSnapshot", "notes"] as const) {
+        if (out[key] !== undefined && typeof out[key] !== "string") delete out[key];
+    }
+    if (out.lunarBirthday !== undefined && typeof out.lunarBirthday !== "boolean") delete out.lunarBirthday;
+    // D23：仅 male/female 合法；复制后清洗，避免改写 loadData 返回的对象。
+    if (out.sex !== "male" && out.sex !== "female") delete out.sex;
+    return out as unknown as FamilyMember;
+}
+
+function clampHour(value: unknown, fallback: number): number {
+    return typeof value === "number" && Number.isFinite(value)
+        ? Math.min(23, Math.max(0, Math.round(value)))
+        : fallback;
+}
+
+function normalizeDbRefs(raw: unknown, fallback: HomeSettings["dbRefs"]): HomeSettings["dbRefs"] {
+    if (!isPlainObject(raw)) return fallback;
+    const out: HomeSettings["dbRefs"] = {};
+    for (const [moduleId, value] of Object.entries(raw)) {
+        if (!isPlainObject(value)) continue;
+        const ref = { ...value } as Record<string, unknown>;
+        for (const key of ["docId", "avId", "notebook", "provisionError"] as const) {
+            if (ref[key] !== undefined && typeof ref[key] !== "string") delete ref[key];
+        }
+        if (ref.provisional !== undefined && typeof ref.provisional !== "boolean") delete ref.provisional;
+        if (ref.columns !== undefined) {
+            ref.columns = isPlainObject(ref.columns)
+                ? Object.fromEntries(Object.entries(ref.columns).filter((entry): entry is [string, string] => typeof entry[1] === "string"))
+                : undefined;
+            if (ref.columns === undefined) delete ref.columns;
+        }
+        out[moduleId] = ref as HomeSettings["dbRefs"][string];
+    }
+    return out;
 }
 
 export async function loadSettings(plugin: Plugin): Promise<HomeSettings> {
     const { data, corrupted } = await loadDataSafe(plugin, SETTINGS_NAME);
     const defaults = defaultSettings();
-    if (!data) {
+    if (!isPlainObject(data)) {
         // corrupted=true 时保留标记供 onload 弹警告（设置页诊断亦可见 corrupted 文件）
         return corrupted ? { ...defaults, corruptedSettings: true } : defaults;
     }
@@ -67,15 +108,42 @@ export async function loadSettings(plugin: Plugin): Promise<HomeSettings> {
     // 新增模块的默认启用只走版本化迁移（33.1），运行时不强制回填。
     const known = new Set(BUILT_IN_MODULES.map((m) => m.id));
     const enabled = Array.isArray(data.enabledModules)
-        ? data.enabledModules.filter((id: string) => known.has(id))
+        ? data.enabledModules.filter((id: unknown): id is string => typeof id === "string" && known.has(id))
         : defaults.enabledModules;
+    const members = Array.isArray(data.members)
+        ? data.members.map(normalizeMember).filter((member): member is FamilyMember => !!member)
+        : defaults.members;
+    const overrides = isPlainObject(data.leadOverrides)
+        ? Object.fromEntries(Object.entries(data.leadOverrides).filter((entry): entry is [string, number] => typeof entry[1] === "number" && Number.isFinite(entry[1]) && entry[1] >= 0))
+        : defaults.leadOverrides;
+    const household = isPlainObject(data.household) ? data.household : undefined;
+    const validRoles = Array.isArray(household?.roles)
+        ? household.roles.filter((role: unknown): role is MemberRole => typeof role === "string" && MEMBER_ROLES.has(role as MemberRole))
+        : undefined;
+    const validHousehold = household && validRoles && typeof household.children === "number" && Number.isFinite(household.children)
+        ? { roles: validRoles, children: Math.max(0, Math.floor(household.children)) }
+        : undefined;
+    const demoRows = isPlainObject(data.demoRows)
+        ? Object.fromEntries(Object.entries(data.demoRows).filter((entry): entry is [string, string[]] => Array.isArray(entry[1])).map(([id, rows]) => [id, rows.filter((row): row is string => typeof row === "string")]))
+        : undefined;
     return {
         ...defaults,
         ...data,
         enabledModules: enabled,
-        members: Array.isArray(data.members) ? data.members.map(sanitizeMemberSex) : [],
-        leadOverrides: isPlainObject(data.leadOverrides) ? data.leadOverrides : defaults.leadOverrides,
-        dbRefs: isPlainObject(data.dbRefs) ? data.dbRefs : defaults.dbRefs,
+        members,
+        leadOverrides: overrides,
+        dbRefs: normalizeDbRefs(data.dbRefs, defaults.dbRefs),
+        notifyHour: clampHour(data.notifyHour, defaults.notifyHour),
+        silentFrom: clampHour(data.silentFrom, defaults.silentFrom),
+        silentTo: clampHour(data.silentTo, defaults.silentTo),
+        onboarded: typeof data.onboarded === "boolean" ? data.onboarded : defaults.onboarded,
+        household: validHousehold,
+        demoRows,
+        demoMemberIds: Array.isArray(data.demoMemberIds) ? data.demoMemberIds.filter((id: unknown): id is string => typeof id === "string") : undefined,
+        webhookEnabled: typeof data.webhookEnabled === "boolean" ? data.webhookEnabled : defaults.webhookEnabled,
+        webhookUrl: typeof data.webhookUrl === "string" ? data.webhookUrl : defaults.webhookUrl,
+        webhookMode: data.webhookMode === "ntfy" ? "ntfy" : "bark",
+        checkinBindings: normalizeCheckinBindings(data.checkinBindings),
     };
 }
 
@@ -106,7 +174,8 @@ export interface NormalizedImport {
  * - enabledModules 只保留已知模块 id（未知 = 版本差/手改 → 剔除并报告）；
  * - members 逐条修复（id/name/role），不给 downstream 留脏形状。
  */
-export function normalizeImportedSettings(data: Record<string, any>): NormalizedImport {
+export function normalizeImportedSettings(input: unknown): NormalizedImport {
+    const data = isPlainObject(input) ? input : {};
     const defaults = defaultSettings();
     const known = new Set(BUILT_IN_MODULES.map((m) => m.id));
     const rawEnabled: string[] = Array.isArray(data.enabledModules) ? data.enabledModules.filter((x: any) => typeof x === "string") : [];
@@ -114,28 +183,31 @@ export function normalizeImportedSettings(data: Record<string, any>): Normalized
     const droppedModules = [...new Set(rawEnabled.filter((id) => !known.has(id)))];
 
     let repairedMembers = 0;
-    const roles = new Set(["self", "spouse", "partner", "child", "elder", "kin", "other"]);
-    const members = (Array.isArray(data.members) ? data.members : []).map((m: any) => {
-        const fixed = { ...m };
-        if (!fixed.id || typeof fixed.id !== "string") { fixed.id = `m-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 7)}`; repairedMembers++; }
-        if (typeof fixed.name !== "string" || !fixed.name.trim()) { fixed.name = "?"; repairedMembers++; }
-        if (!roles.has(fixed.role)) { fixed.role = "other"; repairedMembers++; }
-        return sanitizeMemberSex(fixed);
+    const members = (Array.isArray(data.members) ? data.members : []).flatMap((raw: unknown) => {
+        if (!isPlainObject(raw)) return [];
+        const fixed = normalizeMember(raw)!;
+        if (raw.id !== fixed.id) repairedMembers++;
+        if (raw.name !== fixed.name) repairedMembers++;
+        if (raw.role !== fixed.role) repairedMembers++;
+        return [fixed];
     });
 
-    const clampH = (v: unknown, fb: number) => (Number.isFinite(v as number) ? Math.min(23, Math.max(0, Math.round(v as number))) : fb);
     const settings: HomeSettings = {
         ...defaults,
         ...data,
         enabledModules: enabled,
         members,
-        leadOverrides: isPlainObject(data.leadOverrides) ? (data.leadOverrides as Record<string, number>) : defaults.leadOverrides,
-        dbRefs: isPlainObject(data.dbRefs) ? data.dbRefs : defaults.dbRefs,
+        leadOverrides: isPlainObject(data.leadOverrides) ? Object.fromEntries(Object.entries(data.leadOverrides).filter((entry): entry is [string, number] => typeof entry[1] === "number" && Number.isFinite(entry[1]) && entry[1] >= 0)) : defaults.leadOverrides,
+        dbRefs: normalizeDbRefs(data.dbRefs, defaults.dbRefs),
         checkinBindings: normalizeCheckinBindings(data.checkinBindings),
         // 229 波恢复 e2e：导入路径钳制时刻（敌意/手改文件曾可把摘要时刻设为 99 → 摘要永不触发）
-        notifyHour: clampH(data.notifyHour, defaults.notifyHour),
-        silentFrom: clampH(data.silentFrom, defaults.silentFrom),
-        silentTo: clampH(data.silentTo, defaults.silentTo),
+        notifyHour: clampHour(data.notifyHour, defaults.notifyHour),
+        silentFrom: clampHour(data.silentFrom, defaults.silentFrom),
+        silentTo: clampHour(data.silentTo, defaults.silentTo),
+        onboarded: typeof data.onboarded === "boolean" ? data.onboarded : defaults.onboarded,
+        webhookEnabled: typeof data.webhookEnabled === "boolean" ? data.webhookEnabled : defaults.webhookEnabled,
+        webhookUrl: typeof data.webhookUrl === "string" ? data.webhookUrl : defaults.webhookUrl,
+        webhookMode: data.webhookMode === "ntfy" ? "ntfy" : "bark",
     };
     return { settings, droppedModules, repairedMembers };
 }
@@ -148,7 +220,7 @@ export function normalizeCheckinBindings(raw: unknown): CheckinBinding[] {
     const seen = new Set<string>();
     const out: CheckinBinding[] = [];
     for (const b of raw as Record<string, any>[]) {
-        if (!b || typeof b !== "object") continue;
+        if (!isPlainObject(b)) continue;
         if (typeof b.itemId !== "string" || !b.itemId) continue;
         if (typeof b.memberId !== "string" || !b.memberId) continue;
         if (typeof b.metric !== "string" || !CHECKIN_METRICS.has(b.metric)) continue;
@@ -176,6 +248,8 @@ export function newMember(name: string, role: MemberRole, birthday?: string, lun
     };
 }
 
-function isPlainObject(v: unknown): v is Record<string, unknown> {
-    return typeof v === "object" && v !== null && !Array.isArray(v);
+export function isPlainObject(v: unknown): v is Record<string, unknown> {
+    if (typeof v !== "object" || v === null || Array.isArray(v)) return false;
+    const prototype = Object.getPrototypeOf(v);
+    return prototype === Object.prototype || prototype === null;
 }

@@ -1,5 +1,5 @@
 # 小驴管家（Lv Home）· 项目待办总清单
-> **当前事实（2026-10-07 · 第 273 波）**：v0.3.8 已发布；250–267 波 UI 对齐原型集中打磨完成（含模块趋势条 266 波、设备批 e2e 40/40 适配 272 波、REL-04 发布门禁 269 波）（模块网格修复、中性 token、设置第四屏、引导 aura、台账状态语义接 leadOverrides、弹窗家族中性化、打印翻纸面、QR 打印页对齐、窄屏/交互/双语/媒体降级全走查，证据入 CHANGELOG 未发布段），261 波功能级 e2e 回归全绿（VALUE-01 6/6 + VALUE-02 4/4 + smoke）。274 项单测通过，类型/i18n(885 键)/meta/audit/build/loader 全绿；Svelte 0 错误 0 警告（268 波消除存量 state_referenced_locally）；Windows `pnpm run smoke` 已跨平台（273 波解压回退链）；真机批残余项（Android WebView/独立窗口/兄弟插件/双端冲突）待真机；icon/preview 已替换为产品品牌渲染（274 波）；集市上架继续暂缓。
+> **当前事实（2026-10-07 · 第 282 波）**：v0.3.9 已发布；250–267 波 UI 对齐原型集中打磨完成，随后补齐运行态/设置数据归一化、移动入口生命周期清理、capture 缺列回执、桥卸载身份校验、桥接扫描空快照、续期日期校验、设置窄容器、Tab/日历/引导无障碍语义和 Space 键交互。282 项单测通过，类型/Svelte/i18n(892 键)/meta/audit/build/smoke/loader 全绿；Svelte 0 错误 0 警告；Vite/Rolldown 单文件输出已迁移到 `codeSplitting: false` 且构建弃用告警已消失；`pnpm test:live` 已改为缺真实实例时明确阻断；真机批残余项（Android WebView/独立窗口/兄弟插件/双端冲突）待真机；icon/preview 已替换为产品品牌渲染；集市上架继续暂缓。
 
 ## 第 224 波复审行动清单（当前唯一入口）
 
@@ -7,7 +7,7 @@
 
 - [x] **REL-01 版本单源**：~~修复 `src/index.ts` 诊断/关于显示 0.2.0；由 package/plugin 或构建注入统一版本，并加入漂移测试。~~（225 波完成：vite define 从 plugin.json 注入 `__PLUGIN_VERSION__`，字面量清零；package↔plugin 漂移由 check:meta 既有交叉校验覆盖）
 - [x] **REL-02 跨平台 smoke**：~~移除对系统 `unzip` 的硬依赖。~~（273 波：解压回退链 unzip → PowerShell → python zipfile + SMOKE_EXTRACT 强制指定 + 产出校验；Windows PowerShell 路径实测通过）
-- [ ] **REL-03 文档事实同步**：ROADMAP、MODULES、发布清单、隐私、FAQ、README 统一 v0.3.0、250 tests、真机 UI 未验收、集市暂缓；历史快照加日期和“仅供追溯”。
+- [x] **REL-03 文档事实同步**：README 中文、ROADMAP、TODO 顶部已统一到 v0.3.9/282 tests/892 i18n/真机 UI 未完成/集市暂缓；旧状态评审保留日期并标为历史基线，当前事实以本页和 2026-10-07 审计报告为准。
 - [x] **REL-04 Release 门禁**：~~tag 工作流增加 test、smoke、包内容/体积/版本交叉检查；门禁失败不得创建或覆盖 Release。~~（269 波完成：release.yml 版本三源校验/check 之后补 Unit tests + verify:loader + Package smoke + 体积预算 220KB，全部先于 Release action）
 - [x] **TRUST-01 能力证据矩阵**：~~逐模块登记……~~（275 波完成：scripts/trust-matrix.mjs 生成 docs/capability-matrix.md——31/31 模块 schema 契约、8 台账内核实读全过（真实行列数）、横切能力引用 e2e 断言、L3 残余显性登记；对外文案只引用 L2 及以上）
 - [ ] **TRUST-02 共享与隐私文案**：说明思源同步、协作权限、冲突/撤回和备份边界；“插件不主动外联”不写成整个环境绝对无网络。
@@ -248,10 +248,10 @@ v0.3.0 已发 GitHub Release；**集市上架以此批通过为先决条件**。
 - [x] 🔴 A1a schema.ts：members 成员库 schema 落地（02 §3：角色/生日/农历/尺码/忌口/状态） ✅ 2026-10-01（09 决策记录 / commit 168dcae）
 - [ ] 🔴 A1b 字段字典 i18n 键补全核对（field.* 已有 certs 部分，补 members 专属列）
 - [x] 🔴 A2a siyuan.ts：av 创建端点实现（等 S1） ✅ 2026-10-01 Spike 定案（docs/testing/spike-R1R2.md 结论区）
-- [ ] 🔴 A2b siyuan.ts：av 行 CRUD 封装（新增行/更新行值/删除行/按视图查询）
+- [x] 🔴 A2b siyuan.ts：av 行 CRUD 封装（新增行/更新行值/删除行/按视图查询）（✅ 事实完成核对 275 波：addDetachedRow/setCell/removeLedgerRows/renderAttributeView 均已在产线使用，31 模块建库与多套 e2e 断言背书）
 - [x] 🔴 A2c siyuan.ts：附件关联（asset 列写入文件引用） ✅ 2026-10-03 第十一轮（uploadAsset 封装（multipart/可注入传输）+ 详情抽屉附件段：列出现有文件、多文件上传追加 mAsset、逐文件失败报告；端点与 succMap 形态 [待实测]，回归清单 7.2 有验收项）
 - [ ] 🔴 A2d siyuan.ts：错误类型统一（KernelError）+ 单元可注入 mock——已有 KernelError/setTransport；网络异常与真实响应契约仍需验收，见 D01/D02/T01
-- [ ] 🔴 A3a provisioner：幂等建库全流程打通（依赖 A2a）
+- [x] 🔴 A3a provisioner：幂等建库全流程打通（依赖 A2a）（✅ 事实完成核对 275 波：provisionModule 幂等 + 重复启用不重复建库，VALUE-01「建库 8 个」与 31 模块全量启用实测）
 - [x] 🔴 A3b provisioner：ensureColumns 版本升级补列（不删不改旧列） ✅ 2026-10-03 第七轮（只补缺失列不删不改旧列，补列失败不阻断可重跑续补；26 轮 EC13 contact 列迁移实战验证）
 - [ ] 🔴 A3c provisioner：默认视图创建（certs 的 by_member / expiring）
 - [x] 🔴 A3d provisioner：dbRefs 失效自愈（文档被删→重建→登记刷新） ✅ 2026-10-03 第七轮（内核 not found→重建；瞬态错误→原样返回不重建；文档在但登记丢→补登记+找回 av 块+补列）
@@ -1860,3 +1860,5 @@ v0.3.0 已发 GitHub Release；**集市上架以此批通过为先决条件**。
 | 2026-10-07 | 主线 | 第二百七十六波：**Release Notes 草稿（发版清单第 3 步）** | release-notes-draft.md 手写润色（脚本基于 git 历史，未 commit 时无内容）——用户视角三段（界面/修复/质量）+ 无破坏性变更声明 + CHANGELOG 指引；发版清单 1-4 步全部就绪（版本/CHANGELOG/notes/门禁），5-7 步（tag/集市/发版后）待授权与发版后执行 |
 | 2026-10-07 | 主线 | 第二百七十五波：**TRUST-01 能力证据矩阵落地** | scripts/trust-matrix.mjs（内核实读 + 源码契约解析）→ docs/capability-matrix.md：31/31 模块 schema 覆盖、8 已启用台账实读全过（members 27 行/certs 359 列等真实行列数）、providerCoverage 缺失 0、labelKey 103 零缺失、横切能力引 e2e 断言、L3 真机残余显性；VALUE-01/02 与 icon/preview 同步勾选（e2e/274 波证据） |
 | 2026-10-07 | 主线 | 第二百七十六波：🏁 **v0.3.9 发版**（250–267 波 UI 对齐原型 + 268–275 波质量/工具/证据 + BRAND-01/REL-02/REL-04） | 见 CHANGELOG v0.3.9；发版清单 1-4 步完成（版本双源/CHANGELOG 定稿/release notes/全门禁）；**不上集市**（disabledInPublish=true 维持，D13 复核） |
+| 2026-10-07 | 主线 | 第二百七十八波：**v0.3.9 Release 正文 + 上架状态复核** | GitHub Release 附润色版 notes（用户视角三段 + 无破坏性变更声明）；disabledInPublish=true 复核维持（D13：本地优先手动安装，集市分发继续暂缓）；发版清单 1-5 步全部完成，第 7 步（发版后预检）本地靶场部署即等价完成 |
+| 2026-10-07 | 主线 | 第二百七十九–二百八十二波：**发布后质量收口与真机批前置修复** | 运行态/settings 归一化、生命周期与 capture/bridge 修复、设置窄容器与 ARIA/键盘交互、Vite `codeSplitting:false` 单文件迁移、桥接空快照与续期日期/写回失败边界；真机批预检改为全 dist 字节校验并参数化 SIYUAN_SY/SIYUAN_CONF；282 单测、check/build/smoke/loader 通过；真实 Android/独立窗口/兄弟插件/双端冲突仍待设备与隔离靶场。

@@ -37,6 +37,14 @@
         if (!btn) return;
         pill = { x: btn.offsetLeft - 4, w: btn.offsetWidth };
     }
+    function onTabKeydown(event: KeyboardEvent, index: number) {
+        if (!["ArrowLeft", "ArrowRight", "Home", "End"].includes(event.key)) return;
+        event.preventDefault();
+        const next = event.key === "Home" ? 0 : event.key === "End" ? screens.length - 1
+            : (index + (event.key === "ArrowRight" ? 1 : -1) + screens.length) % screens.length;
+        screen = screens[next].id;
+        requestAnimationFrame(() => (navEl?.querySelector(`[data-s="${screens[next].id}"]`) as HTMLButtonElement | undefined)?.focus());
+    }
     $effect(() => {
         movePill(navEl?.querySelector(`[data-s="${screen}"]`) as HTMLElement | undefined);
         // 254 波：窗口 resize 后重新测量（对齐原型的 resize 监听）——否则胶囊停在旧坐标、
@@ -72,16 +80,18 @@
                 <span>LV HOME</span>
             </div>
         </div>
-        <nav class="lv-tabs" bind:this={navEl} style="position:relative">
+        <div class="lv-tabs" bind:this={navEl} style="position:relative" role="tablist" aria-label={t("tab.title")}>
             <!-- 252 波：首次定位不带过渡（pill.w===0 时挂 init），避免挂载瞬间胶囊从左滑入 -->
             <span class="lv-nav-pill" class:init={pill.w === 0} style="transform:translateX({pill.x}px);width:{pill.w}px"></span>
-            {#each screens as s (s.id)}
-                <button data-s={s.id} class="lv-tabs__item" class:on={screen === s.id} aria-current={screen === s.id ? "page" : undefined} onclick={() => (screen = s.id)}>
+            {#each screens as s, i (s.id)}
+                <button id={`lv-tab-${s.id}`} data-s={s.id} class="lv-tabs__item" class:on={screen === s.id}
+                    role="tab" aria-selected={screen === s.id} aria-current={screen === s.id ? "page" : undefined} aria-controls={`lv-panel-${s.id}`}
+                    tabindex={screen === s.id ? 0 : -1} onkeydown={(e) => onTabKeydown(e, i)} onclick={() => (screen = s.id)}>
                     {t(s.key)}
                     {#if s.id === "reminders" && pendingTotal > 0}<i class="lv-dot" aria-hidden="true"></i>{/if}
                 </button>
             {/each}
-        </nav>
+        </div>
         <span class="fn__flex-1"></span>
         <span class="lv-tabbar__meta lv-caption">
             {t("hub.scannedAt")} {plugin.scan ? new Date(plugin.scan.scannedAt).toLocaleTimeString() : "—"}
@@ -91,8 +101,8 @@
     </header>
 
     {#key screen}
-        <main class="lv-screen lv-anim">
-            <ErrorBoundary onretry={() => { /* screen switch resets naturally via {#key} */ }}>
+        <div id={`lv-panel-${screen}`} class="lv-screen lv-anim" role="tabpanel" tabindex="0" aria-labelledby={`lv-tab-${screen}`}>
+            <ErrorBoundary {t} onretry={() => { /* screen switch resets naturally via {#key} */ }}>
                 {#if screen === "overview"}
                     <Overview {plugin} {t} {version} onGoto={(s: ScreenId) => (screen = s)} />
                 {:else if screen === "reminders"}
@@ -103,6 +113,6 @@
                     <Members {plugin} {t} {version} />
                 {/if}
             </ErrorBoundary>
-        </main>
+        </div>
     {/key}
 </div>

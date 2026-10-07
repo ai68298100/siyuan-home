@@ -4,7 +4,7 @@
 
 **A family archive that reminds you before things expire** — the family & life butler plugin for SiYuan notes.
 
-[![CI](https://github.com/ai68298100/siyuan-home/actions/workflows/ci.yml/badge.svg)](https://github.com/ai68298100/siyuan-home/actions/workflows/ci.yml) [![Release](https://img.shields.io/github/v/release/ai68298100/siyuan-home)](https://github.com/ai68298100/siyuan-home/releases/latest) [![License](https://img.shields.io/github/license/ai68298100/siyuan-home)](./LICENSE) [![Tests](https://img.shields.io/badge/tests-passing-brightgreen)](./tests)
+[![CI](https://github.com/ai68298100/siyuan-home/actions/workflows/ci.yml/badge.svg)](https://github.com/ai68298100/siyuan-home/actions/workflows/ci.yml) [![Release](https://img.shields.io/github/v/release/ai68298100/siyuan-home)](https://github.com/ai68298100/siyuan-home/releases/latest) [![License](https://img.shields.io/github/license/ai68298100/siyuan-home)](./LICENSE)
 
 Family archive · unified expiry reminder hub · household workspace
 
@@ -37,14 +37,15 @@ Certificates expire, medicine expires, insurance needs renewal, subscriptions au
 | 🧩 **Modules on demand** | Disabled modules create no data and stay out of the UI; parenting/school only suggested when you have kids |
 | 🔌 **Ecosystem ready** | Block menu quick capture, statusbar badge, service bridge (`window.LvHome`), contacts picker via 小驴人脉 |
 
-## 📦 Install (v0.3.2)
+## 📦 Install (v0.3.9)
 
 1. Download `package.zip` from [Releases](https://github.com/ai68298100/siyuan-home/releases/latest)
 2. SiYuan → Settings → Marketplace → Download → **Import** the zip
-3. Enable the plugin → complete the 3-step onboarding (household → module picks → provisioning)
+3. Enable the plugin → complete the 2-step onboarding (household → module picks and provisioning)
 4. Press `Ctrl+Alt+H` anytime to open the hub
 
-> **Validation status:** core data paths have automated tests and live-kernel coverage. The six-stage real SiYuan UI batch, including Android WebView and accessibility checks, is still pending; marketplace submission remains paused. `icon.png` and `preview.png` are also pending replacement with production assets.
+> **Validation status:** core data paths have automated tests and live-kernel coverage. The six-stage real SiYuan UI batch, including Android WebView and accessibility checks, is still pending; marketplace submission remains paused. `icon.png` and `preview.png` now use the v0.3.9 product assets.
+> **Version note:** the tagged v0.3.9 package is the stable release artifact; `main` contains post-release hardening and currently reports 282 unit tests.
 >
 > Family sharing depends on SiYuan's collaboration, permissions, sync and conflict behavior. Test with non-sensitive data before sharing; this plugin does not provide a separate permission system.
 >
@@ -118,13 +119,15 @@ Works with the Lv plugin family: **Check-in** (numeric tracking), **Contacts** (
 pnpm install
 pnpm run dev      # dev (app + kernel watch)
 pnpm run build    # dist/ + package.zip
-pnpm run check    # 5-layer gate (types + svelte + i18n + meta + smoke)
-pnpm test         # unit tests (33)
+pnpm run check    # 5-layer gate (types + svelte + i18n + meta + audit)
+pnpm run smoke    # release package and single-file loader smoke checks
+pnpm test         # unit tests (282)
 ```
 
 - Setup & conventions: [CONTRIBUTING.md](./CONTRIBUTING.md)
 - Release quality: CI runs check/test/build/smoke/size-gate on every push & PR
 - Regression checklist: [docs/testing/v0.2.md](./docs/testing/v0.2.md)
+- Questions and bug reports: [SUPPORT.md](./SUPPORT.md) · Security reports: [SECURITY.md](./SECURITY.md)
 
 ## 📚 Documentation
 

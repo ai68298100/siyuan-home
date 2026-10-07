@@ -1,0 +1,3 @@
+# Keep the default owner explicit so GitHub can request review when branch
+# protection or a ruleset is enabled. Update this entry if maintainers change.
+* @ai68298100

@@ -109,7 +109,14 @@ export async function renew(
 ) {
     const targetKey = dbRef.columns?.[fieldKey] ?? dbRef.columns?.expiry ?? dbRef.columns?.due;
     if (!dbRef.avId || !targetKey) throw new Error("ledger not provisioned");
-    const ms = new Date(`${newDueISO}T00:00:00`).getTime();
+    // UI 传入的是 HTML date 的 yyyy-MM-dd 字符串。不要把非法日期静默
+    // 转成 NaN（或 JS 自动进位后的另一天），否则会写坏台账并留下误导性的流水。
+    const parts = /^(\d{4})-(\d{2})-(\d{2})$/.exec(newDueISO);
+    const ms = parts ? new Date(`${newDueISO}T00:00:00`).getTime() : Number.NaN;
+    const parsed = Number.isFinite(ms) ? new Date(ms) : undefined;
+    if (!parts || !parsed || parsed.getFullYear() !== Number(parts[1]) || parsed.getMonth() + 1 !== Number(parts[2]) || parsed.getDate() !== Number(parts[3])) {
+        throw new Error("invalid due date");
+    }
     await setCell(dbRef.avId, targetKey, r.rowId, {
         type: "date", date: { content: ms, isNotEmpty: true, hasEndDate: false, isNotTime: true },
     });
