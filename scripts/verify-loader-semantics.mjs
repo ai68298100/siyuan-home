@@ -4,6 +4,7 @@
 // MODULE_NOT_FOUND → 插件静默加载失败、零入口（v0.3.0 教训）。构建后运行，任何一步失败即非零退出。
 import { readFileSync, existsSync } from "node:fs";
 import { createRequire } from "node:module";
+import path from "node:path";
 
 const distJs = "dist/index.js";
 if (!existsSync(distJs)) {
@@ -49,8 +50,13 @@ const siyuanStub = {
     showMessage() {}, confirm() {}, Dialog: class {}, openTab() {}, closeTab() {},
     fetchPost() {}, fetchSyncPost() {}, getFrontend: () => "desktop",
 };
-// 相对路径基准 = 思源 app 根（真实 Electron window.require 行为），绝不指向插件目录
-const electronLikeRequire = createRequire("D:/biji/SiYuan/resources/app/index.html");
+// 相对路径基准 = 思源 app 根（真实 Electron window.require 行为），绝不指向插件目录。
+// REL-02 配套：基准路径环境化——本机思源安装存在则用之，否则回退仓库根（CI/他机）。
+// 语义不变：stub 拦截 "siyuan"；其余 require 仅在 bundle 误含相对/Node 依赖时才会触发解析。
+const siyuanAppBase = existsSync("D:/biji/SiYuan/resources/app/index.html")
+    ? "D:/biji/SiYuan/resources/app/index.html"
+    : path.resolve("index.html");
+const electronLikeRequire = createRequire(siyuanAppBase);
 const loaderRequire = (n) => (n === "siyuan" ? siyuanStub : electronLikeRequire(n));
 
 // ---------- [1] 按加载器语义评估 ----------
