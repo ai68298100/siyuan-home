@@ -37,15 +37,15 @@ Certificates expire, medicine expires, insurance needs renewal, subscriptions au
 | 🧩 **Modules on demand** | Disabled modules create no data and stay out of the UI; parenting/school only suggested when you have kids |
 | 🔌 **Ecosystem ready** | Block menu quick capture, statusbar badge, service bridge (`window.LvHome`), contacts picker via 小驴人脉 |
 
-## 📦 Install (v0.3.9)
+## 📦 Install (v0.3.10)
 
 1. Download `package.zip` from [Releases](https://github.com/ai68298100/siyuan-home/releases/latest)
 2. SiYuan → Settings → Marketplace → Download → **Import** the zip
 3. Enable the plugin → complete the 2-step onboarding (household → module picks and provisioning)
 4. Press `Ctrl+Alt+H` anytime to open the hub
 
-> **Validation status:** core data paths have automated tests and live-kernel coverage. The six-stage real SiYuan UI batch, including Android WebView and accessibility checks, is still pending; marketplace submission remains paused. `icon.png` and `preview.png` now use the v0.3.9 product assets.
-> **Version note:** the tagged v0.3.9 package is the stable release artifact; `main` contains post-release hardening and currently reports 282 unit tests.
+> **Validation status:** core data paths have automated tests and live-kernel coverage. The six-stage real SiYuan UI batch, including Android WebView and accessibility checks, is still pending; marketplace submission remains paused. `icon.png` and `preview.png` use the v0.3.9 product assets.
+> **Version note:** the tagged v0.3.10 package is the current stable release artifact; `main` contains the latest dependency and release hardening and currently reports 282 unit tests.
 >
 > Family sharing depends on SiYuan's collaboration, permissions, sync and conflict behavior. Test with non-sensitive data before sharing; this plugin does not provide a separate permission system.
 >
@@ -103,7 +103,7 @@ The current release is in a trust-and-validation phase: complete the real SiYuan
 
 | Phase | Content |
 |---|---|
-| ✅ v0.3.9 (current) | everything in v0.3.8, plus: UI aligned to the design spec (settings sidebar, onboarding brand page, ledger status dots, module sparklines, dialogs & theme polish), instant demo-generation receipts, horizontally scrollable ledger on narrow screens, proper icon & preview, dual release gates (CI + tag) |
+| ✅ v0.3.10 (current) | v0.3.9 UI and quality baseline plus dependency/runtime maintenance (Vite 8.3.3, Svelte 5.57.1, js-yaml 5.4.3, SiYuan SDK 1.2.9, pnpm 12.9.1), CodeQL default setup, hardened smoke extraction, and GitHub release governance |
 | 🔜 Next | Task workbench, evidence center, inbox, health recovery |
 | 🔭 Later | Family collaboration, template packs, yearly family report, AI capabilities |
 

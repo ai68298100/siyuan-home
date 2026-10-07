@@ -1,5 +1,15 @@
 # Changelog
 
+## v0.3.10 2026-10-07
+
+### 发布与维护
+
+- 依赖基线更新：Vite 8.3.3、Svelte 5.57.1、js-yaml 5.4.3、SiYuan SDK 1.2.9、pnpm 12.9.1；TypeScript 仍保持 6.0.3，以满足当前 `svelte-check` peer 范围
+- GitHub 治理更新：main 保护、Actions SHA 固定、CodeQL 默认扫描、Dependabot 安全更新、私密漏洞报告、Release/CI runner 固定与协作入口完善
+- smoke 解压路径改为参数化进程调用，避免把归档路径拼接进 shell 命令；CodeQL 首轮发现的问题已修复，当前无开放告警
+- 发布包通过 check、282 项单测、build、smoke、loader 与体积门禁；真实 SiYuan UI、Android WebView、读屏、独立窗口、兄弟插件和双端冲突仍需设备批验收
+- 本版不上架集市，`plugin.json` 的 `disabledInPublish=true` 保持不变；用户可从 GitHub Release 手动安装
+
 ## v0.3.9 2026-10-07
 
 ### 第二百五十–二百六十波（UI 对齐原型集中打磨：token / 状态语义 / 弹窗家族 / 输出与降级态 / 双语言）

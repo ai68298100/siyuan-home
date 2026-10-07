@@ -6,6 +6,8 @@ import path from "node:path";
 import { TOKEN, BASE, ensureKernel } from "./ui-walkthrough/lib.mjs";
 
 const ROOT = path.resolve(import.meta.dirname, "..");
+const packageJson = JSON.parse(fs.readFileSync(path.resolve(ROOT, "package.json"), "utf8"));
+const pluginVersion = packageJson.version;
 const api = async (p2, body) =>
     (await fetch(BASE + p2, { method: "POST", headers: { Authorization: `Token ${TOKEN}`, "Content-Type": "application/json" }, body: JSON.stringify(body ?? {}) })).json();
 
@@ -53,7 +55,7 @@ const readableCount = Object.values(live).filter((l) => l.readable).length;
 const doc = [
     "# 能力证据矩阵（TRUST-01）",
     "",
-    `> 生成：scripts/trust-matrix.mjs @ v0.3.9（靶场 ${BASE} 内核实读 + 源码契约解析）。`,
+    `> 生成：scripts/trust-matrix.mjs @ v${pluginVersion}（靶场 ${BASE} 内核实读 + 源码契约解析）。`,
     "> 证据等级：L1=代码存在 · L2=自动化断言（单测/e2e）· L3=真机（残余见 §缺口）。对外文案只引用 L2 及以上。",
     "",
     "## 全局契约事实（L1/L2）",
@@ -84,7 +86,7 @@ const doc = [
     "| 首录路径 | VALUE-01 6/6（引导→建库→成员→录证件→提醒→定位） |",
     "| 恢复路径 | VALUE-02 4/4（设置损坏回退/缺库自愈） |",
     "| 导入 | IMPORT-RECOVERY 5/5（非法 JSON 拒绝/敌意归一化） |",
-    "| 真机批 | device-batch 40/40（首启/四页/弹层/移动三档/无障碍/性能基线） |",
+    "| 真机批 | Chromium/脚本化覆盖已形成；Android WebView、独立窗口、兄弟插件并发、双端冲突仍待 L3 设备验收 |",
     "| 成员 DAL | addMember/updateMember/removeMember/syncMembersToAv（VALUE-01 成员建立） |",
     "| 提醒派生 | runScan/deriveVisible + providerCoverage 契约自检（hub.test.ts） |",
     "| 导出 | .ics（提醒）/ .csv（台账）/ .vcf（成员）/ QR 标签 |",
