@@ -3,6 +3,9 @@ contact_links:
   - name: 使用帮助与常见问题
     url: https://github.com/ai68298100/siyuan-home/blob/main/docs/FAQ.md
     about: 先查看安装、数据边界、迁移和常见故障说明。
+  - name: 使用支持与提问指南
+    url: https://github.com/ai68298100/siyuan-home/blob/main/SUPPORT.md
+    about: 提问前先确认环境、验证范围和脱敏要求。
   - name: 安全漏洞
     url: https://github.com/ai68298100/siyuan-home/security/advisories/new
     about: 不要在公开 Issue 中提交 token、工作区数据或安全漏洞。
