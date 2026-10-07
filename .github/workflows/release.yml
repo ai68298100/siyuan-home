@@ -63,8 +63,6 @@ jobs:
       - name: Unit tests
         run: pnpm test
 
-      - name: Verify loader semantics
-        run: node scripts/verify-loader-semantics.mjs
 
       - name: Build production package
         run: |
@@ -73,6 +71,9 @@ jobs:
           zip -r ../package.zip ./*
 
       # REL-04：包内容/体积门禁（必需文件、禁入文件泄漏、i18n 键位、体积预算与 CI 同标）
+      - name: Verify loader semantics
+        run: node scripts/verify-loader-semantics.mjs
+
       - name: Package smoke test
         run: pnpm run smoke
 
