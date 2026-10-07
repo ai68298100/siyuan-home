@@ -1,7 +1,7 @@
 // 发布包 smoke test（33.5）—— node scripts/smoke-test.mjs
 // 检查 package.zip：必要文件齐全、禁入文件未泄漏、manifest/i18n JSON 有效、体积门禁。
 import { readFileSync, existsSync, rmSync, mkdirSync } from "node:fs";
-import { execSync } from "node:child_process";
+import { execFileSync } from "node:child_process";
 import path from "node:path";
 
 const zip = path.resolve("package.zip");
@@ -19,19 +19,29 @@ if (!existsSync(zip)) {
 function extractZip(zipPath, dest) {
     rmSync(dest, { recursive: true, force: true });
     mkdirSync(dest, { recursive: true });
-    const quote = (p2) => (process.platform === "win32" ? `"${p2}"` : `'${p2}'`);
     const methods = [
-        ["unzip", `unzip -o -q ${quote(zipPath)} -d ${quote(dest)}`],
-        ["powershell", `powershell -NoProfile -Command "Expand-Archive -LiteralPath ${zipPath.replace(/'/g, "''")} -DestinationPath ${dest.replace(/'/g, "''")} -Force"`],
-        ["python", `python -m zipfile -e ${quote(zipPath)} ${quote(dest)}`],
+        ["unzip", "unzip", ["-o", "-q", zipPath, "-d", dest]],
+        [
+            "powershell",
+            "powershell",
+            [
+                "-NoProfile",
+                "-Command",
+                "Expand-Archive -LiteralPath $env:SMOKE_ZIP -DestinationPath $env:SMOKE_DEST -Force",
+            ],
+        ],
+        ["python", "python", ["-m", "zipfile", "-e", zipPath, dest]],
     ];
     const forced = process.env.SMOKE_EXTRACT;
     const chain = forced ? methods.filter(([name]) => name === forced) : methods;
     if (forced && chain.length === 0) throw new Error(`SMOKE_EXTRACT=${forced} 不存在（可选 unzip/powershell/python）`);
     let lastErr;
-    for (const [name, cmd] of chain) {
+    for (const [name, executable, args] of chain) {
         try {
-            execSync(cmd, { stdio: "pipe" });
+            const env = executable === "powershell"
+                ? { ...process.env, SMOKE_ZIP: zipPath, SMOKE_DEST: dest }
+                : process.env;
+            execFileSync(executable, args, { env, stdio: "pipe" });
             if (existsSync(path.join(dest, "plugin.json"))) return name;
             lastErr = new Error(`${name} 执行成功但未产出 plugin.json`);
         } catch (e) {
