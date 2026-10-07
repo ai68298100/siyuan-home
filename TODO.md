@@ -1,5 +1,5 @@
 # 小驴管家（Lv Home）· 项目待办总清单
-> **当前事实（2026-10-07 · v0.3.10）**：v0.3.10 已发布；250–282 波 UI、运行态、设置归一化、移动入口生命周期、桥接边界、续期校验和无障碍语义均已纳入主线。282 项单测通过，类型/Svelte/i18n(892 键)/meta/audit/build/smoke/loader 全绿；依赖基线为 Vite 8.3.3、Svelte 5.57.1、SiYuan SDK 1.2.9、pnpm 12.9.1；Svelte 0 错误 0 警告；Vite/Rolldown 单文件输出已迁移到 `codeSplitting: false`；`pnpm test:live` 缺真实实例时明确阻断；真机批残余项（Android WebView/独立窗口/兄弟插件/双端冲突）待真机；集市上架继续暂缓。
+> **当前事实（2026-10-07 · v0.3.11）**：v0.3.11 已发布；250–282 波 UI、运行态、设置归一化、移动入口生命周期、桥接边界、续期校验和无障碍语义均已纳入主线。282 项单测通过，类型/Svelte/i18n(892 键)/meta/audit/build/smoke/loader 全绿；独立后台靶场 core/恢复/首录/导入/Chromium 批次已通过；依赖基线为 Vite 8.3.3、Svelte 5.57.1、SiYuan SDK 1.2.9、pnpm 12.9.1；Svelte 0 错误 0 警告；Vite/Rolldown 单文件输出已迁移到 `codeSplitting: false`；`pnpm test:live` 缺真实实例时明确阻断；真实 Android WebView/独立窗口/兄弟插件/双端冲突待设备；集市上架继续暂缓。
 
 ## 第 224 波复审行动清单（当前唯一入口）
 
@@ -7,7 +7,7 @@
 
 - [x] **REL-01 版本单源**：~~修复 `src/index.ts` 诊断/关于显示 0.2.0；由 package/plugin 或构建注入统一版本，并加入漂移测试。~~（225 波完成：vite define 从 plugin.json 注入 `__PLUGIN_VERSION__`，字面量清零；package↔plugin 漂移由 check:meta 既有交叉校验覆盖）
 - [x] **REL-02 跨平台 smoke**：~~移除对系统 `unzip` 的硬依赖。~~（273 波：解压回退链 unzip → PowerShell → python zipfile + SMOKE_EXTRACT 强制指定 + 产出校验；Windows PowerShell 路径实测通过）
-- [x] **REL-03 文档事实同步**：README 中文、ROADMAP、TODO 顶部已统一到 v0.3.10/282 tests/892 i18n/真机 UI 未完成/集市暂缓；旧状态评审保留日期并标为历史基线，当前事实以本页和 2026-10-07 审计报告为准。
+- [x] **REL-03 文档事实同步**：README 中文、ROADMAP、TODO 顶部已统一到 v0.3.11/282 tests/892 i18n/独立后台 e2e 已完成/真实 Android UI 未完成/集市暂缓；旧状态评审保留日期并标为历史基线，当前事实以本页和 2026-10-07 审计报告为准。
 - [x] **REL-04 Release 门禁**：~~tag 工作流增加 test、smoke、包内容/体积/版本交叉检查；门禁失败不得创建或覆盖 Release。~~（269 波完成：release.yml 版本三源校验/check 之后补 Unit tests + verify:loader + Package smoke + 体积预算 220KB，全部先于 Release action）
 - [x] **TRUST-01 能力证据矩阵**：~~逐模块登记……~~（275 波完成：scripts/trust-matrix.mjs 生成 docs/capability-matrix.md——31/31 模块 schema 契约、8 台账内核实读全过（真实行列数）、横切能力引用 e2e 断言、L3 残余显性登记；对外文案只引用 L2 及以上）
 - [ ] **TRUST-02 共享与隐私文案**：说明思源同步、协作权限、冲突/撤回和备份边界；“插件不主动外联”不写成整个环境绝对无网络。
@@ -1863,3 +1863,4 @@ v0.3.0 已发 GitHub Release；**集市上架以此批通过为先决条件**。
 | 2026-10-07 | 主线 | 第二百七十八波：**v0.3.9 Release 正文 + 上架状态复核** | GitHub Release 附润色版 notes（用户视角三段 + 无破坏性变更声明）；disabledInPublish=true 复核维持（D13：本地优先手动安装，集市分发继续暂缓）；发版清单 1-5 步全部完成，第 7 步（发版后预检）本地靶场部署即等价完成 |
 | 2026-10-07 | 主线 | 第二百七十九–二百八十二波：**发布后质量收口与真机批前置修复** | 运行态/settings 归一化、生命周期与 capture/bridge 修复、设置窄容器与 ARIA/键盘交互、Vite `codeSplitting:false` 单文件迁移、桥接空快照与续期日期/写回失败边界；真机批预检改为全 dist 字节校验并参数化 SIYUAN_SY/SIYUAN_CONF；282 单测、check/build/smoke/loader 通过；真实 Android/独立窗口/兄弟插件/双端冲突仍待设备与隔离靶场。
 | 2026-10-07 | 主线 | 第二百八十三波：**v0.3.10 依赖维护与发版** | 合并 pnpm 12.9.1、Vite 8.3.3、Svelte 5.57.1、js-yaml 5.4.3、SiYuan SDK 1.2.9；关闭过时/冲突 Dependabot #11/#14；更新 smoke 解压安全修复与 GitHub 治理文档；保留 `disabledInPublish=true`，集市不上架；真实 Android/宿主 UI 残余仍待设备批 |
+| 2026-10-07 | 主线 | 第二百八十四波：**独立后台 e2e 与 AI 外发边界核验** | `tmp/sy-ui3` 隔离靶场部署 v0.3.10（14680）；`test:live` 11/11、recovery 4/4、VALUE-01 6/6、import 5/5、Chromium device 40/40；修复 Windows Corepack 下 `pnpm test:live` 的 `spawnSync EINVAL`；智谱 `glm-4-flash` 仅做一次性连通性测试，仓库暂无生产 AI 调用，密钥不入仓库；真实 Android/兄弟插件/双端冲突仍待 |

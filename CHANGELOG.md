@@ -1,5 +1,13 @@
 # Changelog
 
+## v0.3.11 2026-10-07
+
+### 测试工具链与独立靶场
+
+- 修复 Windows Corepack 环境下 `pnpm test:live` 启动 `pnpm.cmd` 返回 `spawnSync EINVAL` 的问题：优先使用 `npm_execpath`，无该变量时才回退到 `pnpm.cmd`。
+- 已在独立后台 SiYuan 靶场验证 v0.3.10：core 11/11、恢复 4/4、首录 6/6、导入 5/5、Chromium 设备批 40/40；真实 Android WebView、兄弟插件和双端冲突仍待设备验收。
+- 智谱 `glm-4-flash` 仅完成一次性 API 连通性验证；仓库没有生产 AI 调用，密钥不写入代码、配置、CI 或日志。
+
 ## v0.3.10 2026-10-07
 
 ### 发布与维护

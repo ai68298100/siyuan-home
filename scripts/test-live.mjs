@@ -35,9 +35,17 @@ try {
 }
 if (!envelope || envelope.code !== 0) blocked(`lsNotebooks code=${envelope?.code ?? "unknown"} ${envelope?.msg ?? ""}`);
 
-const command = process.platform === "win32" ? "pnpm.cmd" : "pnpm";
 const { spawnSync } = await import("node:child_process");
-const result = spawnSync(command, ["exec", "vitest", "run", "--config", "vitest.live.config.ts"], { stdio: "inherit" });
+// pnpm sets npm_execpath to its native executable. Prefer that path on Windows:
+// spawning pnpm.cmd directly from a Node process can fail with EINVAL on some
+// Corepack installations. The fallback keeps direct `node scripts/test-live.mjs`
+// usable while limiting shell mode to a constant command and static arguments.
+const command = process.env.npm_execpath || (process.platform === "win32" ? "pnpm.cmd" : "pnpm");
+const result = spawnSync(command, ["exec", "vitest", "run", "--config", "vitest.live.config.ts"], {
+    stdio: "inherit",
+    shell: process.platform === "win32" && !process.env.npm_execpath,
+    windowsHide: true,
+});
 if (result.error) {
     console.error(`[live] failed to start vitest: ${result.error.message}`);
     process.exit(1);
