@@ -64,7 +64,7 @@
     "pinyin-pro": "^3.29.4",
     "playwright": "1.63.0",
     "sass": "^1.105.1",
-    "siyuan": "1.2.8",
+    "siyuan": "1.2.9",
     "svelte": "^5.57.0",
     "svelte-check": "^4.7.6",
     "ts-node": "^10.9.2",
