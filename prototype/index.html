@@ -258,6 +258,7 @@ input,select{font:inherit}
 .mod .stat b{font-size:18px;font-weight:600;letter-spacing:-.01em}
 .mod .stat span{font-size:11.5px;color:var(--lv-tx-3)}
 .mod .stat .up{margin-left:auto}
+.mod .extra{font-size:11.5px;color:var(--lv-tx-3);position:relative}
 /* 趋势条：入场生长 + hover 二次强调 */
 .spark{display:flex;align-items:flex-end;gap:3px;height:20px;margin-left:auto}
 .spark i{width:4px;border-radius:2px;background:var(--lv-accent-soft);transform-origin:bottom;
@@ -280,8 +281,16 @@ input,select{font:inherit}
   color:var(--lv-tx-2);font-size:12.5px;cursor:pointer;
   transition:border var(--lv-t-fast) var(--lv-ease), color var(--lv-t-fast) var(--lv-ease)}
 .select:hover{border-color:var(--lv-line-strong);color:var(--lv-tx)}
-.group-label{display:flex;align-items:center;gap:10px;margin:22px 2px 8px;font-size:12px;color:var(--lv-tx-3);font-weight:500}
+.group-label{display:flex;align-items:center;gap:10px;margin:22px 2px 8px;font-size:12px;color:var(--lv-tx-3);font-weight:500;
+  position:sticky;top:0;z-index:5;padding:5px 0;
+  background:color-mix(in srgb,var(--lv-bg) 86%,transparent);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px)}
 .group-label::after{content:"";flex:1;height:1px;background:var(--lv-line)}
+/* 262 波灵感融合：提醒 meta 成员微头像（Todoist/Linear assignee）+ 备忘日期即时预览 chip（Todoist quick add） */
+.miniava{width:14px;height:14px;border-radius:50%;display:inline-grid;place-items:center;font-size:8.5px;color:#fff;
+  vertical-align:-2px;margin-right:3px;box-shadow:inset 0 1px 0 rgba(255,255,255,.35)}
+.parsechip{display:inline-flex;align-items:center;gap:5px;padding:4px 10px;flex:none;border-radius:999px;
+  background:var(--lv-accent-soft);border:1px solid var(--lv-accent-line);color:var(--lv-accent);font-size:11.5px;font-weight:500;
+  animation:rise var(--lv-t-med) var(--lv-ease)}
 
 /* ── 台账 ─────────────────────────────────────────────── */
 .ledger-head{display:flex;align-items:center;gap:12px;margin:18px 0 12px;flex-wrap:wrap}
@@ -590,7 +599,7 @@ tbody tr.sel{background:var(--lv-accent-soft);box-shadow:inset 2px 0 0 var(--lv-
     <div class="hero">
       <div>
         <h1>早安，小飞驴家</h1>
-        <p>10 月 1 日 周四 · 演示数据，状态需要以实际扫描为准</p>
+        <p>10 月 1 日 周四 · 演示数据，状态需要以实际扫描为准&nbsp;&nbsp;<span class="badge green">✓ 本月已完成 4/6 件</span></p>
       </div>
       <div class="count"><b class="num" id="heroCount">4</b><span>件事需要留意</span></div>
     </div>
@@ -618,7 +627,7 @@ tbody tr.sel{background:var(--lv-accent-soft);box-shadow:inset 2px 0 0 var(--lv-
     <div class="card reminders" id="overview-reminders">
       <div class="rem overdue">
         <div class="ic">🪪</div>
-        <div class="t"><b>妈妈的身份证</b><span>证件 · 身份证 · 存放 玄关抽屉 A</span></div>
+        <div class="t"><b>妈妈的身份证</b><span><span class="miniava" aria-hidden="true" style="background:linear-gradient(135deg,#c99044,#e0b06a)">妈</span>证件 · 身份证 · 存放 玄关抽屉 A</span></div>
         <div class="when"><b class="num" style="color:var(--lv-danger)">已逾期 2 天</b><span class="num">到期 09-29</span></div>
         <div class="ops"><button class="btn ghost">续期…</button><button class="btn ghost">延后</button></div>
       </div>
@@ -664,7 +673,8 @@ tbody tr.sel{background:var(--lv-accent-soft);box-shadow:inset 2px 0 0 var(--lv-
 
     <div class="sec-title"><h2>快速备忘</h2><span class="sub">收件箱 · 稍后分诊进台账</span></div>
     <div class="card memo-card">
-      <input type="text" placeholder="例如：周三给老师打电话（支持「下周五」等日期表达）" aria-label="备忘内容">
+      <input type="text" placeholder="例如：周三给老师打电话（支持「下周五」等日期表达）" aria-label="备忘内容" oninput="memoParsePreview(this.value)">
+      <span class="parsechip" id="memo-parse-chip" role="status" hidden>📅 <span class="num" id="memo-parse-date">10-08</span></span>
       <input type="date" aria-label="到期日（可选）">
       <button class="btn ghost" onclick="demoFeedback('备忘已加入收件箱')">＋ 备忘</button>
     </div>
@@ -694,6 +704,16 @@ tbody tr.sel{background:var(--lv-accent-soft);box-shadow:inset 2px 0 0 var(--lv-
       <div class="card mod" onclick="openModule('favors')">
         <div class="mi t-rose">🧧</div><b>礼尚往来</b>
         <div class="stat"><b class="num">+1,200</b><span>本年净收 · 26 笔</span><span class="up badge green">顺差</span></div>
+      </div>
+      <div class="card mod" onclick="openModule('health')">
+        <div class="mi t-rose">🏥</div><b>病历与健康</b>
+        <div class="stat"><b class="num">18</b><span>条 · 就诊 3 待整理</span></div>
+        <div class="extra">⏱ 打卡绑定 2 项 · 今日强度 82</div>
+      </div>
+      <div class="card mod" onclick="openModule('exams')">
+        <div class="mi t-amber">🎓</div><b>考证管理</b>
+        <div class="stat"><b class="num">4</b><span>本证书 · 1 个考试节点</span></div>
+        <div class="extra">📝 连续打卡 5 天 · 正确率 87%</div>
       </div>
       <div class="card mod" onclick="openModule('schooling')">
         <div class="mi t-amber">🧒</div><b>上学管理</b>
@@ -789,6 +809,7 @@ tbody tr.sel{background:var(--lv-accent-soft);box-shadow:inset 2px 0 0 var(--lv-
       <span style="flex:1"></span>
       <button class="btn ghost">📄 模板</button>
       <button class="btn ghost" title="打印 QR 标签页，扫码直达对应行" onclick="demoFeedback('QR 标签打印页')">打印标签（QR）</button>
+      <button class="btn ghost" title="当前模块导出 CSV（UTF-8 BOM，Excel 可直开）" onclick="demoFeedback('导出当前模块为 CSV')">导出 CSV</button>
       <button class="btn">在文档中打开 ↗</button>
       <button class="btn primary" onclick="openModal('certs')">＋ 新建</button>
     </div>
@@ -952,6 +973,33 @@ tbody tr.sel{background:var(--lv-accent-soft);box-shadow:inset 2px 0 0 var(--lv-
           <div class="togglerow"><div class="tt"><b>育儿管理</b><span>疫苗程序表 · 成长曲线 · 里程碑</span></div><button class="sw" onclick="this.classList.toggle('on')" aria-label="开关"></button></div>
           <div class="togglerow"><div class="tt"><b>上学管理</b><span>幼儿园 → 大学 · 升学节点 · 学费</span></div><button class="sw" onclick="this.classList.toggle('on')" aria-label="开关"></button></div>
           <div class="togglerow"><div class="tt"><b>零花钱与压岁钱</b><span>多账户 · 发放周期 · 用途标签</span></div><button class="sw" onclick="this.classList.toggle('on')" aria-label="开关"></button></div>
+        </div>
+        <div class="card set-card">
+          <h3>提醒</h3>
+          <div class="hint">每类规则的提前提醒天数可按模块微调；站外通知尊重免打扰时段。以下为演示值。</div>
+          <div class="togglerow"><div class="tt"><b>证件 · 提前提醒</b><span>护照 365 天 / 证件 90 天 / 签注 30 天</span></div><input type="number" value="90" style="width:72px;padding:6px 10px;border-radius:var(--lv-r-2);border:1px solid var(--lv-line);background:var(--lv-surface-2);color:var(--lv-tx);font:inherit" aria-label="提前天数（演示）"></div>
+          <div class="togglerow"><div class="tt"><b>免打扰时段</b><span>22:00 → 08:00 不推送站外通知</span></div><span class="badge gray">演示</span></div>
+          <div class="togglerow"><div class="tt"><b>站外推送（Webhook）</b><span>Bark / ntfy · 到期当日推送</span></div><button class="sw" onclick="this.classList.toggle('on')" aria-label="开关"></button></div>
+          <div class="togglerow"><div class="tt"><b>打卡习惯绑定</b><span>成员 × 习惯 × 指标，总览只读强度摘要</span></div><span class="badge green">2 项</span></div>
+        </div>
+        <div class="card set-card">
+          <h3>数据与迁移</h3>
+          <div class="hint">设置 JSON 导出导入（导入前自动备份，可回滚）；示例数据带【示例】前缀，可一键清除；诊断包脱敏后导出。</div>
+          <div class="sg-row">
+            <button class="btn" onclick="demoFeedback('导出设置 JSON')">导出设置</button>
+            <button class="btn" onclick="demoFeedback('导入设置（导入前自动备份）')">导入设置</button>
+            <button class="btn" onclick="demoFeedback('导出脱敏诊断包')">导出诊断包</button>
+            <button class="btn" onclick="demoFeedback('生成【示例】前缀演示数据')">生成示例数据</button>
+            <button class="btn ghost" onclick="demoFeedback('清除全部示例数据')">清除示例数据</button>
+            <button class="btn ghost" onclick="demoFeedback('逐模块实际读取校验（最小健康检查）')">健康检查</button>
+          </div>
+        </div>
+        <div class="card set-card">
+          <h3>生态接入</h3>
+          <div class="hint">与打卡 / 考试 / 人脉等插件的联动；未安装时仅展示占位，不建库。</div>
+          <div class="togglerow"><div class="tt"><b>小驴打卡</b><span>习惯强度摘要 → 总览模块卡</span></div><span class="badge gray">规划</span><button class="sw" onclick="this.classList.toggle('on')" aria-label="开关" disabled></button></div>
+          <div class="togglerow"><div class="tt"><b>小驴考试</b><span>连击与正确率 → 考证模块卡</span></div><span class="badge gray">规划</span><button class="sw" onclick="this.classList.toggle('on')" aria-label="开关" disabled></button></div>
+          <div class="togglerow"><div class="tt"><b>小驴人脉</b><span>成员绑定联系人快照（只存引用）</span></div><span class="badge gray">规划</span><button class="sw" onclick="this.classList.toggle('on')" aria-label="开关" disabled></button></div>
         </div>
       </div>
     </div>
@@ -1285,7 +1333,7 @@ function toggleTheme(){
 }
 
 /* 只操作本页合成样例；以下状态和表单均不调用思源或模型。 */
-const moduleLabels={certs:'证件管理',medicine:'家庭药箱','assets-real':'实物资产',memberships:'会员与订阅',favors:'礼尚往来',schooling:'上学管理',media:'影音书库',shopping:'购物'};
+const moduleLabels={certs:'证件管理',medicine:'家庭药箱','assets-real':'实物资产',memberships:'会员与订阅',favors:'礼尚往来',schooling:'上学管理',media:'影音书库',shopping:'购物',health:'病历与健康',exams:'考证管理'};
 const demoReminderRows=[{module:'certs',member:'mom',days:-2},{module:'parenting',member:'child',days:3},{module:'memberships',member:'self',days:12},{module:'insurance',member:'self',days:25},{module:'adhoc',member:'self',days:5}];
 const demoFilters={member:'all',module:'all',days:'30'};
 const demoMemberNames={all:'全家',self:'我',spouse:'老婆',child:'儿子',mom:'妈妈'};
@@ -1477,8 +1525,16 @@ document.addEventListener('keydown',e=>{
 });
 
 /* 原型状态反馈：演示动作只改变界面，不写入思源数据。 */
-function demoFeedback(action){
-  const toast=$('#prototype-toast');
+/* 262 波灵感融合（Todoist quick add）：备忘输入即时预览解析出的日期（演示正则，生产走 parseNaturalDate）。 */
+function memoParsePreview(value){
+  const chip=$('#memo-parse-chip'),dateEl=$('#memo-parse-date');
+  const m=value.match(/(明天|后天|下?周[一二三四五六日天]|\d{1,2}月\d{1,2}[日号])/);
+  const sample={'明天':'10-02','后天':'10-03','下周三':'10-08','周三':'10-08'};
+  if(m&&!$('#s-overview .memo-card input[type=date]').value){
+    chip.hidden=false;dateEl.textContent=sample[m[1]]||'10-15';
+  }else{chip.hidden=true}
+}
+function demoFeedback(action){  const toast=$('#prototype-toast');
   toast.textContent=`演示反馈：${action}（未写入业务数据）`;toast.classList.add('show');
   window.clearTimeout(window.__lvToast);window.__lvToast=window.setTimeout(()=>toast.classList.remove('show'),2400);
 }

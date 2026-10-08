@@ -119,8 +119,14 @@
     gap: 12px;
     // 控件较多时在行内自然换行，避免窄容器依赖额外的横向滚动。
     flex-wrap: wrap;
-    padding: 10px 0;
+    padding: 10px 8px;
+    margin: 0 -8px;
     border-bottom: 1px solid var(--lv-line);
+    // 260 波：行级 hover 反馈——开关行是可操作控件，给一层极浅的底色提示命中范围
+    border-radius: var(--lv-r-1);
+    transition: background var(--lv-t-fast) var(--lv-ease);
+
+    &:hover { background: color-mix(in srgb, var(--lv-surface-2) 62%, transparent); }
 
     .b3-card__info-meta {
         font-size: 12px;
@@ -287,6 +293,15 @@
     }
 }
 
+// 269 波：svelteDialog 宿主的 .dialog-content 是 display:flex（row），而 .lv-home 带
+// container-type:inline-size（尺寸包含）——flex item 无法从内容推导宽度，设置面板
+// 塌缩成 226px 竖条（真机审计截图实锤）。显式撑满：flex 拉伸 + 宽度 100%
+.dialog-content .lv-home {
+    flex: 1 1 auto;
+    width: 100%;
+    min-width: 0;
+}
+
 // 257 波：插件自建弹窗家族（body 层、无 .lv-home 作用域）内的辅助文字统一中性化——
 // ft__on-surface 在思源默认暗色主题下发蓝，与主面板的中性灰语言冲突。
 // 全部弹窗内容容器遵循 #lv-* id 约定，按清单收敛；新增弹窗记得把容器 id 加进来
@@ -304,12 +319,92 @@
     }
 }
 
+// 263 波：台账详情弹窗 → 右滑抽屉形态（对齐原型 .drawer：440px 贴右全高 + 蒙层模糊 +
+// 弹簧入场）。纯 CSS 改造——openDetail 的 DOM 构建逻辑（附件上传/编辑/续期历史）原样保留，
+// 只换容器呈现；body 层拿不到 lv token，按 07 §1 用 b3 变量现场派生
+.b3-dialog:has(#lv-detail-body) {
+    // 思源 .b3-dialog 是 flex 居中容器——抽屉要贴右停靠，改为尾对齐 + 纵向拉伸
+    justify-content: flex-end;
+    align-items: stretch;
+
+    .b3-dialog__scrim {
+        backdrop-filter: blur(3px);
+        -webkit-backdrop-filter: blur(3px);
+    }
+
+    .b3-dialog__container {
+        right: 0 !important;
+        left: auto !important;
+        top: 0 !important;
+        bottom: 0 !important;
+        width: min(440px, 94vw) !important;
+        height: 100% !important;
+        max-width: none !important;
+        max-height: none !important;
+        border-radius: 0 !important;
+        border-left: 1px solid var(--b3-border-color);
+        box-shadow: 0 24px 64px rgba(0, 0, 0, .30), 0 6px 16px rgba(0, 0, 0, .18);
+        display: flex;
+        flex-direction: column;
+        animation: lv-drawer-in 320ms cubic-bezier(.32, .72, 0, 1);
+    }
+
+    .b3-dialog__header {
+        padding: 16px 20px;
+        border-bottom: 1px solid var(--b3-border-color);
+        font-size: 15px;
+        font-weight: 600;
+    }
+
+    .b3-dialog__content {
+        flex: 1;
+        min-height: 0; // 269 波：缺此值内容不收缩，动作栏被长 kv 列表顶出容器外（审计实证）
+        overflow: auto;
+        padding: 18px 20px !important;
+    }
+
+    // 内容自身不再限高——滚动交给 .b3-dialog__content（抽屉主体），避免双滚动条
+    #lv-detail-body {
+        max-height: none !important;
+        overflow: visible !important;
+    }
+
+    .b3-dialog__action {
+        // 269 波：思源默认把动作栏绝对定位在底部——会盖住长 kv 列表尾行（审计实证），
+        // 抽屉形态下强制回 flex 流（static），由容器布局承担；不透明底防滚动内容透出
+        position: static !important;
+        flex: none;
+        background: var(--b3-theme-surface);
+        padding: 12px 20px;
+        border-top: 1px solid var(--b3-border-color);
+    }
+}
+
+@keyframes lv-drawer-in {
+    from { transform: translateX(36px); opacity: 0; }
+    to { transform: none; opacity: 1; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .b3-dialog:has(#lv-detail-body) .b3-dialog__container { animation: none !important; }
+}
+
 // 17 组：紧急信息卡打印样式——隐藏导航/操作/输入，保留核心数据。
 // 258 波重写：① lv token 在打印媒介下整体翻纸面（此前只覆写根节点，暗色主题会留下
 //   深色卡片块+浅字）；② 打印色板为独立媒介固定色值，不跟随屏幕主题（07 §1 豁免的
 //   边界=打印输出，注释在此声明）；③ button 一刀切隐藏会连日历格（.lv-cal-cell 本身
 //   是 button）一起杀掉，补豁免。
 @media print {
+    // 269 波（审计发现）：打印时 body 级弹窗/蒙层/通知会一起打进纸——打印只关心面板内容
+    .b3-dialog,
+    .b3-mask,
+    .b3-snackbar,
+    .lv-mask,
+    .lv-modal,
+    .lv-drawer {
+        display: none !important;
+    }
+
     .lv-tabbar,
     .filters,
     .lv-toolbar,

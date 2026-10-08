@@ -134,6 +134,37 @@
         if (it) { b.itemName = it.name; b.metric = defaultMetric(it.kind); }
     }
 
+    // 263 波（脏检查）：归一化 helper 与 save() 共用同一份实现——判断口径=落盘口径，永不漂移
+    const clampHour = (v: number, fallback: number) => (Number.isFinite(v) ? Math.min(23, Math.max(0, Math.round(v))) : fallback);
+    const normWebhookUrl = (u: string) => u.trim().replace(/\/+$/, "");
+    const normLeads = (d: Record<string, string>) => Object.fromEntries(
+        Object.entries(d)
+            .map(([k, v]) => [k, v.trim() === "" ? null : Number(v)] as [string, number | null])
+            .filter(([, v]) => v !== null && Number.isFinite(v as number) && (v as number) >= 0)
+            .map(([k, v]) => [k, Math.min(3650, v as number)]),
+    );
+    const memberKey = (m: FamilyMember) => JSON.stringify([m.id, m.name.trim() || "?", m.role, m.birthday ?? "", m.sex ?? "", m.lunarBirthday === true]);
+
+    // settings 是普通对象（属性写不触发响应）——保存落盘后 bump 一次，强迫 dirty 重评
+    let savedTick = $state(0);
+
+    /** 草稿是否偏离已保存设置（footer 徽章；四种生效参数全部覆盖） */
+    const dirty = $derived.by(() => {
+        void savedTick;
+        const s = settings;
+        const normModules = (ids: string[]) => [...new Set(ids)].sort();
+        if (JSON.stringify(normModules(draftEnabled)) !== JSON.stringify(normModules(s.enabledModules))) return true;
+        if (draftMembers.map(memberKey).join("|") !== s.members.map(memberKey).join("|")) return true;
+        if (clampHour(draftNotifyHour, 8) !== s.notifyHour) return true;
+        if (clampHour(draftSilentFrom, 22) !== s.silentFrom || clampHour(draftSilentTo, 8) !== s.silentTo) return true;
+        if (draftWebhookMode !== (s.webhookMode === "ntfy" ? "ntfy" : "bark")) return true;
+        if (normWebhookUrl(draftWebhookUrl) !== (s.webhookUrl ?? "")) return true;
+        if ((draftWebhookEnabled && normWebhookUrl(draftWebhookUrl) !== "") !== (s.webhookEnabled ?? false)) return true;
+        if (JSON.stringify(normLeads(draftLeads)) !== JSON.stringify(s.leadOverrides ?? {})) return true;
+        if (JSON.stringify(normalizeCheckinBindings(draftBindings)) !== JSON.stringify(s.checkinBindings ?? [])) return true;
+        return false;
+    });
+
     // C8b：禁用模块需确认（数据保留语义：只隐藏入口与提醒，台账行不动）
     function toggleModule(id: string, alwaysOn?: boolean) {
         if (alwaysOn) return;
@@ -222,7 +253,7 @@
         const dlg = new Dialog({
             title: t("diag.ambigTitle"),
             content: `<div class="b3-dialog__content" id="lv-ambig-body" style="max-height:60vh;overflow:auto"></div>
-<div class="b3-dialog__action"><button class="b3-button b3-button--cancel" id="lv-ambig-cancel">${t("cancel")}</button><button class="b3-button b3-button--text" id="lv-ambig-ok">${t("save")}</button></div>`,
+<div class="b3-dialog__action"><button class="b3-button b3-button--cancel" id="lv-ambig-cancel">${t("cancel")}</button><button class="b3-button" id="lv-ambig-ok">${t("save")}</button></div>`,
             width: "520px",
         });
         const body = dlg.element.querySelector("#lv-ambig-body") as HTMLElement;
@@ -325,21 +356,16 @@
             const modulesChanged = draftEnabled.length !== prevModules.size || draftEnabled.some((id) => !prevModules.has(id));
             plugin.settings.enabledModules = [...draftEnabled];
             plugin.settings.members = draftMembers.map((m) => ({ ...m, name: m.name.trim() || "?" }));
-            // C8c：提醒设置落盘（无效时段值忽略，保持 0-23 界内）
-            const clampHour = (v: number, fallback: number) => (Number.isFinite(v) ? Math.min(23, Math.max(0, Math.round(v))) : fallback);
+            // C8c：提醒设置落盘（无效时段值忽略，保持 0-23 界内）；263 波起与脏检查共用 clampHour
             plugin.settings.notifyHour = clampHour(draftNotifyHour, 8);
             plugin.settings.silentFrom = clampHour(draftSilentFrom, 22);
             plugin.settings.silentTo = clampHour(draftSilentTo, 8);
-            // 229 波：Webhook 落盘（URL 归一去尾斜杠/空白；空串=不推送）
-            plugin.settings.webhookEnabled = draftWebhookEnabled && draftWebhookUrl.trim() !== "";
-            plugin.settings.webhookUrl = draftWebhookUrl.trim().replace(/\/+$/, "");
+            // 229 波：Webhook 落盘（URL 归一去尾斜杠/空白；空串=不推送）；263 波起与脏检查共用 normWebhookUrl
+            plugin.settings.webhookEnabled = draftWebhookEnabled && normWebhookUrl(draftWebhookUrl) !== "";
+            plugin.settings.webhookUrl = normWebhookUrl(draftWebhookUrl);
             plugin.settings.webhookMode = draftWebhookMode;
-            plugin.settings.leadOverrides = Object.fromEntries(
-                Object.entries(draftLeads)
-                    .map(([k, v]) => [k, v.trim() === "" ? null : Number(v)] as [string, number | null])
-                    .filter(([, v]) => v !== null && Number.isFinite(v as number) && (v as number) >= 0)
-                    .map(([k, v]) => [k, Math.min(3650, v as number)]),
-            );
+            // 263 波：与脏检查共用 normLeads
+            plugin.settings.leadOverrides = normLeads(draftLeads);
             // EC09：打卡绑定落盘（清洗在 normalize——缺 id/metric 非法剔除、去重）
             plugin.settings.checkinBindings = normalizeCheckinBindings(draftBindings);
             await saveSettings(plugin as any, plugin.settings);
@@ -362,6 +388,7 @@
             } else {
                 showMessage(t("saved"), 2000, "info");
             }
+            savedTick += 1; // 263 波：落盘完成后重评 dirty（settings 非响应式，见上）
         } catch (e) {
             // §15/186 波：saveSettings 重试仍失败（或成员同步抛错）→ 显式上报，不静默假成功
             showMessage(`${t("settings.saveFailed")}${e instanceof Error ? ` (${e.message})` : ""}`, 6000, "error");
@@ -398,8 +425,10 @@
                         <div class="fn__flex-1 fn__flex-column">
                             <span>
                                 {t(`module.${mod.id}`)}
-                                {#if mod.alwaysOn}<span class="b3-chip b3-chip--secondary b3-chip--small">{t("alwaysOn")}</span>{/if}
-                                {#if mod.devStatus === "skeleton"}<span class="b3-chip b3-chip--primary b3-chip--small">{t("skeleton")}</span>{/if}
+                                <!-- 259 波：徽章归入 lv 体系（灰阶）——此前 31 行"开发中"全蓝 b3-chip
+                                     让整个模块页充满主色噪点；徽章=属性标注，不抢开关的主角色 -->
+                                {#if mod.alwaysOn}<span class="lv-badge gray">{t("alwaysOn")}</span>{/if}
+                                {#if mod.devStatus === "skeleton"}<span class="lv-badge gray">{t("skeleton")}</span>{/if}
                             </span>
                             <span class="b3-card__info-meta">{t(`module.${mod.id}.desc`)}</span>
                             {#if mod.suggestRoles?.length && !enabledIds.has(mod.id)}
@@ -594,7 +623,7 @@
             {#each ["qiandao", "contacts", "glean", "exam", "flashcard", "leiqie"] as eco (eco)}
                 <div class="fn__flex lv-settings__row">
                     <input type="checkbox" class="b3-switch" disabled />
-                    <span class="fn__flex-1">{t(`eco.${eco}`)} <span class="b3-chip b3-chip--small">{t("settings.ecoPlanned")}</span></span>
+                    <span class="fn__flex-1">{t(`eco.${eco}`)} <span class="lv-badge gray">{t("settings.ecoPlanned")}</span></span>
                 </div>
             {/each}
         </div>
@@ -676,6 +705,9 @@
             <button class="b3-button b3-button--text" onclick={coreOnly}>{t("coreOnly")}</button>
         {/if}
         <span class="fn__flex-1"></span>
+        <!-- 263 波：未保存更改徽章（脏检查口径=落盘口径）——设置页有两种生效心智（草稿+保存），
+             让"改了但还没保存"可见，不再靠猜 -->
+        {#if dirty}<span class="lv-badge orange" role="status">● {t("settings.unsaved")}</span>{/if}
         <!-- 256 波：保存是设置视图唯一核心动作，升为主按钮（对齐原型"主按钮每视图 ≤1 个"） -->
         <button class="lv-btn primary" disabled={saving} onclick={save}>{t("save")}</button>
     </div>

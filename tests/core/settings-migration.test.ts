@@ -91,6 +91,18 @@ describe("坏文件容错（15 组）", () => {
         expect((saved["settings.json.corrupted.json"] as any).reason).toContain("non-object");
     });
 
+    it("SiYuan 缺失文件返回空字符串 → 按未建库默认值处理，不误报损坏", async () => {
+        const saved: Record<string, unknown> = {};
+        const plugin = {
+            loadData: async () => "",
+            saveData: async (name: string, value: unknown) => { saved[name] = value; },
+        } as any;
+        const s = await loadSettings(plugin);
+        expect(s.corruptedSettings).toBeUndefined();
+        expect(saved["settings.json.corrupted.json"]).toBeUndefined();
+        expect(s.onboarded).toBe(false);
+    });
+
     it("设置字段逐项归一化：null/数组/错型不会穿透到运行时", async () => {
         const plugin = pluginWithSettings({
             enabledModules: ["certs", 42, null],

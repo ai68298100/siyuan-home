@@ -89,7 +89,9 @@ export async function armFullRender(page) {
             el.dataset.reparented = "1";
             document.body.appendChild(el);
         }
-        el.style.cssText = "position:fixed;inset:auto;top:0;left:0;z-index:9999;background:var(--b3-theme-background);overflow:visible;height:auto;padding:16px";
+        // width 必须显式给定：.lv-home 带 container-type:inline-size（尺寸包含），
+        // 固定定位下不设宽度会把 inline-size 解析为 0，整面板塌缩成竖条
+        el.style.cssText = "position:fixed;inset:auto;top:0;left:0;width:calc(100vw - 32px);z-index:9999;background:var(--b3-theme-background);overflow:visible;height:auto;padding:16px";
     });
     await sleep(600);
 }

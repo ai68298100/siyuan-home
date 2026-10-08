@@ -3,6 +3,7 @@
     import Reminders from "./screens/reminders.svelte";
     import Ledger from "./screens/ledger.svelte";
     import Members from "./screens/members.svelte";
+    import QuickCapture from "./quick-capture.svelte";
     import ErrorBoundary from "./error-boundary.svelte";
     import type { HomePluginLike } from "@/types/plugin";
 
@@ -11,6 +12,32 @@
     const t = (key: string) => String(plugin.i18n[key] ?? key);
 
     type ScreenId = "overview" | "reminders" | "ledger" | "members";
+    // 261 波：切页签滚回面板顶部（对齐原型 go() 的 scrollTo；此前从长列表中部切页，
+    // 新页签直接从半腰开始展示）。滚动所有者= .lv-home（overflow:auto）
+    let homeEl: HTMLElement;
+    function gotoScreen(s: ScreenId) {
+        if (screen === s) return;
+        screen = s;
+        requestAnimationFrame(() => homeEl?.scrollTo({ top: 0 }));
+    }
+    // 267 波：快速记录弹层（常驻挂载保草稿；任意页签 ⚡ 呼出）
+    let captureOpen = $state(false);
+    // 268 波（Linear 式键盘优先）：N 键任意页签呼出快速记录——只在非输入焦点、
+    // 无修饰键、非输入法组合、宿主弹窗未开时响应
+    $effect(() => {
+        const onKey = (e: KeyboardEvent) => {
+            if (captureOpen) return;
+            if (e.key !== "n" && e.key !== "N") return;
+            if (e.isComposing || e.metaKey || e.ctrlKey || e.altKey) return;
+            const el = e.target as HTMLElement | null;
+            if (el && (["INPUT", "TEXTAREA", "SELECT"].includes(el.tagName) || el.isContentEditable)) return;
+            if (document.querySelector(".b3-dialog")) return; // 设置/续期等宿主弹窗打开时不抢键
+            e.preventDefault();
+            captureOpen = true;
+        };
+        window.addEventListener("keydown", onKey);
+        return () => window.removeEventListener("keydown", onKey);
+    });
     // 状态栏/通知入口可预选页签（plugin.pendingScreen，消费后清空）——初始快照为设计意图。
     // 单次读取落局部量：快照语义不变，且消除同逻辑两处 state_referenced_locally 警告
     // svelte-ignore state_referenced_locally
@@ -42,7 +69,7 @@
         event.preventDefault();
         const next = event.key === "Home" ? 0 : event.key === "End" ? screens.length - 1
             : (index + (event.key === "ArrowRight" ? 1 : -1) + screens.length) % screens.length;
-        screen = screens[next].id;
+        gotoScreen(screens[next].id);
         requestAnimationFrame(() => (navEl?.querySelector(`[data-s="${screens[next].id}"]`) as HTMLButtonElement | undefined)?.focus());
     }
     $effect(() => {
@@ -71,7 +98,7 @@
     });
 </script>
 
-<div class="lv-home lv-tab">
+<div class="lv-home lv-tab" bind:this={homeEl}>
     <header class="lv-tabbar">
         <div class="lv-appbrand">
             <span class="lv-logo" aria-hidden="true">🏠</span>
@@ -86,17 +113,25 @@
             {#each screens as s, i (s.id)}
                 <button id={`lv-tab-${s.id}`} data-s={s.id} class="lv-tabs__item" class:on={screen === s.id}
                     role="tab" aria-selected={screen === s.id} aria-current={screen === s.id ? "page" : undefined} aria-controls={`lv-panel-${s.id}`}
-                    tabindex={screen === s.id ? 0 : -1} onkeydown={(e) => onTabKeydown(e, i)} onclick={() => (screen = s.id)}>
+                    tabindex={screen === s.id ? 0 : -1} onkeydown={(e) => onTabKeydown(e, i)} onclick={() => gotoScreen(s.id)}>
                     {t(s.key)}
                     {#if s.id === "reminders" && pendingTotal > 0}<i class="lv-dot" aria-hidden="true"></i>{/if}
                 </button>
             {/each}
         </div>
         <span class="fn__flex-1"></span>
-        <span class="lv-tabbar__meta lv-caption">
-            {t("hub.scannedAt")} {plugin.scan ? new Date(plugin.scan.scannedAt).toLocaleTimeString() : "—"}
+        <!-- 259 波（对齐原型 hub-status）：呼吸状态点 + mono 扫描时间——全产品唯一常驻动效（07 §5 #5）。
+             绿=已扫描 / 橙=快照陈旧 / 红=有扫描错误（错误态不呼吸）。时间读 runtime.scannedAt：
+             plugin.scan 首轮扫描完成前为空，此前"扫描于 —"与 strip 的快照时间互相矛盾 -->
+        <span class="lv-hubstatus lv-caption" role="status"
+            aria-label={`${t("hub.scannedAt")} ${plugin.runtime?.scannedAt ? new Date(plugin.runtime.scannedAt).toLocaleTimeString() : "—"}${plugin.scan?.errors?.length ? ` · ${t("dash.stripErrors")} ${plugin.scan.errors.length}` : ""}`}>
+            <i class="lv-pulse" class:orange={plugin.scan?.stale && !plugin.scan?.errors?.length}
+                class:red={(plugin.scan?.errors?.length ?? 0) > 0} aria-hidden="true"></i>
+            <span class="lv-num">{plugin.runtime?.scannedAt ? new Date(plugin.runtime.scannedAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) : "—"}</span>
             {#if plugin.scan?.stale}<span class="lv-badge orange" title={plugin.scan.errors.map((e) => e.moduleId).join(", ")}>{t("hub.stale")}</span>{/if}
         </span>
+        <!-- 267 波：⚡ 快速记录（原型 top-actions 主入口；268 波支持 N 键呼出） -->
+        <button class="lv-iconbtn" aria-label={t("capture.title")} title={`${t("capture.title")} (N)`} style="font-size:15px" onclick={() => (captureOpen = true)}>⚡</button>
         <button class="lv-iconbtn" aria-label={t("tab.settings")} title={t("tab.settings")} style="font-size:15px" onclick={() => plugin.openSetting()}>⚙</button>
     </header>
 
@@ -104,7 +139,7 @@
         <div id={`lv-panel-${screen}`} class="lv-screen lv-anim" role="tabpanel" tabindex="0" aria-labelledby={`lv-tab-${screen}`}>
             <ErrorBoundary {t} onretry={() => { /* screen switch resets naturally via {#key} */ }}>
                 {#if screen === "overview"}
-                    <Overview {plugin} {t} {version} onGoto={(s: ScreenId) => (screen = s)} />
+                    <Overview {plugin} {t} {version} onGoto={(s: ScreenId) => gotoScreen(s)} />
                 {:else if screen === "reminders"}
                     <Reminders {plugin} {t} {version} />
                 {:else if screen === "ledger"}
@@ -115,4 +150,7 @@
             </ErrorBoundary>
         </div>
     {/key}
+
+    <!-- 267 波：快速记录弹层（常驻挂载——关闭仅收起，草稿保留） -->
+    <QuickCapture {plugin} {t} {version} bind:open={captureOpen} />
 </div>

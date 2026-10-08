@@ -33,6 +33,23 @@ const api2 = async (path, body) => {
     return r.json();
 };
 
+// 建库/示例数据会串行调用多个内核接口，不能用固定短延时判断完成。
+// 轮询磁盘侧设置，同时把 404/非对象响应视为“尚未落盘”，避免把异步写入误报为失败。
+const readSettings = async () => {
+    try {
+        const value = await api("/api/file/getFile", { path: "/data/storage/petal/siyuan-home/settings.json" });
+        return value && typeof value === "object" && !Array.isArray(value) && !("code" in value) ? value : null;
+    } catch { return null; }
+};
+const waitForSettings = async (predicate, timeoutMs = 180000) => {
+    for (let elapsed = 0; elapsed < timeoutMs; elapsed += 2000) {
+        const value = await readSettings();
+        if (value && predicate(value)) return value;
+        await sleep(2000);
+    }
+    return await readSettings();
+};
+
 // 页面侧工具：按文本点击 / 面板打开 / 等待
 const pClickByText = (page, texts, scope = "button, .b3-chip, [role=tab], select, option") =>
     page.evaluate(([ts, sc]) => {
@@ -90,9 +107,10 @@ const browser = await chromium.launch({ channel: "msedge", headless: true });
     await pClickByText(page, ["＋"]); await sleep(250);
     await pClickByText(page, ["下一步 →", "下一步"]); await sleep(800);
     await pClickByText(page, ["✓ 完成并录第一条证件", "完成引导"]); 
-    await sleep(14000);
+    // 首启会按模块顺序建库，等待磁盘状态而不是猜测固定耗时。
+    const onboardedSettings = await waitForSettings((s) => s.onboarded === true && s.dbRefs && Object.keys(s.dbRefs).length >= 5);
     // getFile 直接返回文件内容（非信封）——res.json() 即 settings 对象
-    const j = await api("/api/file/getFile", { path: "/data/storage/petal/siyuan-home/settings.json" });
+    const j = onboardedSettings ?? {};
     let refs = {}, onboarded = false, errs = [];
     try { refs = j.dbRefs ?? {}; onboarded = !!j.onboarded;
         errs = Object.entries(refs).filter(([, v]) => v.provisionError).map(([k]) => k); } catch { /* noop */ }
@@ -116,13 +134,8 @@ const browser = await chromium.launch({ channel: "msedge", headless: true });
     await pClickByText(page, ["生成示例数据"], "button");
     // 268 波：断言以磁盘结果为主（成员+行落盘），toast 时序受扫描耗时/系统条影响仅作辅助
     let diskDemo = { ids: 0, rows: 0 };
-    for (let i = 0; i < 30; i++) {
-        await sleep(2000);
-        diskDemo = await api("/api/file/getFile", { path: "/data/storage/petal/siyuan-home/settings.json" })
-            .then((j) => ({ ids: (j.demoMemberIds ?? []).length, rows: Object.keys(j.demoRows ?? {}).length }))
-            .catch(() => ({ ids: 0, rows: 0 }));
-        if (diskDemo.ids >= 2 && diskDemo.rows >= 2) break;
-    }
+    const demoSettings = await waitForSettings((s) => (s.demoMemberIds ?? []).length >= 2 && Object.keys(s.demoRows ?? {}).length >= 2);
+    diskDemo = { ids: (demoSettings?.demoMemberIds ?? []).length, rows: Object.keys(demoSettings?.demoRows ?? {}).length };
     const toast = await pToast(page);
     rec("S1.5-演示数据", "生成示例数据", diskDemo.ids >= 2 && diskDemo.rows >= 2, `磁盘 成员${diskDemo.ids}/行${diskDemo.rows}；toast=${toast.slice(0, 40)}`);
     await page.keyboard.press("Escape"); await sleep(1000);
@@ -235,13 +248,8 @@ const browser = await chromium.launch({ channel: "msedge", headless: true });
     await pClickByText(page, ["关于"], ".b3-dialog button"); await sleep(1200);
     await pClickByText(page, ["生成示例数据"], "button");
     let diskDemo2 = { ids: 0 };
-    for (let i = 0; i < 30; i++) {
-        await sleep(2000);
-        diskDemo2 = await api("/api/file/getFile", { path: "/data/storage/petal/siyuan-home/settings.json" })
-            .then((j) => ({ ids: (j.demoMemberIds ?? []).length }))
-            .catch(() => ({ ids: 0 }));
-        if (diskDemo2.ids >= 2) break;
-    }
+    const demoSettings2 = await waitForSettings((s) => (s.demoMemberIds ?? []).length >= 2);
+    diskDemo2 = { ids: (demoSettings2?.demoMemberIds ?? []).length };
     const toast2 = await pToast(page);
     rec(s3, "示例数据生成回执", diskDemo2.ids >= 2, `磁盘 成员${diskDemo2.ids}；toast=${toast2.slice(0, 40)}`);
     // ICS 导出下载（先关设置回提醒页；高后果模块会弹 G1 确认 → 确认后下载）
@@ -343,7 +351,7 @@ const browser = await chromium.launch({ channel: "msedge", headless: true });
 {
     const stage = "S6-性能基线";
     // getFile 直接返回文件内容（非信封）
-    const j = await api("/api/file/getFile", { path: "/data/storage/petal/siyuan-home/settings.json" });
+    const j = await waitForSettings((s) => Boolean(s.dbRefs?.certs?.avId), 180000) ?? {};
     const avId = j.dbRefs?.certs?.avId;
     if (!avId) { rec(stage, "certs av 可用", false, "无 avId"); } else {
         const ctx = await browser.newContext({ viewport: { width: 1440, height: 900 }, locale: "zh-CN" });
@@ -405,3 +413,4 @@ await browser.close();
 writeFileSync("tmp/device-batch-results.json", JSON.stringify(results, null, 1));
 const fails = results.filter((r) => !r.pass);
 console.log(`\n==== SUMMARY: ${results.length - fails.length}/${results.length} PASS, ${fails.length} FAIL ====`);
+process.exitCode = fails.length ? 1 : 0;

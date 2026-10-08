@@ -402,11 +402,17 @@ export default class LvHomePlugin extends Plugin {
                 return cached;
             }
         }
-        const deps = { settings: this.settings, getDbRef: (id: string) => this.settings.dbRefs[id] };
+        // 264 波：行数口径收集器——providers 经 deps.onStats 上报，runScan 并入 byModule 快照
+        const moduleStats = new Map<string, { rowCount: number; memberCounts: Record<string, number> }>();
+        const deps = {
+            settings: this.settings,
+            getDbRef: (id: string) => this.settings.dbRefs[id],
+            onStats: (id: string, stats: { rowCount: number; memberCounts: Record<string, number> }) => moduleStats.set(id, stats),
+        };
         // 12 轮修复：provider 由 schemaCatalog 程序化派生（手工清单曾漏掉 parenting/schooling，
         // 两模块提醒从未生效）；覆盖契约见 registry.providerCoverage
         const providers = buildScanProviders(this.schemaCatalog, deps);
-        const scan = await runScan(providers, this.settings, this.runtime, new Date(), onlySet);
+        const scan = await runScan(providers, this.settings, this.runtime, new Date(), onlySet, moduleStats);
         // H11：扫描期间已有更新的扫描启动（或手动动作已改运行态）→ 旧结果丢弃，不落盘不广播
         if (seq !== this.scanSeq) return scan;
         this.scan = scan;

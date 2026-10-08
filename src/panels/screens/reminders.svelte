@@ -1,5 +1,6 @@
 <script lang="ts">
     import { Dialog, Menu, showMessage, confirm } from "siyuan";
+    import { fade } from "svelte/transition";
     import type { HomePluginLike } from "@/types/plugin";
     import { saveRuntime } from "@/core/hub/runtime";
     import { buildDisplay as display } from "@/core/hub/display";
@@ -8,7 +9,8 @@
     import { provisionModule } from "@/core/provisioner";
     import { toggleMemoPin } from "@/core/hub/actions";
     import Calendar from "@/panels/screens/calendar.svelte";
-    import { moduleIcon, moduleTone } from "@/core/modules";
+    import { moduleIcon } from "@/core/modules";
+    import { memberHue } from "@/core/format";
     import type { Reminder } from "@/types";
     let { plugin, t, version }: { plugin: HomePluginLike; t: (k: string) => string; version?: number } = $props();
 
@@ -36,6 +38,8 @@
         void version;
         return [...new Set((plugin.scan?.reminders ?? []).map((r: Reminder) => r.moduleId))];
     });
+    // 262 波（Todoist/Linear assignee avatar 语言）：行级成员微头像
+    const memberOf = (id: string | undefined) => (id ? (memberOptions ?? []).find((m) => m.id === id) : undefined);
     async function persistFilter() {
         plugin.runtime.hubFilter = filter;
         plugin.runtime.hubMemberId = filterMember;
@@ -113,7 +117,15 @@
     // 17 组：批量操作——选择模式下逐条勾选，批量完成/延后 7 天/忽略（H01 串行队列逐条落盘）
     let batchMode = $state(false);
     // 230 波：原生日历视图切换（列表 ⇄ 日历；批量模式仅在列表生效）
-    let viewMode = $state<"list" | "calendar">("list");
+    // 263 波：视图偏好持久化（runtime.hubViewMode，跨会话记忆）
+    // svelte-ignore state_referenced_locally
+    let viewMode = $state<"list" | "calendar">(plugin.runtime.hubViewMode ?? "list");
+    function setViewMode(mode: "list" | "calendar") {
+        if (viewMode === mode) return;
+        viewMode = mode;
+        plugin.runtime.hubViewMode = mode;
+        saveRuntime(plugin, plugin.runtime).catch((e) => console.warn("[siyuan-home] view mode persist failed:", e));
+    }
     let selected = $state<Set<string>>(new Set());
     let batchBusy = $state(false);
     const selectedCount = $derived(selected.size);
@@ -168,7 +180,7 @@
         const dlg = new Dialog({
             title: t("act.renew"),
             content: `<div class="b3-dialog__content"><div class="b3-dialog__content" id="lv-renew-sub" style="margin-bottom:8px"></div><input class="b3-text-field fn__block" id="lv-renew-date" type="date"><div class="lv-caption" id="lv-renew-err" role="alert" style="color:var(--b3-card-error-color);display:none"></div></div>
-<div class="b3-dialog__action"><button class="b3-button b3-button--cancel" id="lv-renew-cancel">${t("cancel")}</button><button class="b3-button b3-button--text" id="lv-renew-ok">${t("save")}</button></div>`,
+<div class="b3-dialog__action"><button class="b3-button b3-button--cancel" id="lv-renew-cancel">${t("cancel")}</button><button class="b3-button" id="lv-renew-ok">${t("save")}</button></div>`,
             width: "380px",
         });
         // 33.4 弹层契约：初始焦点落在日期输入
@@ -223,7 +235,8 @@
         const l2 = document.createElement("span"); l2.className = "ft__on-surface"; l2.style.minWidth = "72px"; l2.textContent = t("triage.due");
         const dateInput = document.createElement("input"); dateInput.className = "b3-text-field"; dateInput.type = "date"; dateInput.value = r.dueDate;
         row2.append(l2, dateInput);
-        const save = document.createElement("button"); save.className = "b3-button b3-button--text"; save.textContent = t("save");
+        // 260 波：确认键升为描边按钮（幽灵样式的保存键没有动作感，与取消键主次不分）
+        const save = document.createElement("button"); save.className = "b3-button"; save.textContent = t("save");
         save.addEventListener("click", async () => {
             const title = titleInput.value.trim();
             if (!title) return;
@@ -293,7 +306,7 @@
         const l3 = document.createElement("span"); l3.className = "ft__on-surface"; l3.style.minWidth = "72px"; l3.textContent = t("triage.due");
         const dateInput = document.createElement("input"); dateInput.className = "b3-text-field"; dateInput.type = "date"; dateInput.value = r.dueDate;
         row3.append(l3, dateInput);
-        const ok = document.createElement("button"); ok.className = "b3-button b3-button--text"; ok.textContent = t("triage.create");
+        const ok = document.createElement("button"); ok.className = "b3-button"; ok.textContent = t("triage.create");
         const doCreate = async () => {
             const title = nameInput.value.trim();
             if (!title) return;
@@ -341,6 +354,24 @@
         nameInput.focus();
     }
 
+    // 261 波：重扫 busy 态——31 模块串行扫描可达秒级，此前可连点堆积多次全量扫描
+    let rescanning = $state(false);
+    async function rescan() {
+        if (rescanning) return;
+        rescanning = true;
+        try {
+            await plugin.refreshHub(undefined, true);
+        } finally {
+            rescanning = false;
+        }
+    }
+
+    // 260 波：首扫 loading 态（未知 ≠ "暂无事项"，33.3/13 §3.4）
+    const firstScanPending = $derived.by(() => {
+        void version;
+        return !plugin.runtime?.scannedAt && !(plugin.scan?.errors?.length) && all.length === 0;
+    });
+
     let expandedMerges = $state<Set<string>>(new Set());
     function toggleMerge(key: string) {
         const next = new Set(expandedMerges);
@@ -370,20 +401,18 @@
 </script>
 
 {#snippet remRow(r: Reminder)}
-    <div class="lv-rem {r.level}">
+    <!-- 261 波：完成/延后后行 150ms 淡出离场（瞬消失让用户怀疑误触；respects reduced-motion 由全局降级） -->
+    <div class="lv-rem {r.level}" out:fade={{ duration: 150 }}>
         {#if batchMode}
             <input type="checkbox" class="b3-checkbox" aria-label={t("hub.select")}
                 checked={selected.has(r.id)} onchange={() => toggleSelect(r.id)} style="flex-shrink:0" />
         {/if}
-        <div class="lv-rem-ic" class:tone-blue={r.moduleId !== "adhoc" && moduleTone(r.moduleId) === "t-blue"}
-            class:tone-green={r.moduleId !== "adhoc" && moduleTone(r.moduleId) === "t-green"}
-            class:tone-rose={r.moduleId !== "adhoc" && moduleTone(r.moduleId) === "t-rose"}
-            class:tone-amber={r.moduleId !== "adhoc" && moduleTone(r.moduleId) === "t-amber"}
-        >{r.moduleId === "adhoc" ? "📝" : moduleIcon(r.moduleId)}</div>
+        <!-- 259 波：图标砖收回中性（对齐原型 .rem .ic）——级别语义由色轨+右侧大字承载 -->
+        <div class="lv-rem-ic" aria-hidden="true">{r.moduleId === "adhoc" ? "📝" : moduleIcon(r.moduleId)}</div>
         <div class="lv-rem-t" title={(r.autoRenew ? `${t("hub.autoRenew")} · ` : "") + r.dueDate}>
             <b>{r.title}{r.ruleKey === "reciprocate" ? ` · ${t("rule.reciprocate")}` : ""}</b>
-            <!-- 249 波：meta 补模块名（对齐原型三段 meta），模块名与日期并列 -->
-            <span class="lv-num">{r.moduleId !== "adhoc" ? (t(`module.${r.moduleId}`) !== `module.${r.moduleId}` ? t(`module.${r.moduleId}`) : r.moduleId) + " · " : ""}{r.dueDate}{r.lunar ? " 🌙" : ""}{r.autoRenew ? " 🔄" : ""}</span>
+            <!-- 249 波：meta 补模块名（对齐原型三段 meta）；262 波：成员微头像前置（"这是谁的事"） -->
+            <span class="lv-num">{#if memberOf(r.memberId)}{@const member = memberOf(r.memberId)}<span class="lv-miniava" style="background:linear-gradient(135deg, hsl({memberHue(member.id)} 62% 52%), hsl({(memberHue(member.id) + 42) % 360} 62% 40%))" aria-hidden="true">{member.name.slice(0, 1)}</span>{/if}{r.moduleId !== "adhoc" ? (t(`module.${r.moduleId}`) !== `module.${r.moduleId}` ? t(`module.${r.moduleId}`) : r.moduleId) + " · " : ""}{r.dueDate}{r.lunar ? " 🌙" : ""}{r.autoRenew ? " 🔄" : ""}</span>
         </div>
         <!-- 对齐原型：相对到期大字居右（颜色随级别；文字本身已承载逾期/N天后语义，级别徽章不再重复） -->
         <div class="lv-rem-when">
@@ -453,12 +482,12 @@
     <span class="fn__flex-1"></span>
     <span class="lv-tabs" style="padding:2px" role="group" aria-label={t("view.list") + "/" + t("view.calendar")}>
         <button class="lv-tabs__item" class:on={viewMode === "list"} style="min-height:28px;padding:4px 12px"
-            aria-pressed={viewMode === "list"} onclick={() => (viewMode = "list")}>{t("view.list")}</button>
+            aria-pressed={viewMode === "list"} onclick={() => setViewMode("list")}>{t("view.list")}</button>
         <button class="lv-tabs__item" class:on={viewMode === "calendar"} style="min-height:28px;padding:4px 12px"
-            aria-pressed={viewMode === "calendar"} onclick={() => (viewMode = "calendar")}>{t("view.calendar")}</button>
+            aria-pressed={viewMode === "calendar"} onclick={() => setViewMode("calendar")}>{t("view.calendar")}</button>
     </span>
     <button class="b3-button b3-button--outline" class:b3-button--text={batchMode} onclick={() => (batchMode ? clearSelection() : (batchMode = true))}>{t("hub.batch")}</button>
-    <button class="b3-button b3-button--outline" onclick={() => plugin.refreshHub(undefined, true)}>{t("hub.rescan")}</button>
+    <button class="b3-button b3-button--outline" disabled={rescanning} aria-busy={rescanning} onclick={rescan}>{t("hub.rescan")}</button>
 </div>
 
 {#if batchMode}
@@ -496,10 +525,28 @@
         </div>
     {/if}
 {:else if filtered.length === 0}
-    <div class="lv-card"><div class="lv-empty"><div class="eic">🌤</div><b>{t("dash.allClear")}</b><span>{t("hub.emptyHint")}</span></div></div>
+    {#if firstScanPending}
+        <!-- 260 波：首扫骨架（未知 ≠ 全部完成） -->
+        <div class="lv-card lv-rems" aria-busy="true" role="status">
+            {#each [0, 1, 2] as i (i)}
+                <div class="lv-rem">
+                    <div class="lv-skel" style="width:38px;height:38px;border-radius:11px;flex:none"></div>
+                    <div style="flex:1;display:flex;flex-direction:column;gap:7px;min-width:0">
+                        <div class="lv-skel" style="height:13px;width:42%"></div>
+                        <div class="lv-skel" style="height:11px;width:26%"></div>
+                    </div>
+                </div>
+            {/each}
+        </div>
+        <p class="lv-caption" style="margin:8px 2px">{t("hub.firstScan")}</p>
+    {:else}
+        <div class="lv-card"><div class="lv-empty"><div class="eic">🌤</div><b>{t("dash.allClear")}</b><span>{t("hub.emptyHint")}</span></div></div>
+    {/if}
 {:else if viewMode === "calendar"}
-    <!-- 230 波：原生日历视图（数据同列表筛选口径；动作仅"完成"，其余回列表） -->
-    <Calendar items={filtered} {t} {version} onComplete={(r: Reminder) => plugin.complete(r)}
+    <!-- 230 波：原生日历视图（数据同列表筛选口径；动作仅"完成"，其余回列表）；263 波：模式偏好持久化 -->
+    <Calendar items={filtered} {t} {version} initialMode={plugin.runtime.hubCalMode}
+        onModeChange={(m: "month" | "week") => { plugin.runtime.hubCalMode = m; saveRuntime(plugin, plugin.runtime).catch((e) => console.warn("[siyuan-home] cal mode persist failed:", e)); }}
+        onComplete={(r: Reminder) => plugin.complete(r)}
         onAddMemo={(title: string, due: string) => plugin.addMemo(title, due)}
         onConvert={(r: Reminder) => toLedgerDialog(r)} />
 {:else}

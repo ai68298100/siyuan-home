@@ -84,18 +84,23 @@
     }
     // C5a 统计 chips + 17 组/219 波生日倒计时：单遍预计算（原 statChips/birthdaySoon
     // 每成员每次渲染重复 filter+sort；现 alertsByMember 变化时单遍派生 Map）
+    // 264 波：chips 语义升级——台账行数（档案数，对齐原型 person .stats 三格），
+    // 数据源 cache.byModule[].memberCounts（随扫描快照）；此前只数"有提醒的"成员，无提醒即空卡
     interface MemberStat { chips: { label: string; n: number }[]; birthday: string | null; }
     const memberStats = $derived.by(() => {
         void version;
+        const byModule = plugin.runtime?.cache?.byModule ?? {};
         const map = new Map<string, MemberStat>();
         for (const m of members) {
+            const counts: { label: string; n: number }[] = [];
+            for (const [mid, entry] of Object.entries(byModule)) {
+                const n = entry?.memberCounts?.[m.id] ?? 0;
+                if (n > 0) counts.push({ label: t(`module.${mid}`) !== `module.${mid}` ? t(`module.${mid}`) : mid, n });
+            }
+            counts.sort((a, b) => b.n - a.n);
+            const chips = counts.slice(0, 3);
+            // 生日倒计时仍走提醒派生（alertsByMember）
             const alerts = alertsByMember.get(m.id) ?? [];
-            const byModule = new Map<string, number>();
-            for (const r of alerts) byModule.set(r.moduleId, (byModule.get(r.moduleId) ?? 0) + 1);
-            const chips = [...byModule.entries()]
-                .sort((a, b) => b[1] - a[1])
-                .slice(0, 3)
-                .map(([mid, n]) => ({ label: t(`module.${mid}`) !== `module.${mid}` ? t(`module.${mid}`) : mid, n }));
             const hit = alerts
                 .filter((r) => r.ruleKey === "birthday" && r.daysLeft <= 30)
                 .sort((a, b) => a.daysLeft - b.daysLeft)[0];
@@ -300,16 +305,20 @@
 <div class="lv-hero"><h1>{t("members.title")}</h1><p>{t("settings.membersHint")}</p></div>
 
 <div class="lv-card lv-toolbar" style="padding:14px;margin-bottom:14px">
-    <input class="b3-text-field" style="width:140px" placeholder={t("members.name")} bind:value={name} />
-    <select class="b3-select" bind:value={role}>
+    <!-- 261 波：名称回车即提交（isComposing 守卫） -->
+    <input class="b3-text-field" style="width:140px" placeholder={t("members.name")} aria-label={t("members.name")} bind:value={name}
+        onkeydown={(e: KeyboardEvent) => { if (e.key === "Enter" && !e.isComposing && name.trim()) save(); }} />
+    <!-- 265 波：select 无 placeholder 可依，补 aria-label（读屏不再只听到选项值） -->
+    <select class="b3-select" bind:value={role} aria-label={t("members.role")}>
         {#each roles as r (r)}<option value={r}>{t(`role.${r}`)}</option>{/each}
     </select>
-    <input class="b3-text-field" type="date" title={t("members.birthday")} bind:value={birthday} />
+    <input class="b3-text-field" type="date" title={t("members.birthday")} aria-label={t("members.birthday")} bind:value={birthday} />
     <label style="display:flex;gap:5px;align-items:center;font-size:12.5px;cursor:pointer">
         <input type="checkbox" bind:checked={lunar} />{t("members.lunar")}
     </label>
     {#if editId}<span class="lv-caption" style="color:var(--lv-accent)">{t("members.editing")}</span>{/if}
-    <button class="b3-button b3-button--text" onclick={save} disabled={!name.trim()}>
+    <!-- 260 波：添加/保存是本视图唯一核心动作，升为主按钮（对齐"主按钮每视图 ≤1"） -->
+    <button class="lv-btn primary sm" onclick={save} disabled={!name.trim()}>
         {editId ? t("save") : `＋ ${t("add")}`}
     </button>
     {#if editId}
@@ -365,11 +374,12 @@
             {@const s = statsOf(m.id)}
             <div class="lv-person-info">
                 {#each s.chips as c (c.label)}
-                    <span class="b3-chip b3-chip--small b3-chip--secondary">{c.label} {c.n}</span>
+                    <!-- 259 波：统计 chips 归入 lv 徽章体系（b3-chip 的黄绿底与三级文字层次冲突） -->
+                    <span class="lv-badge gray">{c.label} <b class="lv-num">{c.n}</b></span>
                 {/each}
                 {#if s.birthday}
                     <!-- 17 组/219 波：生日倒计时 chip（单遍预计算，数据来自提醒中枢既有派生） -->
-                    <span class="b3-chip b3-chip--small" style="background:var(--lv-accent);color:var(--b3-theme-surface)">🎂 {s.birthday}</span>
+                    <span class="lv-badge" style="background:var(--lv-accent-soft);color:var(--lv-accent)">🎂 {s.birthday}</span>
                 {/if}
             </div>
         {/if}
@@ -377,7 +387,8 @@
             <div class="lv-person-alert" role="status">⚠ {alertsFor(m.id).length} {alertsFor(m.id).length === 1 ? t("dash.needAttentionOne") : t("dash.needAttention")}</div>
         {/if}
         {#if expandedId === m.id}
-            <div style="border-top:1px solid var(--lv-line);padding-top:10px;display:flex;flex-direction:column;gap:6px">
+            <!-- 260 波：展开区入场动画（对齐抽屉编排语言；lv-rise 180ms） -->
+            <div class="lv-person-expanded" style="border-top:1px solid var(--lv-line);padding-top:10px;display:flex;flex-direction:column;gap:6px">
                 {#if m.contactSnapshot}
                     <div style="display:flex;gap:8px;align-items:center">
                         <span class="lv-caption" style="min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title={m.contactSnapshot}>📞 {t("field.contact")}: {m.contactSnapshot.split(" [")[0]}</span>
