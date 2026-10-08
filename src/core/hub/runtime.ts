@@ -50,6 +50,11 @@ export interface HubRuntime {
     hubModuleId?: string;
     /** 提醒中枢时间窗筛选（C3a，天）：all=不限 / 0=今天 / 7 / 30（含逾期） */
     hubDueWithin?: string;
+    /** 263 波：提醒中枢视图偏好（列表/日历）与会历模式（月/周），跨会话记忆 */
+    hubViewMode?: "list" | "calendar";
+    hubCalMode?: "month" | "week";
+    /** 267 波：快速记录弹层记住上次模块（启用模块 id；失效回退首个） */
+    hubQuickModule?: string;
     /** 台账页排序偏好（17 组：列 key + 方向，跨会话记忆） */
     ledgerSortKey?: string;
     ledgerSortAsc?: boolean;
@@ -61,8 +66,8 @@ export interface HubRuntime {
         errors: { moduleId: string; message: string }[];
         /** 运行态合并前的派生列表（H02：动作后免重扫即时重算可见集合） */
         derived: Reminder[];
-        /** 各模块上次成功快照与数据时间（H04：失败模块保留旧数据） */
-        byModule: Record<string, { reminders: Reminder[]; at: string }>;
+        /** 各模块上次成功快照与数据时间（H04：失败模块保留旧数据）；264 波：行数口径随快照 */
+        byModule: Record<string, { reminders: Reminder[]; at: string; rowCount?: number; memberCounts?: Record<string, number> }>;
     };
     /** 延后：提醒 id → 新到期日 */
     snoozed: Record<string, string>;
@@ -178,7 +183,18 @@ function normalizeCache(value: unknown): HubRuntime["cache"] {
     if (isPlainObject(value.byModule)) {
         for (const [id, raw] of Object.entries(value.byModule)) {
             if (isPlainObject(raw) && typeof raw.at === "string" && Array.isArray(raw.reminders)) {
-                byModule[id] = { reminders: normalizeReminders(raw.reminders), at: raw.at };
+                // 264 波：行数口径随快照归一（缺/坏值回退 undefined=无口径，界面回退旧呈现）
+                const rowCount = typeof raw.rowCount === "number" && Number.isFinite(raw.rowCount) && raw.rowCount >= 0
+                    ? raw.rowCount
+                    : undefined;
+                byModule[id] = {
+                    reminders: normalizeReminders(raw.reminders),
+                    at: raw.at,
+                    ...(rowCount !== undefined ? { rowCount } : {}),
+                    ...(isPlainObject(raw.memberCounts) && Object.keys(numberRecord(raw.memberCounts)).length > 0
+                        ? { memberCounts: numberRecord(raw.memberCounts) }
+                        : {}),
+                };
             }
         }
     }
@@ -227,6 +243,11 @@ export async function loadRuntime(plugin: Plugin): Promise<HubRuntime> {
         hubMemberId: optionalString("hubMemberId"),
         hubModuleId: optionalString("hubModuleId"),
         hubDueWithin: optionalString("hubDueWithin"),
+        // 263 波：视图偏好（枚举归一，坏值回退 undefined=默认视图）
+        hubViewMode: data.hubViewMode === "calendar" || data.hubViewMode === "list" ? data.hubViewMode : undefined,
+        hubCalMode: data.hubCalMode === "month" || data.hubCalMode === "week" ? data.hubCalMode : undefined,
+        // 267 波：快速记录上次模块（坏值回退 undefined=首个启用模块）
+        hubQuickModule: optionalString("hubQuickModule"),
         ledgerSortKey: optionalString("ledgerSortKey"),
         ledgerSortAsc: typeof data.ledgerSortAsc === "boolean" ? data.ledgerSortAsc : undefined,
         cache: normalizeCache(data.cache),

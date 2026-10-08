@@ -409,7 +409,7 @@
                 content: `<div class="b3-dialog__content" id="lv-csvimp-body" style="max-height:60vh;overflow:auto">
 <p class="lv-caption ft__on-surface">${t("ledger.importMapHint").replace("${file}", file.name).replace("${n}", String(table.length - 1))}</p>
 <div id="lv-csvimp-map"></div></div>
-<div class="b3-dialog__action"><span class="lv-caption" style="flex:1" id="lv-csvimp-stat"></span><button class="b3-button b3-button--cancel" id="lv-csvimp-close">${t("cancel")}</button><button class="b3-button b3-button--text" id="lv-csvimp-start">${t("ledger.importStart")}</button></div>`,
+<div class="b3-dialog__action"><span class="lv-caption" style="flex:1" id="lv-csvimp-stat"></span><button class="b3-button b3-button--cancel" id="lv-csvimp-close">${t("cancel")}</button><button class="b3-button" id="lv-csvimp-start">${t("ledger.importStart")}</button></div>`,
                 width: "560px",
             });
             const mapBox = dlg.element.querySelector("#lv-csvimp-map") as HTMLElement;
@@ -685,10 +685,12 @@
     // C4b：行点击 → 详情抽屉（全列 kv；DOM 构建用户内容，不走 HTML 模板——19 组安全）
     function openDetail(row: any) {
         if (!ref?.columns) return;
+        // 263 波：抽屉头显示行名（对齐原型 drawer-head；空名回退通用标题）
+        const detailTitle = (ref.columns.name && cellText(row.cells[ref.columns.name], "name")) || t("ledger.detail");
         const dlg = new Dialog({
-            title: t("ledger.detail"),
+            title: detailTitle,
             content: `<div class="b3-dialog__content b3-dialog__content--wrap" id="lv-detail-body" style="max-height:60vh;overflow:auto"></div>
-<div class="b3-dialog__action"><button class="b3-button b3-button--cancel" id="lv-detail-del">${t("delete")}</button><span style="flex:1"></span><button class="b3-button b3-button--cancel" id="lv-detail-close">${t("cancel")}</button><button class="b3-button b3-button--text" id="lv-detail-edit">${t("members.edit")}</button><button class="b3-button b3-button--text" id="lv-detail-open">${t("ledger.openDoc")} ↗</button></div>`,
+<div class="b3-dialog__action"><button class="b3-button b3-button--cancel" id="lv-detail-del">${t("delete")}</button><span style="flex:1"></span><button class="b3-button b3-button--cancel" id="lv-detail-close">${t("cancel")}</button><button class="b3-button b3-button--text" id="lv-detail-edit">${t("members.edit")}</button><button class="b3-button" id="lv-detail-open">${t("ledger.openDoc")} ↗</button></div>`,
             width: "520px",
         });
         const body = dlg.element.querySelector("#lv-detail-body") as HTMLElement;
@@ -1644,7 +1646,8 @@
 <div class="lv-hero"><h1>{t("ledger.title")}</h1><p>{t("ledger.subtitle")}</p></div>
 
 <div class="lv-toolbar" style="margin:14px 0">
-    <select class="b3-select" bind:value={active} onchange={() => (plugin.activeLedger = active)}>
+    <!-- 263 波：切模块清空搜索词——旧模块的关键词对新模块往往就是"空结果"的制造者 -->
+    <select class="b3-select" bind:value={active} onchange={() => { plugin.activeLedger = active; searchText = ""; }}>
         {#each ledgers as l (l.id)}
             <option value={l.id}>{t(`module.${l.id}`)}{l.ref?.avId ? "" : `（${t("diag.missing")}）`}</option>
         {/each}
@@ -1669,7 +1672,7 @@
             <!-- 16 组/188 波：采购建议（低库存汇总） -->
             <button class="b3-button b3-button--outline" onclick={openShoppingList}>{t("ledger.shoppingList")}</button>
         {/if}
-        {#if active === "assets"}
+        {#if active === "assets-real"}
             <!-- 16 组/191 波：CSV 批量导入（列映射向导） -->
             <button class="b3-button b3-button--outline" onclick={openCsvImport}>{t("ledger.importCsv")}</button>
         {/if}
@@ -1704,7 +1707,9 @@
                 <input type="checkbox" class="b3-switch" bind:checked={form[e.key]} />{t(`field.${e.key}`)}
             </label>
         {:else if e.key === "name"}
-            <input class="b3-text-field fn__flex-1" style="min-width:160px" placeholder={t("ledger.newName")} bind:value={form[e.key]} />
+            <!-- 260 波：名称是录入主字段，min-width 220 保证第一行视觉重心；261 波回车提交（守卫在 createRow 内） -->
+            <input class="b3-text-field fn__flex-1" style="min-width:220px" placeholder={t("ledger.newName")} bind:value={form[e.key]}
+                onkeydown={(e: KeyboardEvent) => { if (e.key === "Enter" && !e.isComposing) createRow(); }} />
         {:else}
             <input class="b3-text-field" style="min-width:140px" placeholder={t(`field.${e.key}`)} bind:value={form[e.key]} />
         {/if}
@@ -1755,8 +1760,9 @@
     {:else if nameMissing}
         <div class="lv-caption" role="status" style="color:var(--lv-warn);flex-basis:100%">{t("ledger.nameRequired")}</div>
     {/if}
-    <!-- 主 CTA：台账快速录入是本视图唯一核心动作（对齐原型"主按钮每视图 ≤1 个"） -->
-    <button class="lv-btn primary" onclick={createRow} disabled={!ref?.avId || saving || identityPending || !hasAnyInput || nameMissing}>
+    <!-- 主 CTA：台账快速录入是本视图唯一核心动作（对齐原型"主按钮每视图 ≤1 个"）；
+         260 波右置——多控件折行后 CTA 独占行尾，不再吊在字段流中间 -->
+    <button class="lv-btn primary" style="margin-left:auto" onclick={createRow} disabled={!ref?.avId || saving || identityPending || !hasAnyInput || nameMissing}>
         {saving ? t("ledger.saving") : `＋ ${t("ledger.add")}`}
     </button>
 </div>

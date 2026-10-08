@@ -17,9 +17,12 @@ export interface ScanResult {
     stale: boolean;
     /** 运行态合并前的派生列表（H02：动作后免重扫即时重算可见集合） */
     derived: Reminder[];
-    /** 各模块本次生效的派生切片与数据时间（H04：失败模块为上次快照） */
-    byModule: Record<string, { reminders: Reminder[]; at: string }>;
+    /** 各模块本次生效的派生切片与数据时间（H04：失败模块为上次快照，行数口径随快照同策略） */
+    byModule: Record<string, { reminders: Reminder[]; at: string; rowCount?: number; memberCounts?: Record<string, number> }>;
 }
+
+/** 264 波：行数口径（台账行数 + 成员行分布；providers 全量读表时顺手上报） */
+export type ModuleStats = { rowCount: number; memberCounts: Record<string, number> };
 
 export async function runScan(
     providers: DataProvider[],
@@ -28,6 +31,8 @@ export async function runScan(
     today: Date = new Date(),
     /** PF06 增量刷新：只实扫这些模块，其余沿用上次快照（不标记失败）；缺省全量 */
     only?: Set<string>,
+    /** 264 波：providers 经 deps.onStats 写入的行数口径，成功模块并入 byModule */
+    statsSink?: Map<string, ModuleStats>,
 ): Promise<ScanResult> {
     const enabled = new Set(settings.enabledModules);
     const derivedByModule = new Map<string, Reminder[]>();
@@ -66,7 +71,23 @@ export async function runScan(
 
     const byModule: ScanResult["byModule"] = {};
     for (const [moduleId, list] of derivedByModule) {
-        byModule[moduleId] = { reminders: list, at: atByModule.get(moduleId) ?? now };
+        const at = atByModule.get(moduleId) ?? now;
+        // 264 波：行数口径只属于本轮实扫成功的模块；沿用旧快照（失败/增量跳过）时
+        // 旧口径随快照整体保留（H04 同策略，不冒充新扫描也不丢旧口径）
+        const stats = statsSink?.get(moduleId);
+        if (at === now) {
+            byModule[moduleId] = {
+                reminders: list, at,
+                ...(stats ? { rowCount: stats.rowCount, memberCounts: stats.memberCounts } : {}),
+            };
+        } else {
+            const prev = prevByModule[moduleId];
+            byModule[moduleId] = {
+                reminders: list, at,
+                ...(prev?.rowCount !== undefined ? { rowCount: prev.rowCount } : {}),
+                ...(prev?.memberCounts ? { memberCounts: prev.memberCounts } : {}),
+            };
+        }
     }
     const derived = [...derivedByModule.values()].flat();
     const visible = applyRuntime(derived, rt, today);

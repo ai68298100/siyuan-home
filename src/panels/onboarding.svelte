@@ -9,6 +9,8 @@
     const roleOptions = ["spouse", "partner", "child", "elder", "kin"];
     let picked: string[] = $state(["self"]);
     let children = $state(0);
+    // 260 波：角色 chips 加表情前缀（对齐原型 rolechip 语言，提升扫读辨识）
+    const roleEmoji: Record<string, string> = { spouse: "👫", partner: "💞", child: "🧒", elder: "👴", kin: "👨‍👩‍👧" };
 
     // 推荐模块（C7b：按家庭构成预选）
     const recommended = $derived<string[]>(
@@ -57,7 +59,7 @@
             <p class="lv-sub" style="margin-bottom:16px">{t("wiz.s1Hint")}</p>
             <div class="lv-roles">
                 {#each roleOptions as r (r)}
-                    <button class="lv-rolechip" class:on={picked.includes(r)} aria-pressed={picked.includes(r)} onclick={() => toggle(r)}>{t(`role.${r}`)}</button>
+                    <button class="lv-rolechip" class:on={picked.includes(r)} aria-pressed={picked.includes(r)} onclick={() => toggle(r)}>{roleEmoji[r]} {t(`role.${r}`)}</button>
                 {/each}
             </div>
             {#if picked.includes("child")}

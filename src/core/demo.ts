@@ -42,7 +42,12 @@ async function demoRow(
         await setCell(ref.avId!, cols[key], itemID, value);
     };
     for (const [key, v] of Object.entries(fields)) {
-        if (key === "name") continue;
+        // 269 波：名称列必须显式写——addDetachedRow 的标题不落到 av 名称列
+        // （真机实证：示例行全部退化成"未命名证件"提醒）。与快速表单/分诊同口径。
+        if (key === "name") {
+            await write("name", { type: "text", text: { content: `${DEMO_PREFIX}${v}` } });
+            continue;
+        }
         if (typeof v === "number") await write(key, { type: "number", number: { content: v, isNotEmpty: true } });
         else if (typeof v === "string" && /^\d{4}-\d{2}-\d{2}$/.test(v)) await write(key, { type: "date", date: { content: localMs(daysFromToday(v)), isNotEmpty: true, isNotTime: true } });
         else if (typeof v === "string") await write(key, { type: "text", text: { content: v } });

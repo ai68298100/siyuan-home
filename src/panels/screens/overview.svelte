@@ -3,6 +3,7 @@
     import Onboarding from "../onboarding.svelte";
     import type { HomePluginLike } from "@/types/plugin";
     import { saveRuntime } from "@/core/hub/runtime";
+    import { fade } from "svelte/transition";
     import { localDateKey } from "@/core/hub/rule";
     import { parseNaturalDate } from "@/core/dateparse";
     import { memberHue } from "@/core/format";
@@ -30,6 +31,12 @@
             : allReminders,
     );
     const top = $derived(reminders.slice(0, 4));
+    // 260 波：首扫 loading 态——runtime 无快照时间且无错误时，"最近没有要紧事"是撒谎
+    // （未知 ≠ 0，13 §3.4）；骨架屏表达"正在读取"
+    const firstScanPending = $derived.by(() => {
+        void version;
+        return !plugin.runtime?.scannedAt && !(plugin.scan?.errors?.length) && allReminders.length === 0;
+    });
     // 218 波性能（176 波 alertsByMember 同款）：模块卡 pending 计数预分组——
     // 模板每卡 filter 全量提醒 O(模块×提醒)，预分组后单遍 O(提醒)。
     const pendingByModule = $derived.by(() => {
@@ -104,6 +111,23 @@
     });
     const scopeLabel = $derived(memberFilter ? (members.find((m) => m.id === memberFilter)?.name ?? "?") : t("dash.scopeAll"));
 
+    // 262 波（Todoist quick add 灵感）：自然语言日期即时预览——输入即解析，
+    // 命中且未显式选日期时在输入行内亮出 chip，比"提交后才 toast"早一步反馈
+    const memoParsed = $derived.by(() => {
+        const raw = memoTitle.trim();
+        if (!raw || memoDue) return null;
+        return parseNaturalDate(raw);
+    });
+
+    // 264 波：行数口径（cache.byModule 随扫描快照；version 驱动重算）——模块卡主数字与成员卡统计格
+    const statsByModule = $derived.by(() => {
+        void version;
+        return plugin.runtime?.cache?.byModule ?? {};
+    });
+    const rowCountOf = (mid: string): number | undefined => statsByModule[mid]?.rowCount;
+
+    // 262 波（Todoist/Linear assignee avatar 语言）：行级成员微头像——"这是谁的事"一眼可辨
+    const memberOf = (id: string | undefined) => (id ? members.find((m) => m.id === id) : undefined);
     // 对齐原型 hero：按本地时段问候 + 日期·快照说明行（纯展示，随挂载取值）
     const greet = $derived.by(() => {
         const h = new Date().getHours();
@@ -114,6 +138,17 @@
     // 17 组/196 波：统计卡下钻——待办徽章点击 → 提醒页并预筛选该模块（runtime.hubModuleId 为提醒页筛选持久态）
     function drillReminders(mid: string) {
         plugin.runtime.hubModuleId = mid;
+        onGoto("reminders");
+    }
+
+    // 261 波：「查看全部」= 新意图——清掉上次会话遗留的筛选（逾期/某成员/某模块）再进入；
+    // 与模块卡下钻（预筛该模块）语义相反，各自成立
+    async function viewAllReminders() {
+        plugin.runtime.hubFilter = "all";
+        plugin.runtime.hubMemberId = undefined;
+        plugin.runtime.hubModuleId = undefined;
+        plugin.runtime.hubDueWithin = "all";
+        await saveRuntime(plugin, plugin.runtime);
         onGoto("reminders");
     }
 
@@ -142,6 +177,29 @@
         plugin.addMemo(title, d);
         memoTitle = ""; memoDue = "";
     }
+
+    // 259 波（对齐原型动效 #6）：总览计数 0→N 数字滚动（560ms ease-out-cubic，仅此一处）。
+    // action 形式挂载，target 变化时重跑；prefers-reduced-motion 直接落终值
+    function countUp(node: HTMLElement, target: number) {
+        let raf = 0;
+        const reduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+        const render = (v: number) => { node.textContent = String(Math.round(v)); };
+        const run = (to: number) => {
+            cancelAnimationFrame(raf);
+            if (reduced) { render(to); return; }
+            const from = Number(node.textContent) || 0;
+            if (from === to) return;
+            const t0 = performance.now();
+            const tick = (now: number) => {
+                const p = Math.min(1, (now - t0) / 560);
+                render(from + (to - from) * (1 - Math.pow(1 - p, 3)));
+                if (p < 1) raf = requestAnimationFrame(tick);
+            };
+            raf = requestAnimationFrame(tick);
+        };
+        run(target);
+        return { update: run, destroy: () => cancelAnimationFrame(raf) };
+    }
 </script>
 
 {#if !plugin.settings.onboarded}
@@ -155,12 +213,9 @@
 </div>
 
 <div class="lv-hero">
-    <div><h1>{greet}</h1><p>{dateLine}</p></div>
+    <div><h1>{greet}</h1><p>{dateLine}{#if monthlyDone > 0}&nbsp;&nbsp;<span class="lv-badge green">✓ {t("dash.monthlyDone").replace("${n}", monthlyDueTotal > 0 ? `${monthlyDone}/${monthlyDueTotal}` : String(monthlyDone))}</span>{/if}</p></div>
     <div class="lv-hero-count" title={t("dash.statScope").replace("${t}", snapshotLabel)}>
-        <b class="lv-num">{reminders.length}</b><span>{reminders.length === 1 ? t("dash.needAttentionOne") : t("dash.needAttention")}</span>
-        {#if monthlyDone > 0}
-            <span class="lv-caption" style="display:block;margin-top:2px">✓ {t("dash.monthlyDone").replace("${n}", monthlyDueTotal > 0 ? `${monthlyDone}/${monthlyDueTotal}` : String(monthlyDone))}</span>
-        {/if}
+        <b class="lv-num" use:countUp={reminders.length}>{reminders.length}</b><span>{reminders.length === 1 ? t("dash.needAttentionOne") : t("dash.needAttention")}</span>
     </div>
 </div>
 
@@ -192,8 +247,8 @@
     <button class="lv-chip" onclick={() => onGoto("members")}>＋</button>
 </div>
 
-<div class="lv-sec"><h2 class="lv-title-sec">{t("dash.upcoming")}</h2>
-    <button class="b3-button b3-button--text" onclick={() => onGoto("reminders")}>{t("dash.viewAll")} →</button>
+<div class="lv-sec"><h2 class="lv-title-sec">{t("dash.upcoming")}</h2><span class="lv-sub">{t("dash.upcomingSub")}</span>
+    <button class="b3-button b3-button--text" onclick={viewAllReminders}>{t("dash.viewAll")} →</button>
 </div>
 {#if reminders.length === 0 && memberFilter}
     <!-- 174 波（对齐原型空态解释）：筛选导致的空 ≠ 无资料，说明并给清除出口 -->
@@ -201,17 +256,32 @@
         <button class="b3-button b3-button--outline" style="margin-top:8px" onclick={() => setMemberFilter(undefined)}>{t("dash.clearFilter")}</button>
     </div></div>
 {:else if reminders.length === 0}
-    <div class="lv-card"><div class="lv-empty" role="status"><div class="eic">✓</div><b>{t("dash.allClear")}</b><span>{t("hub.emptyHint")}</span></div></div>
+    {#if firstScanPending}
+        <!-- 260 波：首扫骨架（未知 ≠ 全部完成） -->
+        <div class="lv-card lv-rems" aria-busy="true" role="status">
+            {#each [0, 1, 2] as i (i)}
+                <div class="lv-rem">
+                    <div class="lv-skel" style="width:38px;height:38px;border-radius:11px;flex:none"></div>
+                    <div style="flex:1;display:flex;flex-direction:column;gap:7px;min-width:0">
+                        <div class="lv-skel" style="height:13px;width:42%"></div>
+                        <div class="lv-skel" style="height:11px;width:26%"></div>
+                    </div>
+                </div>
+            {/each}
+        </div>
+        <p class="lv-caption" style="margin:8px 2px">{t("hub.firstScan")}</p>
+    {:else}
+        <div class="lv-card"><div class="lv-empty" role="status"><div class="eic">✓</div><b>{t("dash.allClear")}</b><span>{t("hub.emptyHint")}</span></div></div>
+    {/if}
 {:else}
     <div class="lv-card lv-rems">
         {#each top as r (r.id)}
-            <div class="lv-rem {r.level}">
-                <div class="lv-rem-ic" class:tone-blue={r.moduleId !== "adhoc" && moduleTone(r.moduleId) === "t-blue"}
-                    class:tone-green={r.moduleId !== "adhoc" && moduleTone(r.moduleId) === "t-green"}
-                    class:tone-rose={r.moduleId !== "adhoc" && moduleTone(r.moduleId) === "t-rose"}
-                    class:tone-amber={r.moduleId !== "adhoc" && moduleTone(r.moduleId) === "t-amber"}
-                >{r.moduleId === "adhoc" ? "📝" : moduleIcon(r.moduleId)}</div>
-                <div class="lv-rem-t"><b>{r.title}</b><span>{t(`module.${r.moduleId}`) !== `module.${r.moduleId}` ? t(`module.${r.moduleId}`) : t("adhoc.name")}{r.lunar ? " 🌙" : ""}{r.autoRenew ? " 🔄" : ""}</span></div>
+            <!-- 261 波：离场淡出（对齐提醒页；完成/延后不再瞬消失） -->
+            <div class="lv-rem {r.level}" out:fade={{ duration: 150 }}>
+                <!-- 259 波：图标砖收回中性（对齐原型 .rem .ic = surface-2）——级别语义由色轨+
+                     右侧相对时间大字承载，彩色砖让整列提醒过度用色 -->
+                <div class="lv-rem-ic" aria-hidden="true">{r.moduleId === "adhoc" ? "📝" : moduleIcon(r.moduleId)}</div>
+                <div class="lv-rem-t"><b>{r.title}</b><span>{#if memberOf(r.memberId)}{@const member = memberOf(r.memberId)}<span class="lv-miniava" style="background:linear-gradient(135deg, hsl({memberHue(member.id)} 62% 52%), hsl({(memberHue(member.id) + 42) % 360} 62% 40%))" aria-hidden="true">{member.name.slice(0, 1)}</span>{/if}{t(`module.${r.moduleId}`) !== `module.${r.moduleId}` ? t(`module.${r.moduleId}`) : t("adhoc.name")}{r.lunar ? " 🌙" : ""}{r.autoRenew ? " 🔄" : ""}</span></div>
                 <div class="lv-rem-when"><b class="lv-num" style="color:var(--lv-{r.level === 'overdue' ? 'danger' : r.level === 'soon' ? 'warn' : 'amber'})">
                     {r.daysLeft < 0 ? t("days.overdue").replace("${n}", String(-r.daysLeft)) : r.daysLeft === 0 ? t("days.today") : t("days.after").replace("${n}", String(r.daysLeft))}
                 </b><span class="lv-num">{r.dueDate}</span></div>
@@ -224,7 +294,7 @@
     </div>
 {/if}
 
-<div class="lv-sec"><h2 class="lv-title-sec">{t("memo.quick")}</h2></div>
+<div class="lv-sec"><h2 class="lv-title-sec">{t("dash.quickRecord")}</h2><span class="lv-sub">{t("dash.quickRecordSub")}</span></div>
 <div class="lv-quick" style="margin-bottom:4px">
     <button class="lv-qbtn" onclick={() => { plugin.setActiveLedger("certs"); onGoto("ledger"); }}><span class="qi">🪪</span>{t("module.certs")}</button>
     <button class="lv-qbtn" onclick={() => { plugin.setActiveLedger("medicine"); onGoto("ledger"); }}><span class="qi">💊</span>{t("module.medicine")}</button>
@@ -233,8 +303,15 @@
     <button class="lv-qbtn" onclick={() => { plugin.setActiveLedger("favors"); onGoto("ledger"); }}><span class="qi">🧧</span>{t("module.favors")}</button>
     <button class="lv-qbtn" onclick={() => { plugin.setActiveLedger("members"); onGoto("members"); }}><span class="qi">👪</span>{t("tab.members")}</button>
 </div>
-<div class="lv-card lv-memo" style="margin-top:8px">
-    <input class="b3-text-field fn__flex-1" style="min-width:180px" placeholder={t("memo.placeholder")} bind:value={memoTitle} />
+<div class="lv-sec"><h2 class="lv-title-sec">{t("memo.quick")}</h2><span class="lv-sub">{t("memo.quickSub")}</span></div>
+<div class="lv-card lv-memo" style="margin-top:0">
+    <!-- 261 波：回车提交（isComposing 守卫——中文输入法选词的 Enter 不算提交） -->
+    <input class="b3-text-field fn__flex-1" style="min-width:180px" placeholder={t("memo.placeholder")} bind:value={memoTitle}
+        onkeydown={(e: KeyboardEvent) => { if (e.key === "Enter" && !e.isComposing) addMemo(); }} />
+    <!-- 262 波（Todoist 式即时预览）：解析命中即亮 chip，提交前就知道日期去哪了 -->
+    {#if memoParsed}
+        <span class="lv-parsechip" role="status">📅 <span class="lv-num">{memoParsed.date}</span></span>
+    {/if}
     <input class="b3-text-field" type="date" bind:value={memoDue} />
     <button class="b3-button b3-button--text" onclick={addMemo}>＋ {t("memo.add")}</button>
 </div>
@@ -242,6 +319,18 @@
 <div class="lv-sec"><h2 class="lv-title-sec">{t("dash.myModules")}</h2>
     <button class="b3-button b3-button--text" onclick={() => plugin.openSetting()}>{t("dash.enableMore")} →</button>
 </div>
+{#if firstScanPending}
+    <!-- 262 波：首扫骨架补全模块网格（与提醒骨架同一 loading 故事） -->
+    <div class="lv-mods" aria-hidden="true">
+        {#each [0, 1, 2, 3] as i (i)}
+            <div class="lv-card lv-mod">
+                <div class="lv-skel" style="width:38px;height:38px;border-radius:11px"></div>
+                <div class="lv-skel" style="height:13px;width:56%"></div>
+                <div class="lv-skel" style="height:11px;width:38%"></div>
+            </div>
+        {/each}
+    </div>
+{:else}
 <div class="lv-mods">
     {#each moduleCards as mid (mid)}
         {@const pending = pendingByModule.get(mid) ?? 0}
@@ -257,7 +346,18 @@
                 class:tone-rose={moduleTone(mid) === "t-rose"} class:tone-amber={moduleTone(mid) === "t-amber"}
                 aria-hidden="true">{moduleIcon(mid)}</div><b>{t(`module.${mid}`)}</b>
             <div class="lv-stat" title={t("dash.statScope").replace("${t}", snapshotLabel)}>
-            {#if pending > 0}
+            {#if rowCountOf(mid) !== undefined}
+                <!-- 264 波：主数字=台账行数（原型 "12 条 · 1 待办" 层次）；265 波零值弱色降噪——
+                     空台账的"0"是已知事实但不必与活跃数字同权重；待办徽章右置可下钻 -->
+                <b class="lv-num" class:zero={rowCountOf(mid) === 0}>{rowCountOf(mid)}</b><span>{t("mod.records")}</span>
+                {#if pending > 0}
+                    <span class="up" role="button" tabindex="0" style="cursor:pointer;display:inline-flex"
+                        title={t("mod.pendingDrill")}
+                        onkeydown={(e: KeyboardEvent) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); e.stopPropagation(); drillReminders(mid); } }}
+                        onclick={(e: MouseEvent) => { e.stopPropagation(); drillReminders(mid); }}
+                    ><span class="lv-badge red lv-num">{pending} ⚠</span></span>
+                {/if}
+            {:else if pending > 0}
                 <!-- 17 组/196 波：徽章=独立下钻目标（stopPropagation，卡片本体仍进台账） -->
                 <span class="lv-num" role="button" tabindex="0" style="cursor:pointer"
                     title={t("mod.pendingDrill")}
@@ -269,7 +369,8 @@
             {:else if plugin.settings.dbRefs?.[mid]?.provisional}
                     <span>{t("diag.provisional")}</span>
             {:else}
-                    <span>{t("mod.inLedger")}</span>
+                    <!-- 259 波：fallback 从灰字改为导航出口（卡面视觉重心；箭头 hover 位移） -->
+                    <span class="lv-go">{t("mod.inLedger")}<i aria-hidden="true">&nbsp;→</i></span>
             {/if}
             {#if sparkOf(mid)}
                 <!-- 266 波：近 5 日待办趋势（数据源 moduleHistory；末条高亮=原型 .spark hi） -->
@@ -295,3 +396,4 @@
         </div>
     {/each}
 </div>
+{/if}

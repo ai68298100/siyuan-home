@@ -6,17 +6,26 @@
     import { localDateKey } from "@/core/hub/rule";
     import { moduleIcon } from "@/core/modules";
 
-    let { items, t, version, onComplete, onAddMemo, onConvert }: {
+    let { items, t, version, onComplete, onAddMemo, onConvert, initialMode, onModeChange }: {
         items: Reminder[];
         t: (k: string) => string;
         version?: number;
         onComplete: (r: Reminder) => void;
         onAddMemo: (title: string, due: string) => void;
         onConvert: (r: Reminder) => void;
+        /** 263 波：会历模式偏好（runtime 持久化，由父组件读写） */
+        initialMode?: "month" | "week";
+        onModeChange?: (m: "month" | "week") => void;
     } = $props();
 
     const now = new Date();
-    let mode = $state<"month" | "week">("month");
+    // svelte-ignore state_referenced_locally
+    let mode = $state<"month" | "week">(initialMode === "week" ? "week" : "month");
+    function setMode(m: "month" | "week") {
+        if (mode === m) return;
+        mode = m;
+        onModeChange?.(m);
+    }
     let viewYear = $state(now.getFullYear());
     let viewMonth = $state(now.getMonth());
     let weekAnchor = $state(localDateKey(now));
@@ -101,9 +110,9 @@
         <span class="fn__flex-1"></span>
         <span class="lv-tabs" style="padding:2px" role="group" aria-label={t("cal.title")}>
             <button class="lv-tabs__item" class:on={mode === "month"} style="min-height:28px;padding:3px 12px"
-                aria-pressed={mode === "month"} onclick={() => (mode = "month")}>{t("view.month")}</button>
+                aria-pressed={mode === "month"} onclick={() => setMode("month")}>{t("view.month")}</button>
             <button class="lv-tabs__item" class:on={mode === "week"} style="min-height:28px;padding:3px 12px"
-                aria-pressed={mode === "week"} onclick={() => (mode = "week")}>{t("view.week")}</button>
+                aria-pressed={mode === "week"} onclick={() => setMode("week")}>{t("view.week")}</button>
         </span>
         <button class="lv-iconbtn" aria-label={t("cal.prev")} title={t("cal.prev")} onclick={() => nav(-1)}>‹</button>
         <button class="b3-button b3-button--outline" style="padding:4px 12px;min-height:32px" onclick={goToday}>{t("cal.today")}</button>
@@ -164,7 +173,7 @@
         <div style="display:flex;gap:6px;margin-top:10px;padding-top:10px;border-top:1px solid var(--lv-line)">
             <input class="b3-text-field fn__flex-1" style="min-width:0" placeholder={t("cal.memoPlaceholder")}
                 bind:value={memoTitle}
-                onkeydown={(e: KeyboardEvent) => e.key === "Enter" && addMemoForDay()} />
+                onkeydown={(e: KeyboardEvent) => e.key === "Enter" && !e.isComposing && addMemoForDay()} />
             <button class="b3-button b3-button--outline" style="flex:none" disabled={!memoTitle.trim()} onclick={addMemoForDay}>＋ {t("memo.add")}</button>
         </div>
     </div>

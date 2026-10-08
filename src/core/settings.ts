@@ -29,6 +29,10 @@ export function defaultSettings(): HomeSettings {
 export async function loadDataSafe(plugin: Plugin, name: string): Promise<{ data: any; corrupted: boolean }> {
     try {
         const data = await plugin.loadData(name);
+        // SiYuan returns an empty string for a missing/empty petal data file
+        // on some kernels. Treat that representation like a missing file;
+        // only non-empty scalar data is a corruption signal.
+        if (typeof data === "string" && data.trim() === "") return { data: null, corrupted: false };
         if (data !== null && data !== undefined && !isPlainObject(data)) {
             // 非 JSON 对象（手工改坏/老版本残留）→ 视为损坏
             await backupCorruptMarker(plugin, name, `non-object: ${Array.isArray(data) ? "array" : typeof data}`);

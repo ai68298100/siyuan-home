@@ -65,6 +65,23 @@ export interface ProviderDeps {
     settings: HomeSettings;
     /** 取模块 dbRef（avId + columns 映射） */
     getDbRef: (moduleId: string) => DbRef | undefined;
+    /** 264 波：行数口径上报——providers 本就全量读表，顺手上报台账行数与成员行分布，
+     * 供模块卡主数字 / 成员卡统计格（原型层次）；扫描成功才计入（失败沿用旧快照） */
+    onStats?: (moduleId: string, stats: { rowCount: number; memberCounts: Record<string, number> }) => void;
+}
+
+/** relation 成员列 → settings 成员 id 的行计数（模块卡/成员卡统计共用口径） */
+export function memberCountsFrom(rows: { cells: Record<string, any> }[], ref: DbRef, members: { id: string; avItemId?: string }[]): Record<string, number> {
+    const key = ref.columns?.member;
+    const counts: Record<string, number> = {};
+    if (!key) return counts;
+    const byAv = new Map(members.filter((m) => m.avItemId).map((m) => [m.avItemId as string, m.id]));
+    for (const row of rows) {
+        const rel: string[] | undefined = row.cells[key]?.relation?.blockIDs ?? undefined;
+        const memberId = rel?.[0] ? byAv.get(rel[0]) : undefined;
+        if (memberId) counts[memberId] = (counts[memberId] ?? 0) + 1;
+    }
+    return counts;
 }
 
 /** certs 证件管理：expiry（效期）+ due（签注/审验）双规则；expired/renewed/void 行不提醒（33.3） */
@@ -116,6 +133,8 @@ export class CertsProvider implements DataProvider {
                 if (r) out.push(r);
             }
         }
+        // 264 波：行数口径（本模块全部行 + 成员分布；仅成功路径上报）
+        this.deps.onStats?.(this.moduleId, { rowCount: rows.length, memberCounts: memberCountsFrom(rows, ref, members) });
         return out;
     }
 }
@@ -167,6 +186,8 @@ export class SchemaLedgerProvider implements DataProvider {
                 if (r) out.push(r);
             }
         }
+        // 264 波：行数口径（同 certs）
+        this.deps.onStats?.(this.moduleId, { rowCount: rows.length, memberCounts: memberCountsFrom(rows, ref, members) });
         return out;
     }
 }
@@ -207,6 +228,8 @@ export class MembersProvider implements DataProvider {
                 if (r) out.push(r);
             }
         }
+        // 264 波：成员台账行数（成员数口径；无成员分布语义）
+        this.deps.onStats?.(this.moduleId, { rowCount: rows.length, memberCounts: {} });
         return out;
     }
 }
@@ -264,6 +287,8 @@ export class NumericRuleProvider implements DataProvider {
                 });
             }
         }
+        // 264 波：行数口径（同 schema 通用）
+        this.deps.onStats?.(this.moduleId, { rowCount: read.rows.length, memberCounts: memberCountsFrom(read.rows, ref, members) });
         return out;
     }
 }
