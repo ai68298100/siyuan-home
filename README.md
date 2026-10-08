@@ -1,154 +1,234 @@
 <div align="center">
 
-# 🏠 Lv Home (小驴管家)
+# 🏠 小驴管家（Lv Home）
 
-**A family archive that reminds you before things expire** — the family & life butler plugin for SiYuan notes.
+**思源笔记里的家庭事实、到期提醒与事务跟进层**
 
 [![CI](https://github.com/ai68298100/siyuan-home/actions/workflows/ci.yml/badge.svg)](https://github.com/ai68298100/siyuan-home/actions/workflows/ci.yml) [![Release](https://img.shields.io/github/v/release/ai68298100/siyuan-home)](https://github.com/ai68298100/siyuan-home/releases/latest) [![License](https://img.shields.io/github/license/ai68298100/siyuan-home)](./LICENSE)
 
-Family archive · unified expiry reminder hub · household workspace
+家庭私有资料 · 成员视角 · 到期提醒 · 可继续办理
 
-**[⬇️ Download](https://github.com/ai68298100/siyuan-home/releases/latest)** · **[🗺 Roadmap](./ROADMAP.md)** · **[📖 中文文档](./README.zh-CN.md)**
+[⬇️ 下载安装](https://github.com/ai68298100/siyuan-home/releases/latest) · [📖 使用文档](https://github.com/ai68298100/siyuan-home/blob/main/docs/FAQ.md) · [📖 术语表](https://github.com/ai68298100/siyuan-home/blob/main/docs/glossary.md) · [🗺 路线图](https://github.com/ai68298100/siyuan-home/blob/main/ROADMAP.md) · [🌐 English](https://github.com/ai68298100/siyuan-home/blob/main/README.en.md)
 
-*Local-first · No plugin-owned telemetry · Data stays in your SiYuan workspace*
+*本地优先 · 插件不自建遥测 · 数据保存在你的思源工作区*
 
 </div>
 
 ---
 
-## ✨ What it solves
+## 它解决什么问题
 
-Certificates expire, medicine expires, insurance needs renewal, subscriptions auto-charge, birthdays (lunar ones too) get forgotten, kids' vaccination schedules are complex… and this information is scattered across chats, notes and memory.
+证件会到期，药品会过期，保单和会员会续费，家人的生日、疫苗、年检和学校节点容易被忘记。资料又分散在聊天记录、网页、纸张和不同笔记里，真正需要办理时很难快速找到依据。
 
-**Lv Home brings it all into SiYuan notes**: one family ledger + one reminder hub that reaches out to you.
+小驴管家把这些内容组织成：
 
-| Capability | What it means |
+- **家庭事实**：成员、证件、物品、服务、出行和生活记录；
+- **提醒中枢**：由台账日期和规则派生提醒，区分逾期、近期和提前准备；
+- **事务跟进**：逐步补足材料、来源、回执和下一步，让事项可以跨会话继续。
+
+它的核心目标是“找得到依据、提前准备、跟进办理、保留结果、持续核对”，不是把所有生活服务都自动化。
+
+## 当前版本能做什么
+
+当前仓库版本为 v0.3.13。生产界面是四个 Tab；297 项单测、类型/Svelte/i18n/meta/audit/build/smoke/loader 已通过，独立后台靶场的 core、恢复、首录、导入和 Chromium 批次已通过，但真实 SiYuan UI 六阶段走查（含 Android WebView、无障碍和多端冲突）尚未完成，集市上架继续暂缓。`pnpm test:live` 在缺少真实实例时会明确阻断，不把全量跳过计为通过。用户可感知变更见 [CHANGELOG](./CHANGELOG.md) 的 v0.3.13 段。
+
+带有 v0.3.13 标签的 package.zip 是当前稳定安装包；`main` 与该版本保持同步，当前单测基线为 297 项。
+
+| 页面 | 当前能力 |
 |---|---|
-| ⏰ **Unified expiry reminders** | Certificates, medicine, policies, subscriptions, inspections, birthdays (lunar supported) — all derived automatically, lead time configurable per type (passport 1 year, medicine 30 days), overdue shown in red on top |
-| 👥 **Members as first-class citizens** | Self / spouse / partner / children / elders / kin — every ledger is organized per member, filter "everything about my son" in one click |
-| 🗃 **31 life modules** | People & records · assets & shopping · daily living · parenting & school · travel · media (details below) |
-| 📋 **Rich detail drawer** | Type-specific certificate fields (ID/passport/permits/licences/qualifications/degrees/titles), quick camera/photo/PDF upload, same-origin attachment preview/download, renewal history, replacement chains & timeline journals |
-| 📈 **Growth charts (parenting)** | Height/weight timelines with official WHO reference bands (P3–P97, 0–13 weeks weekly + 0–60 months), percentile on hover |
-| 🛒 **Smart lists** | Shopping suggestions from low stock (editable, copy-to-clipboard), media update reminders, reciprocation reminders for received gifts |
-| 📊 **Check-in & exam integration** | Display study streaks and accuracy from 小驴考试, check-in strength summaries from 小驴打卡 |
-| 📤 **Data portability** | CSV export per module + bulk CSV import (column-mapping wizard), calendar (.ics) & contacts (.vcf) export, sanitized diagnostics bundle, settings JSON export/import with auto-backup, sample data generator |
-| 🔒 **Local-first** | Records live in your SiYuan workspace; the plugin has no author-owned server or telemetry. SiYuan sync, collaboration, backups and marketplace downloads remain host-controlled |
-| 🔗 **Native databases** | Ledgers are SiYuan attribute-view databases inside a dedicated notebook — open any ledger doc to edit, link or embed it in daily notes ("mom's passport" inside your journal) |
-| 🧩 **Modules on demand** | Disabled modules create no data and stay out of the UI; parenting/school only suggested when you have kids |
-| 🔌 **Ecosystem ready** | Quick capture sheet (⚡ / `N`, schema-driven, auto-provision), statusbar badge with scan-health pulse, service bridge (`window.LvHome`), contacts picker via 小驴人脉 |
+| 总览 | 按成员过滤、查看前几条提醒（行内成员微头像、完成/延后淡出离场）、进入常用台账、添加快速备忘（自然语言日期识别即时预览、回车提交）、查看启用模块与行数/待办数（徽章点击直达该模块提醒）、月度完成计数、数据状态条与三张重点卡（今日处理/资料核对/数据状态）、首扫骨架屏 |
+| 提醒 | 列表/日历双视图（偏好记忆）、级别/成员/模块/时间窗四组筛选、已处理视图（可恢复/删除）、同人同日折叠卡、备忘置顶/编辑/删除、批量完成/延后/忽略、重新扫描、证件/保险/合同续期（写回规则对应列）、定位台账、相对到期表述（今天/明天/N 天后 · 周几）、回礼与追更提醒、导出日历 (.ics)、粘性分组头 |
+| 台账 | 切换启用模块、按证件类型显示身份证/护照/通行证/驾驶证/资格/学历/学位/职称字段，手机拍照与照片/PDF 快速上传、附件同源预览/下载；同时保留搜索、排序、提醒、换证链、时间线和 CSV 能力 |
+| 成员 | 新增/编辑/删除成员（设置与台账双写、同名确认）、人脉联系人绑定/解绑、角色、生日/农历、成员卡统计、头像上传与展示、拖拽排序（右键菜单上移/下移）、导出联系人 (.vcf)、展开该成员提醒与联系人快照 |
 
-## 📦 Install (v0.3.13)
+全局入口：状态栏"今日到期 N"角标（点击直达提醒页）、块菜单"存入小驴管家"（选中文本 → 常用语/书签）、命令面板与顶栏入口、面板内 `N` 键或顶栏 ⚡ 呼出快速记录弹层（schema 列集驱动、未建库自动建库、连续录入、草稿保留）、呼吸状态点提示扫描健康（绿/橙/红）。
 
-1. Download `package.zip` from [Releases](https://github.com/ai68298100/siyuan-home/releases/latest)
-2. SiYuan → Settings → Marketplace → Download → **Import** the zip
-3. Enable the plugin → complete the 2-step onboarding (household → module picks and provisioning)
-4. Press `Ctrl+Alt+H` anytime to open the hub
+提醒中枢：每日摘要（可配时刻）、每周预告（周日）、逾期即时提示、静默时段 + 今日免打扰快捷开关、按模块/规则配置提前量（设置 → 提醒设置）、低库存提醒（药品/囤货逐行阈值）、行级提前量（remind_before）、回礼提醒（收礼 30 天后）与追更提醒（登记更新日）、月度完成计数。
 
-> **Validation status:** core data paths have automated tests and live-kernel coverage. The six-stage real SiYuan UI batch, including Android WebView and accessibility checks, is still pending; marketplace submission remains paused. `icon.png` and `preview.png` were redesigned for v0.3.13 (brand-gradient tile + geometric mark; dark overview with sample data).
-> **Version note:** the tagged v0.3.13 package is the current stable release artifact; `main` contains the latest UI-alignment and quick-capture work and currently reports 297 unit tests.
->
-> Family sharing depends on SiYuan's collaboration, permissions, sync and conflict behavior. Test with non-sensitive data before sharing; this plugin does not provide a separate permission system.
->
-> Privacy & FAQ: [privacy statement](https://github.com/ai68298100/siyuan-home/blob/main/docs/privacy.md) · [FAQ](https://github.com/ai68298100/siyuan-home/blob/main/docs/FAQ.md)
+生态集成（9 项）：
 
-## 🧩 Module Overview (6 groups, 31 modules)
+| 集成 | 方向 | 说明 |
+|---|---|---|
+| 人脉选人 | 人脉→管家 | 合同/保单/学校/考试台账的 contact 列支持从小驴人脉搜索选人 |
+| 成员绑人脉 | 管家↔人脉 | 成员卡可关联/解除人脉联系人（快照 `名称 [docId]`） |
+| 人情交集 | 管家→人脉 | 人情台账行一键记录到人脉（ensurePerson + recordInteraction 幂等） |
+| 雷切动作 | 雷切→管家 | 管家面板/提醒中枢注册为雷切快捷动作 |
+| 雷切摘要 | 管家→雷切 | 家庭摘要模块（逾期/7 天计数，只读） |
+| 打卡摘要 | 打卡→管家 | getStrengthSummary top 5 展示（只读） |
+| 考试统计 | 考试→管家 | lv-exam:stats 备考连续天数+正确率展示（只读） |
+| 服务桥 | 管家→其他 | `window.LvHome` protocol 1（openButler/openReminders/addMemo/summary） |
+
+数据安全：设置导出/导入（导入前自动备份、一键回滚、归一化校验）、示例数据一键生成/清除、深度健康检查（含台账文档缺失预检——回收站/删除给明确重建指引）、设置文件损坏自动回退并留标记、设置写入失败自动重试、重复台账检测、成员关联回填（同名歧义人工选择）、CSV 导出（BOM/排序/过滤联动）与升级演练测试、pnpm audit（0 漏洞）。本地优先不等于自动备份；同步、协作、权限、冲突和第三方存储由思源部署决定。
+
+首次引导当前为两步：选择家庭构成，查看推荐模块，然后完成引导并进入证件台账（建库起止有提示，失败模块会在完成后明确报出）。家庭构成与角色选择用于配置建议，不会据此创建真实成员；需要关联具体家人时，应到成员页新增成员。逐模块进度条与交互级重试仍在规划中。
+
+31 个模块目前是 schema 目录和按需建库规划，不等于 31 个完整交付模块。模块的字段目录、数据库是否已创建、是否有提醒 provider、是否能回到来源、是否有 AI 任务并不相同；设置和模块卡会逐步显示这些能力状态。不能把“模块已启用”或“没有提醒”理解为“所有数据已扫描”。核心读写路径（行增删改、附件上传、资源单元格、分页读取）已经活体集成测试打真机内核验证（见 [回归清单](./docs/testing/v0.2.md) §8）；剩余真机项为 UI 走查（按 [真机批手册](./docs/testing/device-batch-runbook.md) 执行）。
+
+## 从一条证件开始
+
+1. 安装并启用插件，打开管家面板。
+2. 在引导中选择家庭构成并查看推荐模块；需要关联具体家人时，到成员页新增成员。
+3. 进入台账，确认目标模块数据库已创建；若显示缺库，可从台账触发重建。
+4. 新增第一条证件记录，填写名称、成员、到期日等已有字段。
+5. 回到提醒页查看派生提醒，按需延后、定位、续期或标记完成。
+6. 需要办理时，回到台账和思源原文继续补充材料与结果。
+
+提醒是日期规则的派生结果。延后提醒不会自动表示事情已经办妥；完成、提交、受理、部分结果和最终办妥需要分别记录。
+
+## 模块范围
+
+模块按六组组织。下面的名称表示产品覆盖方向和 schema 规划，实际可用能力以设置页和诊断信息为准。
 
 <details open>
-<summary><b>People & Records</b> — Members (always on) · Certificates · Medical Records · Social Security · Insurance · Certifications · Pets</summary>
+<summary><b>人员档案</b>：成员、证件、健康、社保、保险、考试、宠物</summary>
 
-Rule-based expiry reminders (passport 1y / license 90d / endorsements), checkups & vaccine book, retirement countdown, policy ledger, renewal cycles, pet deworming
+成员关系与生日、证件和材料、就诊资料、社保快照、保单、考试通知、宠物照护记录。
 </details>
 
 <details open>
-<summary><b>Assets & Shopping</b> — Physical Assets · Digital Assets · Shopping Log · Memberships · Contracts</summary>
+<summary><b>资产与服务</b>：实物资产、虚拟资产、购物、会员订阅、合同</summary>
 
-Location hierarchy & warranty tracking, account assets with password-location index (never passwords), tracking numbers & pickup codes, prepaid balances, contract expiry
+物品位置与保修资料、非秘密的数字资产索引、订单与售后材料、续费周期、合同版本。
 </details>
 
 <details open>
-<summary><b>Daily Living</b> — Medicine Cabinet · Stock & Pantry · Gift Ledger · Chores · Dining · Addresses · Bookmarks · Snippets · House & Schedule</summary>
+<summary><b>日常生活</b>：药箱、库存、人情、家务、餐饮、地址、网址、常用语、房屋</summary>
 
-Medicine expiry + stock, pantry low-stock, gift net-balance per person, recurring chores, recipes & dislikes, payment days & lunar anniversaries, emergency checklist
+效期和余量、库存盘点、收送记录、周期事项、菜谱与偏好、地址版本、办事入口、常用语和住处事项。
 </details>
 
 <details open>
-<summary><b>Parenting & School</b> — Parenting · Schooling (K→college) · Allowance & Lucky Money</summary>
+<summary><b>育儿与上学</b>：育儿、上学、零花钱</summary>
 
-National immunization schedule (22 doses), growth records, school phases & milestones, tuition payments, multi-account allowance
+成长与照护记录、学校通知和材料、学费/课时草稿、零花钱流水草稿。
 </details>
 
 <details open>
-<summary><b>Travel & Vehicles</b> — Vehicles · Transit Cards · Trip Plans · Bookings · Packing Lists · Trip Journal</summary>
+<summary><b>出行与旅行</b>：车辆、交通卡、旅行计划、预订、行李、足迹</summary>
 
-Service/inspection/insurance/battery reminders, itinerary timeline, voucher archive, document self-check
+维护和年检资料、卡证期限、行程约束、预订凭证、行前清单和行后事实。
 </details>
 
 <details open>
-<summary><b>Media Library</b> — Movies / TV / Variety / Books / Comics / Novels</summary>
+<summary><b>影音书库</b>：电影、电视剧、综艺、书籍、漫画、小说</summary>
 
-Want/doing/done states, ratings & progress, source links
+想看/在看/完成状态、评分、进度和来源链接。
 </details>
 
-> 🧮 **Modules on demand**: all 31 modules are schema-driven — enabling one provisions its database and joins the reminder hub automatically. Full list in [MODULES.md](./MODULES.md).
+完整模块字段、状态和规划边界见 [MODULES.md](./MODULES.md) 与 [数据模型](./docs/design/02-数据模型与模块规格.md)。
 
-## 🚫 Explicitly NOT doing
+## AI 如何融入
 
-Full accounting · password vaults · official data integrations · real-time travel info · barcode wallets · telemedicine · media streaming
+AI 是后续体验的重要协作层，但当前版本**没有接入模型，也不会自动调用思源 Agent**。规划中的 AI 入口从具体任务进入，而不是把整个插件变成聊天窗口：
 
-> Lv Home stays at the **ledger + reminders + archive** layer — professional tools do the rest.
+- 根据选定来源回答“这条资料说明了什么”，并附原文定位；
+- 把用户选定文字整理成录入草稿，保留未知和冲突；
+- 解释提醒使用了哪个字段、规则和时间；
+- 比较新旧资料，形成逐字段差异；
+- 准备办理材料、交接摘要和下一步草稿；
+- 在小驴系列插件之间规划最小上下文接力。
 
-## 🗺 Roadmap
+每次 AI 任务都应先显示读取范围、来源、敏感字段和实际可用能力。结果区分事实、建议、未知和草稿；生成不等于写入，应用前必须经过差异预览、目标版本检查和用户确认。思源 Agent 接入只遵循公开能力注册契约，不调用私有接口。关闭 AI 后，查看、手工录入、提醒处理和导出仍可完成。
 
-The current release is in a trust-and-validation phase: complete the real SiYuan UI batch, mobile/accessibility checks, recovery paths and production screenshots before marketplace submission. The next feature slice should optimize the five-minute path from a member to a first reminder and its source record. Pinyin search, webhooks, QR labels, AI and family collaboration remain an observation pool until host capability and user evidence are available.
+设计和提示词规划见：
 
-| Phase | Content |
+- [AI 融入与思源智能体](./docs/design/10-AI融入与思源智能体.md)
+- [内置 AI 提示词模板](./docs/design/11-内置AI提示词模板.md)
+- [工作台页面与内容架构](./docs/design/12-工作台页面与内容架构.md)
+
+## v4 场景与 AI 协作原型
+
+[打开交互原型](./prototype/index.html)，可预览以固定合成资料串起的目标体验：
+
+- **模块快捷登记与草稿**：购物、药品、影音、人情和证件使用对应录入字段；模拟保存保留本页草稿与回执，刷新页面会清除。
+- **不同记录详情**：查看身份证、驾驶证和护照样例的成员、日期、状态与来源，AI 样例限定在妈妈身份证记录中。
+- **组合筛选**：组合成员、模块和时间条件，查看范围、结果数及清除路径。
+- **提醒状态**：切换完整快照、无提醒、筛选无结果、缺库、部分失败、陈旧及读取失败的合成场景。
+- **AT05 提醒解释**：先看资料白名单、排除项与规则轨迹，再看有依据的说明、未知项、核对清单草稿和演示核对回执。
+
+这是独立 HTML 的目标体验预览，**未接入模型或思源智能体，未读取或写入真实业务数据**。草稿保留和核对回执只作用于本页演示，不创建台账、提醒或办理完成事实。相关生产待办仍未完成；场景目标、待验证点及浏览器结果见 [场景原型与 AI 协作验证](./docs/design/14-场景原型与AI协作验证.md)，生产适配规划见 [原型质感与实现差距](./docs/design/13-原型质感与实现差距.md)。原型预览与浏览器检查均不能替代思源实机验收。
+
+## 隐私与数据边界
+
+- 业务台账写入思源数据库，设置和运行态保存在插件存储；
+- 当前没有默认模型调用、外部官方数据同步或遥测上报；
+- 不把密码、密钥、取件码和完整证件号设计成 AI 默认上下文；
+- 共享笔记本不等于插件自动完成权限隔离，家庭共享、照护交接和撤回需要按思源实际权限验证；
+- 本地优先不等于自动备份，导出、恢复、冲突和回收站仍是持续建设内容。
+
+## 明确不做
+
+小驴管家暂不替代：
+
+- 完整记账、预算和复式财务；
+- 密码库、密钥保管和账户登录代理；
+- 官方违章、社保余额、保单理赔等实时数据接口；
+- 实时交通、天气、票务和在线预订；
+- 在线问诊、诊断、用药和资格判断；
+- 自动发送消息、付款、预约、购买或向机构提交资料；
+- 媒体在线播放。
+
+它负责整理家庭资料、派生提醒、保留依据和协助准备；专业判断与外部办理仍由用户和对应机构完成。
+
+## 路线图
+
+当前版本先完成发布信任与真实使用验收：真机六阶段 UI 批、移动端/无障碍、失败恢复和生产截图通过后，再讨论集市上架。下一阶段围绕“成员 → 第一条记录 → 提醒 → 回到原文办理 → 导出/恢复”的五分钟路径。拼音检索、Webhook、QR、AI 和家庭共享权限仍属于观察池，待宿主能力与真实用户证据成立后再承诺。
+
+| 阶段 | 方向 |
 |---|---|
-| ✅ v0.3.12 (current) | v0.3.10 baseline plus Windows Corepack live-test startup fix, independent backend e2e evidence, and explicit AI outbound boundary |
-| 🔜 Next | Task workbench, evidence center, inbox, health recovery |
-| 🔭 Later | Family collaboration, template packs, yearly family report, AI capabilities |
+| ✅ v0.3.13 当前 | 界面对齐原型收官：设置面板/资产模块 id/示例无名行修复、⚡ 快速记录弹层、详情右滑抽屉、行数口径贯通、偏好持久化、icon/preview 资产重制 |
+| 下一阶段 | 事项工作台、资料/依据中心、收件箱、健康恢复、移动端降级 |
+| AI 阶段 | 证据问答、提醒解释、录入草稿、资料比较、办理准备、交接草稿和系列插件接力 |
+| 长期研究 | 家庭共享、模板包、定期回顾、年度报告和可携带性 |
 
-Full plan: [ROADMAP.md](./ROADMAP.md)
+完整阶段出口与停止条件见 [ROADMAP.md](./ROADMAP.md)，页面契约见 [交互与 UI 原型](./docs/design/04-交互与UI原型.md)。
 
-## 🤝 Ecosystem
+## 小驴系列联动
 
-Works with the Lv plugin family: **Check-in** (numeric tracking), **Contacts** (technicians/teachers/doctors), **Quick Switch** (bookmarks/snippets), **Web Clipper** (archiving).
+小驴管家可围绕家庭事实与到期事项，规划与打卡、人脉、快切、拾遗等插件协作：
 
-## 🛠 Development
+- 打卡：提供数值或习惯记录；
+- 人脉：提供师傅、老师、医生等联系人候选；
+- 快切：提供网址、常用语和入口；
+- 拾遗：提供原文或剪藏来源。
 
-```bash
+当前联动仍需逐个验证版本、权限、字段、唯一负责人、幂等和回执。文档中的联动方案不代表接口已经接通，不读取其他插件的私有库，也不把“生成联动计划”说成“联动已成功”。
+
+## 安装
+
+1. 从 [Releases](https://github.com/ai68298100/siyuan-home/releases/latest) 下载 package.zip。
+2. 在思源笔记中打开“设置 → 集市 → 下载”，使用顶部的导入入口安装 zip。
+3. 启用插件并完成当前两步引导。
+4. 通过命令面板或快捷键 Ctrl+Alt+H 打开管家面板。
+
+首次使用建议只启用成员和一个高价值模块，先完成一条证件或订阅记录，再扩大范围。若某模块显示缺库，先使用台账页的重建入口并查看设置中的诊断信息。
+
+## 开发
+
+~~~bash
 pnpm install
-pnpm run dev      # dev (app + kernel watch)
-pnpm run build    # dist/ + package.zip
-pnpm run check    # 5-layer gate (types + svelte + i18n + meta + audit)
-pnpm run smoke    # release package and single-file loader smoke checks
-pnpm test         # unit tests (293)
-```
+pnpm run dev
+pnpm run build
+pnpm run check
+pnpm test
+~~~
 
-- Setup & conventions: [CONTRIBUTING.md](./CONTRIBUTING.md)
-- Release quality: CI runs check/test/build/smoke/size-gate on every push & PR
-- Regression checklist: [docs/testing/v0.2.md](./docs/testing/v0.2.md)
-- Questions and bug reports: [SUPPORT.md](./SUPPORT.md) · Security reports: [SECURITY.md](./SECURITY.md)
-
-## 📚 Documentation
-
-| Category | Docs |
-|---|---|
-| Usage | [FAQ](https://github.com/ai68298100/siyuan-home/blob/main/docs/FAQ.md) · [Privacy](https://github.com/ai68298100/siyuan-home/blob/main/docs/privacy.md) · [Migration](https://github.com/ai68298100/siyuan-home/blob/main/docs/migration.md) · [Glossary](https://github.com/ai68298100/siyuan-home/blob/main/docs/glossary.en.md) |
-| Design | [01 Architecture](./docs/design/01-架构总览.md) · [02 Data model](./docs/design/02-数据模型与模块规格.md) · [03 Reminder hub](./docs/design/03-提醒中枢.md) · [07 Visual language](./docs/design/07-视觉设计语言.md) · [Index](./docs/design/00-index.md) |
-| Interactive prototype | [prototype/index.html](./prototype/index.html) (open in browser — dark/light themes, 7 screens incl. style guide) |
+- 开发约定：[CONTRIBUTING.md](./CONTRIBUTING.md)
+- 回归清单：[docs/testing/v0.2.md](./docs/testing/v0.2.md)
+- 设计索引：[docs/design/00-index.md](./docs/design/00-index.md)
+- 交互原型：[docs/design/04-交互与UI原型.md](./docs/design/04-交互与UI原型.md)
+- 高保真目标体验：[v4 场景与 AI 协作原型](./prototype/index.html)；合成路径与验证记录见 [场景原型与 AI 协作验证](./docs/design/14-场景原型与AI协作验证.md)。
+- 隐私声明：[docs/privacy.md](./docs/privacy.md)
+- 常见问题：[docs/FAQ.md](./docs/FAQ.md)
+- 使用支持：[SUPPORT.md](./SUPPORT.md)
+- 安全问题：[SECURITY.md](./SECURITY.md)
 
 ## License
 
-[MIT](./LICENSE) · Third-party data & notices: [NOTICE.md](./NOTICE.md) (WHO Child Growth Standards, CC BY-NC 3.0 IGO)
+[MIT](./LICENSE) · 第三方数据与声明：[NOTICE.md](./NOTICE.md)（WHO 儿童生长标准，CC BY-NC 3.0 IGO）
 
 <div align="center">
 
-*Start with one certificate — let the hub remember, so you don't have to.*
+*从一张证件开始，让家事不再依赖记性。*
 
 </div>
-
----
-
-### 🌐 中文
-
-**小驴管家** —— 思源笔记的家庭与生活管家：31 个 schema 驱动的生活模块（证件/药品/保单/订阅/上学/旅行/影音…）、统一到期提醒中枢、按成员组织、本地优先零遥测。完整介绍见 [中文文档](./README.zh-CN.md)。

@@ -62,7 +62,7 @@ try {
 // 1. 必要文件（集市与运行要求）
 const required = [
     "index.js", "index.css", "plugin.json", "icon.png", "preview.png",
-    "README.md", "README.zh-CN.md", "LICENSE", "kernel.js",
+    "README.md", "README.en.md", "LICENSE", "kernel.js",
     "i18n/zh-CN.json", "i18n/en.json",
 ];
 for (const f of required) {
