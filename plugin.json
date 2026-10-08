@@ -41,7 +41,7 @@
   },
   "readme": {
     "default": "README.md",
-    "zh-CN": "README.zh-CN.md"
+    "en": "README.en.md"
   },
   "icon": "icon.png",
   "preview": "preview.png",

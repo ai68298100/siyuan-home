@@ -28,7 +28,7 @@ if (pkg.author && plugin.author && pkg.author !== plugin.author) {
 if (plugin.url && !plugin.url.startsWith("https://github.com/")) {
     errors.push(`plugin.json url should be a GitHub HTTPS URL: "${plugin.url}"`);
 }
-for (const f of ["src/index.ts", "plugin.json", "icon.png", "preview.png", "README.md", "README.zh-CN.md", "LICENSE", "public/i18n/zh-CN.json", "public/i18n/en.json"]) {
+for (const f of ["src/index.ts", "plugin.json", "icon.png", "preview.png", "README.md", "README.en.md", "LICENSE", "public/i18n/zh-CN.json", "public/i18n/en.json"]) {
     if (!existsSync(f)) errors.push(`missing file: ${f}`);
 }
 if (plugin.disabledInPublish === false) {
