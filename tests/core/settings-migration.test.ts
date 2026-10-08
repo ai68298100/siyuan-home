@@ -74,7 +74,7 @@ describe("坏文件容错（15 组）", () => {
         } as any;
         const s = await loadSettings(plugin);
         expect(s.enabledModules.length).toBeGreaterThan(0); // 默认值
-        expect(s.corruptedSettings).toBe(true);
+        expect(s.corruptedSettings).toContain("invalid json"); // 269 波：原因随标记透传
         const marker = saved["settings.json.corrupted.json"] as any;
         expect(marker.source).toBe("settings.json");
         expect(marker.reason).toContain("invalid json");
@@ -87,8 +87,54 @@ describe("坏文件容错（15 组）", () => {
             saveData: async (n: string, v: unknown) => { saved[n] = v; },
         } as any;
         const s = await loadSettings(plugin);
-        expect(s.corruptedSettings).toBe(true);
-        expect((saved["settings.json.corrupted.json"] as any).reason).toContain("non-object");
+        // 269 波：非对象字符串先尝试 JSON 解析——写坏的字符串仍标记，但原因改为解析失败
+        expect(s.corruptedSettings).toContain("non-JSON string content");
+        expect((saved["settings.json.corrupted.json"] as any).reason).toContain("non-JSON");
+    });
+
+    it("269 波：内核返回原始 JSON 字符串 → 解析采用，不误报损坏（v3.8.6 形态）", async () => {
+        const saved: Record<string, unknown> = {};
+        const raw = JSON.stringify({ enabledModules: ["certs"], members: [{ id: "m1", name: "测试", role: "self" }] });
+        const plugin = {
+            loadData: async () => raw,
+            saveData: async (n: string, v: unknown) => { saved[n] = v; },
+        } as any;
+        const s = await loadSettings(plugin);
+        expect(s.enabledModules).toEqual(["certs"]);
+        expect(s.corruptedSettings).toBeUndefined();
+        expect(saved["settings.json.corrupted.json"]).toBeUndefined();
+    });
+
+    it("269 波：loadData 抛 not found 系错误 → 首次安装正常路径，不落损坏标记", async () => {
+        const saved: Record<string, unknown> = {};
+        const plugin = {
+            loadData: async () => { throw new Error("storage file not found"); },
+            saveData: async (n: string, v: unknown) => { saved[n] = v; },
+        } as any;
+        const s = await loadSettings(plugin);
+        expect(s.enabledModules.length).toBeGreaterThan(0);
+        expect(s.corruptedSettings).toBeUndefined();
+        expect(saved["settings.json.corrupted.json"]).toBeUndefined();
+    });
+
+    it("269 波：字符串解析出非对象标量 → 按缺失处理，不误报损坏", async () => {
+        const plugin = {
+            loadData: async () => "123",
+            saveData: async () => undefined,
+        } as any;
+        const s = await loadSettings(plugin);
+        expect(s.corruptedSettings).toBeUndefined();
+    });
+
+    it("269 波：非法 JSON 字符串 → 仍视为损坏（原因入标记）", async () => {
+        const saved: Record<string, unknown> = {};
+        const plugin = {
+            loadData: async () => "{broken json",
+            saveData: async (n: string, v: unknown) => { saved[n] = v; },
+        } as any;
+        const s = await loadSettings(plugin);
+        expect(s.corruptedSettings).toContain("non-JSON string content");
+        expect((saved["settings.json.corrupted.json"] as any).reason).toContain("non-JSON");
     });
 
     it("SiYuan 缺失文件返回空字符串 → 按未建库默认值处理，不误报损坏", async () => {

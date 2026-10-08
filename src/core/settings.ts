@@ -25,23 +25,38 @@ export function defaultSettings(): HomeSettings {
     };
 }
 
-/** 15 组：坏文件容错——loadData 抛错或返回非对象时备份标记并回退默认值，不让 onload 崩溃 */
-export async function loadDataSafe(plugin: Plugin, name: string): Promise<{ data: any; corrupted: boolean }> {
+/** 15 组：坏文件容错——loadData 抛错或返回非对象时备份标记并回退默认值，不让 onload 崩溃。
+ * 269 波（v3.8.6 全新安装误报"设置文件已损坏"实测）：
+ *  1. 内核对缺失存储文件会抛 not found 系错误——那是首次安装的正常路径，静默走默认值；
+ *  2. 部分内核把存储内容以原始字符串返回而非解析对象——先尝试 JSON 解析，
+ *     解析出对象即合法数据直接采用；非对象标量按缺失处理；
+ *  3. 只有"解析失败的字符串内容"（真写坏）与未知异常才落损坏标记。 */
+export async function loadDataSafe(plugin: Plugin, name: string): Promise<{ data: any; corrupted: boolean; reason?: string }> {
     try {
         const data = await plugin.loadData(name);
-        // SiYuan returns an empty string for a missing/empty petal data file
-        // on some kernels. Treat that representation like a missing file;
-        // only non-empty scalar data is a corruption signal.
-        if (typeof data === "string" && data.trim() === "") return { data: null, corrupted: false };
-        if (data !== null && data !== undefined && !isPlainObject(data)) {
-            // 非 JSON 对象（手工改坏/老版本残留）→ 视为损坏
-            await backupCorruptMarker(plugin, name, `non-object: ${Array.isArray(data) ? "array" : typeof data}`);
-            return { data: null, corrupted: true };
+        if (data === null || data === undefined) return { data: null, corrupted: false };
+        if (typeof data === "string") {
+            const t = data.trim();
+            if (t === "") return { data: null, corrupted: false };
+            try {
+                const parsed = JSON.parse(t);
+                return { data: isPlainObject(parsed) ? parsed : null, corrupted: false };
+            } catch {
+                // 非法 JSON 字符串 = 文件真被写坏——保留标记（原始文件不动，留给思源备份）
+                const reason = "non-JSON string content";
+                await backupCorruptMarker(plugin, name, reason);
+                return { data: null, corrupted: true, reason };
+            }
         }
+        if (!isPlainObject(data)) return { data: null, corrupted: false };
         return { data, corrupted: false };
     } catch (e) {
-        await backupCorruptMarker(plugin, name, e instanceof Error ? e.message : String(e));
-        return { data: null, corrupted: true };
+        const msg = e instanceof Error ? e.message : String(e);
+        // 内核对缺失存储文件抛 not found 系错误——首次安装的正常路径，不是损坏
+        if (/not found|no such|missing|enoent|不存在/i.test(msg)) return { data: null, corrupted: false };
+        console.warn(`[siyuan-home] loadData(${name}) failed: ${msg}`);
+        await backupCorruptMarker(plugin, name, msg);
+        return { data: null, corrupted: true, reason: msg };
     }
 }
 
@@ -102,11 +117,11 @@ function normalizeDbRefs(raw: unknown, fallback: HomeSettings["dbRefs"]): HomeSe
 }
 
 export async function loadSettings(plugin: Plugin): Promise<HomeSettings> {
-    const { data, corrupted } = await loadDataSafe(plugin, SETTINGS_NAME);
+    const { data, corrupted, reason } = await loadDataSafe(plugin, SETTINGS_NAME);
     const defaults = defaultSettings();
     if (!isPlainObject(data)) {
-        // corrupted=true 时保留标记供 onload 弹警告（设置页诊断亦可见 corrupted 文件）
-        return corrupted ? { ...defaults, corruptedSettings: true } : defaults;
+        // corrupted=true 时保留标记供 onload 弹警告（269 波：原因串随标记透传，弹窗可就地诊断）
+        return corrupted ? { ...defaults, corruptedSettings: reason ?? true } : defaults;
     }
     // 用户显式管理模块开关：已有 enabledModules 时完全尊重（含关闭默认模块）；
     // 新增模块的默认启用只走版本化迁移（33.1），运行时不强制回填。

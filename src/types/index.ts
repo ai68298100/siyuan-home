@@ -146,7 +146,8 @@ export interface HomeSettings {
     /** 示例成员 id 清单（一键清除移除引用） */
     demoMemberIds?: string[];
     /** 15 组：settings.json 损坏已回退默认（onload 弹警告；marker 文件 settings.json.corrupted.json 可查） */
-    corruptedSettings?: boolean;
+    /** 269 波：值为损坏原因串（弹窗就地诊断）；布尔 true = 无细节 */
+    corruptedSettings?: boolean | string;
     /** EC09（D20）：打卡习惯 → 成员指标绑定（settings 驱动映射 v1；只读消费，不写打卡数据） */
     checkinBindings?: CheckinBinding[];
     /** Webhook 推送（路线图"下一阶段"，229 波）：用户显式配置并启用后才外发；空 URL 不推送 */
