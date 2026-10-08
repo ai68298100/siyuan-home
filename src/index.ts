@@ -150,7 +150,10 @@ export default class LvHomePlugin extends Plugin {
 
         // 15 组：settings.json 损坏已回退默认 → 明确警告（诊断区可见 settings.json.corrupted.json 标记）
         if (this.settings.corruptedSettings) {
-            showMessage(this.i18nText("settings.corrupted"), 8000, "error");
+            // 269 波：损坏原因就地显示（用户不必翻 marker 文件）；时长 8s→10s 给足阅读时间
+            const reason = this.settings.corruptedSettings;
+            const detail = typeof reason === "string" ? `（${reason}）` : "";
+            showMessage(this.i18nText("settings.corrupted") + detail, 10000, "error");
         }
 
         // B2d 降级定案（kernel.js 无定时器 API）：前端心跳 30min 驱动定时扫描
