@@ -9,9 +9,9 @@ afterEach(() => setWebhookSender(null));
 
 describe("Webhook 推送（Bark / ntfy）", () => {
     it("Bark：GET，标题/正文 URL 编码，尾斜杠归一", () => {
-        const req = buildWebhookRequest("bark", "https://api.day.app/abc/", { title: "小驴管家", body: "逾期 2 件" });
+        const req = buildWebhookRequest("bark", "https://api.day.app/abc/", { title: "小驴管家（内测版）", body: "逾期 2 件" });
         expect(req.method).toBe("GET");
-        expect(req.url).toBe(`https://api.day.app/abc/${encodeURIComponent("小驴管家")}/${encodeURIComponent("逾期 2 件")}`);
+        expect(req.url).toBe(`https://api.day.app/abc/${encodeURIComponent("小驴管家（内测版）")}/${encodeURIComponent("逾期 2 件")}`);
         expect(req.body).toBeUndefined();
     });
 
