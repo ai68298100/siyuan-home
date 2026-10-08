@@ -65,7 +65,7 @@ export async function sendWebhook(settings: HomeSettings, p: WebhookPayload): Pr
 export function buildDigestBody(counts: { overdue: number; soon: number }, topTitles: string[]): WebhookPayload {
     const titles = topTitles.slice(0, 3).map((t) => `· ${t}`).join("\n");
     return {
-        title: "小驴管家",
+        title: "小驴管家（内测版）",
         body: `逾期 ${counts.overdue} 件 · 7 天内 ${counts.soon} 件${titles ? "\n" + titles : ""}`,
     };
 }
