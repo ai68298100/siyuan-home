@@ -8,6 +8,9 @@
 // ============================================================
 
 .lv-home {
+  // 常驻挂载的 .lv-mask/.lv-modal（267 波）以最近定位祖先为包含块——不设 relative 时
+  // 会锚到更外层元素，关闭态的 480px 弹层把窄容器面板撑出幽灵横向滚动区
+  position: relative;
   // ── 1. Token ────────────────────────────────────────────
   --lv-r-1: 6px; --lv-r-2: 10px; --lv-r-3: 14px; --lv-r-4: 18px;
   --lv-ease: cubic-bezier(.2, 0, 0, 1);
@@ -415,7 +418,9 @@
     visibility: hidden;
     transition: visibility 0s var(--lv-t-slow);
     &.open { visibility: visible; transition: visibility 0s; }
-    .lv-sheet { width: 480px; max-width: 92%; max-height: calc(100% - 32px); background: var(--lv-surface);
+    // 宽度用容器查询单位：92% 在 place-items:center 的 auto 网格里百分比解析不可靠
+    // （实测按 482px 而非面板宽解析，窄容器溢出 69px）；.lv-home 即 inline-size 容器，cqw 恒定可期
+    .lv-sheet { width: min(480px, calc(100cqw - 24px)); max-height: calc(100% - 32px); background: var(--lv-surface);
       border: 1px solid var(--lv-line-strong); border-radius: var(--lv-r-4);
       box-shadow: var(--lv-shadow-3), inset 0 1px 0 var(--lv-inset); opacity: 0;
       display: flex; flex-direction: column;
@@ -424,7 +429,9 @@
     &.open { pointer-events: auto;
       .lv-sheet { opacity: 1; transform: none; } }
     .lv-sheet-head { display: flex; align-items: center; gap: 10px; padding: 16px 22px;
-      border-bottom: 1px solid var(--lv-line); }
+      border-bottom: 1px solid var(--lv-line);
+      // ✕ 关闭钮命中区收口（DEVICE-03：触控目标 ≥32px；实测裸字形 31px 差 1px）
+      .lv-iconbtn { min-width: 32px; min-height: 32px; } }
     .lv-sheet-body { padding: 20px 22px; display: flex; flex-direction: column; gap: 14px;
       flex: 1; min-height: 0; overflow: auto; scrollbar-width: thin; scrollbar-color: var(--lv-line-strong) transparent; }
     .lv-sheet-foot { display: flex; gap: 8px; justify-content: flex-end; padding: 14px 22px;

@@ -6,6 +6,9 @@
     import { parseCsv } from "@/core/csv";
     import { planImport, guessMapping } from "@/core/importer";
     import { buildCsv } from "@/core/csv";
+    import { maskIdNumber, parseIdNumber } from "@/core/idcard";
+    import { selectCellValue, selectCellContent } from "@/core/avcell";
+    import { renderRecordCardPng, copyPngToClipboard, downloadPng } from "@/core/sharecard";
     import { localDateKey } from "@/core/hub/rule";
     import { showMessage, Dialog, confirm } from "siyuan";
     import type { HomePluginLike } from "@/types/plugin";
@@ -505,10 +508,19 @@
     const certificateScalarCols = $derived.by(() => {
         if (!certificateProfile) return [] as { key: string; type: string; options?: string[] }[];
         const schemaCols: any[] = plugin.schemaCatalog?.certs?.columns ?? [];
-        const keys = new Set(["x_cert_holder_name", "holder_no", "issue_date", "x_cert_valid_from", "issuance_rule", "store_place", "location", "copy_location", "note", ...certificateProfile.fieldKeys]);
+        const keys = new Set(["x_cert_holder_name", "holder_no", "x_cert_id_number", "issue_date", "x_cert_valid_from", "issuance_rule", "store_place", "location", "copy_location", "note", ...certificateProfile.fieldKeys]);
         if (!getCertificateReminderField(certificateProfile.category)) keys.add("due");
         return schemaCols.filter((col: any) => keys.has(col.key) && col.type !== "mAsset")
             .map((col: any) => ({ key: col.key, type: col.type, options: col.options }));
+    });
+    // R7 资料强化：身份证号实时校验（输入非空才解析；校验通过且性别未填时自动回填）
+    const idcardCheck = $derived.by(() => {
+        const v = String(form.x_cert_id_number ?? "").trim();
+        return v ? parseIdNumber(v) : null;
+    });
+    $effect(() => {
+        const check = idcardCheck;
+        if (check?.ok && check.sex && !form.x_cert_id_gender) form.x_cert_id_gender = check.sex;
     });
     const certificateAssetCols = $derived.by(() => active === "certs"
         ? [
@@ -575,7 +587,7 @@
 
     function cellValue(type: string, v: any): unknown | null {
         switch (type) {
-            case "select": return { type: "select", select: { content: v } };
+            case "select": return selectCellValue(v);
             case "relation": return { type: "relation", relation: { blockIDs: [v], contents: null } };
             case "date": return v === "" ? { type: "date", date: { isNotEmpty: false } } : { type: "date", date: { content: new Date(`${v}T00:00:00`).getTime(), isNotEmpty: true, isNotTime: true } };
             case "number": return v === "" || v === null ? { type: "number", number: { isNotEmpty: false } } : { type: "number", number: { content: Number(v), isNotEmpty: true } };
@@ -605,10 +617,16 @@
     function cellText(v: any, colKey?: string): string {
         if (!v) return "—";
         switch (v.type) {
-            case "text": return v.text?.content ?? "—";
+            case "text": {
+                const content = v.text?.content ?? "—";
+                // 完整证件号在表格默认掩码（防侧窥）；详情抽屉内可显文明本
+                if (colKey === "x_cert_id_number" && content !== "—") return maskIdNumber(content);
+                return content;
+            }
             case "date": return v.date?.isNotEmpty ? localDateKey(new Date(v.date.content)) : "—";
             case "select": {
-                const s = v.select?.content ?? "—";
+                // R8：内核 3.8.x 把 select 值存为 mSelect 数组——双形态读取
+                const s = selectCellContent(v) ?? "—";
                 return colKey ? optLabel(t, colKey, s) : s;
             }
             case "mSelect": {
@@ -664,7 +682,7 @@
             case "number": return v?.number?.isNotEmpty && typeof v.number.content === "number" ? v.number.content : "";
             case "date": return v?.date?.isNotEmpty ? localDateKey(new Date(v.date.content)) : "";
             case "checkbox": return !!v?.checkbox?.checked;
-            case "select": return v?.select?.content ?? "";
+            case "select": return selectCellContent(v) ?? "";
             case "url": return v?.url?.content ?? "";
             default: return v?.text?.content ?? "";
         }
@@ -690,11 +708,11 @@
         const dlg = new Dialog({
             title: detailTitle,
             content: `<div class="b3-dialog__content b3-dialog__content--wrap" id="lv-detail-body" style="max-height:60vh;overflow:auto"></div>
-<div class="b3-dialog__action"><button class="b3-button b3-button--cancel" id="lv-detail-del">${t("delete")}</button><span style="flex:1"></span><button class="b3-button b3-button--cancel" id="lv-detail-close">${t("cancel")}</button><button class="b3-button b3-button--text" id="lv-detail-edit">${t("members.edit")}</button><button class="b3-button" id="lv-detail-open">${t("ledger.openDoc")} ↗</button></div>`,
+<div class="b3-dialog__action"><button class="b3-button b3-button--cancel" id="lv-detail-del">${t("delete")}</button><span style="flex:1"></span><button class="b3-button b3-button--cancel" id="lv-detail-card-copy">${t("ledger.copyAsImage")}</button><button class="b3-button b3-button--cancel" id="lv-detail-card-png">${t("ledger.downloadPng")}</button><button class="b3-button b3-button--cancel" id="lv-detail-card-text">${t("ledger.copyAsText")}</button><button class="b3-button b3-button--cancel" id="lv-detail-close">${t("cancel")}</button><button class="b3-button b3-button--text" id="lv-detail-edit">${t("members.edit")}</button><button class="b3-button" id="lv-detail-open">${t("ledger.openDoc")} ↗</button></div>`,
             width: "520px",
         });
         const body = dlg.element.querySelector("#lv-detail-body") as HTMLElement;
-        const rowCategory = active === "certs" ? row.cells[ref.columns.category ?? ""]?.select?.content : undefined;
+        const rowCategory = active === "certs" ? selectCellContent(row.cells[ref.columns.category ?? ""]) : undefined;
         const activeCertFields = active === "certs" ? new Set(getCertificateProfile(rowCategory).fieldKeys) : null;
         const schemaCols: any[] = (plugin.schemaCatalog?.[active]?.columns ?? []).filter((col: any) =>
             active !== "certs" || !String(col.key).startsWith("x_cert_") || activeCertFields?.has(col.key));
@@ -826,8 +844,10 @@
             }
         }
         // 查看模式：kv 行 + 历史 + 附件
+        let cardRows: { label: string; value: string }[] = [];
         function buildView() {
             body.innerHTML = "";
+            cardRows = [];
             for (const col of schemaCols) {
                 const keyID = ref!.columns[col.key];
                 if (!keyID) continue;
@@ -844,8 +864,63 @@
                 } else {
                     v.textContent = cellText(cell, col.key); // 211 波：select 值走枚举 i18n
                 }
+                // R7 资料强化：完整证件号默认掩码 + 显示/复制（明文只在显式动作后可见/离机）
+                if (active === "certs" && col.key === "x_cert_id_number") {
+                    const full = String(cellText(cell, col.key));
+                    if (full !== "—") {
+                        v.textContent = maskIdNumber(full);
+                        const reveal = document.createElement("button");
+                        reveal.className = "b3-button b3-button--text";
+                        reveal.style.cssText = "padding:0 6px;font-size:12px";
+                        reveal.textContent = t("ledger.idNumberShow");
+                        let shown = false;
+                        reveal.onclick = () => {
+                            shown = !shown;
+                            v.textContent = shown ? full : maskIdNumber(full);
+                            reveal.textContent = shown ? t("ledger.idNumberHide") : t("ledger.idNumberShow");
+                        };
+                        const copy = document.createElement("button");
+                        copy.className = "b3-button b3-button--text";
+                        copy.style.cssText = "padding:0 6px;font-size:12px";
+                        copy.textContent = t("ledger.idNumberCopy");
+                        copy.onclick = async () => {
+                            try {
+                                await navigator.clipboard.writeText(full);
+                                showMessage(t("ledger.idNumberCopied"), 2500, "info");
+                            } catch {
+                                showMessage(t("ledger.copyAsImageFail"), 4000, "error");
+                            }
+                        };
+                        line.append(reveal, copy);
+                        // R7 识别深化：号码校验通过且关联成员生日为空 → 一键回填成员生日（公历；农历生日不覆写）
+                        const parsedId = parseIdNumber(full);
+                        const memberBid = row.cells[ref.columns.member]?.relation?.blockIDs?.[0];
+                        const member = memberBid ? (plugin.settings.members ?? []).find(m => m.avItemId === memberBid) : undefined;
+                        if (parsedId.ok && parsedId.birth && member && !member.birthday && !member.lunarBirthday) {
+                            const birthFill = document.createElement("button");
+                            birthFill.className = "b3-button b3-button--text";
+                            birthFill.style.cssText = "padding:0 6px;font-size:12px";
+                            birthFill.textContent = t("ledger.idBirthFill").replace("${birth}", parsedId.birth);
+                            birthFill.onclick = async () => {
+                                const target = (plugin.settings.members ?? []).find(m => m.id === member.id);
+                                if (!target || target.birthday) return;
+                                target.birthday = parsedId.birth;
+                                try {
+                                    const { updateMember } = await import("@/core/members");
+                                    await updateMember(plugin as any, plugin.settings, target);
+                                    showMessage(t("ledger.idBirthFilled").replace("${birth}", parsedId.birth), 3000, "info");
+                                    birthFill.disabled = true;
+                                } catch (e) {
+                                    showMessage(t("ledger.copyAsImageFail").replace(": Downloaded instead", "") + ` (${e instanceof Error ? e.message : String(e)})`, 5000, "error");
+                                }
+                            };
+                            line.append(birthFill);
+                        }
+                    }
+                }
                 line.append(v);
                 body.appendChild(line);
+                cardRows.push({ label: colLabel(col), value: String(v.textContent) });
             }
             // C4b 收尾：用户在思源视图手建的列（schema 映射之外）追加展示——独立分区、
             // 原始列名直出（不做 i18n 包装），只读；编辑仍走思源视图，不冒充 schema 字段。
@@ -986,7 +1061,9 @@
             const rl = await import("@/core/rowlog");
             const at = () => new Date().toISOString();
             const fresh = () => rl.loadRowLogs(plugin as any);
-            if (active === "assets") {
+            // v0.3.13 只修了 CSV 导入按钮的组名错位，抽屉估值/移动分区仍查不存在的 "assets"
+            // （2026-10-09 审计实锤：模块真实 id 为 assets-real，分区自上线从未渲染）
+            if (active === "assets-real") {
                 await addRowLogSection({
                     title: t("ledger.valuations"), emptyText: t("ledger.noValuations"), addLabel: t("ledger.valAdd"),
                     fields: [
@@ -1377,7 +1454,7 @@
                 try {
                     const person = await bridge.ensurePerson(personName);
                     const dateVal = ref!.columns.date ? rawFromValue("date", row.cells[ref!.columns.date]) : "";
-                    const dir = row.cells[ref!.columns.direction ?? ""]?.select?.content ?? "";
+                    const dir = selectCellContent(row.cells[ref!.columns.direction ?? ""]) ?? "";
                     const amount = row.cells[ref!.columns.amount ?? ""]?.number;
                     const noteParts = [
                         dir === "in" ? t("ec15.received") : dir === "out" ? t("ec15.given") : "",
@@ -1495,6 +1572,47 @@
         (dlg.element.querySelector("#lv-detail-close") as HTMLButtonElement).onclick = () => dlg.destroy();
         (dlg.element.querySelector("#lv-detail-edit") as HTMLButtonElement).onclick = () => buildEdit();
         (dlg.element.querySelector("#lv-detail-open") as HTMLButtonElement).onclick = () => { dlg.destroy(); plugin.showTabDocs(ref?.docId); };
+        // R7 资料强化：分享卡（复制为图片 / 下载 PNG）——kv 用当前显示文本（掩码态即导出掩码态）
+        const nameKeyForCard = ref?.columns?.name;
+        const nameValForCard = nameKeyForCard ? row.cells?.[nameKeyForCard] : undefined;
+        const cardTitle = (nameValForCard?.type === "block" ? nameValForCard.block?.content : "") || detailTitle;
+        const cardDeepLink = nameValForCard?.type === "block" && nameValForCard.block?.id ? blockDeepLink(nameValForCard.block.id) : blockDeepLink(ref?.docId || "");
+        const buildCard = async () => renderRecordCardPng({
+            title: cardTitle,
+            moduleLabel: t(`module.${active}`) !== `module.${active}` ? t(`module.${active}`) : active,
+            rows: cardRows,
+            deepLink: cardDeepLink,
+        });
+        (dlg.element.querySelector("#lv-detail-card-copy") as HTMLButtonElement).onclick = async function (this: HTMLButtonElement) {
+            this.disabled = true;
+            try {
+                const blob = await buildCard();
+                const ok = await copyPngToClipboard(blob);
+                if (ok) showMessage(t("ledger.copyAsImageOk"), 2500, "info");
+                else { downloadPng(blob, `${cardTitle.slice(0, 20) || "lvhome"}.png`); showMessage(t("ledger.copyAsImageFail"), 4000, "info"); }
+            } catch (e) {
+                showMessage(t("ledger.copyAsImageFail").replace(": Downloaded instead", "") + ` (${e instanceof Error ? e.message : String(e)})`, 5000, "error");
+            } finally { this.disabled = false; }
+        };
+        (dlg.element.querySelector("#lv-detail-card-png") as HTMLButtonElement).onclick = async function (this: HTMLButtonElement) {
+            this.disabled = true;
+            try {
+                const blob = await buildCard();
+                downloadPng(blob, `${cardTitle.slice(0, 20) || "lvhome"}.png`);
+            } catch (e) {
+                showMessage(t("ledger.copyAsImageFail").replace(": Downloaded instead", "") + ` (${e instanceof Error ? e.message : String(e)})`, 5000, "error");
+            } finally { this.disabled = false; }
+        };
+        // R7 资料强化：复制为文本（label: value 行，便于贴到聊天/邮件）
+        (dlg.element.querySelector("#lv-detail-card-text") as HTMLButtonElement).onclick = async () => {
+            const text = cardRows.map((r) => `${r.label}：${r.value}`).join("\n");
+            try {
+                await navigator.clipboard.writeText(`${cardTitle}\n${text}`);
+                showMessage(t("ledger.copyAsTextOk"), 2500, "info");
+            } catch (e) {
+                showMessage(t("ledger.copyAsImageFail") + ` (${e instanceof Error ? e.message : String(e)})`, 5000, "error");
+            }
+        };
         // 17 组：行删除（detached 行走内核 av 删除端点 [待实测]；删除是显式用户动作，双确认说明影响范围）
         (dlg.element.querySelector("#lv-detail-del") as HTMLButtonElement).onclick = () => {
             confirm(t("ledger.delTitle"), t("ledger.delBody").replace("${name}", cellText(row.cells[ref.columns.name])), async () => {
@@ -1672,8 +1790,8 @@
             <!-- 16 组/188 波：采购建议（低库存汇总） -->
             <button class="b3-button b3-button--outline" onclick={openShoppingList}>{t("ledger.shoppingList")}</button>
         {/if}
-        {#if active === "assets-real"}
-            <!-- 16 组/191 波：CSV 批量导入（列映射向导） -->
+        {#if active !== "members" && active !== "adhoc"}
+            <!-- R7 资料强化：CSV 批量导入通用化（向导本身按模块 schema 通用）——此前仅 assets-real -->
             <button class="b3-button b3-button--outline" onclick={openCsvImport}>{t("ledger.importCsv")}</button>
         {/if}
         <button class="b3-button b3-button--outline" onclick={() => plugin.showTabDocs(ref?.docId)}>{t("ledger.openDoc")} ↗</button>
@@ -1726,6 +1844,19 @@
             <input class="b3-text-field" type="date" title={t(`field.${e.key}`)} bind:value={form[e.key]} />
         {:else if e.type === "number"}
             <input class="b3-text-field" type="number" style="width:90px" placeholder={t(`field.${e.key}`)} bind:value={form[e.key]} />
+        {:else if e.key === "x_cert_id_number"}
+            <!-- R7 资料强化：完整证件号 + GB11643 实时校验（校验通过自动回填性别；明文仅存行内） -->
+            <div style="display:flex;flex-direction:column;gap:3px">
+                <input class="b3-text-field" style="min-width:220px;font-family:var(--b3-font-family-code, monospace)"
+                    placeholder={t(`field.${e.key}`)} bind:value={form[e.key]} />
+                {#if idcardCheck}
+                    {#if idcardCheck.ok}
+                        <span class="lv-caption" role="status" style="color:var(--lv-ok)">✓ {t("ledger.idcardValid").replace("${birth}", idcardCheck.birth ?? "").replace("${sex}", t(`ledger.idcardGender.${idcardCheck.sex}`))}</span>
+                    {:else}
+                        <span class="lv-caption" role="alert" style="color:var(--lv-warn)">⚠ {t("ledger.idcardBad").replace("${reason}", t(`ledger.idcardReason.${idcardCheck.reason ?? "format"}`))}</span>
+                    {/if}
+                {/if}
+            </div>
         {:else}
             <input class="b3-text-field" style="min-width:140px" placeholder={t(`field.${e.key}`)} bind:value={form[e.key]} />
         {/if}

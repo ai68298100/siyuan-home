@@ -233,6 +233,11 @@ exports[`31 模块 schema 契约快照（21 组） > 每个 schema 的结构快�
       "type": "relation",
     },
     {
+      "key": "x_cert_id_number",
+      "labelKey": "field.x_cert_id_number",
+      "type": "text",
+    },
+    {
       "key": "x_cert_id_address",
       "labelKey": "field.x_cert_id_address",
       "type": "text",

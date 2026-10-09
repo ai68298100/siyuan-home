@@ -42,4 +42,8 @@ export interface HomePluginLike extends Plugin {
     addMemo(title: string, due: string): Promise<void>;
     removeMemo(id: string): Promise<void>;
     updateMemo(id: string, patch: { title?: string; dueDate?: string }): Promise<void>;
+    /** 29 组：今日免打扰快捷开关（todaySilent 跨天自动失效） */
+    toggleTodaySilent(): Promise<void>;
+    /** 已挂载面板的页签直切（openRemindersScreen 已挂载路径用；面板卸载时由组件清空） */
+    panelScreenSwitch?: (screen: string) => void;
 }

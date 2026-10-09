@@ -27,17 +27,17 @@ Certificates expire, medicine expires, insurance needs renewal, subscriptions au
 | ⏰ **Unified expiry reminders** | Certificates, medicine, policies, subscriptions, inspections, birthdays (lunar supported) — all derived automatically, lead time configurable per type (passport 1 year, medicine 30 days), overdue shown in red on top |
 | 👥 **Members as first-class citizens** | Self / spouse / partner / children / elders / kin — every ledger is organized per member, filter "everything about my son" in one click |
 | 🗃 **31 life modules** | People & records · assets & shopping · daily living · parenting & school · travel · media (details below) |
-| 📋 **Rich detail drawer** | Type-specific certificate fields (ID/passport/permits/licences/qualifications/degrees/titles), quick camera/photo/PDF upload, same-origin attachment preview/download, renewal history, replacement chains & timeline journals |
+| 📋 **Rich detail drawer** | Type-specific certificate fields (ID/passport/permits/licences/qualifications/degrees/titles), full ID-card number with GB 11643 validation (region/birth/checksum), gender & birthday auto-fill, masked display, record share card (copy as image / download PNG / copy as text), quick camera/photo/PDF upload, same-origin attachment preview/download, renewal history, replacement chains & timeline journals |
 | 📈 **Growth charts (parenting)** | Height/weight timelines with official WHO reference bands (P3–P97, 0–13 weeks weekly + 0–60 months), percentile on hover |
 | 🛒 **Smart lists** | Shopping suggestions from low stock (editable, copy-to-clipboard), media update reminders, reciprocation reminders for received gifts |
 | 📊 **Check-in & exam integration** | Display study streaks and accuracy from 小驴考试, check-in strength summaries from 小驴打卡 |
-| 📤 **Data portability** | CSV export per module + bulk CSV import (column-mapping wizard), calendar (.ics) & contacts (.vcf) export, sanitized diagnostics bundle, settings JSON export/import with auto-backup, sample data generator |
+| 📤 **Data portability** | CSV export per module + bulk CSV import (column-mapping wizard, all modules), calendar (.ics) & contacts (.vcf) export, sanitized diagnostics bundle, settings JSON export/import with auto-backup, sample data generator |
 | 🔒 **Local-first** | Records live in your SiYuan workspace; the plugin has no author-owned server or telemetry. SiYuan sync, collaboration, backups and marketplace downloads remain host-controlled |
 | 🔗 **Native databases** | Ledgers are SiYuan attribute-view databases inside a dedicated notebook — open any ledger doc to edit, link or embed it in daily notes ("mom's passport" inside your journal) |
 | 🧩 **Modules on demand** | Disabled modules create no data and stay out of the UI; parenting/school only suggested when you have kids |
 | 🔌 **Ecosystem ready** | Quick capture sheet (⚡ / `N`, schema-driven, auto-provision), statusbar badge with scan-health pulse, service bridge (`window.LvHome`), contacts picker via 小驴人脉 |
 
-## 📦 Install (v0.3.15)
+## 📦 Install (v0.4.0)
 
 1. Download `package.zip` from [Releases](https://github.com/ai68298100/siyuan-home/releases/latest)
 2. SiYuan → Settings → Marketplace → Download → **Import** the zip
@@ -45,7 +45,7 @@ Certificates expire, medicine expires, insurance needs renewal, subscriptions au
 4. Press `Ctrl+Alt+H` anytime to open the hub
 
 > **Validation status:** core data paths have automated tests and live-kernel coverage. The six-stage real SiYuan UI batch, including Android WebView and accessibility checks, is still pending; marketplace submission remains paused. `icon.png` and `preview.png` were redesigned for v0.3.13 (brand-gradient tile + geometric mark; dark overview with sample data).
-> **Version note:** the tagged v0.3.15 package is the current stable release artifact; `main` contains the latest UI-alignment and quick-capture work and currently reports 297 unit tests.
+> **Version note:** the tagged v0.4.0 package is the current stable release artifact; `main` is in sync with it and currently reports 316 unit tests.
 >
 > Family sharing depends on SiYuan's collaboration, permissions, sync and conflict behavior. Test with non-sensitive data before sharing; this plugin does not provide a separate permission system.
 >

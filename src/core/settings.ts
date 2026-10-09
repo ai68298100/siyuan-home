@@ -25,6 +25,14 @@ export function defaultSettings(): HomeSettings {
     };
 }
 
+/** 内核 getFile 对缺失文件返回的错误信封（{"code":404,"msg":"…","data":null}）在部分前端
+ *  会作为普通对象透传给 loadData——形状恰为合法 JSON 对象，一旦被采纳并写回即污染存储
+ *  （2026-10-09 R6/R7 审计实锤：hub-runtime.json 被写成纯信封）。真实数据两文件都带
+ *  schemaVersion，以此与信封区分。 */
+function looksLikeKernelErrorEnvelope(o: Record<string, unknown>): boolean {
+    return typeof o.code === "number" && typeof o.msg === "string" && !("schemaVersion" in o);
+}
+
 /** 15 组：坏文件容错——loadData 抛错或返回非对象时备份标记并回退默认值，不让 onload 崩溃。
  * 269 波（v3.8.6 全新安装误报"设置文件已损坏"实测）：
  *  1. 内核对缺失存储文件会抛 not found 系错误——那是首次安装的正常路径，静默走默认值；
@@ -35,11 +43,13 @@ export async function loadDataSafe(plugin: Plugin, name: string): Promise<{ data
     try {
         const data = await plugin.loadData(name);
         if (data === null || data === undefined) return { data: null, corrupted: false };
+        if (isPlainObject(data) && looksLikeKernelErrorEnvelope(data)) return { data: null, corrupted: false };
         if (typeof data === "string") {
             const t = data.trim();
             if (t === "") return { data: null, corrupted: false };
             try {
                 const parsed = JSON.parse(t);
+                if (isPlainObject(parsed) && looksLikeKernelErrorEnvelope(parsed)) return { data: null, corrupted: false };
                 return { data: isPlainObject(parsed) ? parsed : null, corrupted: false };
             } catch {
                 // 非法 JSON 字符串 = 文件真被写坏——保留标记（原始文件不动，留给思源备份）

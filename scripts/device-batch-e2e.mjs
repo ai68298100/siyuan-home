@@ -51,14 +51,27 @@ const waitForSettings = async (predicate, timeoutMs = 180000) => {
 };
 
 // 页面侧工具：按文本点击 / 面板打开 / 等待
+// 2026-10-09：精确匹配之外加 contains 兜底——v0.3.9+ 引导角色胶囊带 emoji 前缀
+// （textContent="👫 配偶"），裸精确匹配全部落空（本次审计实锤的选择器漂移）
 const pClickByText = (page, texts, scope = "button, .b3-chip, [role=tab], select, option") =>
     page.evaluate(([ts, sc]) => {
         for (const t of ts) {
             const els = Array.from(document.querySelectorAll(sc)).filter((e) => e.textContent?.trim() === t);
             if (els.length) { els[0].click(); return t; }
         }
+        for (const t of ts) {
+            const els = Array.from(document.querySelectorAll(sc)).filter((e) => (e.textContent || "").includes(t));
+            if (els.length) { els[0].click(); return t; }
+        }
         return null;
     }, [texts, scope]);
+// 页签栏设置齿轮：v0.3.13 起页签栏新增 ⚡快速记录，`.lv-iconbtn` 首元素不再是齿轮——按 aria-label 找
+const pClickSettingsGear = (page) =>
+    page.evaluate(() => {
+        const el = Array.from(document.querySelectorAll(".lv-tabbar button")).find((b) => (b.getAttribute("aria-label") || "").includes("设置"));
+        el?.click();
+        return !!el;
+    });
 const pOpenPanel = async (page) => {
     await page.evaluate(() => {
         const tb = document.getElementById("toolbar");
@@ -101,12 +114,11 @@ const browser = await chromium.launch({ channel: "msedge", headless: true });
     const wiz = await page.evaluate(() => document.body.innerText.includes("STEP 1 / 2"));
     rec(stage, "首启显示两步引导向导", wiz);
     await page.screenshot({ path: `${OUT}/s1-onboarding.png` });
-    // 走向导：配偶+子女+1
+    // 走向导：配偶+子女（子女计数默认 1，无需点 ＋——裸 "＋" 会误点总览成员 chips 的添加钮并跳页）
     await pClickByText(page, ["配偶"]); await sleep(250);
     await pClickByText(page, ["子女"]); await sleep(250);
-    await pClickByText(page, ["＋"]); await sleep(250);
     await pClickByText(page, ["下一步 →", "下一步"]); await sleep(800);
-    await pClickByText(page, ["✓ 完成并录第一条证件", "完成引导"]); 
+    await pClickByText(page, ["✓ 完成并录第一条证件", "完成引导"]);
     // 首启会按模块顺序建库，等待磁盘状态而不是猜测固定耗时。
     const onboardedSettings = await waitForSettings((s) => s.onboarded === true && s.dbRefs && Object.keys(s.dbRefs).length >= 5);
     // getFile 直接返回文件内容（非信封）——res.json() 即 settings 对象
@@ -128,7 +140,7 @@ const browser = await chromium.launch({ channel: "msedge", headless: true });
     await page.goto(`${BASE}/`, { waitUntil: "domcontentloaded" });
     await sleep(12000);
     await pOpenPanel(page);
-    await page.evaluate(() => document.querySelector(".lv-tabbar .lv-iconbtn")?.dispatchEvent(new MouseEvent("click", { bubbles: true })));
+    await pClickSettingsGear(page);
     await sleep(2000);
     await pClickByText(page, ["ℹ️ 关于", "关于"], ".lv-setnav__item, .b3-dialog button"); await sleep(1200);
     await pClickByText(page, ["生成示例数据"], "button");
@@ -243,7 +255,7 @@ const browser = await chromium.launch({ channel: "msedge", headless: true });
     rec(s3, "成员删除经确认对话框", del === "menu" && !!confirmHit && afterDel === before, `${after}→${afterDel}`);
 
     // 演示数据生成回执
-    await page.evaluate(() => document.querySelector(".lv-tabbar .lv-iconbtn")?.dispatchEvent(new MouseEvent("click", { bubbles: true })));
+    await pClickSettingsGear(page);
     await sleep(2000);
     await pClickByText(page, ["关于"], ".b3-dialog button"); await sleep(1200);
     await pClickByText(page, ["生成示例数据"], "button");
@@ -291,7 +303,12 @@ const browser = await chromium.launch({ channel: "msedge", headless: true });
             opsVisible: (() => { const b = Array.from(document.querySelectorAll(".lv-rem-ops")); if (!b.length) return "no-rows"; return b.every((e) => getComputedStyle(e).display !== "none"); })(),
             minHit: (() => {
                 let min = 999;
-                for (const e of document.querySelectorAll(".lv-home button")) { const r = e.getBoundingClientRect(); if (r.height > 0) min = Math.min(min, r.height); }
+                // 只量可见控件：常驻挂载的快速记录弹层关闭态带 scale(.97)（草稿保留设计），
+                // 其隐藏按钮的 rect 是变换后尺寸（32px→31.04），不属于真实命中区
+                for (const e of document.querySelectorAll(".lv-home button")) {
+                    const r = e.getBoundingClientRect();
+                    if (r.height > 0 && e.checkVisibility({ visibilityProperty: true })) min = Math.min(min, r.height);
+                }
                 return min;
             })(),
         }));
@@ -377,7 +394,10 @@ const browser = await chromium.launch({ channel: "msedge", headless: true });
             const rv = await render();
             const apiMs = Date.now() - t0;
             // 面板内：切到台账，量首屏 200 行可达耗时（230 波起渐进渲染：加载更多按需追加，全量语义不变）
+            // R8 修复：种子写入会触发插件自动重扫（数据丰富的工作区重扫可达分钟级），重扫骨架窗口内
+            // 表格被清空/半渲染——先等行数连续稳定再测量，避免把重扫竞态误报为性能回归
             await pClickByText(page, ["总览"]); await sleep(600);
+            await sleep(20000); // 等种子触发的自动重扫窗口过去
             const t1 = Date.now();
             await pClickByText(page, ["台账"]);
             await page.waitForFunction(() => document.querySelectorAll(".lv-table tbody tr").length >= 200, { timeout: 30000 }).catch(() => {});
@@ -388,8 +408,13 @@ const browser = await chromium.launch({ channel: "msedge", headless: true });
                     const btn = document.querySelector(".lv-more button");
                     btn?.click();
                 });
-                await sleep(1500);
-                domRows = await page.evaluate(() => document.querySelectorAll(".lv-table tbody tr").length);
+                // 等行数实际增长（慢内核下 fetch+render 可超 1.5s；无增长则重试点击）
+                let prev = -1;
+                for (let w = 0; w < 8; w++) {
+                    await sleep(1000);
+                    domRows = await page.evaluate(() => document.querySelectorAll(".lv-table tbody tr").length);
+                    if (domRows > prev) { prev = domRows; if (domRows >= size) break; }
+                }
             }
             rec(stage, `${size} 行：面板首屏 ${domMs}ms（渐进 200 行）+ 加载更多至 ${domRows} 行`, domRows >= size, `firstPaint=${domMs}ms rows=${domRows}`);
             await page.screenshot({ path: `${OUT}/s6-perf-${size}.png` });

@@ -185,7 +185,7 @@ export async function backfillMemberLinks(
         const parts: string[] = [];
         if (roleKey) {
             const v = r.cells[roleKey];
-            const s = v?.select?.content ?? v?.text?.content ?? "";
+            const s = v?.mSelect?.[0]?.content ?? v?.select?.content ?? v?.text?.content ?? "";
             if (s) parts.push(s);
         }
         if (birthdayKey) {

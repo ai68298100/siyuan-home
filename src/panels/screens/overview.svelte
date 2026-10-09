@@ -313,7 +313,7 @@
         <span class="lv-parsechip" role="status">📅 <span class="lv-num">{memoParsed.date}</span></span>
     {/if}
     <input class="b3-text-field" type="date" bind:value={memoDue} />
-    <button class="b3-button b3-button--text" onclick={addMemo}>＋ {t("memo.add")}</button>
+    <button class="b3-button b3-button--text" onclick={addMemo} disabled={!memoTitle.trim()} title={t("memo.add")}>＋ {t("memo.add")}</button>
 </div>
 
 <div class="lv-sec"><h2 class="lv-title-sec">{t("dash.myModules")}</h2>

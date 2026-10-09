@@ -46,6 +46,8 @@ export default class LvHomePlugin extends Plugin {
     private checkinEventHandler?: (e: Event) => void;
     /** 下次面板挂载的目标页签（状态栏/通知入口预选） */
     pendingScreen?: string;
+    /** 已挂载面板的页签直切回调（tab-panel 挂载时注册、卸载时清空） */
+    panelScreenSwitch?: (screen: string) => void;
     private statusbarEl?: HTMLElement;
     /** C6c 块菜单监听（onunload 精确解绑用） */
     private captureMenuHandler?: (...args: any[]) => void;
@@ -194,7 +196,7 @@ export default class LvHomePlugin extends Plugin {
         const statusEl = document.createElement("div");
         statusEl.className = "lv-statusbar";
         statusEl.style.cssText = "cursor:pointer;padding:0 6px;font-size:12px;display:none";
-        statusEl.onclick = () => { this.pendingScreen = "reminders"; this.showTab(); };
+        statusEl.onclick = () => this.openRemindersScreen();
         this.addStatusBar({ element: statusEl });
         this.statusbarEl = statusEl;
 
@@ -225,7 +227,7 @@ export default class LvHomePlugin extends Plugin {
             settings: this.settings,
             get scan() { return self.scan; },
             showTab: () => self.showTab(),
-            openRemindersTab: () => { self.pendingScreen = "reminders"; self.showTab(); },
+            openRemindersTab: () => self.openRemindersScreen(),
             addMemo: (title, due) => self.addMemo(title, due),
             onBridgeDisposed: () => { self.disposeLvHomeBridge = undefined; },
         });
@@ -336,7 +338,7 @@ export default class LvHomePlugin extends Plugin {
         const register = speedSwitch.registerQuickAction.bind(speedSwitch);
         const actions: {id: string; label: string; handler: () => void}[] = [
             {id: "lvhome.open-overview", label: this.i18nText("butler"), handler: () => this.showTab()},
-            {id: "lvhome.open-reminders", label: this.i18nText("tab.reminders"), handler: () => { this.pendingScreen = "reminders"; this.showTab(); }},
+            {id: "lvhome.open-reminders", label: this.i18nText("tab.reminders"), handler: () => this.openRemindersScreen()},
         ];
         for (const action of actions) {
             const dispose = register({
@@ -584,6 +586,14 @@ export default class LvHomePlugin extends Plugin {
         });
     }
 
+    /** 打开面板并预选提醒页签——pendingScreen 仅在挂载时消费（SiYuan 会恢复上次打开的页签，
+     *  日常路径几乎总是"已挂载"），已挂载时经 panelScreenSwitch 直切（2026-10-09 R6 实证修复）。 */
+    openRemindersScreen() {
+        this.pendingScreen = "reminders";
+        this.showTab();
+        this.panelScreenSwitch?.("reminders");
+    }
+
     /** 移动前端顶栏入口（DEVICE-07）：petal addTopBar 在移动端不渲染，直接注入 #mobileTopBar；
      *  顶栏未就绪时 800ms 重试（参照 checkin ensureMobileTopBarButtonFor）。
      *  227 波实测两处坑：① 移动工具栏在插件 onload 之后异步重建，会吞掉先注入的按钮 → 启动后
@@ -693,6 +703,15 @@ export default class LvHomePlugin extends Plugin {
     async updateMemo(id: string, patch: { title?: string; dueDate?: string }) { await updateMemo(this, id, patch); await this.notifyHubChanged(); }
     /** 删除备忘（显式动作，H03：未处理备忘只经此删除） */
     async removeMemo(id: string) { await removeMemo(this, id); await this.notifyHubChanged(); }
+    /** 29 组：今日免打扰快捷开关（todaySilent 存当日 localDateKey，跨天自动失效；闸口在 inSilentHours） */
+    async toggleTodaySilent() {
+        const { localDateKey } = await import("@/core/hub/rule");
+        const today = localDateKey(new Date());
+        this.runtime.todaySilent = this.runtime.todaySilent === today ? "" : today;
+        await saveRuntime(this, this.runtime);
+        showMessage(this.i18nText(this.runtime.todaySilent ? "hub.todaySilentOn" : "hub.todaySilentOff"), 3000, "info");
+        await this.notifyHubChanged();
+    }
     /** 已处理视图数据（H07） */
     listHandled() { return listHandled(this.runtime, this.runtime.cache?.derived ?? []); }
     async finishOnboarding(household: { roles: string[]; children: number }, moduleIds: string[]) {
