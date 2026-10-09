@@ -118,6 +118,7 @@ export interface CertificateProfile {
 
 const CERTIFICATE_PROFILE_COLUMNS: Record<CertificateCategory, readonly ColumnDef[]> = {
     id: [
+        { key: "x_cert_id_number", type: "text", labelKey: "field.x_cert_id_number" },
         { key: "x_cert_id_address", type: "text", labelKey: "field.x_cert_id_address" },
         { key: "x_cert_id_authority", type: "text", labelKey: "field.x_cert_id_authority" },
         { key: "x_cert_id_gender", type: "select", labelKey: "field.x_cert_id_gender", options: ["male", "female"] },
