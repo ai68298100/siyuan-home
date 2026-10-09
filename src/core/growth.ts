@@ -5,6 +5,7 @@
  * 第七十八轮：精确小数月龄 + 新生儿期（0–13 周）周粒度参考带。
  */
 import type { FamilyMember } from "@/types";
+import { selectCellContent } from "@/core/avcell";
 import { WHO_REFS, type WhoBandTable } from "@/core/data/who-refs";
 
 export type GrowthMetric = "height" | "weight";
@@ -71,7 +72,7 @@ export function collectGrowthSeries(
 
     const acc = new Map<string, GrowthSeries>();
     for (const row of rows) {
-        const cat = catKey ? row.cells[catKey]?.select?.content : undefined;
+        const cat = catKey ? selectCellContent(row.cells[catKey]) : undefined;
         if (cat && cat !== "growth") continue;
         const num = row.cells[valKey]?.number;
         const value = num?.isNotEmpty && typeof num.content === "number" ? num.content : NaN;
@@ -79,7 +80,7 @@ export function collectGrowthSeries(
         const rawDate = row.cells[dateKey]?.date;
         const date = rawDate?.isNotEmpty && typeof rawDate.content === "number" ? localKey(new Date(rawDate.content)) : "";
         if (!date) continue;
-        const rawType = typeKey ? row.cells[typeKey]?.select?.content : undefined;
+        const rawType = typeKey ? selectCellContent(row.cells[typeKey]) : undefined;
         const metric: GrowthMetric = rawType === "weight" ? "weight" : "height"; // 缺省按身高（schema default 一致）
         const relId = row.cells[columns.member ?? ""]?.relation?.blockIDs?.[0] as string | undefined;
         const member = relId ? relToMember.get(relId) : undefined;
