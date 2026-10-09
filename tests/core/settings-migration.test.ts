@@ -66,6 +66,27 @@ describe("坏文件容错（15 组）", () => {
         expect(rt.schemaVersion).toBe(1);
     });
 
+    it("内核 404 错误信封（对象/字符串形态）→ 按缺失处理不采纳（R6/R7 信封污染根修）", async () => {
+        const envelope = { code: 404, msg: "open …: file does not exist", data: null };
+        const plugin = {
+            loadData: async () => envelope,
+            saveData: async () => undefined,
+        } as any;
+        const s = await loadSettings(plugin);
+        expect(s.enabledModules.length).toBeGreaterThan(0); // 默认值，而非信封原样采纳
+        expect((s as unknown as Record<string, unknown>).code).toBeUndefined();
+        const rt = await loadRuntime(plugin);
+        expect(rt.schemaVersion).toBe(1);
+        expect((rt as unknown as Record<string, unknown>).msg).toBeUndefined();
+        // 字符串形态同样拒收
+        const plugin2 = {
+            loadData: async () => JSON.stringify(envelope),
+            saveData: async () => undefined,
+        } as any;
+        const rt2 = await loadRuntime(plugin2);
+        expect((rt2 as unknown as Record<string, unknown>).msg).toBeUndefined();
+    });
+
     it("loadData 抛错 → 回退默认 + corruptedSettings 标记 + 备份 marker 落盘", async () => {
         const saved: Record<string, unknown> = {};
         const plugin = {
