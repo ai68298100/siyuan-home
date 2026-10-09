@@ -20,6 +20,12 @@
         screen = s;
         requestAnimationFrame(() => homeEl?.scrollTo({ top: 0 }));
     }
+    // R6（2026-10-09）：对外入口（状态栏角标/服务桥 openReminders/命令面板）在面板已挂载时
+    // 直切页签——pendingScreen 只在挂载时消费，SiYuan 恢复的旧页签路径永远走不到挂载消费
+    $effect(() => {
+        plugin.panelScreenSwitch = (s: string) => gotoScreen(s as ScreenId);
+        return () => { if (plugin.panelScreenSwitch) plugin.panelScreenSwitch = undefined; };
+    });
     // 267 波：快速记录弹层（常驻挂载保草稿；任意页签 ⚡ 呼出）
     let captureOpen = $state(false);
     // 268 波（Linear 式键盘优先）：N 键任意页签呼出快速记录——只在非输入焦点、

@@ -4,7 +4,7 @@
     import type { HomePluginLike } from "@/types/plugin";
     import { saveRuntime } from "@/core/hub/runtime";
     import { buildDisplay as display } from "@/core/hub/display";
-    import { relativeDue, weekdayKey } from "@/core/hub/rule";
+    import { relativeDue, weekdayKey, localDateKey } from "@/core/hub/rule";
     import { addDetachedRow, setCell } from "@/core/siyuan";
     import { provisionModule } from "@/core/provisioner";
     import { toggleMemoPin } from "@/core/hub/actions";
@@ -211,14 +211,21 @@
 
     // C3c 延后天数菜单（1/3/7/30）
     function snoozeMenu(r: Reminder, ev: MouseEvent) {
-        const menu = new Menu("lv-snooze");
-        for (const d of [1, 3, 7, 30]) {
-            menu.addItem({
-                label: t("act.snoozeN").replace("${n}", String(d)),
-                click: () => plugin.snooze(r.id, d),
-            });
-        }
-        menu.open({ x: ev.clientX, y: ev.clientY });
+        // 3.8.x 宿主的全局 click 关单监听在窗口层，且 Menu 为共享单例容器：同一次 click 的
+        // 传播中打开的菜单会被立即清空（2026-10-09 分层采样实证——document 层 4 项可见，
+        // window 层 0 项；仅延迟 open 会在重展示时拿到已被清空的共享壳）。整个构建+打开
+        // 都放进宏任务，等打开它的这次 click 传播清算完毕后再新建。
+        const x = ev.clientX, y = ev.clientY;
+        setTimeout(() => {
+            const menu = new Menu("lv-snooze");
+            for (const d of [1, 3, 7, 30]) {
+                menu.addItem({
+                    label: t("act.snoozeN").replace("${n}", String(d)),
+                    click: () => plugin.snooze(r.id, d),
+                });
+            }
+            menu.open({ x, y });
+        }, 0);
     }
 
     // 246 波（收件箱深化）：备忘编辑对话框（标题/到期日修正 → updateMemo 落盘）
@@ -356,6 +363,11 @@
 
     // 261 波：重扫 busy 态——31 模块串行扫描可达秒级，此前可连点堆积多次全量扫描
     let rescanning = $state(false);
+    // 29 组：今日免打扰（runtime 非响应式——依赖 version prop 刷新；当日键比较即跨天自动失效）
+    const todaySilentOn = $derived.by(() => {
+        void version;
+        return plugin.runtime.todaySilent === localDateKey(new Date());
+    });
     async function rescan() {
         if (rescanning) return;
         rescanning = true;
@@ -486,6 +498,9 @@
         <button class="lv-tabs__item" class:on={viewMode === "calendar"} style="min-height:28px;padding:4px 12px"
             aria-pressed={viewMode === "calendar"} onclick={() => setViewMode("calendar")}>{t("view.calendar")}</button>
     </span>
+    <button class="b3-button b3-button--outline" class:b3-button--text={todaySilentOn}
+        aria-pressed={todaySilentOn} title={t("hub.todaySilentTip")}
+        onclick={() => plugin.toggleTodaySilent()}>{todaySilentOn ? "🔕 " : ""}{t("hub.todaySilent")}{todaySilentOn ? " ✓" : ""}</button>
     <button class="b3-button b3-button--outline" class:b3-button--text={batchMode} onclick={() => (batchMode ? clearSelection() : (batchMode = true))}>{t("hub.batch")}</button>
     <button class="b3-button b3-button--outline" disabled={rescanning} aria-busy={rescanning} onclick={rescan}>{t("hub.rescan")}</button>
 </div>
