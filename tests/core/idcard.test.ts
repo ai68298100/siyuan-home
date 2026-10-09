@@ -22,9 +22,13 @@ describe("parseIdNumber（GB 11643 校验识别）", () => {
         expect(f.sex).toBe("female");
     });
 
-    it("小写 x 归一化为大写 X 后通过", () => {
-        const id = makeValidId();
-        expect(parseIdNumber(id.toLowerCase().replace(/x$/, "x")).ok).toBe(true);
+    it("小写 x 校验位归一化为大写后通过", () => {
+        // 构造一个校验位为 X 的号码（不是真实号码）：小写输入应被解析器归一化接受
+        const id = "11010119900908019X";
+        expect(idCheckDigit(id.slice(0, 17))).toBe("X");
+        const lower = id.toLowerCase();
+        expect(parseIdNumber(lower).ok).toBe(true);
+        expect(parseIdNumber(lower).number).toBe(id);
     });
 
     it("格式：非 18 位 / 非法字符 / 15 位旧号 → format 不支持", () => {
