@@ -7,7 +7,7 @@
     import ErrorBoundary from "./error-boundary.svelte";
     import type { HomePluginLike } from "@/types/plugin";
 
-    let { plugin }: { plugin: HomePluginLike } = $props();
+    let { plugin, onMobileClose }: { plugin: HomePluginLike; onMobileClose?: () => void } = $props();
     // i18n 取值统一转 string（1.2.8 起 JSONValue；screens 以 props 接收 string 返回的 t）
     const t = (key: string) => String(plugin.i18n[key] ?? key);
 
@@ -90,13 +90,26 @@
     // Tab 挂载即注册刷新回调（扫描完成 → version 递增驱动各屏 $derived 重算，H02：
     // 动作/扫描后留在当前页即时更新，不靠切页重挂载；多实例安全）
     let version = $state(0);
+    let initialScanError = $state("");
+    async function refreshInitialScan(force = false) {
+        initialScanError = "";
+        try {
+            await plugin.refreshHub(undefined, force);
+            initialScanError = "";
+        } catch (e) {
+            initialScanError = e instanceof Error ? e.message : String(e);
+        }
+    }
     $effect(() => {
-        const listener = () => { version += 1; };
+        const listener = () => {
+            version += 1;
+            if (plugin.runtime?.scannedAt && !plugin.scan?.errors?.length) initialScanError = "";
+        };
         (plugin.hubListeners as Set<() => void>).add(listener);
         // 225 波修复：refreshHub 必须延后到 effect 同步作用域之外——其缓存路径会在本次 flush 内
         // 同步触发 hubListeners（version++），在 effect 依赖跟踪未定型时形成
         // effect_update_depth_exceeded 无限循环（真机首启即崩、页签全冻结）
-        const timer = window.setTimeout(() => { void plugin.refreshHub(); }, 0);
+        const timer = window.setTimeout(() => { void refreshInitialScan(); }, 0);
         return () => {
             window.clearTimeout(timer);
             (plugin.hubListeners as Set<() => void>).delete(listener);
@@ -107,7 +120,7 @@
 <div class="lv-home lv-tab" bind:this={homeEl}>
     <header class="lv-tabbar">
         <div class="lv-appbrand">
-            <span class="lv-logo" aria-hidden="true">🏠</span>
+            <span class="lv-logo" aria-hidden="true"><span class="lv-logo-mark">⌂</span></span>
             <div class="lv-appbrand-t">
                 <b>{t("butler")}</b>
                 <span>LV HOME</span>
@@ -137,15 +150,20 @@
             {#if plugin.scan?.stale}<span class="lv-badge orange" title={plugin.scan.errors.map((e) => e.moduleId).join(", ")}>{t("hub.stale")}</span>{/if}
         </span>
         <!-- 267 波：⚡ 快速记录（原型 top-actions 主入口；268 波支持 N 键呼出） -->
-        <button class="lv-iconbtn" aria-label={t("capture.title")} title={`${t("capture.title")} (N)`} style="font-size:15px" onclick={() => (captureOpen = true)}>⚡</button>
-        <button class="lv-iconbtn" aria-label={t("tab.settings")} title={t("tab.settings")} style="font-size:15px" onclick={() => plugin.openSetting()}>⚙</button>
+        <div class="lv-tabbar-actions">
+            <button class="lv-iconbtn" aria-label={t("capture.title")} title={`${t("capture.title")} (N)`} style="font-size:15px" onclick={() => (captureOpen = true)}>⚡</button>
+            <button class="lv-iconbtn" aria-label={t("tab.settings")} title={t("tab.settings")} style="font-size:15px" onclick={() => plugin.openSetting()}>⚙</button>
+            {#if onMobileClose}
+                <button class="lv-iconbtn lv-mobile-close" aria-label={t("close")} title={t("close")} onclick={onMobileClose}>×</button>
+            {/if}
+        </div>
     </header>
 
     {#key screen}
         <div id={`lv-panel-${screen}`} class="lv-screen lv-anim" role="tabpanel" tabindex="0" aria-labelledby={`lv-tab-${screen}`}>
             <ErrorBoundary {t} onretry={() => { /* screen switch resets naturally via {#key} */ }}>
                 {#if screen === "overview"}
-                    <Overview {plugin} {t} {version} onGoto={(s: ScreenId) => gotoScreen(s)} />
+                    <Overview {plugin} {t} {version} {initialScanError} onRetryScan={() => refreshInitialScan(true)} onGoto={(s: ScreenId) => gotoScreen(s)} />
                 {:else if screen === "reminders"}
                     <Reminders {plugin} {t} {version} />
                 {:else if screen === "ledger"}

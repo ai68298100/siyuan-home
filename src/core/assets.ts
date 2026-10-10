@@ -82,6 +82,27 @@ export function assetHref(path: string, origin = runtimeOrigin()): string {
     return url.href;
 }
 
+/** OCR is offered only for local image attachments, never PDFs or external URLs. */
+export function isImageAsset(path: string): boolean {
+    try {
+        const url = new URL(assetHref(path));
+        const filename = decodeURIComponent(url.pathname.split("/").pop() ?? "");
+        return /\.(?:png|jpe?g|gif|webp|bmp|tiff?|heic|heif)$/i.test(filename);
+    } catch {
+        return false;
+    }
+}
+
+/** The kernel identifies notebook-scoped asset references with the `box` query. */
+export function isEncryptedNotebookAsset(path: string, notebooks: readonly { id: string; encrypted?: boolean }[]): boolean {
+    try {
+        const boxID = new URL(assetHref(path)).searchParams.get("box")?.trim();
+        return !!boxID && notebooks.some((notebook) => notebook.id === boxID && notebook.encrypted === true);
+    } catch {
+        return false;
+    }
+}
+
 /** Return a safe leaf filename for the browser download attribute. */
 export function safeDownloadName(name?: string, fallback = "attachment"): string {
     const leaf = String(name ?? "").split(/[\\/]/).pop() ?? "";

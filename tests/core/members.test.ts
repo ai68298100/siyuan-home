@@ -225,6 +225,7 @@ describe("backfillMemberLinks（D06）", () => {
         // D06 收尾：歧义项携带候选明细（id + 摘要）供人工选择对话框；row 顺序=插入序 row-2/row-3
         expect(res.ambiguous).toHaveLength(1);
         expect(res.ambiguous[0].member).toBe("同名");
+        expect(res.ambiguous[0].memberId).toBe(st.members.find((m) => m.name === "同名")!.id);
         expect(res.ambiguous[0].candidates.map((c) => c.id)).toEqual(["row-2", "row-3"]);
         expect(res.unmatched).toEqual(["缺失"]);
         expect(st.members.find((m) => m.name === "唯一")!.avItemId).toMatch(/^row-/);

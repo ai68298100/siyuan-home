@@ -11,6 +11,8 @@
   // 常驻挂载的 .lv-mask/.lv-modal（267 波）以最近定位祖先为包含块——不设 relative 时
   // 会锚到更外层元素，关闭态的 480px 弹层把窄容器面板撑出幽灵横向滚动区
   position: relative;
+  // 思源侧栏/分屏的 viewport 可能仍然很宽，布局断点应依据插件实际容器宽度。
+  container: lv-home / inline-size;
   // ── 1. Token ────────────────────────────────────────────
   --lv-r-1: 6px; --lv-r-2: 10px; --lv-r-3: 14px; --lv-r-4: 18px;
   --lv-ease: cubic-bezier(.2, 0, 0, 1);
@@ -121,17 +123,24 @@
   // ── 3. 页头与节奏 ───────────────────────────────────────
   // 对齐原型：页头为悬浮应用条（品牌区 + 胶囊页签 + 元信息），不再是分隔线模式
   .lv-tabbar { display: flex; align-items: center; gap: 14px; padding: 10px 14px; margin-bottom: 16px;
-    background: var(--lv-surface); border: 1px solid var(--lv-line); border-radius: var(--lv-r-3);
+    // 长台账/提醒列表滚动时保留主导航和快速记录入口；窄屏在下方容器断点
+    // 复用同一 sticky 语义，避免侧栏场景导航消失。
+    position: sticky; top: 0; z-index: var(--lv-z-topbar);
+    background: color-mix(in srgb, var(--lv-surface) 96%, transparent);
+    backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);
+    border: 1px solid var(--lv-line); border-radius: var(--lv-r-3);
     box-shadow: var(--lv-shadow-1), inset 0 1px 0 var(--lv-inset); }
   .lv-appbrand { display: flex; align-items: center; gap: 10px; flex: none; }
   .lv-logo { width: 34px; height: 34px; border-radius: 10px; display: grid; place-items: center; font-size: 17px;
     background: linear-gradient(135deg, var(--lv-accent), var(--lv-accent-2)); color: #fff;
     box-shadow: 0 2px 10px var(--lv-accent-soft), inset 0 1px 0 rgba(255, 255, 255, .3); }
+  .lv-logo-mark { display: block; transform: translateY(-1px); font-size: 20px; line-height: 1; font-weight: 500; }
   .lv-appbrand-t { display: flex; flex-direction: column; line-height: 1.18;
     b { font-size: 14px; font-weight: 600; letter-spacing: -.01em; }
     span { font-size: 9.5px; font-weight: 600; letter-spacing: .16em; color: var(--lv-tx-3); } }
   .lv-tabbar__title { font-size: 15px; font-weight: 600; }
   .lv-tabbar__meta { display: flex; gap: 6px; align-items: center; }
+  .lv-tabbar-actions { display: flex; align-items: center; gap: 4px; flex: none; }
   // ⚙ 等顶栏图标按钮：幽灵风（对齐原型 iconbtn——无描边、hover 才浮出底色），命中区 ≥34px（26.7 回归项）
   .lv-tabbar > .b3-button { min-height: 34px; min-width: 34px; display: inline-flex; align-items: center; justify-content: center;
     border: none; background: none; box-shadow: none; color: var(--lv-tx-2); font-size: 15px;
@@ -450,6 +459,38 @@
   // ── 11. 表单 ───────────────────────────────────────────
   .lv-frow { display: grid; grid-template-columns: 76px 1fr; gap: 12px; align-items: center;
     > label { font-size: 12.5px; color: var(--lv-tx-3); } }
+
+  // 新建记录弹层：把复杂证件录入拆成基本信息、详情、附件三个明确区块。
+  .lv-record-sheet { width: min(720px, calc(100cqw - 24px)) !important; }
+  .lv-record-title { min-width: 0; flex: 1; display: flex; flex-direction: column; gap: 4px;
+    b { font-size: 15px; font-weight: 600; }
+    span { color: var(--lv-tx-3); font-size: 12px; line-height: 1.5; } }
+  .lv-record-body { gap: 18px; }
+  .lv-record-section { border: 1px solid var(--lv-line); border-radius: var(--lv-r-2); padding: 14px; background: var(--lv-surface-2);
+    h3 { margin: 0 0 12px; font-size: 13px; font-weight: 600; color: var(--lv-tx-2); } }
+  .lv-record-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+  .lv-record-field { min-width: 0; display: flex; flex-direction: column; gap: 5px;
+    label { font-size: 12px; color: var(--lv-tx-3); }
+    .b3-select, .b3-text-field { width: 100%; min-width: 0; box-sizing: border-box; } }
+  .lv-record-field-wide { grid-column: 1 / -1; }
+  .lv-record-field-stack { display: flex; flex-direction: column; gap: 4px; }
+  .lv-record-check { display: flex; align-items: center; gap: 6px; min-height: 32px; cursor: pointer; }
+  .lv-record-next { padding: 11px 13px; border: 1px dashed var(--lv-accent-line); border-radius: var(--lv-r-2); color: var(--lv-tx-3); background: var(--lv-accent-soft); font-size: 12.5px; }
+  .lv-record-assets { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+  .lv-record-upload { position: relative; overflow: hidden; font-size: 12px;
+    input { position: absolute; inset: 0; width: 100%; height: 100%; opacity: 0; cursor: pointer; } }
+  .lv-record-error { padding: 8px 10px; border-radius: var(--lv-r-2); color: var(--lv-danger); background: color-mix(in srgb, var(--lv-danger) 9%, transparent); font-size: 12.5px; }
+  .lv-record-warning { color: var(--lv-warn); background: color-mix(in srgb, var(--lv-warn) 10%, transparent); }
+  .lv-record-save-status { display: flex; align-items: center; gap: 6px; margin: 10px 2px; color: var(--lv-accent); font-size: 12.5px; }
+  .lv-record-foot { align-items: center; flex-wrap: wrap; }
+  @media (max-width: 600px) {
+    .lv-record-grid { grid-template-columns: 1fr; }
+    .lv-record-field-wide { grid-column: auto; }
+    .lv-record-foot { gap: 6px; }
+    .lv-record-foot .fn__flex-1 { display: none; }
+    .lv-record-foot .lv-btn { flex: 1 1 calc(50% - 6px); min-width: 0; }
+    .lv-record-foot > .b3-button--text { flex: 1 1 100%; text-align: left; }
+  }
   .lv-select { appearance: none; padding: 7px 30px 7px 12px; border-radius: var(--lv-r-2);
     border: 1px solid var(--lv-line); background: var(--lv-surface); color: var(--lv-tx-2);
     font-size: 12.5px; cursor: pointer; transition: border var(--lv-t-fast) var(--lv-ease), color var(--lv-t-fast) var(--lv-ease);
@@ -489,10 +530,10 @@
 
   // ── 13. 快速记录 / 备忘卡 / 成员卡 ─────────────────────
   .lv-quick { display: flex; gap: 8px; flex-wrap: wrap; }
-  .lv-qbtn { display: inline-flex; align-items: center; gap: 8px; padding: 9px 16px; border-radius: var(--lv-r-2);
+  .lv-qbtn { display: inline-flex; align-items: center; gap: 8px; min-width: 0; max-width: 100%; padding: 9px 16px; border-radius: var(--lv-r-2);
     background: var(--lv-surface);
     border: 1px solid var(--lv-line);
-    font-size: 13px; color: var(--lv-tx-2);
+    font-size: 13px; color: var(--lv-tx-2); white-space: normal; overflow-wrap: anywhere;
     box-shadow: inset 0 1px 0 var(--lv-inset); transition: all var(--lv-t-fast) var(--lv-ease);
     &:hover { color: var(--lv-tx); border-color: var(--lv-accent-line); transform: translateY(-2px);
       box-shadow: var(--lv-shadow-2), inset 0 1px 0 var(--lv-inset); }
@@ -561,25 +602,131 @@
     .lv-rem { display: grid; grid-template-columns: 38px minmax(0, 1fr) auto; gap: 8px 10px; }
     .lv-rem .lv-rem-t b { white-space: normal; }
     .lv-rem .lv-rem-ops { grid-column: 2 / -1; flex-wrap: wrap; }
-    // 26.7 触屏设备：无 hover，操作按钮常显（替代长按实现）。
-    // 184 波修复：原实现把 hover:none 常显规则放在 display:none 之前，被后续同特异性规则覆盖
-    // （触屏操作全隐）；且一刀切 display:none 会连桌面窄窗口的 hover/键盘 focus-within 路径
-    // 一起杀掉——现删去 display:none，窄屏沿用宽屏的 opacity 显现语义，仅触屏强制常显。
-    @media (hover: none) {
-      .lv-rem .lv-rem-ops { display: flex; opacity: 1; transform: none; }
-      // 250 波：成员卡头行操作钮触屏常显（同提醒行语义）
-      .lv-person .lv-person-head .lv-iconbtn,
-      .lv-person .lv-person-head .b3-button { display: inline-flex; }
+    // 26.7 窄屏 tabbar：品牌/状态/动作保持一行，页签独占下一行，避免多次换行挤压入口。
+    .lv-tabbar {
+      position: sticky;
+      top: 0;
+      z-index: var(--lv-z-topbar);
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) auto auto;
+      grid-template-areas: "brand status actions" "tabs tabs tabs";
+      align-items: center;
+      gap: 8px 10px;
+      padding: 9px 10px;
+      background: color-mix(in srgb, var(--lv-surface) 94%, transparent);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      box-shadow: var(--lv-shadow-1), inset 0 1px 0 var(--lv-inset);
     }
-    // 26.7 窄屏 tabbar：标题隐藏，页签横向滚动
-    .lv-tabbar { flex-wrap: wrap; }
+    .lv-appbrand { grid-area: brand; min-width: 0; }
+    .lv-hubstatus { grid-area: status; justify-self: end; }
+    .lv-tabbar-actions { grid-area: actions; }
+    .lv-tabbar > .fn__flex-1 { display: none; }
+    .lv-tabbar > .lv-tabs { grid-area: tabs; min-width: 0; width: 100%; overflow-x: auto; scrollbar-width: none; }
+    .lv-tabbar > .lv-tabs::-webkit-scrollbar { display: none; }
     .lv-tabbar__title { display: none; }
     .lv-tabbar__meta { display: none; }
+    .lv-appbrand-t span { display: none; }
+    .lv-appbrand .lv-logo { width: 30px; height: 30px; font-size: 15px; border-radius: 8px; }
+    .lv-hubstatus { font-size: 11px; gap: 5px; }
+    .lv-tabbar-actions .lv-iconbtn { width: 34px; height: 34px; }
   }
   // 26.7 超窄屏（<400px）：页签等分收窄
   @media (max-width: 400px) {
-    .lv-tabs { width: 100%; }
+    // 内测版中文全名在 320px 下会挤压三枚操作按钮；品牌独占首行，
+    // 状态与操作并列，页签保持第三行，保证标题完整且每个入口都可点。
+    .lv-tabbar { grid-template-columns: minmax(0, 1fr) auto; grid-template-areas: "brand brand" "status actions" "tabs tabs"; }
+    .lv-hubstatus { justify-self: start; }
+    .lv-tabbar-actions { justify-self: end; }
     .lv-tabs__item { padding: 6px 8px; font-size: 12px; flex: 1; text-align: center; min-height: 34px; }
+    .lv-tabbar > .lv-tabs { width: 100%; }
+  }
+  // 触屏设备不论 CSS 视口宽度，均常显原先依赖 hover 的操作入口。
+  @media (hover: none) {
+    .lv-rem .lv-rem-ops { display: flex; opacity: 1; transform: none; }
+    .lv-person .lv-person-head .lv-iconbtn,
+    .lv-person .lv-person-head .b3-button { display: inline-flex; }
+  }
+
+  // 容器响应式：思源的侧栏/分屏 viewport 仍可能很宽，单靠 @media 会让
+  // 顶栏、重点卡和提醒控制区在窄面板中横向溢出。面板自身是 lv-home 容器，
+  // 这里补齐和 viewport 断点一致的关键布局。
+  @container lv-home (max-width: 760px) {
+    .lv-focus { grid-template-columns: 1fr; }
+    .lv-tabbar {
+      position: sticky;
+      top: 0;
+      z-index: var(--lv-z-topbar);
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) auto auto;
+      grid-template-areas: "brand status actions" "tabs tabs tabs";
+      align-items: center;
+      gap: 8px 10px;
+      padding: 9px 10px;
+      background: color-mix(in srgb, var(--lv-surface) 94%, transparent);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+    }
+    .lv-appbrand { grid-area: brand; min-width: 0; }
+    .lv-hubstatus { grid-area: status; justify-self: end; }
+    .lv-tabbar-actions { grid-area: actions; }
+    .lv-tabbar > .fn__flex-1 { display: none; }
+    .lv-tabbar > .lv-tabs {
+      grid-area: tabs;
+      min-width: 0;
+      width: 100%;
+      overflow-x: auto;
+      scrollbar-width: none;
+    }
+    .lv-tabbar > .lv-tabs::-webkit-scrollbar { display: none; }
+    .lv-appbrand-t span { display: none; }
+    .lv-appbrand .lv-logo { width: 30px; height: 30px; font-size: 15px; border-radius: 8px; }
+    .lv-hubstatus { font-size: 11px; gap: 5px; }
+    .lv-tabbar-actions .lv-iconbtn { width: 34px; height: 34px; }
+    .lv-rem { display: grid; grid-template-columns: 38px minmax(0, 1fr) auto; gap: 8px 10px; }
+    .lv-rem .lv-rem-t b { white-space: normal; overflow-wrap: anywhere; }
+    .lv-rem .lv-rem-ops { grid-column: 2 / -1; flex-wrap: wrap; }
+  }
+
+  @container lv-home (max-width: 640px) {
+    .lv-hero { align-items: flex-start; gap: 8px; }
+    .lv-hero-count { margin-left: 0 !important; width: 100%; }
+    .lv-strip { margin-inline: 0; }
+    .lv-sec { margin-top: 22px; }
+    .lv-toolbar { align-items: stretch; }
+    .lv-toolbar > .b3-select,
+    .lv-toolbar > .b3-text-field,
+    .lv-toolbar > .b3-button { flex: 1 1 140px; min-width: 0; }
+    .lv-modal .lv-sheet { max-height: calc(100% - 16px); border-radius: var(--lv-r-3); }
+    .lv-record-grid { grid-template-columns: 1fr; }
+    .lv-record-field-wide { grid-column: auto; }
+    .lv-record-foot { gap: 6px; }
+    .lv-record-foot .fn__flex-1 { display: none; }
+    .lv-record-foot .lv-btn { flex: 1 1 calc(50% - 6px); min-width: 0; }
+    .lv-record-foot > .b3-button--text { flex: 1 1 100%; text-align: left; }
+    .lv-cal-head { display: grid; grid-template-columns: 40px minmax(0, 1fr) 40px; gap: 6px; }
+    .lv-cal-head > .fn__flex-1 { display: none; }
+    .lv-cal-head > b { grid-column: 1 / -1; }
+    .lv-cal-head > .lv-tabs { grid-column: 1 / -1; grid-row: 3; justify-content: center; }
+    .lv-cal-head > .lv-tabs .lv-tabs__item { flex: 1; }
+    .lv-cal-head > .lv-iconbtn:first-of-type { grid-column: 1; grid-row: 2; }
+    .lv-cal-head > .b3-button { grid-column: 2; grid-row: 2; min-width: 0; }
+    .lv-cal-head > .lv-iconbtn:last-of-type { grid-column: 3; grid-row: 2; }
+  }
+
+  @container lv-home (max-width: 400px) {
+    .lv-tabbar {
+      grid-template-columns: minmax(0, 1fr) auto;
+      grid-template-areas: "brand brand" "status actions" "tabs tabs";
+    }
+    .lv-hubstatus { justify-self: start; }
+    .lv-tabbar-actions { justify-self: end; }
+    .lv-tabs__item { padding: 6px 8px; font-size: 12px; flex: 1; min-height: 34px; }
+    .lv-tabbar > .lv-tabs { width: 100%; }
+    .lv-rem { grid-template-columns: 34px minmax(0, 1fr); }
+    .lv-rem .lv-rem-when { grid-column: 2; margin-left: 0; text-align: left; }
+    .lv-rem .lv-rem-ops { grid-column: 1 / -1; }
+    .lv-empty { padding-inline: 16px; }
   }
 }
 
@@ -624,6 +771,60 @@
         &.overdue { color: var(--lv-danger); }
         &.soon { color: var(--lv-warn); } } }
 
+// ── 17. 视觉收敛（2026-10）：温润、安静的家庭资料工作台 ─────────
+// 页面层级主要由留白、表面色和细分隔建立；阴影与品牌色只承担交互反馈，避免每个区块都像仪表盘。
+.lv-home {
+  --lv-r-2: 8px;
+  --lv-r-3: 14px;
+  --lv-r-4: 18px;
+  --lv-shadow-1: 0 1px 2px rgba(0, 0, 0, .045), 0 4px 16px rgba(0, 0, 0, .035);
+  --lv-shadow-2: 0 3px 10px rgba(0, 0, 0, .075), 0 10px 24px rgba(0, 0, 0, .055);
+  --lv-shadow-3: 0 10px 28px rgba(0, 0, 0, .14), 0 24px 56px rgba(0, 0, 0, .16);
+
+  // 统一默认文本节奏，保留说明文字的较小字号，但不要让中文正文显得像后台表格。
+  font-size: 13.5px;
+  line-height: 1.55;
+
+  .lv-tabbar { padding: 11px 16px; margin-bottom: 20px; box-shadow: var(--lv-shadow-1); }
+  .lv-hero { margin-top: 24px; margin-bottom: 12px;
+    h1 { font-size: clamp(23px, 2.6vw, 28px); letter-spacing: -.025em; }
+    p { font-size: 13px; }
+    .lv-hero-count b { font-size: 34px; }
+  }
+  .lv-strip { background: color-mix(in srgb, var(--lv-surface-2) 72%, transparent); box-shadow: none; }
+  .lv-sec { margin-top: 28px; margin-bottom: 12px;
+    .lv-title-sec { font-size: 14.5px; }
+  }
+  .lv-card { box-shadow: var(--lv-shadow-1), inset 0 1px 0 var(--lv-inset); }
+  .lv-card--hover:hover { transform: translateY(-1px); box-shadow: var(--lv-shadow-2), inset 0 1px 0 var(--lv-inset); }
+  .lv-focus-card { padding: 14px 16px; box-shadow: var(--lv-shadow-1); }
+  .lv-focus-card:hover { transform: translateY(-1px); }
+  .lv-mod { min-height: 136px; padding: 18px; }
+  .lv-mod::after { opacity: .35; }
+  .lv-qbtn { padding: 10px 14px; box-shadow: none; }
+  .lv-empty { padding: 56px 24px;
+    .eic { box-shadow: inset 0 1px 0 var(--lv-inset); }
+  }
+  .lv-rem { padding: 16px 20px 16px 18px; }
+  .lv-rem .lv-rem-t b { font-size: 14px; }
+  .lv-rem .lv-rem-t span { font-size: 12.5px; }
+  .lv-toolbar .b3-select, .lv-toolbar .b3-text-field,
+  .lv-toolbar .b3-button { min-height: 36px; }
+  .lv-ledger-no-modules { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; color: var(--lv-tx-2); font-size: 12.5px; }
+  .lv-iconbtn { min-width: 34px; min-height: 34px; }
+
+  // 首启卡片保持品牌时刻，但降低光晕和渐变的存在感。
+  .lv-start-guide { background: color-mix(in srgb, var(--lv-accent-soft) 45%, var(--lv-surface)); }
+  .lv-aura::before, .lv-aura::after { opacity: .45; }
+
+  @media (max-width: 760px) {
+    .lv-tabbar { margin-bottom: 14px; }
+    .lv-hero { margin-top: 16px; }
+    .lv-rem { padding: 13px 14px 13px 12px; }
+    .lv-mod { min-height: 124px; padding: 15px; }
+  }
+}
+
 // ── 16. 首启引导（251 波，对齐原型 .aura 品牌时刻：双漂移辉光 + 居中向导）──
 .lv-aura { position: relative; overflow: hidden; border-radius: var(--lv-r-4); padding: 40px 36px;
     &::before, &::after { content: ""; position: absolute; border-radius: 50%; pointer-events: none; }
@@ -636,14 +837,61 @@
 @keyframes lv-drift { from { transform: translate(-8px, 4px); } to { transform: translate(10px, -8px); } }
 .lv-wiz { max-width: 560px; margin: 0 auto; position: relative;
     .lv-wiz__step { font-size: 12px; color: var(--lv-accent); font-weight: 600; letter-spacing: .08em; }
-    .lv-wiz__title { font-size: 20px; font-weight: 600; margin: 8px 0 6px; letter-spacing: -.01em; } }
+    .lv-wiz__title { font-size: 20px; font-weight: 600; margin: 8px 0 6px; letter-spacing: -.01em; }
+    .lv-wiz__lead { margin: 0 0 6px; color: var(--lv-tx-2); font-size: 13px; line-height: 1.6; } }
+.lv-wiz__intro { display: flex; align-items: flex-start; gap: 12px; margin-bottom: 20px; }
+.lv-wiz__intro-icon { width: 36px; height: 36px; flex: none; display: grid; place-items: center; border-radius: 11px;
+    color: var(--lv-accent); background: var(--lv-accent-soft); border: 1px solid var(--lv-accent-line); font-size: 21px; }
+.lv-wiz__eyebrow { color: var(--lv-accent); font-size: 11px; font-weight: 600; letter-spacing: .08em; }
+.lv-wiz__welcome { margin: 3px 0 4px; font-size: 21px; line-height: 1.25; font-weight: 650; }
+.lv-wiz__features { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; margin: 0 0 22px; }
+.lv-wiz__feature { display: flex; align-items: flex-start; gap: 8px; min-width: 0; padding: 10px; border: 1px solid var(--lv-line); border-radius: var(--lv-r-2); background: color-mix(in srgb, var(--lv-surface-2) 68%, transparent);
+    .lv-wiz__feature-icon { width: 23px; height: 23px; flex: none; display: grid; place-items: center; border-radius: 7px; color: var(--lv-accent); background: var(--lv-accent-soft); font-size: 13px; }
+    b { display: block; margin-bottom: 3px; font-size: 12.5px; font-weight: 600; }
+    span:not(.lv-wiz__feature-icon) { display: block; color: var(--lv-tx-3); font-size: 11px; line-height: 1.45; } }
+.lv-wiz-flow { display: flex; align-items: stretch; gap: 7px; margin: 0 0 22px; padding: 10px;
+    border: 1px solid var(--lv-line); border-radius: var(--lv-r-3); background: color-mix(in srgb, var(--lv-surface) 62%, transparent);
+    .lv-wiz-flow__item { display: flex; align-items: flex-start; gap: 7px; min-width: 0; flex: 1; }
+    .lv-wiz-flow__num { width: 22px; height: 22px; flex: none; display: grid; place-items: center; border-radius: 50%;
+        background: var(--lv-accent-soft); color: var(--lv-accent); font-size: 11px; font-weight: 700; }
+    b { display: block; font-size: 12px; font-weight: 600; color: var(--lv-tx-2); }
+    span:not(.lv-wiz-flow__num) { display: block; margin-top: 2px; font-size: 11px; line-height: 1.35; color: var(--lv-tx-3); }
+    .lv-wiz-flow__arrow { flex: none; align-self: center; color: var(--lv-tx-3); font-size: 14px; }
+}
 .lv-roles { display: flex; flex-wrap: wrap; gap: 9px; margin-bottom: 20px; }
 // 256 波：窄面板下向导内边距收窄（40/36 在 300px 容器里占比过大）
 @media (max-width: 760px) {
     .lv-aura { padding: 26px 20px; }
+    .lv-wiz__features { grid-template-columns: 1fr; gap: 7px; }
+    .lv-wiz__feature { padding: 9px 10px; }
+    .lv-wiz-flow { gap: 4px; padding: 8px; }
+    .lv-wiz-flow .lv-wiz-flow__arrow { display: none; }
+    .lv-wiz-flow .lv-wiz-flow__item { gap: 5px; }
+    .lv-wiz-flow .lv-wiz-flow__num { width: 20px; height: 20px; }
+    .lv-wiz-flow b { font-size: 11.5px; }
+    .lv-wiz-flow span:not(.lv-wiz-flow__num) { font-size: 10.5px; }
 }
 .lv-rolechip { display: inline-flex; align-items: center; gap: 8px; padding: 9px 16px; border-radius: 999px;
     border: 1px solid var(--lv-line-strong); font-size: 13.5px; color: var(--lv-tx); background: none; cursor: pointer;
     transition: all var(--lv-t-med) var(--lv-spring);
     &:hover { border-color: var(--lv-accent-line); transform: translateY(-1px); }
     &.on { background: var(--lv-accent-soft); border-color: var(--lv-accent-line); color: var(--lv-accent); font-weight: 500; } }
+
+// 首次配置完成后的操作路径：用户完成第一条记录后自动隐藏。
+.lv-start-guide { margin: 0 0 22px; padding: 18px 20px; border: 1px solid var(--lv-accent-line);
+    border-radius: var(--lv-r-3); background: linear-gradient(100deg, var(--lv-accent-soft), var(--lv-surface)); }
+.lv-kicker { color: var(--lv-accent); font-size: 11px; font-weight: 650; letter-spacing: .08em; }
+.lv-start-guide__head { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; }
+.lv-start-guide__head h2 { margin: 3px 0 4px; font-size: 17px; font-weight: 600; }
+.lv-start-guide__head p { margin: 0; color: var(--lv-tx-3); font-size: 12.5px; line-height: 1.6; }
+.lv-start-guide__mark { color: var(--lv-accent); font-size: 22px; line-height: 1; }
+.lv-start-guide__steps { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; margin-top: 16px; }
+.lv-start-guide__step { min-width: 0; display: grid; grid-template-columns: 24px 1fr; gap: 8px; align-items: start; padding: 10px; border-top: 1px solid var(--lv-line); }
+.lv-start-guide__step > div { min-width: 0; }
+.lv-start-guide__step b, .lv-start-guide__step div span { display: block; }
+.lv-start-guide__step b { font-size: 12.5px; font-weight: 600; }
+.lv-start-guide__step div span { margin-top: 3px; color: var(--lv-tx-3); font-size: 11.5px; line-height: 1.45; }
+.lv-start-guide__step button { grid-column: 2; justify-self: start; margin-top: 5px; padding: 5px 9px; font-size: 11.5px; }
+.lv-start-guide__num { width: 22px; height: 22px; display: grid; place-items: center; border-radius: 50%; background: var(--lv-accent); color: var(--b3-theme-background); font-size: 12px; font-weight: 700; }
+@media (max-width: 760px) { .lv-start-guide__steps { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 460px) { .lv-start-guide { padding: 15px 14px; } .lv-start-guide__steps { grid-template-columns: 1fr; } }

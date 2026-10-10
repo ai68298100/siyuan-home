@@ -39,4 +39,16 @@ describe("31 模块 schema 契约快照（21 组）", () => {
             expect(schema, `module: ${id}`).toMatchSnapshot();
         }
     });
+
+    it("车辆档案覆盖核心资产字段和到期提醒", () => {
+        const fields = new Set(VEHICLES_SCHEMA.columns.map((column) => column.key));
+        expect([...fields]).toEqual(expect.arrayContaining([
+            "vin", "color", "purchase_date", "purchase_price", "current_value",
+            "insurance_company", "insurance_due", "vehicle_tax_due", "battery_capacity",
+        ]));
+        expect(VEHICLES_SCHEMA.reminders).toEqual(expect.arrayContaining([
+            expect.objectContaining({ key: "insurance", field: "insurance_due", leadDays: 30 }),
+            expect.objectContaining({ key: "vehicle_tax", field: "vehicle_tax_due", leadDays: 30 }),
+        ]));
+    });
 });

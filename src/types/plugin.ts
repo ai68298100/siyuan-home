@@ -9,6 +9,7 @@ import type { HomeSettings, Reminder } from "./index";
 import type { HubRuntime, HandledEntry } from "@/core/hub/runtime";
 import type { ScanResult } from "@/core/hub/scanner";
 import type { ModuleSchema } from "@/core/schema";
+import type { ProvisioningReport } from "@/core/provisioner";
 
 export interface HomePluginLike extends Plugin {
     i18n: Record<string, JSONValue>;
@@ -24,7 +25,7 @@ export interface HomePluginLike extends Plugin {
     pendingScreen?: string;
 
     refreshHub(only?: string | string[], force?: boolean): Promise<ScanResult>;
-    ensureCoreLedgers(): Promise<void>;
+    ensureCoreLedgers(): Promise<ProvisioningReport>;
     showTab(): void;
     showTabDocs(docId?: string): void;
     openSetting(): void;

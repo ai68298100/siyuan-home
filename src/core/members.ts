@@ -9,6 +9,7 @@ import type { Plugin } from "siyuan";
 import type { FamilyMember, HomeSettings, DbRef } from "@/types";
 import { addDetachedRow, setCell, renderLedgerAll } from "./siyuan";
 import { saveSettings } from "./settings";
+import { selectCellValue } from "./avcell";
 
 export function colMsToLocalDate(ms?: number): string | undefined {
     if (!ms) return undefined;
@@ -24,7 +25,7 @@ function errText(e: unknown): string {
 async function writeMemberCells(ref: DbRef, itemID: string, m: FamilyMember): Promise<void> {
     const c = ref.columns ?? {};
     if (c.name) await setCell(ref.avId!, c.name, itemID, { type: "text", text: { content: m.name } });
-    if (c.role) await setCell(ref.avId!, c.role, itemID, { type: "select", select: { content: m.role } });
+    if (c.role) await setCell(ref.avId!, c.role, itemID, selectCellValue(m.role));
     if (c.birthday) {
         await setCell(ref.avId!, c.birthday, itemID, m.birthday
             ? { type: "date", date: { content: new Date(`${m.birthday}T00:00:00`).getTime(), isNotEmpty: true, isNotTime: true } }
@@ -156,7 +157,7 @@ export interface BackfillResult {
     linked: string[];
     unmatched: string[];
     /** 同名多候选：不自动回填，附候选明细供人工选择对话框（D06） */
-    ambiguous: { member: string; candidates: AmbiguousCandidate[] }[];
+    ambiguous: { memberId: string; member: string; candidates: AmbiguousCandidate[] }[];
     /** 已有 avItemId 但台账行已不存在：清除关联并报告（D06） */
     stale: string[];
 }
@@ -223,6 +224,7 @@ export async function backfillMemberLinks(
             dirty = true;
         } else if (cands.length > 1) {
             result.ambiguous.push({
+                memberId: m.id,
                 member: m.name,
                 candidates: cands.map((id) => ({ id, summary: summaryOf(id) })),
             });

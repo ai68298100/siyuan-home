@@ -5,13 +5,14 @@
     import { monthGrid, weekGrid } from "@/core/calendar";
     import { localDateKey } from "@/core/hub/rule";
     import { moduleIcon } from "@/core/modules";
+    import { showMessage } from "siyuan";
 
     let { items, t, version, onComplete, onAddMemo, onConvert, initialMode, onModeChange }: {
         items: Reminder[];
         t: (k: string) => string;
         version?: number;
         onComplete: (r: Reminder) => void;
-        onAddMemo: (title: string, due: string) => void;
+        onAddMemo: (title: string, due: string) => void | Promise<void>;
         onConvert: (r: Reminder) => void;
         /** 263 波：会历模式偏好（runtime 持久化，由父组件读写） */
         initialMode?: "month" | "week";
@@ -24,6 +25,9 @@
     function setMode(m: "month" | "week") {
         if (mode === m) return;
         mode = m;
+        const selectedDate = keyToDate(selected);
+        if (m === "week") weekAnchor = selected;
+        else { viewYear = selectedDate.getFullYear(); viewMonth = selectedDate.getMonth(); }
         onModeChange?.(m);
     }
     let viewYear = $state(now.getFullYear());
@@ -62,11 +66,13 @@
         const d = new Date(viewYear, viewMonth + delta, 1);
         viewYear = d.getFullYear();
         viewMonth = d.getMonth();
+        selected = localDateKey(d);
     }
     function shiftWeek(deltaDays: number) {
         const d = keyToDate(weekAnchor);
         d.setDate(d.getDate() + deltaDays);
         weekAnchor = localDateKey(d);
+        selected = weekAnchor;
     }
     function goToday() {
         const d = new Date();
@@ -85,11 +91,25 @@
     const weekdays = ["cal.wk.mo", "cal.wk.tu", "cal.wk.we", "cal.wk.th", "cal.wk.fr", "cal.wk.sa", "cal.wk.su"];
     // 233 波：当日面板快捷新增备忘（预设选中日；回车或按钮提交后清空）
     let memoTitle = $state("");
-    function addMemoForDay() {
+    let memoInput: HTMLInputElement | undefined = $state();
+    let savingMemo = $state(false);
+    async function addMemoForDay() {
+        if (savingMemo) return;
         const title = memoTitle.trim();
-        if (!title) return;
-        onAddMemo(title, selected);
-        memoTitle = "";
+        if (!title) {
+            memoInput?.focus();
+            showMessage(t("memo.titleRequired"), 4000, "info");
+            return;
+        }
+        savingMemo = true;
+        try {
+            await onAddMemo(title, selected);
+            memoTitle = "";
+        } catch (e) {
+            showMessage(t("ledger.saveFailed").replace("${msg}", e instanceof Error ? e.message : String(e)), 5000, "error");
+        } finally {
+            savingMemo = false;
+        }
     }
     function moveDayFocus(event: KeyboardEvent, index: number) {
         const key = event.key;
@@ -171,10 +191,10 @@
         {/if}
         <!-- 233 波：当日快捷新增备忘（日期预设为选中日） -->
         <div style="display:flex;gap:6px;margin-top:10px;padding-top:10px;border-top:1px solid var(--lv-line)">
-            <input class="b3-text-field fn__flex-1" style="min-width:0" placeholder={t("cal.memoPlaceholder")}
+            <input bind:this={memoInput} class="b3-text-field fn__flex-1" style="min-width:0" placeholder={t("cal.memoPlaceholder")} disabled={savingMemo}
                 bind:value={memoTitle}
-                onkeydown={(e: KeyboardEvent) => e.key === "Enter" && !e.isComposing && addMemoForDay()} />
-            <button class="b3-button b3-button--outline" style="flex:none" disabled={!memoTitle.trim()} onclick={addMemoForDay}>＋ {t("memo.add")}</button>
+                onkeydown={(e: KeyboardEvent) => e.key === "Enter" && !e.isComposing && void addMemoForDay()} />
+            <button class="b3-button b3-button--outline" style="flex:none" disabled={savingMemo} aria-busy={savingMemo} onclick={addMemoForDay}>{savingMemo ? t("ledger.saving") : `＋ ${t("memo.add")}`}</button>
         </div>
     </div>
 </div>

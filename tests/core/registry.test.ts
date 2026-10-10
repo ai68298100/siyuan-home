@@ -62,6 +62,11 @@ describe("provider 注册表覆盖契约", () => {
         expect(stock).toHaveLength(2);
     });
 
+    it("车辆维护提醒与车辆主表共用一个 provider，避免重复扫描", () => {
+        const providers = buildScanProviders(ALL, deps);
+        expect(providers.filter((p) => p.moduleId === "vehicles")).toHaveLength(1);
+    });
+
     it("31/31 模块任一启用组合下覆盖契约都成立（含全开）", () => {
         const providers = buildScanProviders(ALL, deps);
         expect(providerCoverage(ALL, providers)).toEqual([]);

@@ -3,7 +3,8 @@
     // 未建库自动建库（triage 同链路）。常驻挂载：关闭仅收起弹层，草稿保留到下次打开（对齐原型）。
     import { showMessage } from "siyuan";
     import { tick } from "svelte";
-    import { addDetachedRow, setCell } from "@/core/siyuan";
+    import { addDetachedRow, RowIdentityPendingError, setCell } from "@/core/siyuan";
+    import { selectCellValue } from "@/core/avcell";
     import { saveRuntime } from "@/core/hub/runtime";
     import type { HomeSettings } from "@/types";
 
@@ -13,6 +14,7 @@
         schemaCatalog?: Record<string, { capture?: string[]; columns?: { key: string; type: string; options?: string[] }[] }>;
         runtime?: { hubQuickModule?: string };
         refreshHub?: (only?: string | string[], force?: boolean) => Promise<unknown>;
+        showTabDocs?: (docId?: string) => void;
     }
 
     let { plugin, t, version, open = $bindable(false), onClose }: {
@@ -30,10 +32,19 @@
         return (plugin.settings.enabledModules ?? []).filter((id) => id !== "members" && id !== "adhoc");
     });
 
-    // 打开时恢复上次模块（失效回退首个）；values 保留草稿，仅切模块时清空
+    // 打开时恢复上次模块；后台模块列表刷新时只在当前模块失效后回退。
     let moduleId = $state("");
+    let identityPending = $state(false);
+    let pendingModuleId = $state<string | undefined>();
+    let wasOpen = false;
     $effect(() => {
-        if (open) {
+        if (open && !wasOpen) {
+            wasOpen = true;
+            const last = identityPending ? pendingModuleId : plugin.runtime?.hubQuickModule;
+            moduleId = last && modules.includes(last) ? last : (modules[0] ?? "");
+        } else if (!open) {
+            wasOpen = false;
+        } else if (moduleId && !modules.includes(moduleId)) {
             const last = plugin.runtime?.hubQuickModule;
             moduleId = last && modules.includes(last) ? last : (modules[0] ?? "");
         }
@@ -58,6 +69,8 @@
 
     let saving = $state(false);
     let saveError = $state("");
+    let identityChecked = $state(false);
+    let pendingRowId: string | undefined;
     let nameEl: HTMLInputElement | undefined = $state();
 
     function close() {
@@ -90,14 +103,23 @@
     const modOptions = $derived(modules.map((id) => ({ id, label: modLabel(id) + (plugin.settings.dbRefs?.[id]?.avId ? "" : t("triage.needProvision")) })));
 
     async function save(continueAfter = false) {
+        if (identityPending) return;
         const title = String(values.name ?? "").trim();
-        if (!title) { saveError = t("ledger.nameRequired"); return; }
+        if (!title) {
+            saveError = t("ledger.nameRequired");
+            nameEl?.focus();
+            return;
+        }
         saving = true;
         saveError = "";
         // 268 波：连续录入的重聚焦必须在 saving=false 之后（disabled 输入框不可聚焦）
         let refocusName = false;
         try {
             let r = plugin.settings.dbRefs[moduleId];
+            if (pendingRowId && pendingModuleId !== moduleId) {
+                saveError = t("capture.pendingTarget");
+                return;
+            }
             if (!r?.avId) {
                 // 未建库自动建库（triage 同链路；provisionModule 幂等）
                 await import("@/core/provisioner").then((m) => m.provisionModule(
@@ -107,7 +129,30 @@
                 r = plugin.settings.dbRefs[moduleId];
                 if (!r?.avId) throw new Error(t("triage.noTarget"));
             }
-            const itemID = await addDetachedRow(r.avId, title);
+            // 禁用选项仍可能由旧草稿带入失效关系 ID；建行前做最终校验。
+            for (const f of captureFields as { key: string; type: string }[]) {
+                if (f.type !== "relation") continue;
+                const relationID = String(values[f.key] ?? "").trim();
+                if (relationID && !(plugin.settings.members ?? []).some((m) => m.avItemId === relationID)) {
+                    saveError = t("members.notLinked");
+                    return;
+                }
+            }
+            let itemID = pendingRowId;
+            if (!itemID) {
+                pendingModuleId = moduleId;
+                try {
+                    itemID = await addDetachedRow(r.avId, title);
+                    pendingRowId = itemID;
+                } catch (e) {
+                    if (e instanceof RowIdentityPendingError) {
+                        identityPending = true;
+                        saveError = t("capture.identityPending").replace("${module}", modLabel(moduleId));
+                        return;
+                    }
+                    throw e;
+                }
+            }
             // 新建行身份确认存在延迟：setCell 失败受控重试（同格重写不会重复建行，triage 同款）
             const setCellSafe = async (key: string, value: unknown) => {
                 const keyID = r!.columns?.[key];
@@ -129,13 +174,31 @@
                 else if (f.type === "date") await setCellSafe(f.key, { type: "date", date: { content: new Date(`${v}T00:00:00`).getTime(), isNotEmpty: true, isNotTime: true } });
                 else if (f.type === "number") await setCellSafe(f.key, { type: "number", number: { content: Number(v), isNotEmpty: true } });
                 else if (f.type === "url") await setCellSafe(f.key, { type: "url", url: { content: String(v) } });
-                else if (f.type === "select") await setCellSafe(f.key, { type: "select", select: { content: String(v) } });
+                else if (f.type === "select") await setCellSafe(f.key, selectCellValue(String(v)));
                 else await setCellSafe(f.key, { type: "text", text: { content: String(v) } });
             }
-            // 记住上次模块（跨会话）
-            plugin.runtime!.hubQuickModule = moduleId;
-            await saveRuntime(plugin as any, plugin.runtime as any);
-            showMessage(t("capture.saved").replace("${module}", modLabel(moduleId)), 3000, "info");
+            // A preference failure must not turn a committed row into a retryable save failure.
+            const previousQuickModule = plugin.runtime?.hubQuickModule;
+            try {
+                if (plugin.runtime) {
+                    plugin.runtime.hubQuickModule = moduleId;
+                    await saveRuntime(plugin as any, plugin.runtime as any);
+                }
+            } catch (e) {
+                if (plugin.runtime) plugin.runtime.hubQuickModule = previousQuickModule;
+                showMessage(t("capture.preferenceSaveFailed").replace("${msg}", e instanceof Error ? e.message : String(e)), 5000, "error");
+            }
+            let refreshFailed = false;
+            try {
+                // A capture can create a new reminder row. Bypass the normal
+                // full-scan debounce so overview/reminders reflect it now.
+                await plugin.refreshHub?.(undefined, true);
+            } catch (e) {
+                refreshFailed = true;
+                console.warn("[siyuan-home] quick capture saved but refresh failed:", e);
+                showMessage(t("capture.savedRefreshFailed").replace("${module}", modLabel(moduleId)), 5000, "error");
+            }
+            if (!refreshFailed) showMessage(t("capture.saved").replace("${module}", modLabel(moduleId)), 3000, "info");
             if (continueAfter) {
                 // 268 波：连续录入——清空字段、保留模块（家庭录入常成批）
                 values = {};
@@ -143,8 +206,8 @@
             } else {
                 open = false;
             }
-            // 新行可能派生提醒：全量重扫让总览/提醒即时可见（triage 同款）
-            await plugin.refreshHub?.();
+            pendingRowId = undefined;
+            pendingModuleId = undefined;
         } catch (e) {
             saveError = t("capture.failed").replace("${msg}", e instanceof Error ? e.message : String(e));
         } finally {
@@ -152,6 +215,24 @@
         }
         // saving=false 到 DOM 重新可聚焦之间隔着一个 Svelte 刷新（微任务）——tick 后再聚焦
         if (refocusName) await tick().then(() => nameEl?.focus());
+    }
+    function openPendingLedger() {
+        const targetModule = pendingModuleId ?? moduleId;
+        const docId = plugin.settings.dbRefs[targetModule]?.docId;
+        if (!docId || !plugin.showTabDocs) return;
+        identityChecked = true;
+        close();
+        plugin.showTabDocs(docId);
+    }
+
+    function discardUncertainDraft() {
+        values = {};
+        pendingRowId = undefined;
+        pendingModuleId = undefined;
+        identityPending = false;
+        identityChecked = false;
+        saveError = "";
+        showMessage(t("capture.uncertainDraftDiscarded"), 6000, "error");
     }
 </script>
 
@@ -163,10 +244,10 @@
     <div class="lv-sheet">
         <div class="lv-sheet-head">
             <b style="font-size:14px">⚡ {t("capture.title")}</b>
-            <select class="b3-select" style="margin-left:auto;max-width:200px" bind:value={moduleId} aria-label={t("capture.title")} disabled={saving}>
+            <select class="b3-select" style="margin-left:auto;max-width:200px" bind:value={moduleId} aria-label={t("capture.title")} disabled={saving || identityPending}>
                 {#each modOptions as m (m.id)}<option value={m.id}>{m.label}</option>{/each}
             </select>
-            <button class="lv-iconbtn" aria-label={t("cancel")} onclick={close}>✕</button>
+            <button class="lv-iconbtn" aria-label={t("cancel")} onclick={close} disabled={saving}>✕</button>
         </div>
         <div class="lv-sheet-body lv-cap-body">
             {#if modules.length === 0}
@@ -192,7 +273,9 @@
                             <select id="lv-cap-{f.key}" class="b3-select" bind:value={values[f.key]} disabled={saving}>
                                 <option value=""></option>
                                 {#each plugin.settings.members ?? [] as m (m.avItemId ?? m.id)}
-                                    <option value={m.avItemId}>{m.name}</option>
+                                    <option value={m.avItemId ?? ""} disabled={!m.avItemId}>
+                                        {m.name}{m.avItemId ? "" : ` · ${t("members.notLinked")}`}
+                                    </option>
                                 {/each}
                             </select>
                         {:else if f.type === "date"}
@@ -213,12 +296,16 @@
             {/if}
         </div>
         <div class="lv-sheet-foot">
+            {#if identityPending}
+                <button class="lv-btn ghost" onclick={openPendingLedger}>{t("capture.checkLedger")}</button>
+                {#if identityChecked}<button class="lv-btn ghost" onclick={discardUncertainDraft}>{t("capture.discardUncertain")}</button>{/if}
+            {/if}
             <button class="lv-btn ghost" onclick={close} disabled={saving}>{t("cancel")}</button>
             <!-- 268 波：连续录入（家庭数据常成批）——保存后清空字段保留弹层，焦点回名称 -->
-            <button class="lv-btn" onclick={() => save(true)} disabled={saving || modules.length === 0 || !String(values.name ?? "").trim()}>
+            <button class="lv-btn" onclick={() => save(true)} disabled={saving || identityPending || modules.length === 0}>
                 {t("capture.saveContinue")}
             </button>
-            <button class="lv-btn primary" onclick={() => save(false)} disabled={saving || modules.length === 0 || !String(values.name ?? "").trim()}>
+            <button class="lv-btn primary" onclick={() => save(false)} disabled={saving || identityPending || modules.length === 0}>
                 {saving ? t("ledger.saving") : t("save")}
             </button>
         </div>

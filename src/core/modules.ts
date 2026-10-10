@@ -36,7 +36,7 @@ export const BUILT_IN_MODULES: HomeModule[] = [
     { id: "schooling",    group: "kids",   defaultEnabled: false, suggestRoles: ["child"], devStatus: "skeleton" },
     { id: "allowance",    group: "kids",   defaultEnabled: false, suggestRoles: ["child"], devStatus: "skeleton" },
     // ── 出行旅行 ──
-    { id: "vehicles",     group: "travel", defaultEnabled: false, devStatus: "skeleton" },
+    { id: "vehicles",     group: "travel", defaultEnabled: false, devStatus: "ready" },
     { id: "transit",      group: "travel", defaultEnabled: false, devStatus: "skeleton" },
     { id: "travel-plan",  group: "travel", defaultEnabled: false, devStatus: "skeleton" },
     { id: "travel-booking", group: "travel", defaultEnabled: false, devStatus: "skeleton" },

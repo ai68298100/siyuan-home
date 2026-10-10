@@ -76,8 +76,29 @@ export function listNotebooks(): Promise<NotebookInfo[]> {
         .then((d) => d?.notebooks ?? []);
 }
 
-export function createNotebook(name: string): Promise<string> {
-    return post<string>("/api/notebook/createNotebook", { name });
+/**
+ * 归一化 createNotebook 的返回值。
+ * 思源 3.8.5 返回裸 ID，3.8.6+ 部分版本返回 { notebook: { id } }；
+ * 同时兼容过渡版本的 { notebook: id } 与 { id }，避免对象继续流入文档 API。
+ */
+function notebookIdFromCreateResponse(data: unknown): string {
+    if (typeof data === "string" && data) return data;
+    if (!data || typeof data !== "object") {
+        throw new KernelError("/api/notebook/createNotebook", -3, "invalid notebook id in response");
+    }
+    const response = data as { notebook?: unknown; id?: unknown };
+    if (typeof response.notebook === "string" && response.notebook) return response.notebook;
+    if (response.notebook && typeof response.notebook === "object") {
+        const nestedId = (response.notebook as { id?: unknown }).id;
+        if (typeof nestedId === "string" && nestedId) return nestedId;
+    }
+    if (typeof response.id === "string" && response.id) return response.id;
+    throw new KernelError("/api/notebook/createNotebook", -3, "invalid notebook id in response");
+}
+
+export async function createNotebook(name: string): Promise<string> {
+    const data = await post<unknown>("/api/notebook/createNotebook", { name });
+    return notebookIdFromCreateResponse(data);
 }
 
 /** 重新打开已关闭的笔记本（D07：笔记本被用户关闭 → 恢复而非新建。[待实测] payload 以 3.8.x 实例为准） */
@@ -229,12 +250,24 @@ function rowIDsFromAddResponse(d: any): string[] {
  */
 export async function addDetachedRow(avID: string, content: string): Promise<string> {
     const before = new Set(await renderRowIDs(avID));
-    const d = await post<any>("/api/av/addAttributeViewBlocks", {
-        avID, blockID: "", srcs: [{ blockID: "", content, isDetached: true }],
-    });
+    let d: any;
+    try {
+        d = await post<any>("/api/av/addAttributeViewBlocks", {
+            avID, blockID: "", srcs: [{ blockID: "", content, isDetached: true }],
+        });
+    } catch (error) {
+        if (error instanceof KernelError && error.code !== -1) throw error;
+        throw new RowIdentityPendingError([]);
+    }
     const fromResponse = rowIDsFromAddResponse(d).filter((id) => !before.has(id));
+    if (fromResponse.length === 1) return fromResponse[0];
     await new Promise((r) => setTimeout(r, 300)); // 块索引异步重建
-    const added = (await renderRowIDs(avID)).filter((id) => !before.has(id));
+    let added: string[];
+    try {
+        added = (await renderRowIDs(avID)).filter((id) => !before.has(id));
+    } catch {
+        throw new RowIdentityPendingError(fromResponse);
+    }
     const confirmed = fromResponse.length === 1 ? fromResponse[0] : added.length === 1 ? added[0] : undefined;
     if (confirmed) return confirmed;
     throw new RowIdentityPendingError(added.length ? Array.from(new Set(added)) : fromResponse);
@@ -287,6 +320,40 @@ export async function uploadAsset(file: File, assetsPath = "/assets/siyuan-home/
     const entry = Object.entries(succMap as Record<string, string>)[0];
     if (!entry) throw new KernelError("asset.upload", -3, "no file in succMap");
     return { name: entry[0], path: entry[1] };
+}
+
+// ── OCR（手动识别使用思源当前设备的 OCR 配置；不改变自动识别开关）──
+
+export interface OCRConfigData {
+    config: {
+        provider: string;
+        model: string;
+        auto: boolean;
+        aiModelId?: string;
+    };
+    providers: { id: string; available: boolean }[];
+    models: { id: string; name: string; builtIn: boolean }[];
+    aiModels: { id: string; name: string; provider: string }[];
+}
+
+/** 获取当前设备 OCR 设置；旧内核不支持时由调用方提供升级/设置指引。 */
+export function getOCRConfig(): Promise<OCRConfigData> {
+    return post<OCRConfigData>("/api/asset/getOCRConfig", {});
+}
+
+/** 读取资源已保存的 OCR 文本，不触发识别。 */
+export async function getImageOCRText(path: string): Promise<string> {
+    const data = await post<{ text?: string }>("/api/asset/getImageOCRText", { path });
+    return typeof data?.text === "string" ? data.text : "";
+}
+
+/** 按当前思源 OCR 提供商识别图片；内核会保存结果并更新 OCR 索引。 */
+export async function recognizeAsset(path: string): Promise<{ text: string; ocrJSON: Record<string, string>[] }> {
+    const data = await post<{ text?: string; ocrJSON?: Record<string, string>[] }>("/api/asset/ocr", { path });
+    return {
+        text: typeof data?.text === "string" ? data.text : "",
+        ocrJSON: Array.isArray(data?.ocrJSON) ? data.ocrJSON : [],
+    };
 }
 
 /** 单元格写值（value 按列类型：{type:"text",text:{content}} / {type:"date",date:{content,isNotEmpty}} / {type:"relation",relation:{blockIDs}} …）。

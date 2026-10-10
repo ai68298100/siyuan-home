@@ -122,6 +122,20 @@ export interface ProvisionResult {
     created: boolean;
 }
 
+export interface ProvisioningReport {
+    issues: { moduleId: string; message: string }[];
+}
+
+export function getProvisioningReport(settings: Pick<HomeSettings, "enabledModules" | "dbRefs">): ProvisioningReport {
+    const issues: ProvisioningReport["issues"] = [];
+    for (const moduleId of settings.enabledModules) {
+        const ref = settings.dbRefs[moduleId];
+        const message = ref?.provisionError ?? (!ref?.avId ? "Attribute view unavailable" : "");
+        if (message) issues.push({ moduleId, message });
+    }
+    return { issues };
+}
+
 export interface ProvisionOptions {
     /** 列名解析（i18n）：列 key → 显示名（缺省用 key 本身） */
     resolveName?: (colKey: string) => string;

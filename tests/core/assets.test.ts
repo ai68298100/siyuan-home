@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { assetHref, downloadAsset, safeDownloadName } from "@/core/assets";
+import { assetHref, downloadAsset, isEncryptedNotebookAsset, isImageAsset, safeDownloadName } from "@/core/assets";
 
 describe("assetHref", () => {
     it("resolves kernel relative paths on the supplied origin", () => {
@@ -25,6 +25,25 @@ describe("safeDownloadName", () => {
         expect(safeDownloadName("/assets/siyuan-home/身份证:正面?.png")).toBe("身份证_正面_.png");
         expect(safeDownloadName("../")).toBe("attachment");
         expect(safeDownloadName("", "证件副本.pdf")).toBe("证件副本.pdf");
+    });
+});
+
+describe("isImageAsset", () => {
+    it("accepts local image formats and rejects PDFs, traversal, and external URLs", () => {
+        expect(isImageAsset("assets/siyuan-home/id-front.png")).toBe(true);
+        expect(isImageAsset("/assets/siyuan-home/护照.HEIC?box=nb-1")).toBe(true);
+        expect(isImageAsset("assets/siyuan-home/scan.pdf")).toBe(false);
+        expect(isImageAsset("assets/../outside.png")).toBe(false);
+        expect(isImageAsset("https://outside.example/photo.png")).toBe(false);
+    });
+});
+
+describe("isEncryptedNotebookAsset", () => {
+    it("recognizes encrypted notebook asset references", () => {
+        const notebooks = [{ id: "private-box", encrypted: true }, { id: "open-box", encrypted: false }];
+        expect(isEncryptedNotebookAsset("assets/private.png?box=private-box", notebooks)).toBe(true);
+        expect(isEncryptedNotebookAsset("assets/open.png?box=open-box", notebooks)).toBe(false);
+        expect(isEncryptedNotebookAsset("assets/plain.png", notebooks)).toBe(false);
     });
 });
 

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { idCheckDigit, maskIdNumber, parseIdNumber } from "../../src/core/idcard";
+import { idCheckDigit, maskCredentialNumber, maskIdNumber, parseIdNumber } from "../../src/core/idcard";
 
 /** 构造一个校验位合法的测试号码（避免使用真实存在者的号码） */
 function makeValidId(overrides?: { region?: string; birth?: string; seq?: string }): string {
@@ -72,5 +72,15 @@ describe("maskIdNumber（展示掩码）", () => {
     });
     it("空串安全", () => {
         expect(maskIdNumber("")).toBe("");
+    });
+});
+
+describe("maskCredentialNumber（通用证件号展示掩码）", () => {
+    it("保留少量首尾字符，不改变存储值", () => {
+        expect(maskCredentialNumber("AB1234567890")).toBe("AB******7890");
+    });
+    it("短编号不显示完整内容", () => {
+        expect(maskCredentialNumber("P1234")).toBe("P1*34");
+        expect(maskCredentialNumber("1234")).toBe("****");
     });
 });

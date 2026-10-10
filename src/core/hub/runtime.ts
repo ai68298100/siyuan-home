@@ -441,6 +441,19 @@ export interface HandledEntry {
 }
 
 /**
+ * 运行态的 muted/handledYear/handledUntil 旧格式只保存提醒 ID。
+ * 提醒 ID 由 rule.ts 生成 `${rowId}::${moduleId}.${ruleKey}`，缓存不可用时
+ * 从这个稳定部分回推模块，避免模块筛选把历史条目当成无归属数据隐藏。
+ */
+function moduleIdFromReminderId(id: string): string {
+    const marker = id.indexOf("::");
+    if (marker < 0) return "";
+    const moduleAndRule = id.slice(marker + 2);
+    const dot = moduleAndRule.indexOf(".");
+    return dot > 0 ? moduleAndRule.slice(0, dot) : "";
+}
+
+/**
  * 已处理列表（提醒页"已处理"筛选的真实数据源）：
  * oneoff 已办 + 忽略中 + 周年当年已办 + recurring 本期已办 + 已完成备忘。
  * title 尽量从派生列表回查；不在扫描结果时给出可读的降级说明。
@@ -453,15 +466,15 @@ export function listHandled(rt: HubRuntime, derived: Reminder[]): HandledEntry[]
     }
     for (const id of Object.keys(rt.muted)) {
         const r = byId.get(id);
-        out.push({ id, title: r?.title ?? "", moduleId: r?.moduleId ?? "", dueDate: r?.dueDate, kind: "muted" });
+        out.push({ id, title: r?.title ?? "", moduleId: r?.moduleId ?? moduleIdFromReminderId(id), dueDate: r?.dueDate, kind: "muted" });
     }
     for (const [id, year] of Object.entries(rt.handledYear)) {
         const r = byId.get(id);
-        out.push({ id, title: r?.title ?? "", moduleId: r?.moduleId ?? "", dueDate: r?.dueDate, at: String(year), kind: "year" });
+        out.push({ id, title: r?.title ?? "", moduleId: r?.moduleId ?? moduleIdFromReminderId(id), dueDate: r?.dueDate, at: String(year), kind: "year" });
     }
     for (const [id, until] of Object.entries(rt.handledUntil)) {
         const r = byId.get(id);
-        out.push({ id, title: r?.title ?? "", moduleId: r?.moduleId ?? "", dueDate: until, kind: "period" });
+        out.push({ id, title: r?.title ?? "", moduleId: r?.moduleId ?? moduleIdFromReminderId(id), dueDate: until, kind: "period" });
     }
     for (const m of rt.memos ?? []) {
         if (!m.doneAt) continue;

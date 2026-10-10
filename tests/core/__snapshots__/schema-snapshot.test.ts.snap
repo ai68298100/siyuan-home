@@ -2157,7 +2157,8 @@ exports[`31 模块 schema 契约快照（21 组） > 每个 schema 的结构快�
   "capture": [
     "name",
     "plate",
-    "expiry",
+    "energy_type",
+    "mileage",
     "inspection_due",
   ],
   "columns": [
@@ -2177,6 +2178,34 @@ exports[`31 模块 schema 契约快照（21 组） > 每个 schema 的结构快�
       "type": "text",
     },
     {
+      "key": "brand_model",
+      "labelKey": "field.brand_model",
+      "type": "text",
+    },
+    {
+      "key": "vin",
+      "labelKey": "field.vin",
+      "type": "text",
+    },
+    {
+      "key": "color",
+      "labelKey": "field.color",
+      "type": "text",
+    },
+    {
+      "default": "gasoline",
+      "key": "energy_type",
+      "labelKey": "field.energy_type",
+      "options": [
+        "gasoline",
+        "diesel",
+        "hybrid",
+        "electric",
+        "other",
+      ],
+      "type": "select",
+    },
+    {
       "key": "expiry",
       "labelKey": "field.expiry",
       "type": "date",
@@ -2192,9 +2221,44 @@ exports[`31 模块 schema 契约快照（21 组） > 每个 schema 的结构快�
       "type": "number",
     },
     {
+      "key": "purchase_date",
+      "labelKey": "field.purchase_date",
+      "type": "date",
+    },
+    {
+      "key": "purchase_price",
+      "labelKey": "field.purchase_price",
+      "type": "number",
+    },
+    {
+      "key": "current_value",
+      "labelKey": "field.current_value",
+      "type": "number",
+    },
+    {
       "key": "inspection_due",
       "labelKey": "field.inspection_due",
       "type": "date",
+    },
+    {
+      "key": "insurance_company",
+      "labelKey": "field.insurance_company",
+      "type": "text",
+    },
+    {
+      "key": "insurance_due",
+      "labelKey": "field.insurance_due",
+      "type": "date",
+    },
+    {
+      "key": "vehicle_tax_due",
+      "labelKey": "field.vehicle_tax_due",
+      "type": "date",
+    },
+    {
+      "key": "battery_capacity",
+      "labelKey": "field.battery_capacity",
+      "type": "number",
     },
     {
       "key": "battery_due",
@@ -2217,6 +2281,18 @@ exports[`31 模块 schema 契约快照（21 组） > 每个 schema 的结构快�
     {
       "field": "inspection_due",
       "key": "inspection",
+      "kind": "oneoff",
+      "leadDays": 30,
+    },
+    {
+      "field": "insurance_due",
+      "key": "insurance",
+      "kind": "oneoff",
+      "leadDays": 30,
+    },
+    {
+      "field": "vehicle_tax_due",
+      "key": "vehicle_tax",
       "kind": "oneoff",
       "leadDays": 30,
     },

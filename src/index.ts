@@ -11,8 +11,10 @@ import { runScan, deriveVisible, type ScanResult } from "@/core/hub/scanner";
 import { buildScanProviders } from "@/core/hub/registry";
 import { dailyDigest, markNotified, inSilentHours, weeklyPreview, markWeeklyNotified } from "@/core/hub/notify";
 import { complete, snooze, mute, unmute, renew, restore, addMemo, removeMemo, updateMemo } from "@/core/hub/actions";
-import { provisionModule } from "@/core/provisioner";
+import { getProvisioningReport, provisionModule, type ProvisioningReport } from "@/core/provisioner";
+import { createSingleFlightUntilStable } from "@/core/single-flight";
 import { addDetachedRow, setCell } from "@/core/siyuan";
+import { loadRowLogs } from "@/core/rowlog";
 import { mountLvHomeBridge } from "@/bridge/external-bridge";
 import { SCHEMA_CATALOG, validateSchema } from "@/core/schema";
 import type { HomeSettings } from "@/types";
@@ -38,6 +40,10 @@ export default class LvHomePlugin extends Plugin {
     hubListeners = new Set<() => void>();
     /** 扫描序号（H11）：慢的旧扫描不得覆写新扫描结果或之后的手动动作 */
     private scanSeq = 0;
+    private readonly provisionLedgersSingleFlight = createSingleFlightUntilStable(
+        () => [...new Set(this.settings.enabledModules)].sort().join("\0"),
+        () => this.provisionLedgers(),
+    );
     /** EC03/v0.3：服务桥卸载函数 */
     private disposeLvHomeBridge?: () => void;
     /** EC21：lv-exam:stats 监听（window CustomEvent，非 eventBus） */
@@ -381,7 +387,12 @@ export default class LvHomePlugin extends Plugin {
 
     /** members 先建（relation 目标），其余按需；幂等。启用模块才建库（P4）。
      * 12 轮修复：遍历 schemaCatalog（members 声明序居首），删除第二份手工清单防漂移 */
-    async ensureCoreLedgers(): Promise<void> {
+    async ensureCoreLedgers(): Promise<ProvisioningReport> {
+        await this.provisionLedgersSingleFlight();
+        return getProvisioningReport(this.settings);
+    }
+
+    private async provisionLedgers(): Promise<void> {
         const resolveName = (key: string) => String(this.i18n[`field.${key}`] ?? key);
         const enabled = new Set(this.settings.enabledModules);
         for (const [id, schema] of Object.entries(this.schemaCatalog)) {
@@ -412,6 +423,8 @@ export default class LvHomePlugin extends Plugin {
         const deps = {
             settings: this.settings,
             getDbRef: (id: string) => this.settings.dbRefs[id],
+            loadRowLogs: () => loadRowLogs(this),
+            t: (key: string) => this.i18nText(key),
             onStats: (id: string, stats: { rowCount: number; memberCounts: Record<string, number> }) => moduleStats.set(id, stats),
         };
         // 12 轮修复：provider 由 schemaCatalog 程序化派生（手工清单曾漏掉 parenting/schooling，
@@ -652,7 +665,10 @@ export default class LvHomePlugin extends Plugin {
         }
         // 全屏化样式钩子（100vw/100dvh、无圆角、内容滚动）
         dialog.element.classList.add("b3-dialog--lvmobile");
-        this.mobileDialogUnmount = mount(TabPanel, { target: host, props: { plugin: self } }) as () => void;
+        this.mobileDialogUnmount = mount(TabPanel, {
+            target: host,
+            props: { plugin: self, onMobileClose: () => dialog.destroy() },
+        }) as () => void;
         this.mobileDialog = dialog;
     }
 
@@ -720,12 +736,10 @@ export default class LvHomePlugin extends Plugin {
         this.settings.onboarded = true;
         // C7c：建库批处理进度提示（31 模块串行需数秒；起止均有反馈，失败落 dbRefs.provisionError 诊断可见）
         showMessage(this.i18nText("wiz.provisioning").replace("${n}", String(moduleIds.length)), 4000, "info");
-        await this.ensureCoreLedgers();
+        const provisioning = await this.ensureCoreLedgers();
         await saveSettings(this, this.settings);
         // C7c 收尾：建库失败浮出（此前只进诊断区，向导完成后用户无感）
-        const failed = Object.entries(this.settings.dbRefs)
-            .filter(([id, ref]) => this.settings.enabledModules.includes(id) && (ref as any)?.provisionError)
-            .map(([id]) => this.i18nText(`module.${id}`));
+        const failed = provisioning.issues.map(({ moduleId }) => this.i18nText(`module.${moduleId}`));
         if (failed.length > 0) {
             showMessage(this.i18nText("wiz.provisionIssues")
                 .replace("${n}", String(failed.length))
@@ -733,7 +747,9 @@ export default class LvHomePlugin extends Plugin {
         } else {
             showMessage(this.i18nText("wiz.provisioned").replace("${n}", String(moduleIds.length)), 3000, "info");
         }
-        await this.refreshHub();
+        // Onboarding provisions ledgers and may add member rows. Force the
+        // first post-wizard scan so the overview is built from fresh data.
+        await this.refreshHub(undefined, true);
     }
 
     /** Tab 面板挂载入口（tab callback 由框架调 addTab 注册的 destroy 之外回调） */
@@ -750,7 +766,8 @@ export default class LvHomePlugin extends Plugin {
             title: this.i18nText("settingsTitle"),
             component: HomeSettingsPanel,
             props: { plugin: this, settings: this.settings },
-            width: "860px",
+            width: "min(920px, calc(100vw - 32px))",
+            height: "min(760px, calc(100vh - 96px))",
         });
     }
 

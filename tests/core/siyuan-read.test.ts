@@ -6,12 +6,16 @@ import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import {
     setTransport,
     setUploadTransport,
+    createNotebook,
     primaryRowItemIDs,
     renderLedger,
     renderLedgerAll,
     addDetachedRow,
     removeLedgerRows,
     uploadAsset,
+    getOCRConfig,
+    getImageOCRText,
+    recognizeAsset,
     RowIdentityPendingError,
     KernelError,
 } from "@/core/siyuan";
@@ -31,6 +35,63 @@ afterEach(() => setTransport(null));
 
 const ids = (n: number, prefix = "row") => Array.from({ length: n }, (_, i) => `${prefix}-${i}`);
 
+describe("createNotebook 返回值兼容", () => {
+    it.each([
+        ["裸字符串 ID", "nb-string", "nb-string"],
+        ["对象 notebook.id", { notebook: { id: "nb-nested" } }, "nb-nested"],
+        ["对象 notebook 字符串", { notebook: "nb-legacy" }, "nb-legacy"],
+        ["对象顶层 id", { id: "nb-top-level" }, "nb-top-level"],
+    ])("兼容%s", async (_label, data, expected) => {
+        handler = (endpoint, payload) => {
+            expect(endpoint).toBe("/api/notebook/createNotebook");
+            expect(payload).toEqual({ name: "小驴管家" });
+            return { code: 0, msg: "", data };
+        };
+        await expect(createNotebook("小驴管家")).resolves.toBe(expected);
+    });
+
+    it("无法提取笔记本 ID 时抛出 KernelError，不把对象继续传给下游 API", async () => {
+        handler = () => ({ code: 0, msg: "", data: { notebook: {} } });
+        await expect(createNotebook("小驴管家")).rejects.toMatchObject({
+            name: "KernelError",
+            endpoint: "/api/notebook/createNotebook",
+            code: -3,
+        });
+    });
+});
+
+describe("OCR API（沿用当前设备配置）", () => {
+    it("读取配置与已有文字，不会触发 OCR", async () => {
+        handler = (endpoint, payload) => {
+            if (endpoint === "/api/asset/getOCRConfig") return {
+                code: 0, msg: "", data: {
+                    config: { provider: "paddleocr", model: "tiny", auto: false },
+                    providers: [{ id: "paddleocr", available: true }], models: [], aiModels: [],
+                },
+            };
+            if (endpoint === "/api/asset/getImageOCRText") return { code: 0, msg: "", data: { text: "已保存文字" } };
+            throw new Error(`unexpected OCR endpoint: ${endpoint}`);
+        };
+
+        await expect(getOCRConfig()).resolves.toMatchObject({ config: { provider: "paddleocr", auto: false } });
+        await expect(getImageOCRText("assets/siyuan-home/id.png")).resolves.toBe("已保存文字");
+        expect(calls).toEqual([
+            { endpoint: "/api/asset/getOCRConfig", payload: {} },
+            { endpoint: "/api/asset/getImageOCRText", payload: { path: "assets/siyuan-home/id.png" } },
+        ]);
+    });
+
+    it("手动识别调用统一 OCR API，并返回内核保存后的文本", async () => {
+        handler = (endpoint, payload) => {
+            expect(endpoint).toBe("/api/asset/ocr");
+            expect(payload).toEqual({ path: "assets/siyuan-home/id.png" });
+            return { code: 0, msg: "", data: { text: "识别结果", ocrJSON: [{ text: "识别结果" }] } };
+        };
+        await expect(recognizeAsset("assets/siyuan-home/id.png")).resolves.toEqual({
+            text: "识别结果", ocrJSON: [{ text: "识别结果" }],
+        });
+    });
+});
 /** 分页 mock：按 page 返回 200/页 */
 function paginatedPK(total: number) {
     return (payload: any) => {
@@ -185,6 +246,25 @@ describe("addDetachedRow 身份确认（D02）", () => {
             name: "RowIdentityPendingError",
             candidates: ["row-1", "row-2"],
         });
+    });
+
+    it("创建请求成功但后续身份查询失败 → 报结果待确认，避免调用方直接重建", async () => {
+        let renderCount = 0;
+        let addCount = 0;
+        handler = (endpoint) => {
+            if (endpoint === ADD) { addCount++; return { code: 0, msg: "", data: {} }; }
+            if (endpoint === RENDER) {
+                renderCount++;
+                if (renderCount === 2) throw new Error("temporary render failure");
+                return renderRows(0)({});
+            }
+            return { code: 0, msg: "", data: {} };
+        };
+        await expect(addDetachedRow(AV, "内容")).rejects.toMatchObject({
+            name: "RowIdentityPendingError",
+            candidates: [],
+        });
+        expect(addCount).toBe(1);
     });
 
     it("响应 ID 与 diff 多候选并存时优先响应唯一 ID", async () => {

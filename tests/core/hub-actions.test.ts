@@ -200,6 +200,17 @@ describe("H07 已处理视图数据", () => {
         const kinds = listHandled(rt, derived).map((h) => h.kind).sort();
         expect(kinds).toEqual(["done", "muted", "period", "year"]);
     });
+
+    it("缓存缺失时从提醒 ID 回推历史条目的模块", () => {
+        const rt: HubRuntime = {
+            ...defaultRuntime(),
+            muted: { "row-1::assets-real.expiry": true },
+            handledYear: { "row-2::members.birthday": 2026 },
+            handledUntil: { "row-3::contracts.expiry": "2026-10-20" },
+        };
+        const entries = listHandled(rt, []);
+        expect(entries.map((entry) => entry.moduleId).sort()).toEqual(["assets-real", "contracts", "members"]);
+    });
 });
 
 describe("H04 扫描失败保留模块快照", () => {

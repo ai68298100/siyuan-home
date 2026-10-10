@@ -40,11 +40,16 @@ export interface RowLog {
     prices?: PriceEntry[];
     transfers?: MoveEntry[];
     meters?: MeterEntry[];
+    /** 车辆能源流水：加油（升）与充电（kWh），按车辆行隔离。 */
+    fuelings?: Record<string, unknown>[];
+    chargings?: Record<string, unknown>[];
+    /** 车辆保养/维修流水，按车辆行隔离。 */
+    maintenance?: Record<string, unknown>[];
 }
 
 export type RowLogs = Record<string, RowLog>;
 
-export type LogKind = "valuations" | "moves" | "prices" | "transfers" | "meters" | "checks" | "loans" | "deposits";
+export type LogKind = "valuations" | "moves" | "prices" | "transfers" | "meters" | "checks" | "loans" | "deposits" | "fuelings" | "chargings" | "maintenance";
 
 export interface MeterEntry {
     date: string;
