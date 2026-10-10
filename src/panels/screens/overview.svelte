@@ -10,7 +10,14 @@
     import { showMessage } from "siyuan";
     import { moduleIcon as icons, moduleTone } from "@/core/modules";
 
-    let { plugin, t, onGoto, version }: { plugin: HomePluginLike; t: (k: string) => string; onGoto: (s: string) => void; version?: number } = $props();
+    let { plugin, t, onGoto, version, initialScanError = "", onRetryScan }: {
+        plugin: HomePluginLike;
+        t: (k: string) => string;
+        onGoto: (s: string) => void;
+        version?: number;
+        initialScanError?: string;
+        onRetryScan?: () => Promise<void>;
+    } = $props();
 
     // version（H02）：hubListeners 触发时递增，驱动以下 $derived 重算（plugin.* 为普通对象引用，本身不追踪）
     const allReminders = $derived.by(() => {
@@ -35,7 +42,7 @@
     // （未知 ≠ 0，13 §3.4）；骨架屏表达"正在读取"
     const firstScanPending = $derived.by(() => {
         void version;
-        return !plugin.runtime?.scannedAt && !(plugin.scan?.errors?.length) && allReminders.length === 0;
+        return !initialScanError && !plugin.runtime?.scannedAt && !(plugin.scan?.errors?.length) && allReminders.length === 0;
     });
     // 218 波性能（176 波 alertsByMember 同款）：模块卡 pending 计数预分组——
     // 模板每卡 filter 全量提醒 O(模块×提醒)，预分组后单遍 O(提醒)。
@@ -148,19 +155,53 @@
         plugin.runtime.hubMemberId = undefined;
         plugin.runtime.hubModuleId = undefined;
         plugin.runtime.hubDueWithin = "all";
-        await saveRuntime(plugin, plugin.runtime);
         onGoto("reminders");
+        try {
+            await saveRuntime(plugin, plugin.runtime);
+        } catch (e) {
+            showMessage(t("dash.preferenceSaveFailed").replace("${msg}", e instanceof Error ? e.message : String(e)), 5000, "error");
+        }
     }
 
-    async function setMemberFilter(id: string | undefined) {        memberFilter = id;
+    async function setMemberFilter(id: string | undefined) {
+        memberFilter = id;
         plugin.runtime.filterMemberId = id;
-                await saveRuntime(plugin, plugin.runtime);
+        try {
+            await saveRuntime(plugin, plugin.runtime);
+        } catch (e) {
+            showMessage(t("dash.preferenceSaveFailed").replace("${msg}", e instanceof Error ? e.message : String(e)), 5000, "error");
+        }
+    }
+
+    let retryingScan = $state(false);
+    async function retryScan() {
+        if (retryingScan) return;
+        retryingScan = true;
+        try {
+            if (onRetryScan) await onRetryScan();
+            else await plugin.refreshHub();
+        } catch (e) {
+            showMessage(t("hub.rescanFailed").replace("${msg}", e instanceof Error ? e.message : String(e)), 5000, "error");
+        } finally {
+            retryingScan = false;
+        }
     }
 
     let memoTitle = $state("");
     let memoDue = $state("");
-    function addMemo() {
-        if (!memoTitle.trim()) return;
+    let memoInput: HTMLInputElement | undefined = $state();
+    let savingMemo = $state(false);
+    async function runOverviewAction(action: () => Promise<void>) {
+        try { await action(); }
+        catch (e) { showMessage(t("hub.actionFailed").replace("${msg}", e instanceof Error ? e.message : String(e)), 5000, "error"); }
+    }
+    async function addMemo() {
+        if (savingMemo) return;
+        if (!memoTitle.trim()) {
+            memoInput?.focus();
+            showMessage(t("memo.titleRequired"), 4000, "info");
+            return;
+        }
         // 16 组/214 波：智能日期解析（滴答清单规格）——标题命中日期表达式则剥离进到期日；
         // 显式选择的日期优先于解析（用户选了日期选择器即为明确意图）。
         const parsed = parseNaturalDate(memoTitle);
@@ -174,8 +215,15 @@
         if (!title) return;
         // 默认到期日走本地时区（33.3：禁 toISOString，UTC+8 夜间会偏一天）
         const d = due || localDateKey(new Date(Date.now() + 3 * 86400000));
-        plugin.addMemo(title, d);
-        memoTitle = ""; memoDue = "";
+        savingMemo = true;
+        try {
+            await plugin.addMemo(title, d);
+            memoTitle = ""; memoDue = "";
+        } catch (e) {
+            showMessage(t("ledger.saveFailed").replace("${msg}", e instanceof Error ? e.message : String(e)), 5000, "error");
+        } finally {
+            savingMemo = false;
+        }
     }
 
     // 259 波（对齐原型动效 #6）：总览计数 0→N 数字滚动（560ms ease-out-cubic，仅此一处）。
@@ -250,7 +298,15 @@
 <div class="lv-sec"><h2 class="lv-title-sec">{t("dash.upcoming")}</h2><span class="lv-sub">{t("dash.upcomingSub")}</span>
     <button class="b3-button b3-button--text" onclick={viewAllReminders}>{t("dash.viewAll")} →</button>
 </div>
-{#if reminders.length === 0 && memberFilter}
+{#if reminders.length === 0 && (initialScanError || scanErrors.length > 0)}
+    <div class="lv-card"><div class="lv-empty" role="alert">
+        <div class="eic">⚠</div><b>{t("dash.scanUnavailable")}</b>
+        <span>{initialScanError || t("dash.focusDataErr").replace("${t}", snapshotLabel).replace("${n}", String(scanErrors.length))}</span>
+        <button class="b3-button b3-button--outline" style="margin-top:8px" disabled={retryingScan} aria-busy={retryingScan} onclick={retryScan}>
+            {retryingScan ? t("ledger.saving") : t("hub.rescan")}
+        </button>
+    </div></div>
+{:else if reminders.length === 0 && memberFilter}
     <!-- 174 波（对齐原型空态解释）：筛选导致的空 ≠ 无资料，说明并给清除出口 -->
     <div class="lv-card"><div class="lv-empty" role="status"><div class="eic">🔍</div><b>{t("dash.filteredEmpty")}</b><span>{t("dash.filteredEmptyHint")}</span>
         <button class="b3-button b3-button--outline" style="margin-top:8px" onclick={() => setMemberFilter(undefined)}>{t("dash.clearFilter")}</button>
@@ -286,8 +342,8 @@
                     {r.daysLeft < 0 ? t("days.overdue").replace("${n}", String(-r.daysLeft)) : r.daysLeft === 0 ? t("days.today") : t("days.after").replace("${n}", String(r.daysLeft))}
                 </b><span class="lv-num">{r.dueDate}</span></div>
                 <div class="lv-rem-ops">
-                    <button class="b3-button b3-button--text" onclick={() => plugin.complete(r)}>{t("act.done")}</button>
-                    <button class="b3-button b3-button--text" onclick={() => plugin.snooze(r.id, 7)}>{t("act.snooze7")}</button>
+                    <button class="b3-button b3-button--text" onclick={() => void runOverviewAction(() => plugin.complete(r))}>{t("act.done")}</button>
+                    <button class="b3-button b3-button--text" onclick={() => void runOverviewAction(() => plugin.snooze(r.id, 7))}>{t("act.snooze7")}</button>
                 </div>
             </div>
         {/each}
@@ -306,14 +362,14 @@
 <div class="lv-sec"><h2 class="lv-title-sec">{t("memo.quick")}</h2><span class="lv-sub">{t("memo.quickSub")}</span></div>
 <div class="lv-card lv-memo" style="margin-top:0">
     <!-- 261 波：回车提交（isComposing 守卫——中文输入法选词的 Enter 不算提交） -->
-    <input class="b3-text-field fn__flex-1" style="min-width:180px" placeholder={t("memo.placeholder")} bind:value={memoTitle}
-        onkeydown={(e: KeyboardEvent) => { if (e.key === "Enter" && !e.isComposing) addMemo(); }} />
+    <input bind:this={memoInput} class="b3-text-field fn__flex-1" style="min-width:180px" placeholder={t("memo.placeholder")} bind:value={memoTitle}
+        disabled={savingMemo} onkeydown={(e: KeyboardEvent) => { if (e.key === "Enter" && !e.isComposing) void addMemo(); }} />
     <!-- 262 波（Todoist 式即时预览）：解析命中即亮 chip，提交前就知道日期去哪了 -->
     {#if memoParsed}
         <span class="lv-parsechip" role="status">📅 <span class="lv-num">{memoParsed.date}</span></span>
     {/if}
     <input class="b3-text-field" type="date" bind:value={memoDue} />
-    <button class="b3-button b3-button--text" onclick={addMemo} disabled={!memoTitle.trim()} title={t("memo.add")}>＋ {t("memo.add")}</button>
+    <button class="b3-button b3-button--text" disabled={savingMemo} aria-busy={savingMemo} onclick={addMemo} title={t("memo.add")}>{savingMemo ? t("ledger.saving") : `＋ ${t("memo.add")}`}</button>
 </div>
 
 <div class="lv-sec"><h2 class="lv-title-sec">{t("dash.myModules")}</h2>

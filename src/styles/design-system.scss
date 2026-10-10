@@ -561,16 +561,6 @@
     .lv-rem { display: grid; grid-template-columns: 38px minmax(0, 1fr) auto; gap: 8px 10px; }
     .lv-rem .lv-rem-t b { white-space: normal; }
     .lv-rem .lv-rem-ops { grid-column: 2 / -1; flex-wrap: wrap; }
-    // 26.7 触屏设备：无 hover，操作按钮常显（替代长按实现）。
-    // 184 波修复：原实现把 hover:none 常显规则放在 display:none 之前，被后续同特异性规则覆盖
-    // （触屏操作全隐）；且一刀切 display:none 会连桌面窄窗口的 hover/键盘 focus-within 路径
-    // 一起杀掉——现删去 display:none，窄屏沿用宽屏的 opacity 显现语义，仅触屏强制常显。
-    @media (hover: none) {
-      .lv-rem .lv-rem-ops { display: flex; opacity: 1; transform: none; }
-      // 250 波：成员卡头行操作钮触屏常显（同提醒行语义）
-      .lv-person .lv-person-head .lv-iconbtn,
-      .lv-person .lv-person-head .b3-button { display: inline-flex; }
-    }
     // 26.7 窄屏 tabbar：标题隐藏，页签横向滚动
     .lv-tabbar { flex-wrap: wrap; }
     .lv-tabbar__title { display: none; }
@@ -580,6 +570,12 @@
   @media (max-width: 400px) {
     .lv-tabs { width: 100%; }
     .lv-tabs__item { padding: 6px 8px; font-size: 12px; flex: 1; text-align: center; min-height: 34px; }
+  }
+  // 触屏设备不论 CSS 视口宽度，均常显原先依赖 hover 的操作入口。
+  @media (hover: none) {
+    .lv-rem .lv-rem-ops { display: flex; opacity: 1; transform: none; }
+    .lv-person .lv-person-head .lv-iconbtn,
+    .lv-person .lv-person-head .b3-button { display: inline-flex; }
   }
 }
 

@@ -1,11 +1,11 @@
 <script lang="ts">
     import type { HomePluginLike } from "@/types/plugin";
-    import { showMessage } from "siyuan";
     let { plugin, t, onGoto }: { plugin: HomePluginLike; t: (k: string) => string; onGoto?: (s: string) => void } = $props();
 
     let step = $state(1);
     let provisioning = $state(false);
     let provisionError = $state("");
+    let skipFailed = $state(false);
     const roleOptions = ["spouse", "partner", "child", "elder", "kin"];
     let picked: string[] = $state(["self"]);
     let children = $state(0);
@@ -22,31 +22,37 @@
         if (!picked.includes("child")) children = 0;
     }
 
-    // C7 向导 CTA：完成后直达证件快速录入（预选 certs）；C7c：建库 loading/error/超时反馈
-    async function finishAndCapture() {
+    async function runOnboarding(roles: string[], moduleIds: string[], goToCapture: boolean) {
         if (provisioning) return;
         provisioning = true;
         provisionError = "";
+        skipFailed = false;
+        const timeout = window.setTimeout(() => {
+            provisionError = t("wiz.provisionStillRunning");
+        }, 120_000);
         try {
-            const roles = ["self", ...picked];
-            const timeout = new Promise<never>((_, reject) =>
-                window.setTimeout(() => reject(new Error("建库超时（120 秒），请检查思源内核是否正常运行")), 120_000)
-            );
-            await Promise.race([plugin.finishOnboarding({ roles, children }, recommended), timeout]);
-            plugin.setActiveLedger("certs");
-            onGoto?.("ledger");
+            await plugin.finishOnboarding({ roles, children }, moduleIds);
+            if (goToCapture) {
+                plugin.setActiveLedger("certs");
+                onGoto?.("ledger");
+            }
         } catch (e) {
             provisionError = e instanceof Error ? e.message : String(e);
+            skipFailed = !goToCapture;
         } finally {
+            window.clearTimeout(timeout);
             provisioning = false;
         }
     }
+    // C7 向导 CTA：完成后直达证件快速录入（预选 certs）。超时只提示仍在处理中，
+    // 保持 busy 锁直到建库流程实际结束，避免超时后再次点击并发建库。
+    async function finishAndCapture() {
+        await runOnboarding(["self", ...picked], recommended, true);
+    }
     // 完成=建库+直达证件快速录入（C7 CTA）；skip 路径同样经 finishOnboarding（需容错）
-    function skip() {
-        plugin.finishOnboarding({ roles: ["self"], children: 0 }, []).catch((e: unknown) => {
-            console.error("[siyuan-home] onboarding skip failed:", e);
-            showMessage(t("wiz.provisionIssues").replace("${n}", "0").replace("${modules}", ""), 6000, "error");
-        });
+    async function skip() {
+        children = 0;
+        await runOnboarding(["self"], [], false);
     }
 </script>
 
@@ -59,21 +65,22 @@
             <p class="lv-sub" style="margin-bottom:16px">{t("wiz.s1Hint")}</p>
             <div class="lv-roles">
                 {#each roleOptions as r (r)}
-                    <button class="lv-rolechip" class:on={picked.includes(r)} aria-pressed={picked.includes(r)} onclick={() => toggle(r)}>{roleEmoji[r]} {t(`role.${r}`)}</button>
+                    <button class="lv-rolechip" class:on={picked.includes(r)} aria-pressed={picked.includes(r)} disabled={provisioning} onclick={() => toggle(r)}>{roleEmoji[r]} {t(`role.${r}`)}</button>
                 {/each}
             </div>
             {#if picked.includes("child")}
                 <div style="display:flex;gap:8px;align-items:center;margin-bottom:16px">
                     <span class="lv-sub">{t("wiz.children")}</span>
-                    <button class="b3-button b3-button--outline" aria-label={t("wiz.childrenDecrease")} onclick={() => (children = Math.max(0, children - 1))}>−</button>
+                    <button class="b3-button b3-button--outline" aria-label={t("wiz.childrenDecrease")} disabled={provisioning} onclick={() => (children = Math.max(0, children - 1))}>−</button>
                     <b class="lv-num" aria-live="polite">{children}</b>
-                    <button class="b3-button b3-button--outline" aria-label={t("wiz.childrenIncrease")} onclick={() => (children += 1)}>＋</button>
+                    <button class="b3-button b3-button--outline" aria-label={t("wiz.childrenIncrease")} disabled={provisioning} onclick={() => (children += 1)}>＋</button>
                 </div>
             {/if}
             <div style="display:flex;justify-content:flex-end;gap:8px">
-                <button class="lv-btn ghost" onclick={skip}>{t("wiz.skip")}</button>
-                <button class="lv-btn primary" onclick={() => (step = 2)}>{t("wiz.next")} →</button>
+                <button class="lv-btn ghost" disabled={provisioning} onclick={skip}>{provisioning ? t("wiz.provisioningShort") : t("wiz.skip")}</button>
+                <button class="lv-btn primary" disabled={provisioning} onclick={() => (step = 2)}>{t("wiz.next")} →</button>
             </div>
+            {#if provisionError}<p class="lv-caption" role="alert" style="color:var(--lv-danger)">⚠ {skipFailed ? `${t("wiz.skipFailed")}: ${provisionError}` : provisionError}</p>{/if}
         {:else}
             <h3 id="lv-wiz-title" class="lv-wiz__title">{t("wiz.s2Title")}</h3>
             <p class="lv-sub" style="margin-bottom:16px">{t("wiz.s2Hint")}</p>
@@ -88,9 +95,9 @@
                 <p class="lv-caption" role="note" style="margin:-6px 0 14px;color:var(--lv-accent)">ⓘ {t("wiz.sexHint")}</p>
             {/if}
             <div style="display:flex;justify-content:space-between;align-items:center">
-                <button class="lv-btn" onclick={() => (step = 1)}>← {t("wiz.back")}</button>
+                <button class="lv-btn" disabled={provisioning} onclick={() => (step = 1)}>← {t("wiz.back")}</button>
                 {#if provisionError}
-                    <span class="lv-caption" role="alert" style="color:var(--lv-danger);flex:1;margin:0 8px">⚠ {provisionError}</span>
+                    <span class="lv-caption" role="alert" style="color:var(--lv-danger);flex:1;margin:0 8px">⚠ {skipFailed ? `${t("wiz.skipFailed")}: ${provisionError}` : provisionError}</span>
                 {/if}
                 <button class="lv-btn primary" disabled={provisioning}
                     title={t("wiz.finishCta")} onclick={finishAndCapture}>

@@ -10,11 +10,14 @@
 
     let { plugin, t, version }: { plugin: HomePluginLike; t: (k: string) => string; version?: number } = $props();
 
+    let orderVersion = $state(0);
     // version（H02）：hub 变更时递增，驱动派生重算（plugin.* 为普通对象引用）
     const members = $derived.by(() => {
         void version;
+        void orderVersion;
         return plugin.settings.members ?? [];
     });
+    let nameInput: HTMLInputElement | undefined = $state();
     const reminders = $derived.by(() => {
         void version;
         return plugin.scan?.reminders ?? [];
@@ -117,14 +120,21 @@
         return map;
     });
     const statsOf = (id: string): MemberStat => memberStats.get(id) ?? { chips: [], birthday: null };
+    async function runMemberAction(action: () => Promise<void>) {
+        try { await action(); }
+        catch (e) { showMessage(t("hub.actionFailed").replace("${msg}", e instanceof Error ? e.message : String(e)), 5000, "error"); }
+    }
+    let contactOverrides = $state<Record<string, string | null>>({});
+    let contactBusy = $state<Record<string, boolean>>({});
+    const contactOf = (m: FamilyMember) => Object.prototype.hasOwnProperty.call(contactOverrides, m.id)
+        ? contactOverrides[m.id]
+        : m.contactSnapshot;
     // C5b：卡片点击展开该成员提醒明细（含日期与动作）
     let expandedId = $state<string | null>(null);
     function toggleExpand(id: string) {
         expandedId = expandedId === id ? null : id;
     }
-    // 17 组/195 波：成员卡右键/长按菜单（编辑/查看台账/删除）——触屏长按 500ms，桌面右键
-    let lpTimer: ReturnType<typeof setTimeout> | null = null;
-    let lpFired = false;
+    // 菜单从卡片内的明确按钮打开，键盘和触屏都能发现排序、删除等操作。
     function cardMenu(m: FamilyMember, x: number, y: number) {
         const menu = new Menu("lv-member-card");
         menu.addItem({ label: t("members.edit"), click: () => startEdit(m) });
@@ -133,8 +143,8 @@
         // 225 波：头像上传/联系人绑定收入菜单（头行只留编辑，修复 230px 窄卡按钮挤爆姓名排版）
         menu.addItem({ label: t("members.uploadAvatar"), click: () => pickAvatar(m) });
         menu.addItem({
-            label: m.contactSnapshot ? t("members.contactUnlink") : t("members.contactLink"),
-            click: () => (m.contactSnapshot ? unlinkContact(m) : linkContact(m)),
+            label: contactOf(m) ? t("members.contactUnlink") : t("members.contactLink"),
+            click: () => (contactOf(m) ? void unlinkContact(m) : linkContact(m)),
         });
         // 17 组/197 波：上移/下移（拖拽排序的键盘可达替代）
         const idx = members.findIndex((x) => x.id === m.id);
@@ -143,14 +153,25 @@
         menu.addItem({ label: t("delete"), click: () => confirmRemove(m) });
         menu.open({ x, y });
     }
+    async function persistMemberOrder(ids: string[]) {
+        const previous = [...plugin.settings.members];
+        try {
+            const { reorderMembers } = await import("@/core/members");
+            await reorderMembers(plugin as any, plugin.settings, ids);
+            orderVersion += 1;
+        } catch (e) {
+            plugin.settings.members = previous;
+            orderVersion += 1;
+            showMessage(t("members.reorderFailed").replace("${msg}", e instanceof Error ? e.message : String(e)), 5000, "error");
+        }
+    }
     async function move(m: FamilyMember, delta: number) {
         const ids = members.map((x) => x.id);
         const i = ids.indexOf(m.id);
         const j = i + delta;
         if (j < 0 || j >= ids.length) return;
         [ids[i], ids[j]] = [ids[j], ids[i]];
-        const { reorderMembers } = await import("@/core/members");
-        await reorderMembers(plugin as any, plugin.settings, ids);
+        await persistMemberOrder(ids);
     }
     // 拖拽排序（17 组/197 波）：HTML5 DnD；drop 即持久化（reorderMembers）
     let dragId = $state<string | null>(null);
@@ -169,31 +190,35 @@
         const to = ids.indexOf(m.id);
         if (from < 0 || to < 0) return;
         ids.splice(to, 0, ids.splice(from, 1)[0]);
-        const { reorderMembers } = await import("@/core/members");
-        await reorderMembers(plugin as any, plugin.settings, ids);
+        await persistMemberOrder(ids);
     }
-    function cardTouchStart(m: FamilyMember, e: TouchEvent) {
-        const t0 = e.touches[0];
-        lpFired = false;
-        lpTimer = setTimeout(() => { lpFired = true; cardMenu(m, t0.clientX, t0.clientY); }, 500);
-    }
-    function cardTouchEnd() {
-        if (lpTimer) { clearTimeout(lpTimer); lpTimer = null; }
+    function openCardMenu(m: FamilyMember, e: MouseEvent) {
+        const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
+        cardMenu(m, rect.right, rect.bottom);
     }
     // 26.7 删除文案升级：说明数据保留语义（仅移除引用，台账行保留）
     // H16：删除成员后复位指向它的失效筛选（总览与提醒页）
     function confirmRemove(m: FamilyMember) {
         confirm(t("members.deleteTitle"), t("members.deleteBody").replace("${name}", m.name), async () => {
+            let removed = false;
             try {
                 await removeMember(plugin, plugin.settings, m.id);
-                                let dirty = false;
+                removed = true;
+            } catch (e) {
+                showMessage(t("ledger.saveFailed").replace("${msg}", e instanceof Error ? e.message : String(e)), 5000, "error");
+                return;
+            }
+            let followupError: unknown;
+            try {
+                let dirty = false;
                 if (plugin.runtime.filterMemberId === m.id) { plugin.runtime.filterMemberId = undefined; dirty = true; }
                 if (plugin.runtime.hubMemberId === m.id) { plugin.runtime.hubMemberId = undefined; dirty = true; }
                 if (dirty) await saveRuntime(plugin, plugin.runtime);
                 await plugin.refreshHub();
             } catch (e) {
-                showMessage(t("ledger.saveFailed").replace("${msg}", e instanceof Error ? e.message : String(e)), 5000, "error");
+                followupError = e;
             }
+            if (removed && followupError) showMessage(t("members.deleteFollowupFailed").replace("${msg}", followupError instanceof Error ? followupError.message : String(followupError)), 6000, "error");
         });
     }
 
@@ -215,25 +240,38 @@
     }
 
     // EC14：成员 ↔ 人脉联系人绑定（仅存快照 `名称 [docId]`，不改写人脉数据）
+    async function saveContactSnapshot(m: FamilyMember, snapshot: string | undefined) {
+        if (contactBusy[m.id]) return;
+        const target = (plugin.settings.members ?? []).find((x) => x.id === m.id);
+        if (!target) return;
+        const previous = target.contactSnapshot;
+        contactBusy = { ...contactBusy, [m.id]: true };
+        target.contactSnapshot = snapshot;
+        try {
+            const { saveSettings } = await import("@/core/settings");
+            await saveSettings(plugin as any, plugin.settings);
+            contactOverrides = { ...contactOverrides, [m.id]: snapshot ?? null };
+            showMessage(t(snapshot ? "members.contactLinked" : "members.contactUnlinked"), 2500, "info");
+        } catch (e) {
+            target.contactSnapshot = previous;
+            showMessage(t("members.contactSaveFailed").replace("${msg}", e instanceof Error ? e.message : String(e)), 5000, "error");
+        } finally {
+            const next = { ...contactBusy };
+            delete next[m.id];
+            contactBusy = next;
+        }
+    }
     function linkContact(m: FamilyMember) {
         if (!getContactsBridge()) {
             showMessage(t("ledger.contactsMissing"), 5000, "info");
             return;
         }
-        openContactPicker({ t: (k) => t(k), showMessage: (msg, timeout, type) => showMessage(msg, timeout, type) }, (snapshot) => {
-            const target = (plugin.settings.members ?? []).find((x) => x.id === m.id);
-            if (!target) return;
-            target.contactSnapshot = snapshot;
-            import("@/core/settings").then((mod) => mod.saveSettings(plugin, plugin.settings));
-            showMessage(t("members.contactLinked"), 2500, "info");
-        });
+        openContactPicker({ t: (k) => t(k), showMessage: (msg, timeout, type) => showMessage(msg, timeout, type) },
+            (snapshot) => { void saveContactSnapshot(m, snapshot); });
     }
-    function unlinkContact(m: FamilyMember) {
-        const target = (plugin.settings.members ?? []).find((x) => x.id === m.id);
-        if (!target?.contactSnapshot) return;
-        target.contactSnapshot = undefined;
-        import("@/core/settings").then((mod) => mod.saveSettings(plugin, plugin.settings));
-        showMessage(t("members.contactUnlinked"), 2500, "info");
+    async function unlinkContact(m: FamilyMember) {
+        if (!contactOf(m)) return;
+        await saveContactSnapshot(m, undefined);
     }
     function cancelEdit() {
         editId = null; name = ""; role = "self"; birthday = ""; lunar = false;
@@ -244,6 +282,8 @@
         const list = plugin.settings.members ?? [];
         if (list.length === 0) return;
         confirm(t("members.exportVcf"), t("members.exportVcfBody").replace("${n}", String(list.length)), () => {
+            if (exportingVcf) return;
+            exportingVcf = true;
             import("@/core/vcard").then(({ buildVCard }) => {
                 const vcf = buildVCard(list.map((m) => ({
                     uid: m.id,
@@ -261,43 +301,67 @@
                 a.click();
                 URL.revokeObjectURL(a.href);
                 showMessage(t("members.exportVcfDone").replace("${n}", String(list.length)), 3000, "info");
+            }).catch((e) => {
+                showMessage(t("members.exportVcfFailed").replace("${msg}", e instanceof Error ? e.message : String(e)), 5000, "error");
+            }).finally(() => {
+                exportingVcf = false;
             });
         });
     }
 
+    let memberSaving = $state(false);
+    let exportingVcf = $state(false);
     async function save() {
-        if (!name.trim()) return;
+        if (memberSaving) return;
+        if (!name.trim()) {
+            nameInput?.focus();
+            showMessage(t("ledger.nameRequired"), 4000, "info");
+            return;
+        }
         // D06 配套：同名成员会让按姓名回填产生歧义——新增时提示确认（编辑不受影响）
         const dup = !editId && (plugin.settings.members ?? []).some((m) => m.name.trim() === name.trim());
         if (dup) {
-            confirm(t("members.dupTitle"), t("members.dupBody").replace("${name}", name.trim()), () => doSave());
+            confirm(t("members.dupTitle"), t("members.dupBody").replace("${name}", name.trim()), () => { void doSave(true); });
             return;
         }
-        await doSave();
+        await doSave(true);
     }
 
-    async function doSave() {
-        if (!name.trim()) return;
+    async function doSave(clearAfterCreate = true) {
+        if (!name.trim() || memberSaving) return;
+        memberSaving = true;
         try {
-            if (editId) {
-                const target = (plugin.settings.members ?? []).find((m) => m.id === editId);
-                if (target) {
-                    await updateMember(plugin, plugin.settings, {
-                        ...target, name: name.trim(), role, birthday: birthday || undefined, lunarBirthday: lunar,
+            try {
+                if (editId) {
+                    const target = (plugin.settings.members ?? []).find((m) => m.id === editId);
+                    if (target) {
+                        await updateMember(plugin, plugin.settings, {
+                            ...target, name: name.trim(), role, birthday: birthday || undefined, lunarBirthday: lunar,
+                        });
+                    }
+                    cancelEdit();
+                } else {
+                    const submittedName = name.trim();
+                    await addMember(plugin, plugin.settings, {
+                        id: newSiYuanId(),
+                        name: submittedName, role, birthday: birthday || undefined,
+                        lunarBirthday: lunar, createdAt: new Date().toISOString(),
                     });
+                    if (clearAfterCreate) {
+                        name = ""; role = "self"; birthday = ""; lunar = false;
+                    }
                 }
-                cancelEdit();
-            } else {
-                await addMember(plugin, plugin.settings, {
-                    id: newSiYuanId(),
-                    name: name.trim(), role, birthday: birthday || undefined,
-                    lunarBirthday: lunar, createdAt: new Date().toISOString(),
-                });
-                name = ""; role = "self"; birthday = ""; lunar = false;
+            } catch (e) {
+                showMessage(t("ledger.saveFailed").replace("${msg}", e instanceof Error ? e.message : String(e)), 5000, "error");
+                return;
             }
-            await plugin.refreshHub();
-        } catch (e) {
-            showMessage(t("ledger.saveFailed").replace("${msg}", e instanceof Error ? e.message : String(e)), 5000, "error");
+            try {
+                await plugin.refreshHub();
+            } catch (e) {
+                showMessage(t("members.saveRefreshFailed").replace("${msg}", e instanceof Error ? e.message : String(e)), 6000, "error");
+            }
+        } finally {
+            memberSaving = false;
         }
     }
 </script>
@@ -306,8 +370,8 @@
 
 <div class="lv-card lv-toolbar" style="padding:14px;margin-bottom:14px">
     <!-- 261 波：名称回车即提交（isComposing 守卫） -->
-    <input class="b3-text-field" style="width:140px" placeholder={t("members.name")} aria-label={t("members.name")} bind:value={name}
-        onkeydown={(e: KeyboardEvent) => { if (e.key === "Enter" && !e.isComposing && name.trim()) save(); }} />
+    <input bind:this={nameInput} class="b3-text-field" style="width:140px" placeholder={t("members.name")} aria-label={t("members.name")} bind:value={name}
+        onkeydown={(e: KeyboardEvent) => { if (e.key === "Enter" && !e.isComposing) save(); }} />
     <!-- 265 波：select 无 placeholder 可依，补 aria-label（读屏不再只听到选项值） -->
     <select class="b3-select" bind:value={role} aria-label={t("members.role")}>
         {#each roles as r (r)}<option value={r}>{t(`role.${r}`)}</option>{/each}
@@ -318,14 +382,14 @@
     </label>
     {#if editId}<span class="lv-caption" style="color:var(--lv-accent)">{t("members.editing")}</span>{/if}
     <!-- 260 波：添加/保存是本视图唯一核心动作，升为主按钮（对齐"主按钮每视图 ≤1"） -->
-    <button class="lv-btn primary sm" onclick={save} disabled={!name.trim()}>
-        {editId ? t("save") : `＋ ${t("add")}`}
+    <button class="lv-btn primary sm" onclick={save} disabled={memberSaving} aria-busy={memberSaving}>
+        {memberSaving ? t("ledger.saving") : editId ? t("save") : `＋ ${t("add")}`}
     </button>
     {#if editId}
         <button class="b3-button b3-button--outline" onclick={cancelEdit}>{t("cancel")}</button>
     {/if}
     <span style="flex:1"></span>
-    <button class="b3-button b3-button--outline" onclick={exportVcf} disabled={members.length === 0}>{t("members.exportVcf")}</button>
+    <button class="b3-button b3-button--outline" onclick={exportVcf} disabled={members.length === 0 || exportingVcf} aria-busy={exportingVcf}>{exportingVcf ? t("ledger.saving") : t("members.exportVcf")}</button>
 </div>
 
 {#if members.length === 0}
@@ -340,16 +404,12 @@
             ondragleave={() => { if (dragOverId === m.id) dragOverId = null; }}
             ondrop={(e: DragEvent) => void onDrop(m, e)}
             ondragend={() => { dragId = null; dragOverId = null; }}
-            style={dragOverId === m.id && dragId !== m.id ? "outline:2px dashed var(--lv-accent);outline-offset:-2px" : ""}>
-        <div class="lv-person-head" role="button" tabindex="0"
-            onkeydown={(e: KeyboardEvent) => {
-                if (e.key === "Enter" || e.key === " ") { e.preventDefault(); toggleExpand(m.id); }
-            }}
-            oncontextmenu={(e: MouseEvent) => { e.preventDefault(); cardMenu(m, e.clientX, e.clientY); }}
-            ontouchstart={(e: TouchEvent) => cardTouchStart(m, e)}
-            ontouchend={cardTouchEnd}
-            ontouchmove={cardTouchEnd}
-            onclick={() => { if (lpFired) { lpFired = false; return; } toggleExpand(m.id); }}>
+            style={dragOverId === m.id && dragId !== m.id ? "outline:2px dashed var(--lv-accent);outline-offset:-2px;cursor:default" : "cursor:default"}>
+        <div class="lv-person-head" style="cursor:default">
+            <button class="lv-person-toggle" type="button" aria-expanded={expandedId === m.id}
+                aria-controls={expandedId === m.id ? `member-details-${m.id}` : undefined} aria-label={t("members.toggleDetails").replace("${name}", m.name)}
+                onclick={() => toggleExpand(m.id)}
+                style="display:flex;align-items:center;gap:12px;min-width:0;flex:1;background:transparent;border:0;padding:0;color:inherit;text-align:left;font:inherit;cursor:pointer">
             {#if avatars[m.id]}
                 <!-- 17 组/192 波：头像图（资产相对路径 → 内核 origin） -->
                 <img class="lv-avatar lg" src={new URL(avatars[m.id], location.origin).href}
@@ -362,10 +422,13 @@
                 <b>{m.name}</b>
                 <div class="lv-caption">{t(`role.${m.role}`)}{m.lunarBirthday ? " 🌙" : ""} {m.birthday ?? ""}</div>
             </div>
-            <!-- 225 波：头行只留 编辑；联系人/头像/删除经右键菜单与展开区（窄卡不再挤压） -->
+            </button>
+            <!-- 保持窄卡姓名空间；头像、更多操作只在悬停/聚焦时展开。 -->
             <button class="lv-iconbtn" title={t("members.uploadAvatar")} aria-label={t("members.uploadAvatar")}
-                onclick={(e) => { e.stopPropagation(); pickAvatar(m); }}>📷</button>
-            <button class="b3-button b3-button--text" onclick={(e) => { e.stopPropagation(); startEdit(m); }}>{t("members.edit")}</button>
+                onclick={() => pickAvatar(m)}>📷</button>
+            <button class="b3-button b3-button--text" onclick={() => startEdit(m)}>{t("members.edit")}</button>
+            <button class="b3-button b3-button--text" title={t("members.moreActions")} aria-label={t("members.moreActions")}
+                onclick={(e) => openCardMenu(m, e)}>⋯</button>
         </div>
         {#if m.syncError}
             <div class="lv-caption" role="alert" style="color:var(--lv-danger)">⚠ {t("members.syncError")}: {m.syncError}</div>
@@ -388,18 +451,26 @@
         {/if}
         {#if expandedId === m.id}
             <!-- 260 波：展开区入场动画（对齐抽屉编排语言；lv-rise 180ms） -->
-            <div class="lv-person-expanded" style="border-top:1px solid var(--lv-line);padding-top:10px;display:flex;flex-direction:column;gap:6px">
-                {#if m.contactSnapshot}
+            <div id={`member-details-${m.id}`} class="lv-person-expanded" style="border-top:1px solid var(--lv-line);padding-top:10px;display:flex;flex-direction:column;gap:6px">
+                <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center">
+                    <button class="b3-button b3-button--text" disabled={members.findIndex((x) => x.id === m.id) <= 0} onclick={() => void move(m, -1)}>{t("members.moveUp")}</button>
+                    <button class="b3-button b3-button--text" disabled={members.findIndex((x) => x.id === m.id) >= members.length - 1} onclick={() => void move(m, 1)}>{t("members.moveDown")}</button>
+                    {#if plugin.settings.dbRefs?.members?.docId}
+                        <button class="b3-button b3-button--text" onclick={() => plugin.showTabDocs(plugin.settings.dbRefs.members.docId)}>{t("members.openLedger")}</button>
+                    {/if}
+                    <button class="b3-button b3-button--text" onclick={() => confirmRemove(m)}>{t("delete")}</button>
+                </div>
+                {#if contactOf(m)}
                     <div style="display:flex;gap:8px;align-items:center">
-                        <span class="lv-caption" style="min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title={m.contactSnapshot}>📞 {t("field.contact")}: {m.contactSnapshot.split(" [")[0]}</span>
+                        <span class="lv-caption" style="min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title={contactOf(m) ?? ""}>📞 {t("field.contact")}: {contactOf(m)?.split(" [")[0]}</span>
                         <span style="flex:1"></span>
-                        <button class="b3-button b3-button--text" onclick={() => unlinkContact(m)}>{t("members.contactUnlink")}</button>
+                        <button class="b3-button b3-button--text" disabled={!!contactBusy[m.id]} onclick={() => void unlinkContact(m)}>{t("members.contactUnlink")}</button>
                     </div>
                 {:else}
                     <div style="display:flex;gap:8px;align-items:center">
                         <span class="lv-caption">{t("members.contactLink")}</span>
                         <span style="flex:1"></span>
-                        <button class="b3-button b3-button--text" onclick={() => linkContact(m)}>{t("members.contactLink")}</button>
+                        <button class="b3-button b3-button--text" disabled={!!contactBusy[m.id]} onclick={() => linkContact(m)}>{t("members.contactLink")}</button>
                     </div>
                 {/if}
                 {#if alertsFor(m.id).length === 0}
@@ -410,7 +481,7 @@
                             <span class="lv-badge {r.level === 'overdue' ? 'red' : r.level === 'soon' ? 'orange' : 'yellow'}">{r.dueDate}</span>
                             <span>{r.title}</span>
                             <span style="flex:1"></span>
-                            <button class="b3-button b3-button--text" onclick={() => plugin.complete(r)}>{t("act.done")}</button>
+                            <button class="b3-button b3-button--text" onclick={() => void runMemberAction(() => plugin.complete(r))}>{t("act.done")}</button>
                         </div>
                     {/each}
                 {/if}

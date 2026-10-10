@@ -229,12 +229,24 @@ function rowIDsFromAddResponse(d: any): string[] {
  */
 export async function addDetachedRow(avID: string, content: string): Promise<string> {
     const before = new Set(await renderRowIDs(avID));
-    const d = await post<any>("/api/av/addAttributeViewBlocks", {
-        avID, blockID: "", srcs: [{ blockID: "", content, isDetached: true }],
-    });
+    let d: any;
+    try {
+        d = await post<any>("/api/av/addAttributeViewBlocks", {
+            avID, blockID: "", srcs: [{ blockID: "", content, isDetached: true }],
+        });
+    } catch (error) {
+        if (error instanceof KernelError && error.code !== -1) throw error;
+        throw new RowIdentityPendingError([]);
+    }
     const fromResponse = rowIDsFromAddResponse(d).filter((id) => !before.has(id));
+    if (fromResponse.length === 1) return fromResponse[0];
     await new Promise((r) => setTimeout(r, 300)); // 块索引异步重建
-    const added = (await renderRowIDs(avID)).filter((id) => !before.has(id));
+    let added: string[];
+    try {
+        added = (await renderRowIDs(avID)).filter((id) => !before.has(id));
+    } catch {
+        throw new RowIdentityPendingError(fromResponse);
+    }
     const confirmed = fromResponse.length === 1 ? fromResponse[0] : added.length === 1 ? added[0] : undefined;
     if (confirmed) return confirmed;
     throw new RowIdentityPendingError(added.length ? Array.from(new Set(added)) : fromResponse);

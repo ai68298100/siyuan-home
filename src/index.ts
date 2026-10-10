@@ -11,7 +11,8 @@ import { runScan, deriveVisible, type ScanResult } from "@/core/hub/scanner";
 import { buildScanProviders } from "@/core/hub/registry";
 import { dailyDigest, markNotified, inSilentHours, weeklyPreview, markWeeklyNotified } from "@/core/hub/notify";
 import { complete, snooze, mute, unmute, renew, restore, addMemo, removeMemo, updateMemo } from "@/core/hub/actions";
-import { provisionModule } from "@/core/provisioner";
+import { getProvisioningReport, provisionModule, type ProvisioningReport } from "@/core/provisioner";
+import { createSingleFlightUntilStable } from "@/core/single-flight";
 import { addDetachedRow, setCell } from "@/core/siyuan";
 import { mountLvHomeBridge } from "@/bridge/external-bridge";
 import { SCHEMA_CATALOG, validateSchema } from "@/core/schema";
@@ -38,6 +39,10 @@ export default class LvHomePlugin extends Plugin {
     hubListeners = new Set<() => void>();
     /** 扫描序号（H11）：慢的旧扫描不得覆写新扫描结果或之后的手动动作 */
     private scanSeq = 0;
+    private readonly provisionLedgersSingleFlight = createSingleFlightUntilStable(
+        () => [...new Set(this.settings.enabledModules)].sort().join("\0"),
+        () => this.provisionLedgers(),
+    );
     /** EC03/v0.3：服务桥卸载函数 */
     private disposeLvHomeBridge?: () => void;
     /** EC21：lv-exam:stats 监听（window CustomEvent，非 eventBus） */
@@ -381,7 +386,12 @@ export default class LvHomePlugin extends Plugin {
 
     /** members 先建（relation 目标），其余按需；幂等。启用模块才建库（P4）。
      * 12 轮修复：遍历 schemaCatalog（members 声明序居首），删除第二份手工清单防漂移 */
-    async ensureCoreLedgers(): Promise<void> {
+    async ensureCoreLedgers(): Promise<ProvisioningReport> {
+        await this.provisionLedgersSingleFlight();
+        return getProvisioningReport(this.settings);
+    }
+
+    private async provisionLedgers(): Promise<void> {
         const resolveName = (key: string) => String(this.i18n[`field.${key}`] ?? key);
         const enabled = new Set(this.settings.enabledModules);
         for (const [id, schema] of Object.entries(this.schemaCatalog)) {
@@ -720,12 +730,10 @@ export default class LvHomePlugin extends Plugin {
         this.settings.onboarded = true;
         // C7c：建库批处理进度提示（31 模块串行需数秒；起止均有反馈，失败落 dbRefs.provisionError 诊断可见）
         showMessage(this.i18nText("wiz.provisioning").replace("${n}", String(moduleIds.length)), 4000, "info");
-        await this.ensureCoreLedgers();
+        const provisioning = await this.ensureCoreLedgers();
         await saveSettings(this, this.settings);
         // C7c 收尾：建库失败浮出（此前只进诊断区，向导完成后用户无感）
-        const failed = Object.entries(this.settings.dbRefs)
-            .filter(([id, ref]) => this.settings.enabledModules.includes(id) && (ref as any)?.provisionError)
-            .map(([id]) => this.i18nText(`module.${id}`));
+        const failed = provisioning.issues.map(({ moduleId }) => this.i18nText(`module.${moduleId}`));
         if (failed.length > 0) {
             showMessage(this.i18nText("wiz.provisionIssues")
                 .replace("${n}", String(failed.length))

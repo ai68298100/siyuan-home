@@ -36,7 +36,11 @@
     // C4b 收尾：renderLedger 的原始列数组（含用户在思源视图手建的列，schema 映射之外）
     let avCols: any[] = $state([]);
     let loading = $state(false);
+    let loadError = $state("");
+    let loadRequest = 0;
     let rebuilding = $state(false);
+    let exporting = $state(false);
+    let printing = $state(false);
     // 17 组：台账内搜索（标题/备注 contains + 拼音全拼/首字母，与成员过滤不叠加——本页无成员过滤）
     let searchText = $state("");
     // 229 波性能（真机批 S6：1000 行挂表 3.7-7.3s）：渐进渲染——首屏 200 行 + "加载更多"按需追加；
@@ -61,11 +65,21 @@
     // svelte-ignore state_referenced_locally
     let sortAsc = $state<boolean>(plugin.runtime.ledgerSortAsc ?? true);
     async function toggleSort(k: string) {
+        const previousKey = sortKey;
+        const previousAsc = sortAsc;
         if (sortKey === k) sortAsc = !sortAsc;
         else { sortKey = k; sortAsc = true; }
         plugin.runtime.ledgerSortKey = sortKey;
         plugin.runtime.ledgerSortAsc = sortAsc;
-                await saveRuntime(plugin, plugin.runtime);
+        try {
+            await saveRuntime(plugin, plugin.runtime);
+        } catch (e) {
+            sortKey = previousKey;
+            sortAsc = previousAsc;
+            plugin.runtime.ledgerSortKey = previousKey;
+            plugin.runtime.ledgerSortAsc = previousAsc;
+            showMessage(t("ledger.sortSaveFailed").replace("${msg}", e instanceof Error ? e.message : String(e)), 5000, "error");
+        }
     }
     const filteredRows = $derived.by(() => {
         const q = searchText.trim().toLowerCase();
@@ -73,13 +87,12 @@
         if (q) {
             // 提案 C（227 波）：拼音检索——全拼/首字母；字典懒加载完成后 pyTick 驱动重算
             void pyTick;
-            list = list.filter((r) => {
-                const nameCol = ref?.columns?.name ? (r.cells[ref.columns.name]?.text?.content ?? r.cells[ref.columns.name]?.block?.content ?? "") : "";
-                const noteCol = ref?.columns?.note ? (r.cells[ref.columns.note]?.text?.content ?? "") : "";
-                return searchMatch(nameCol, q) || searchMatch(noteCol, q);
-            });
+            list = list.filter((r) => rowMatchesSearch(r, q, ref?.columns));
         }
         const keyID = sortKey ? ref?.columns?.[sortKey] : undefined;
+        return sortRows(list, keyID, sortAsc);
+    });
+    function sortRows(list: any[], keyID?: string, ascending = true) {
         if (!keyID) return list;
         return [...list].sort((a, b) => {
             const av = cellText(a.cells[keyID]);
@@ -87,11 +100,19 @@
             const an = parseFloat(av);
             const bn = parseFloat(bv);
             const cmp = !isNaN(an) && !isNaN(bn) && av !== "—" && bv !== "—" ? an - bn : av.localeCompare(bv);
-            return sortAsc ? cmp : -cmp;
+            return ascending ? cmp : -cmp;
         });
-    });
+    }
     // 229 波性能：渐进渲染切片（排序/筛选已作用于全量，这里只切显示窗口）
     const visibleRows = $derived(filteredRows.slice(0, renderLimit));
+
+    function rowMatchesSearch(row: any, q: string, columns?: Record<string, string>) {
+        const nameKey = columns?.name;
+        const noteKey = columns?.note;
+        const name = nameKey ? (row.cells[nameKey]?.text?.content ?? row.cells[nameKey]?.block?.content ?? "") : "";
+        const note = noteKey ? (row.cells[noteKey]?.text?.content ?? "") : "";
+        return searchMatch(name, q) || searchMatch(note, q);
+    }
 
     const ref = $derived(plugin.settings.dbRefs[active]);
     const schemaKeys = $derived<string[]>(ref?.columns ? Object.keys(ref.columns) : []);
@@ -102,31 +123,29 @@
 
     // 246 波（QR 标签打印页）：当前模块全量行 → QR（块深链，无绑定行回退台账文档深链）+ 名称，隐藏 iframe 调起打印
     async function printLabels() {
-        if (!ref?.avId || !ref.docId) return;
-        const all = await renderLedgerAll(ref.avId);
-        const q = searchText.trim().toLowerCase();
-        let list = all.rows;
-        if (q) {
-            list = list.filter((r) => {
-                const nameCol = ref?.columns?.name ? (r.cells[ref.columns.name]?.text?.content ?? r.cells[ref.columns.name]?.block?.content ?? "") : "";
-                const noteCol = ref?.columns?.note ? (r.cells[ref.columns.note]?.text?.content ?? "") : "";
-                return nameCol.toLowerCase().includes(q) || noteCol.toLowerCase().includes(q);
-            });
-        }
-        if (list.length === 0) { showMessage(t("ledger.printNoRows"), 3000, "info"); return; }
-        const labels = await Promise.all(list.map(async (r) => {
-            const nameCol = ref.columns?.name;
-            const nameVal = nameCol ? r.cells?.[nameCol] : undefined;
-            const blockId = nameVal?.type === "block" ? nameVal.block?.id : undefined;
-            const name = cellText(nameVal, "name");
-            const link = blockDeepLink(blockId || ref.docId!);
-            let qr = "";
-            try { qr = await generateQRDataUrl(link, 160); } catch { qr = ""; }
-            return { name, qr };
-        }));
-        const esc = (s: string) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
-        // 259 波：打印页对齐设计语言（纸面固定色板，独立于屏幕主题——同 index.scss 打印豁免边界）
-        const html = `<!doctype html><html lang="zh-CN"><head><meta charset="utf-8"><title>${t("ledger.printTitle")}</title>
+        const sourceRef = ref;
+        const query = searchText.trim().toLowerCase();
+        if (!sourceRef?.avId || !sourceRef.docId || printing) return;
+        printing = true;
+        try {
+            const all = await renderLedgerAll(sourceRef.avId);
+            if (!all.complete) { showMessage(t("ledger.loadIncomplete"), 5000, "error"); return; }
+            let list = all.rows;
+            if (query) list = list.filter((r) => rowMatchesSearch(r, query, sourceRef.columns));
+            if (list.length === 0) { showMessage(t("ledger.printNoRows"), 3000, "info"); return; }
+            const labels = await Promise.all(list.map(async (r) => {
+                const nameCol = sourceRef.columns?.name;
+                const nameVal = nameCol ? r.cells?.[nameCol] : undefined;
+                const blockId = nameVal?.type === "block" ? nameVal.block?.id : undefined;
+                const name = cellText(nameVal, "name");
+                const link = blockDeepLink(blockId || sourceRef.docId!);
+                let qr = "";
+                try { qr = await generateQRDataUrl(link, 160); } catch { qr = ""; }
+                return { name, qr };
+            }));
+            const esc = (s: string) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+            // 259 波：打印页对齐设计语言（纸面固定色板，独立于屏幕主题——同 index.scss 打印豁免边界）
+            const html = `<!doctype html><html lang="zh-CN"><head><meta charset="utf-8"><title>${t("ledger.printTitle")}</title>
 <style>body{font-family:system-ui,-apple-system,"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif;margin:0;padding:20px;color:#1f2328;background:#fff}
 .head{display:flex;align-items:baseline;gap:10px;flex-wrap:wrap;border-bottom:1px solid #d0d7de;padding-bottom:10px;margin-bottom:16px}
 .head b{font-size:16px;font-weight:600}
@@ -143,40 +162,54 @@
 <div class="noprint" style="text-align:center;margin-bottom:14px"><button class="printbtn" onclick="window.print()">打印</button></div>
 <div class="grid">${labels.map((l) => `<div class="label"><img src="${l.qr}" alt="QR">${l.name ? `<div class="nm">${esc(l.name)}</div>` : ""}<div class="tip">${t("ledger.printScanTip")}</div></div>`).join("")}</div>
 <script>window.print()<\/script></body></html>`;
-        const w = window.open("", "_blank");
-        if (!w) { showMessage(t("ledger.printBlocked"), 4000, "error"); return; }
-        w.document.write(html);
-        w.document.close();
+            const w = window.open("", "_blank");
+            if (!w) { showMessage(t("ledger.printBlocked"), 4000, "error"); return; }
+            w.document.write(html);
+            w.document.close();
+        } catch (e) {
+            showMessage(t("ledger.readFailed").replace("${msg}", e instanceof Error ? e.message : String(e)), 5000, "error");
+        } finally {
+            printing = false;
+        }
     }
 
     function exportCsv() {
-        if (!ref?.columns || filteredRows.length === 0) return;
+        const sourceRef = ref;
+        const moduleId = active;
+        const query = searchText.trim().toLowerCase();
+        const sortField = sortKey ? sourceRef?.columns?.[sortKey] : undefined;
+        const ascending = sortAsc;
+        if (!sourceRef?.columns || filteredRows.length === 0 || exporting) return;
         const download = async () => {
+            exporting = true;
             // N7/E13：导出走全量读（UI 列表仍单页，PF11）；搜索词对全量行复用同一过滤语义
-            const all = await renderLedgerAll(ref!.avId!);
-            const q = searchText.trim().toLowerCase();
-            let list = all.rows;
-            if (q) {
-                const nameKey = ref!.columns?.name;
-                const noteKey = ref!.columns?.note;
-                list = list.filter((r) => {
-                    const nameCol = nameKey ? (r.cells[nameKey]?.text?.content ?? r.cells[nameKey]?.block?.content ?? "") : "";
-                    const noteCol = noteKey ? (r.cells[noteKey]?.text?.content ?? "") : "";
-                    return nameCol.toLowerCase().includes(q) || noteCol.toLowerCase().includes(q);
-                });
+            try {
+                let all;
+                try {
+                    all = await renderLedgerAll(sourceRef.avId!);
+                } catch (e) {
+                    showMessage(t("ledger.readFailed").replace("${msg}", e instanceof Error ? e.message : String(e)), 5000, "error");
+                    return;
+                }
+                if (!all.complete) { showMessage(t("ledger.loadIncomplete"), 5000, "error"); return; }
+                let list = all.rows;
+                if (query) list = list.filter((r) => rowMatchesSearch(r, query, sourceRef.columns));
+                list = sortRows(list, sortField, ascending);
+                const cols = (plugin.schemaCatalog?.[moduleId]?.columns ?? []).filter((c: any) => sourceRef.columns![c.key]);
+                const label = (c: any) => (t(`field.${c.key}`) !== `field.${c.key}` ? t(`field.${c.key}`) : c.key);
+                const csv = buildCsv(cols.map(label), list.map((r) => cols.map((c: any) => cellText(r.cells[sourceRef.columns![c.key]]))));
+                const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
+                const a = document.createElement("a");
+                a.href = URL.createObjectURL(blob);
+                a.download = `lv-${moduleId}-${new Date().toISOString().slice(0, 10)}.csv`;
+                a.click();
+                URL.revokeObjectURL(a.href);
+            } finally {
+                exporting = false;
             }
-            const cols = (plugin.schemaCatalog?.[active]?.columns ?? []).filter((c: any) => ref!.columns![c.key]);
-            const label = (c: any) => (t(`field.${c.key}`) !== `field.${c.key}` ? t(`field.${c.key}`) : c.key);
-            const csv = buildCsv(cols.map(label), list.map((r) => cols.map((c: any) => cellText(r.cells[ref!.columns![c.key]]))));
-            const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
-            const a = document.createElement("a");
-            a.href = URL.createObjectURL(blob);
-            a.download = `lv-${active}-${new Date().toISOString().slice(0, 10)}.csv`;
-            a.click();
-            URL.revokeObjectURL(a.href);
         };
-        if (HIGH_CONSEQUENCE_MODULES.has(active)) {
-            confirm(t("ledger.exportSensitiveTitle"), t("ledger.exportSensitiveBody").replace("${module}", t(`module.${active}`)), () => { void download(); });
+        if (HIGH_CONSEQUENCE_MODULES.has(moduleId)) {
+            confirm(t("ledger.exportSensitiveTitle"), t("ledger.exportSensitiveBody").replace("${module}", t(`module.${moduleId}`)), () => { void download(); });
             return;
         }
         void download();
@@ -311,14 +344,29 @@
                 body.appendChild(note);
             }
             renderPanels();
+        }).catch((e) => {
+            showMessage(t("ledger.growthFailed").replace("${msg}", e instanceof Error ? e.message : String(e)), 6000, "error");
         });
     }
 
     async function rebuildLedger() {
         rebuilding = true;
         try {
-            await plugin.ensureCoreLedgers();
-            await plugin.refreshHub();
+            const report = await plugin.ensureCoreLedgers();
+            try {
+                await plugin.refreshHub();
+            } catch (e) {
+                showMessage(t("ledger.rebuildRefreshFailed").replace("${msg}", e instanceof Error ? e.message : String(e)), 6000, "error");
+                return;
+            }
+            if (report.issues.length > 0) {
+                const modules = report.issues.map(({ moduleId }) => t(`module.${moduleId}`)).join("、");
+                showMessage(t("ledger.rebuildPartial").replace("${modules}", modules), 7000, "error");
+            } else {
+                showMessage(t("ledger.rebuildDone"), 3000, "info");
+            }
+        } catch (e) {
+            showMessage(t("ledger.rebuildFailed").replace("${msg}", e instanceof Error ? e.message : String(e)), 6000, "error");
         } finally {
             rebuilding = false;
         }
@@ -327,16 +375,21 @@
     // 16 组/188 波：囤货采购建议——低库存（qty≤阈值，H15 同口径）汇总，逐项可改建议量，一键复制清单
     async function openShoppingList() {
         if (!ref?.avId || !ref.columns?.name || !ref.columns.qty || !ref.columns.low_stock_at) return;
-        const all = await renderLedgerAll(ref.avId);
-        const items = buildShoppingList(all.rows, {
-            nameKey: ref.columns.name, qtyKey: ref.columns.qty, thresholdKey: ref.columns.low_stock_at,
-        });
-        const dlg = new Dialog({
-            title: t("ledger.shoppingList"),
-            content: `<div class="b3-dialog__content" id="lv-shop-body" style="max-height:60vh;overflow:auto"></div>
-<div class="b3-dialog__action"><span class="lv-caption" id="lv-shop-total" style="flex:1"></span><button class="b3-button b3-button--cancel" id="lv-shop-close">${t("cancel")}</button><button class="b3-button b3-button--text" id="lv-shop-copy">${t("ledger.shopCopy")}</button></div>`,
-            width: "520px",
-        });
+        try {
+            const all = await renderLedgerAll(ref.avId);
+            if (!all.complete) {
+                showMessage(t("ledger.loadIncomplete"), 5000, "error");
+                return;
+            }
+            const items = buildShoppingList(all.rows, {
+                nameKey: ref.columns.name, qtyKey: ref.columns.qty, thresholdKey: ref.columns.low_stock_at,
+            });
+            const dlg = new Dialog({
+                title: t("ledger.shoppingList"),
+                content: `<div class="b3-dialog__content" id="lv-shop-body" style="max-height:60vh;overflow:auto"></div>
+<div class="b3-dialog__action"><span class="lv-caption" id="lv-shop-total" style="flex:1"></span><button class="b3-button b3-button--cancel" id="lv-shop-close">${t("cancel")}</button><button class="b3-button b3-button--text" id="lv-shop-copy" ${items.length === 0 ? "disabled" : ""}>${t("ledger.shopCopy")}</button></div>`,
+                width: "520px",
+            });
         const body = dlg.element.querySelector("#lv-shop-body") as HTMLElement;
         if (items.length === 0) {
             const none = document.createElement("div");
@@ -383,6 +436,9 @@
                 showMessage(t("ledger.shopCopyFailed"), 4000, "error");
             }
         };
+        } catch (e) {
+            showMessage(t("ledger.shoppingFailed").replace("${msg}", e instanceof Error ? e.message : String(e)), 6000, "error");
+        }
     }
 
     // 16 组/191 波：assets CSV 批量导入——列映射向导（解析/规划纯函数在 core，UI 只做映射与写入）
@@ -404,7 +460,8 @@
             }
             if (table.length < 2) { showMessage(t("ledger.importBadCsv"), 5000, "error"); return; }
             const headers = table[0];
-            const schemaCols: any[] = plugin.schemaCatalog?.[active]?.columns ?? [];
+            const importableTypes = new Set(["text", "number", "date", "checkbox", "select"]);
+            const schemaCols: any[] = (plugin.schemaCatalog?.[active]?.columns ?? []).filter((c: any) => importableTypes.has(c.type));
             const labelOf = (key: string) => (t(`field.${key}`) !== `field.${key}` ? t(`field.${key}`) : key);
             let mapping = guessMapping(headers, schemaCols, labelOf);
             const dlg = new Dialog({
@@ -435,35 +492,64 @@
                 mapBox.appendChild(line);
             });
             (dlg.element.querySelector("#lv-csvimp-close") as HTMLButtonElement).onclick = () => dlg.destroy();
-            (dlg.element.querySelector("#lv-csvimp-start") as HTMLButtonElement).onclick = async () => {
+            (dlg.element.querySelector("#lv-csvimp-start") as HTMLButtonElement).onclick = async (event) => {
+                const startBtn = event.currentTarget as HTMLButtonElement;
+                if (startBtn.disabled) return;
                 mapping = Object.fromEntries(selects.map((s, i) => [i, s.value || undefined]));
                 const mappedCount = Object.values(mapping).filter(Boolean).length;
                 if (mappedCount === 0) { showMessage(t("ledger.importNoMap"), 4000, "error"); return; }
                 const plan = planImport(table, mapping, schemaCols, "name");
                 if (plan.rows.length === 0) { showMessage(t("ledger.importNoRows"), 4000, "error"); return; }
+                startBtn.disabled = true;
                 dlg.destroy();
                 confirm(
                     t("ledger.importCsv"),
-                    t("ledger.importConfirm").replace("${n}", String(plan.rows.length)).replace("${skip}", String(plan.skipped)),
+                    t("ledger.importConfirm")
+                        .replace("${n}", String(plan.rows.length))
+                        .replace("${skip}", String(plan.skipped))
+                        .replace("${warnings}", String(plan.rows.reduce((n, row) => n + row.warnings.length, 0))),
                     async () => {
-                        let ok = 0;
-                        const failed: number[] = [];
-                        for (let i = 0; i < plan.rows.length; i++) {
-                            const row = plan.rows[i];
-                            try {
-                                const itemID = await addDetachedRow(ref!.avId!, row.name);
-                                for (const c of row.cells) {
-                                    if (ref!.columns![c.key]) await setCell(ref!.avId!, ref!.columns![c.key], itemID, cellValue(c.type, c.value));
+                        try {
+                            let ok = 0;
+                            const failed: number[] = [];
+                            const partial: number[] = [];
+                            const pending: number[] = [];
+                            for (let i = 0; i < plan.rows.length; i++) {
+                                const row = plan.rows[i];
+                                let created = false;
+                                try {
+                                    const itemID = await addDetachedRow(ref!.avId!, row.name);
+                                    created = true;
+                                    for (const c of row.cells) {
+                                        if (ref!.columns![c.key]) await setCell(ref!.avId!, ref!.columns![c.key], itemID, cellValue(c.type, c.value));
+                                    }
+                                    ok++;
+                                } catch (e) {
+                                    if (e instanceof RowIdentityPendingError) pending.push(i + 1);
+                                    else if (created) partial.push(i + 1);
+                                    else failed.push(i + 1);
                                 }
-                                ok++;
-                            } catch {
-                                failed.push(i + 1);
                             }
+                            await load();
+                            if (loadError) {
+                                showMessage(t("ledger.importRefreshFailed").replace("${msg}", loadError), 6000, "error");
+                                return;
+                            }
+                            try {
+                                await plugin.refreshHub([active]); // PF06：只重扫本模块
+                            } catch (e) {
+                                showMessage(t("ledger.importRefreshFailed").replace("${msg}", e instanceof Error ? e.message : String(e)), 6000, "error");
+                            }
+                            const failTxt = failed.length ? ` · ${t("ledger.importRowFail").replace("${n}", String(failed.length))} (#${failed.slice(0, 3).join(", #")}${failed.length > 3 ? "…" : ""})` : "";
+                            const partialTxt = partial.length ? ` · ${t("ledger.importPartial").replace("${n}", String(partial.length))} (#${partial.slice(0, 3).join(", #")}${partial.length > 3 ? "…" : ""})` : "";
+                            const pendingTxt = pending.length ? ` · ${t("ledger.importPending").replace("${n}", String(pending.length))} (#${pending.slice(0, 3).join(", #")}${pending.length > 3 ? "…" : ""})` : "";
+                            const warningRows = plan.rows.flatMap((row, i) => row.warnings.map((warning) => `#${i + 1} ${t(`field.${warning.key}`) !== `field.${warning.key}` ? t(`field.${warning.key}`) : warning.key}: ${warning.message}`));
+                            const warningTxt = warningRows.length ? ` · ${t("ledger.importWarnings").replace("${n}", String(warningRows.length))}: ${warningRows.slice(0, 3).join("; ")}${warningRows.length > 3 ? "…" : ""}` : "";
+                            const hasIssues = failed.length + partial.length + pending.length + warningRows.length > 0;
+                            showMessage(t("ledger.importDone").replace("${ok}", String(ok)).replace("${skip}", String(plan.skipped)) + failTxt + partialTxt + pendingTxt + warningTxt, 10000, hasIssues ? "error" : "info");
+                        } catch (e) {
+                            showMessage(t("ledger.importRefreshFailed").replace("${msg}", e instanceof Error ? e.message : String(e)), 6000, "error");
                         }
-                        await load();
-                        await plugin.refreshHub([active]); // PF06：只重扫本模块
-                        const failTxt = failed.length ? ` · ${t("ledger.importRowFail").replace("${n}", String(failed.length))} (#${failed.slice(0, 3).join(", #")}${failed.length > 3 ? "…" : ""})` : "";
-                        showMessage(t("ledger.importDone").replace("${ok}", String(ok)).replace("${skip}", String(plan.skipped)) + failTxt, 8000, failed.length ? "error" : "info");
                     },
                 );
             };
@@ -472,16 +558,30 @@
     }
 
     async function load() {
-        if (!ref?.avId) { rows = []; avCols = []; return; }
+        const avID = ref?.avId;
+        const request = ++loadRequest;
+        loadError = "";
+        rows = [];
+        avCols = [];
+        if (!avID) { loading = false; return; }
         loading = true;
         try {
             // 226 波修复（真机 e2e 发现）：renderLedger 单次调用受内核 pageSize 封顶（默认 50），
             // 表格永远只显示前 50 行——改用分页聚合的 renderLedgerAll
-            const res = await renderLedgerAll(ref.avId);
+            const res = await renderLedgerAll(avID);
+            if (request !== loadRequest || avID !== ref?.avId) return;
+            if (!res.complete) {
+                loadError = t("ledger.loadIncomplete");
+                return;
+            }
             rows = res.rows;
             avCols = res.columns ?? [];
+        } catch (e) {
+            if (request === loadRequest && avID === ref?.avId) {
+                loadError = t("ledger.readFailed").replace("${msg}", e instanceof Error ? e.message : String(e));
+            }
         } finally {
-            loading = false;
+            if (request === loadRequest) loading = false;
         }
     }
     $effect(() => { void version; void active; void plugin.scan?.scannedAt; load(); });
@@ -504,6 +604,7 @@
     const unsupportedCount = $derived(captureCols.filter((e) => UNSUPPORTED_TYPES.includes(e.type) && e.type !== "mAsset").length);
     // 表单值：列 key → 输入值（select/relation 为字符串值，checkbox 为布尔）
     let form: Record<string, any> = $state({});
+    let nameInput: HTMLInputElement | undefined = $state();
     const certificateProfile = $derived(active === "certs" && form.category ? getCertificateProfile(String(form.category)) : null);
     const certificateScalarCols = $derived.by(() => {
         if (!certificateProfile) return [] as { key: string; type: string; options?: string[] }[];
@@ -588,7 +689,13 @@
     function cellValue(type: string, v: any): unknown | null {
         switch (type) {
             case "select": return selectCellValue(v);
-            case "relation": return { type: "relation", relation: { blockIDs: [v], contents: null } };
+            case "relation": {
+                // relation 录入当前仅面向 members 库。选项虽已禁用未绑定成员，旧草稿或
+                // stale value 仍可能绕过控件；最终写入前只接受当前仍存在的合法行 ID。
+                const relationID = typeof v === "string" ? v.trim() : "";
+                const linked = relationID && (plugin.settings.members ?? []).some((m) => m.avItemId === relationID);
+                return linked ? { type: "relation", relation: { blockIDs: [relationID], contents: null } } : null;
+            }
             case "date": return v === "" ? { type: "date", date: { isNotEmpty: false } } : { type: "date", date: { content: new Date(`${v}T00:00:00`).getTime(), isNotEmpty: true, isNotTime: true } };
             case "number": return v === "" || v === null ? { type: "number", number: { isNotEmpty: false } } : { type: "number", number: { content: Number(v), isNotEmpty: true } };
             case "url": return { type: "url", url: { content: v } };
@@ -811,32 +918,37 @@
                 fileInput.onchange = async () => {
                     const files = Array.from(fileInput.files ?? []);
                     if (files.length === 0) return;
+                    uploadBtn.disabled = true;
                     const failed: string[] = [];
-                    const pending = pendingDetailAssets[attCol.key] ?? [];
-                    const appended = [...existing, ...pending];
-                    for (const f of files) {
-                        try {
-                            const { uploadAsset } = await import("@/core/siyuan");
-                            const { name, path } = await uploadAsset(f);
-                            appended.push({ name, content: path });
-                        } catch (e) {
-                            failed.push(`${f.name}: ${e instanceof Error ? e.message : String(e)}`);
+                    try {
+                        const pending = pendingDetailAssets[attCol.key] ?? [];
+                        const appended = [...existing, ...pending];
+                        for (const f of files) {
+                            try {
+                                const { uploadAsset } = await import("@/core/siyuan");
+                                const { name, path } = await uploadAsset(f);
+                                appended.push({ name, content: path });
+                            } catch (e) {
+                                failed.push(`${f.name}: ${e instanceof Error ? e.message : String(e)}`);
+                            }
                         }
-                    }
-                    if (appended.length !== existing.length) {
-                        try {
-                            await setCell(ref!.avId!, attKeyID, row.itemID, { type: "mAsset", mAsset: appended });
-                            delete pendingDetailAssets[attCol.key];
-                            const msg = failed.length ? t("ledger.uploadFailed").replace("${msg}", failed.join("; ")) : t("ledger.uploadDone");
-                            showMessage(msg, 5000, failed.length ? "error" : "info");
-                            dlg.destroy();
-                            await load();
-                        } catch (e) {
-                            pendingDetailAssets[attCol.key] = appended.slice(existing.length);
-                            showMessage(t("ledger.uploadFailed").replace("${msg}", e instanceof Error ? e.message : String(e)), 6000, "error");
+                        if (appended.length !== existing.length) {
+                            try {
+                                await setCell(ref!.avId!, attKeyID, row.itemID, { type: "mAsset", mAsset: appended });
+                                delete pendingDetailAssets[attCol.key];
+                                const msg = failed.length ? t("ledger.uploadFailed").replace("${msg}", failed.join("; ")) : t("ledger.uploadDone");
+                                showMessage(msg, 5000, failed.length ? "error" : "info");
+                                dlg.destroy();
+                                await load();
+                            } catch (e) {
+                                pendingDetailAssets[attCol.key] = appended.slice(existing.length);
+                                showMessage(t("ledger.uploadFailed").replace("${msg}", e instanceof Error ? e.message : String(e)), 6000, "error");
+                            }
+                        } else if (failed.length) {
+                            showMessage(t("ledger.uploadFailed").replace("${msg}", failed.join("; ")), 6000, "error");
                         }
-                    } else if (failed.length) {
-                        showMessage(t("ledger.uploadFailed").replace("${msg}", failed.join("; ")), 6000, "error");
+                    } finally {
+                        uploadBtn.disabled = false;
                     }
                     // 附件写入不影响提醒派生——无需扫描（PF06：无相关变更不重扫）
                 };
@@ -904,6 +1016,7 @@
                             birthFill.onclick = async () => {
                                 const target = (plugin.settings.members ?? []).find(m => m.id === member.id);
                                 if (!target || target.birthday) return;
+                                const previousBirthday = target.birthday;
                                 target.birthday = parsedId.birth;
                                 try {
                                     const { updateMember } = await import("@/core/members");
@@ -911,6 +1024,7 @@
                                     showMessage(t("ledger.idBirthFilled").replace("${birth}", parsedId.birth), 3000, "info");
                                     birthFill.disabled = true;
                                 } catch (e) {
+                                    target.birthday = previousBirthday;
                                     showMessage(t("ledger.copyAsImageFail").replace(": Downloaded instead", "") + ` (${e instanceof Error ? e.message : String(e)})`, 5000, "error");
                                 }
                             };
@@ -961,6 +1075,7 @@
         }) {
             const section = document.createElement("div");
             let loaded: Record<string, any>[] = [];
+            let loadFailed = false;
             const render = () => {
                 section.replaceChildren();
                 for (const e of loaded) {
@@ -973,14 +1088,36 @@
                     del.style.cssText = "padding:0 4px;font-size:12px";
                     del.textContent = "✕";
                     del.onclick = async () => {
-                        await opts.remove(e);
-                        loaded = await opts.load();
+                        del.disabled = true;
+                        try {
+                            await opts.remove(e);
+                        } catch (err) {
+                            showMessage(t("ledger.logDeleteFailed").replace("${msg}", err instanceof Error ? err.message : String(err)), 5000, "error");
+                            del.disabled = false;
+                            return;
+                        }
+                        loaded = loaded.filter((item) => item !== e);
+                        loadFailed = false;
                         render();
+                        try {
+                            loaded = await opts.load();
+                            render();
+                        } catch (err) {
+                            loadFailed = true;
+                            render();
+                            showMessage(t("ledger.logReadFailed").replace("${msg}", err instanceof Error ? err.message : String(err)), 5000, "error");
+                        }
                     };
                     line.append(text, del);
                     section.appendChild(line);
                 }
-                if (loaded.length === 0) {
+                if (loadFailed) {
+                    const error = document.createElement("div");
+                    error.className = "ft__on-surface";
+                    error.style.cssText = "font-size:12.5px;color:var(--lv-danger)";
+                    error.textContent = t("ledger.logReadFailed");
+                    section.appendChild(error);
+                } else if (loaded.length === 0) {
                     const none = document.createElement("div");
                     none.className = "ft__on-surface";
                     none.style.cssText = "font-size:12.5px";
@@ -1011,20 +1148,39 @@
             addBtn.style.cssText = "font-size:12px";
             addBtn.textContent = opts.addLabel;
             addBtn.onclick = async () => {
+                if (addBtn.disabled) return;
                 const vals = Object.fromEntries(Object.entries(inputs).map(([k, i]) => [k, i.value]));
                 if (!vals.date) {
                     showMessage(t("ledger.logInvalid"), 3000, "error");
                     return;
                 }
-                if (await opts.add(vals)) {
-                    for (const i of Object.values(inputs)) i.value = "";
-                    loaded = await opts.load();
-                    render();
+                addBtn.disabled = true;
+                try {
+                    if (await opts.add(vals)) {
+                        for (const i of Object.values(inputs)) i.value = "";
+                        loadFailed = false;
+                        try {
+                            loaded = await opts.load();
+                        } catch (err) {
+                            loadFailed = true;
+                            showMessage(t("ledger.logReadFailed").replace("${msg}", err instanceof Error ? err.message : String(err)), 5000, "error");
+                        }
+                        render();
+                    }
+                } catch (err) {
+                    showMessage(t("ledger.logSaveFailed").replace("${msg}", err instanceof Error ? err.message : String(err)), 5000, "error");
+                } finally {
+                    addBtn.disabled = false;
                 }
             };
             form.appendChild(addBtn);
             body.appendChild(form);
-            loaded = await opts.load();
+            try {
+                loaded = await opts.load();
+            } catch (err) {
+                loadFailed = true;
+                showMessage(t("ledger.logReadFailed").replace("${msg}", err instanceof Error ? err.message : String(err)), 5000, "error");
+            }
             render();
         }
 
@@ -1121,7 +1277,9 @@
                         }
                         body.appendChild(head);
                     }
-                })();
+                })().catch((e) => {
+                    showMessage(t("ledger.logReadFailed").replace("${msg}", e instanceof Error ? e.message : String(e)), 5000, "error");
+                });
                 await addRowLogSection({
                     title: t("ledger.deposits"), emptyText: t("ledger.noDeposits"), addLabel: t("ledger.valAdd"),
                     fields: [
@@ -1276,20 +1434,25 @@
             btn.className = "b3-button b3-button--outline";
             btn.style.cssText = "margin-top:8px;font-size:12px";
             btn.textContent = t("ledger.rxToMedicine");
+            let pendingMedicineID: string | null = null;
             btn.onclick = () => {
+                if (btn.disabled) return;
                 confirm(t("ledger.rxToMedicine"), t("ledger.rxToMedicineBody").replace("${name}", name), async () => {
+                    btn.disabled = true;
                     try {
                         const { addDetachedRow, setCell } = await import("@/core/siyuan");
-                        const itemID = await addDetachedRow(medRef.avId!, name);
+                        const itemID = pendingMedicineID ?? await addDetachedRow(medRef.avId!, name);
+                        pendingMedicineID = itemID;
                         const catKey = medRef.columns?.category;
-                        if (catKey) await setCell(medRef.avId!, catKey, itemID, { type: "select", select: { content: "rx" } });
+                        if (catKey) await setCell(medRef.avId!, catKey, itemID, selectCellValue("rx"));
                         const memKey = medRef.columns?.member;
                         const relBlock = row.cells[ref!.columns.member]?.relation?.blockIDs?.[0];
                         if (memKey && relBlock) await setCell(medRef.avId!, memKey, itemID, { type: "relation", relation: { blockIDs: [relBlock], contents: null } });
                         showMessage(t("ledger.rxToMedicineDone").replace("${name}", name), 3000, "info");
-                        btn.disabled = true;
+                        pendingMedicineID = null;
                     } catch (e) {
                         showMessage(t("ledger.rxToMedicineFailed").replace("${msg}", e instanceof Error ? e.message : String(e)), 6000, "error");
+                        btn.disabled = false;
                     }
                 });
             };
@@ -1305,43 +1468,87 @@
             const name = String(cellText(row.cells[ref!.columns.name]));
             if (!name || name === "—") return;
             const qtyRaw = cellText(row.cells[ref!.columns.qty]);
-            const qty = qtyRaw !== "—" && qtyRaw !== "" && Number.isFinite(Number(qtyRaw)) ? Number(qtyRaw) : 1;
+            const qty = qtyRaw !== "—" && qtyRaw !== "" && Number.isFinite(Number(qtyRaw)) && Number(qtyRaw) > 0 ? Number(qtyRaw) : 1;
             const btn = document.createElement("button");
             btn.className = "b3-button b3-button--outline";
             btn.style.cssText = "margin-top:8px;font-size:12px";
             btn.textContent = t("ledger.stockIn");
+            let pendingStockItemID: string | null = null;
+            let stockInBusy = false;
             btn.onclick = async () => {
+                if (stockInBusy) return;
+                stockInBusy = true;
+                btn.disabled = true;
                 try {
-                    const { renderLedger, addDetachedRow, setCell } = await import("@/core/siyuan");
-                    const read = await renderLedger(medRef.avId!);
+                    const { addDetachedRow, setCell } = await import("@/core/siyuan");
+                    const read = await renderLedgerAll(medRef.avId!);
+                    if (!read.complete) throw new Error(t("ledger.loadIncomplete"));
                     const nameKey = medRef.columns?.name;
                     const stockKey = medRef.columns?.stock_qty;
+                    if (!stockKey) throw new Error("stock quantity column is unavailable");
                     const matches = nameKey
                         ? read.rows.filter((r) => String(r.cells[nameKey]?.text?.content ?? "").trim() === name)
                         : [];
-                    confirm(
-                        t("ledger.stockIn"),
-                        t("ledger.stockInBody").replace("${name}", name).replace("${qty}", String(qty)).replace("${n}", String(matches.length)),
-                        async () => {
-                            try {
-                                if (matches[0] && stockKey) {
-                                    const cur = matches[0].cells[stockKey]?.number;
-                                    const curVal = cur?.isNotEmpty && typeof cur.content === "number" ? cur.content : 0;
-                                    await setCell(medRef.avId!, stockKey, matches[0].itemID, { type: "number", number: { content: curVal + qty, isNotEmpty: true } });
-                                } else {
-                                    const itemID = await addDetachedRow(medRef.avId!, name);
-                                    if (stockKey) await setCell(medRef.avId!, stockKey, itemID, { type: "number", number: { content: qty, isNotEmpty: true } });
-                                }
-                                showMessage(t("ledger.stockInDone").replace("${qty}", String(qty)).replace("${name}", name), 3000, "info");
-                                btn.disabled = true;
-                                await plugin.refreshHub?.(["medicine"]); // 低库存提醒即时重算
-                            } catch (e) {
-                                showMessage(t("ledger.stockInFailed").replace("${msg}", e instanceof Error ? e.message : String(e)), 6000, "error");
+                    const dialog = new Dialog({
+                        title: t("ledger.stockIn"),
+                        content: `<div class="b3-dialog__content" id="lv-stockin-body"></div><div class="b3-dialog__action"><button class="b3-button b3-button--cancel" id="lv-stockin-cancel">${t("cancel")}</button><button class="b3-button" id="lv-stockin-ok">${t("ledger.stockIn")}</button></div>`,
+                        width: "420px",
+                        destroyCallback: () => {
+                            if (!stockCommitted) {
+                                stockInBusy = false;
+                                btn.disabled = false;
                             }
                         },
-                    );
+                    });
+                    let stockCommitted = false;
+                    const body = dialog.element.querySelector("#lv-stockin-body") as HTMLElement;
+                    body.textContent = t("ledger.stockInBody").replace("${name}", name).replace("${qty}", String(qty)).replace("${n}", String(matches.length));
+                    const cancel = dialog.element.querySelector("#lv-stockin-cancel") as HTMLButtonElement;
+                    const ok = dialog.element.querySelector("#lv-stockin-ok") as HTMLButtonElement;
+                    cancel.onclick = () => { dialog.destroy(); stockInBusy = false; btn.disabled = false; };
+                    ok.onclick = async () => {
+                        if (ok.disabled) return;
+                        ok.disabled = true;
+                        cancel.disabled = true;
+                        try {
+                            if (matches[0]) {
+                                const cur = matches[0].cells[stockKey]?.number;
+                                const curVal = cur?.isNotEmpty && typeof cur.content === "number" ? cur.content : 0;
+                                await setCell(medRef.avId!, stockKey, matches[0].itemID, { type: "number", number: { content: curVal + qty, isNotEmpty: true } });
+                            } else {
+                                const itemID = pendingStockItemID ?? await addDetachedRow(medRef.avId!, name);
+                                pendingStockItemID = itemID;
+                                await setCell(medRef.avId!, stockKey, itemID, { type: "number", number: { content: qty, isNotEmpty: true } });
+                                pendingStockItemID = null;
+                            }
+                            stockCommitted = true;
+                            dialog.destroy();
+                            btn.textContent = t("ledger.stockIn");
+                            try {
+                                await plugin.refreshHub?.(["medicine"]); // 低库存提醒即时重算
+                            } catch (e) {
+                                showMessage(t("ledger.stockInRefreshFailed").replace("${msg}", e instanceof Error ? e.message : String(e)), 6000, "error");
+                            } finally {
+                                stockInBusy = false;
+                                btn.disabled = false;
+                            }
+                        } catch (e) {
+                            if (stockCommitted) {
+                                showMessage(t("ledger.stockInRefreshFailed").replace("${msg}", e instanceof Error ? e.message : String(e)), 6000, "error");
+                                stockInBusy = false;
+                                btn.disabled = false;
+                            } else {
+                                showMessage(t("ledger.stockInFailed").replace("${msg}", e instanceof Error ? e.message : String(e)), 6000, "error");
+                                ok.disabled = false;
+                                cancel.disabled = false;
+                            }
+                            return;
+                        }
+                    };
                 } catch (e) {
                     showMessage(t("ledger.stockInFailed").replace("${msg}", e instanceof Error ? e.message : String(e)), 6000, "error");
+                    stockInBusy = false;
+                    btn.disabled = false;
                 }
             };
             body.appendChild(btn);
@@ -1379,6 +1586,7 @@
                         const exp = ref!.columns.expiry ? cellText(r.cells[ref!.columns.expiry]) : "";
                         b.textContent = `${String(cellText(r.cells[ref!.columns.name]))}${exp && exp !== "—" ? ` · ${exp}` : ""}`;
                         b.onclick = async () => {
+                            b.disabled = true;
                             try {
                                 const { setCell } = await import("@/core/siyuan");
                                 await setCell(ref!.avId!, relKey, row.itemID, { type: "relation", relation: { blockIDs: [r.itemID], contents: null } });
@@ -1386,10 +1594,16 @@
                                 dlg.destroy();
                                 showMessage(t("ledger.linked").replace("${name}", String(cellText(r.cells[ref!.columns.name]))), 2500, "info");
                                 await load();
+                                try {
+                                    await plugin.refreshHub([active]);
+                                } catch (e) {
+                                    showMessage(t("ledger.refreshFailed").replace("${msg}", e instanceof Error ? e.message : String(e)), 5000, "error");
+                                }
                                 const fresh = rows.find((x) => x.itemID === row.itemID);
                                 if (fresh) openDetail(fresh);
                             } catch (e) {
                                 showMessage(t("ledger.renewLinkFailed").replace("${msg}", e instanceof Error ? e.message : String(e)), 6000, "error");
+                                b.disabled = false;
                             }
                         };
                         list.appendChild(b);
@@ -1534,36 +1748,56 @@
             cancel.textContent = t("cancel");
             cancel.onclick = () => buildView();
             save.onclick = async () => {
+                if (save.disabled) return;
+                save.disabled = true;
+                cancel.disabled = true;
                 const failed: string[] = [];
                 let changed = 0;
                 let personChanged = false;
                 const personKeyID = ref!.columns.person;
-                for (const e of inputs) {
-                    const v = e.get();
-                    const orig = rawFromValue(e.type, row.cells[e.keyID]);
-                    const same = e.type === "checkbox" ? v === orig : String(v) === String(orig);
-                    if (same) continue;
-                    try {
-                        await setCell(ref!.avId!, e.keyID, row.itemID, cellValue(e.type, v));
-                        changed++;
-                        if (personKeyID && e.keyID === personKeyID) personChanged = true;
-                    } catch {
-                        failed.push(e.label); // D03 语义：失败字段聚合报告
+                const previousFavorSync = plugin.runtime?.favorSyncs?.[row.itemID];
+                try {
+                    for (const e of inputs) {
+                        const v = e.get();
+                        const orig = rawFromValue(e.type, row.cells[e.keyID]);
+                        const same = e.type === "checkbox" ? v === orig : String(v) === String(orig);
+                        if (same) continue;
+                        try {
+                            await setCell(ref!.avId!, e.keyID, row.itemID, cellValue(e.type, v));
+                            changed++;
+                            if (personKeyID && e.keyID === personKeyID) personChanged = true;
+                        } catch {
+                            failed.push(e.label); // D03 语义：失败字段聚合报告
+                        }
                     }
+                    // EC15：person 变更 → favorSyncs 失效（新对手方的交集需重新记录）
+                    if (personChanged && previousFavorSync) {
+                        delete plugin.runtime.favorSyncs[row.itemID];
+                        try {
+                            await saveRuntime(plugin, plugin.runtime);
+                        } catch (err) {
+                            plugin.runtime.favorSyncs = { ...(plugin.runtime.favorSyncs ?? {}), [row.itemID]: previousFavorSync };
+                            failed.push(t("ledger.runtimeSync"));
+                            showMessage(t("ledger.saveFailed").replace("${msg}", err instanceof Error ? err.message : String(err)), 6000, "error");
+                        }
+                    }
+                    dlg.destroy();
+                    if (changed > 0) {
+                        await load();
+                        if (loadError) showMessage(t("ledger.refreshFailed").replace("${msg}", loadError), 5000, "error");
+                        try {
+                            await plugin.refreshHub([active]); // PF06：只重扫本模块
+                        } catch (err) {
+                            showMessage(t("ledger.refreshFailed").replace("${msg}", err instanceof Error ? err.message : String(err)), 5000, "error");
+                        }
+                    }
+                    if (failed.length > 0) showMessage(t("ledger.savePartial").replace("${fields}", failed.join("、")), 6000, "error");
+                    else if (changed > 0) showMessage(t("ledger.editSaved"), 2500, "info");
+                } catch (err) {
+                    showMessage(t("ledger.saveFailed").replace("${msg}", err instanceof Error ? err.message : String(err)), 6000, "error");
+                    save.disabled = false;
+                    cancel.disabled = false;
                 }
-                // EC15：person 变更 → favorSyncs 失效（新对手方的交集需重新记录）
-                if (personChanged && plugin.runtime?.favorSyncs?.[row.itemID]) {
-                    delete plugin.runtime.favorSyncs[row.itemID];
-                    const { saveRuntime } = await import("@/core/hub/runtime");
-                    await saveRuntime(plugin, plugin.runtime);
-                }
-                dlg.destroy();
-                if (changed > 0) {
-                    await load();
-                    await plugin.refreshHub([active]); // PF06：只重扫本模块
-                }
-                if (failed.length > 0) showMessage(t("ledger.savePartial").replace("${fields}", failed.join("、")), 6000, "error");
-                else if (changed > 0) showMessage(t("ledger.editSaved"), 2500, "info");
             };
             saveBar.append(save, cancel);
             body.appendChild(saveBar);
@@ -1619,30 +1853,50 @@
                 try {
                     const { removeLedgerRows, } = await import("@/core/siyuan");
                     await removeLedgerRows(ref!.avId!, [row.itemID]);
+                } catch (e) {
+                    showMessage(t("ledger.delFailed").replace("${msg}", e instanceof Error ? e.message : String(e)), 6000, "error");
+                    return;
+                }
+                showMessage(t("ledger.delDone"), 2500, "info");
+                dlg.destroy();
+                const followupErrors: string[] = [];
+                try {
                     // 行删除后清理孤儿运行态数据（handled/handledYear/handledUntil/snoozed/renewHistory/favorSyncs）
                     const { cleanupRowRuntimeData } = await import("@/core/hub/runtime");
                     const dirty = cleanupRowRuntimeData(plugin.runtime, row.itemID);
                     if (dirty) {
                         await saveRuntime(plugin, plugin.runtime);
                     }
+                } catch (e) {
+                    followupErrors.push(e instanceof Error ? e.message : String(e));
+                }
+                try {
                     // 子记录模型：行日志（估值时间线等）一并清理
                     const { loadRowLogs, saveRowLogs, removeRowLog } = await import("@/core/rowlog");
                     const logs = removeRowLog(await loadRowLogs(plugin as any), ref!.avId!, row.itemID);
                     await saveRowLogs(plugin as any, logs);
-                    showMessage(t("ledger.delDone"), 2500, "info");
-                    dlg.destroy();
+                } catch (e) {
+                    followupErrors.push(e instanceof Error ? e.message : String(e));
+                }
+                try {
                     await load();
                     await plugin.refreshHub([active]); // PF06：只重扫本模块
                 } catch (e) {
-                    // 端点不可用等失败：给出人工路径，不静默假删
-                    showMessage(t("ledger.delFailed").replace("${msg}", e instanceof Error ? e.message : String(e)), 6000, "error");
+                    followupErrors.push(e instanceof Error ? e.message : String(e));
                 }
+                // 行已删除；后续元数据清理或刷新失败不能提示用户再删一次。
+                if (followupErrors.length) showMessage(t("ledger.delFollowupFailed").replace("${msg}", followupErrors.join("; ")), 6000, "error");
             });
         };
     }
 
     async function createRow() {
-        if (!ref?.avId || saving || identityPending || !hasAnyInput) return;
+        if (!ref?.avId || saving || identityPending) return;
+        if (!hasAnyInput) {
+            nameInput?.focus();
+            showMessage(t("ledger.nameRequired"), 4000, "info");
+            return;
+        }
         // UI05：name 必填——有其他输入但姓名为空时阻止建行（避免产生"（未命名）"行）
         if (nameMissing) {
             saveError = t("ledger.nameRequired");
@@ -1678,6 +1932,12 @@
             const failed: string[] = [];
             const tryCell = async (label: string, key: string | undefined, value: unknown) => {
                 if (!key) {
+                    failed.push(label);
+                    return;
+                }
+                // cellValue 返回 null 表示值未通过最终类型/关系校验；不要把 null
+                // 交给内核，避免生成空关系或覆盖已有数据。
+                if (value === null) {
                     failed.push(label);
                     return;
                 }
@@ -1732,7 +1992,7 @@
             }
             // C6a 增量 3：自动写入默认状态（schema 显式声明优先，否则枚举首值；D11）
             const statusCol = (plugin.schemaCatalog?.[active]?.columns ?? []).find((c: any) => c.key === "status");
-            if (statusCol?.options?.length) await tryCell(t("field.status"), cols.status, { type: "select", select: { content: statusCol.default ?? statusCol.options[0] } });
+            if (statusCol?.options?.length) await tryCell(t("field.status"), cols.status, selectCellValue(statusCol.default ?? statusCol.options[0]));
             if (failed.length > 0) {
                 // 输入与 itemID 均保留：再次保存补写同一行（同键 60s 合并，重试不重复轰炸——17 组）
                 saveError = t("ledger.savePartial").replace("${fields}", failed.join("、"));
@@ -1779,10 +2039,10 @@
         <input class="b3-text-field" style="width:150px" type="search" placeholder={t("ledger.search")}
             bind:value={searchText} title={t("ledger.search")} />
         <button class="b3-button b3-button--outline" title={t("ledger.exportCsvTip")}
-            disabled={filteredRows.length === 0} onclick={exportCsv}>{t("ledger.exportCsv")}</button>
+            disabled={filteredRows.length === 0 || exporting || printing} aria-busy={exporting} onclick={exportCsv}>{exporting ? t("ledger.saving") : t("ledger.exportCsv")}</button>
         <!-- 246 波：QR 标签打印页（扫码直达对应行） -->
         <button class="b3-button b3-button--outline" title={t("ledger.printLabels")}
-            disabled={filteredRows.length === 0} onclick={printLabels}>{t("ledger.printLabels")}</button>
+            disabled={filteredRows.length === 0 || printing || exporting} aria-busy={printing} onclick={printLabels}>{printing ? t("ledger.saving") : t("ledger.printLabels")}</button>
         {#if active === "parenting"}
             <button class="b3-button b3-button--outline" onclick={openGrowthChart}>{t("ledger.growthChart")}</button>
         {/if}
@@ -1792,7 +2052,7 @@
         {/if}
         {#if active !== "members" && active !== "adhoc"}
             <!-- R7 资料强化：CSV 批量导入通用化（向导本身按模块 schema 通用）——此前仅 assets-real -->
-            <button class="b3-button b3-button--outline" onclick={openCsvImport}>{t("ledger.importCsv")}</button>
+            <button class="b3-button b3-button--outline" disabled={printing || exporting} onclick={openCsvImport}>{t("ledger.importCsv")}</button>
         {/if}
         <button class="b3-button b3-button--outline" onclick={() => plugin.showTabDocs(ref?.docId)}>{t("ledger.openDoc")} ↗</button>
     {/if}
@@ -1811,7 +2071,9 @@
             <select class="b3-select" bind:value={form[e.key]} title={t(`field.${e.key}`)}>
                 <option value="">{t(`field.${e.key}`)}: {t("members.all")}</option>
                 {#each plugin.settings.members ?? [] as m (m.avItemId ?? m.id)}
-                    <option value={m.avItemId}>{m.name}</option>
+                    <option value={m.avItemId ?? ""} disabled={!m.avItemId}>
+                        {m.name}{m.avItemId ? "" : ` · ${t("members.notLinked")}`}
+                    </option>
                 {/each}
             </select>
         {:else if e.type === "date"}
@@ -1826,7 +2088,7 @@
             </label>
         {:else if e.key === "name"}
             <!-- 260 波：名称是录入主字段，min-width 220 保证第一行视觉重心；261 波回车提交（守卫在 createRow 内） -->
-            <input class="b3-text-field fn__flex-1" style="min-width:220px" placeholder={t("ledger.newName")} bind:value={form[e.key]}
+            <input bind:this={nameInput} class="b3-text-field fn__flex-1" style="min-width:220px" placeholder={t("ledger.newName")} bind:value={form[e.key]}
                 onkeydown={(e: KeyboardEvent) => { if (e.key === "Enter" && !e.isComposing) createRow(); }} />
         {:else}
             <input class="b3-text-field" style="min-width:140px" placeholder={t(`field.${e.key}`)} bind:value={form[e.key]} />
@@ -1893,13 +2155,17 @@
     {/if}
     <!-- 主 CTA：台账快速录入是本视图唯一核心动作（对齐原型"主按钮每视图 ≤1 个"）；
          260 波右置——多控件折行后 CTA 独占行尾，不再吊在字段流中间 -->
-    <button class="lv-btn primary" style="margin-left:auto" onclick={createRow} disabled={!ref?.avId || saving || identityPending || !hasAnyInput || nameMissing}>
+    <button class="lv-btn primary" style="margin-left:auto" onclick={createRow} disabled={!ref?.avId || saving || identityPending || nameMissing}>
         {saving ? t("ledger.saving") : `＋ ${t("ledger.add")}`}
     </button>
 </div>
 
 {#if loading}
     <div class="lv-card" style="padding:20px"><div class="lv-skel" style="height:16px;width:60%"></div></div>
+{:else if loadError}
+    <div class="lv-card"><div class="lv-empty" role="alert"><div class="eic">⚠</div><b>{loadError}</b>
+        <button class="b3-button b3-button--outline" onclick={() => void load()}>{t("ledger.retryRead")}</button>
+    </div></div>
 {:else if filteredRows.length === 0}
     {#if !ref?.avId}
         <div class="lv-card"><div class="lv-empty" role="status"><div class="eic">🚧</div><b>{t("ledger.notProvisioned")}</b><span>{t("ledger.notProvisionedHint")}</span></div></div>

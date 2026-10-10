@@ -5,7 +5,7 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { setTransport, KernelError } from "@/core/siyuan";
 import {
-    provisionModule, ensureNotebook, isDocMissingError, DEFAULT_NOTEBOOK_NAME,
+    provisionModule, ensureNotebook, isDocMissingError, DEFAULT_NOTEBOOK_NAME, getProvisioningReport,
     type ProvisionOptions,
 } from "@/core/provisioner";
 import type { HomeSettings, DbRef } from "@/types";
@@ -241,5 +241,19 @@ describe("provisionModule（D07/D08）", () => {
         const res2 = await provisionModule(st, "medicine", schema, "药箱", opts);
         expect(res2.created).toBe(false);
         expect(res2.dbRef.provisionError).toBeTruthy(); // 记录而非抛出
+    });
+});
+
+describe("getProvisioningReport", () => {
+    it("reports enabled modules with missing AV or provision errors", () => {
+        const st = { ...defaultSettings(), enabledModules: ["members", "certs", "medicine"], dbRefs: {
+            members: { docId: "d-members", avId: "av-members" },
+            certs: { docId: "d-certs", avId: "av-certs", provisionError: "column failed" },
+            medicine: { docId: "d-medicine" },
+        } } as HomeSettings;
+        expect(getProvisioningReport(st).issues).toEqual([
+            { moduleId: "certs", message: "column failed" },
+            { moduleId: "medicine", message: "Attribute view unavailable" },
+        ]);
     });
 });

@@ -90,13 +90,26 @@
     // Tab 挂载即注册刷新回调（扫描完成 → version 递增驱动各屏 $derived 重算，H02：
     // 动作/扫描后留在当前页即时更新，不靠切页重挂载；多实例安全）
     let version = $state(0);
+    let initialScanError = $state("");
+    async function refreshInitialScan() {
+        initialScanError = "";
+        try {
+            await plugin.refreshHub();
+            initialScanError = "";
+        } catch (e) {
+            initialScanError = e instanceof Error ? e.message : String(e);
+        }
+    }
     $effect(() => {
-        const listener = () => { version += 1; };
+        const listener = () => {
+            version += 1;
+            if (plugin.runtime?.scannedAt && !plugin.scan?.errors?.length) initialScanError = "";
+        };
         (plugin.hubListeners as Set<() => void>).add(listener);
         // 225 波修复：refreshHub 必须延后到 effect 同步作用域之外——其缓存路径会在本次 flush 内
         // 同步触发 hubListeners（version++），在 effect 依赖跟踪未定型时形成
         // effect_update_depth_exceeded 无限循环（真机首启即崩、页签全冻结）
-        const timer = window.setTimeout(() => { void plugin.refreshHub(); }, 0);
+        const timer = window.setTimeout(() => { void refreshInitialScan(); }, 0);
         return () => {
             window.clearTimeout(timer);
             (plugin.hubListeners as Set<() => void>).delete(listener);
@@ -145,7 +158,7 @@
         <div id={`lv-panel-${screen}`} class="lv-screen lv-anim" role="tabpanel" tabindex="0" aria-labelledby={`lv-tab-${screen}`}>
             <ErrorBoundary {t} onretry={() => { /* screen switch resets naturally via {#key} */ }}>
                 {#if screen === "overview"}
-                    <Overview {plugin} {t} {version} onGoto={(s: ScreenId) => gotoScreen(s)} />
+                    <Overview {plugin} {t} {version} {initialScanError} onRetryScan={refreshInitialScan} onGoto={(s: ScreenId) => gotoScreen(s)} />
                 {:else if screen === "reminders"}
                     <Reminders {plugin} {t} {version} />
                 {:else if screen === "ledger"}

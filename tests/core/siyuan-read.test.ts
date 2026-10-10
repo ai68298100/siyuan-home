@@ -187,6 +187,25 @@ describe("addDetachedRow 身份确认（D02）", () => {
         });
     });
 
+    it("创建请求成功但后续身份查询失败 → 报结果待确认，避免调用方直接重建", async () => {
+        let renderCount = 0;
+        let addCount = 0;
+        handler = (endpoint) => {
+            if (endpoint === ADD) { addCount++; return { code: 0, msg: "", data: {} }; }
+            if (endpoint === RENDER) {
+                renderCount++;
+                if (renderCount === 2) throw new Error("temporary render failure");
+                return renderRows(0)({});
+            }
+            return { code: 0, msg: "", data: {} };
+        };
+        await expect(addDetachedRow(AV, "内容")).rejects.toMatchObject({
+            name: "RowIdentityPendingError",
+            candidates: [],
+        });
+        expect(addCount).toBe(1);
+    });
+
     it("响应 ID 与 diff 多候选并存时优先响应唯一 ID", async () => {
         let added = false;
         handler = (endpoint, payload) => {

@@ -6,6 +6,7 @@
 import type { Plugin } from "siyuan";
 import type { HomeSettings, MemberRole } from "@/types";
 import { addDetachedRow, setCell, removeLedgerRows, newSiYuanId } from "./siyuan";
+import { selectCellValue } from "./avcell";
 import { addMember, removeMember } from "./members";
 import { saveSettings } from "./settings";
 
@@ -14,6 +15,7 @@ const DEMO_PREFIX = "【示例】";
 export interface DemoResult {
     created: number;
     cleared: number;
+    alreadyPresent?: boolean;
     /** 清除失败的行（moduleId/itemID/原因），数据仍在台账可手动删 */
     errors: string[];
 }
@@ -26,17 +28,21 @@ function localMs(daysAhead: number): number {
 
 /** 在模块台账中建一行示例数据（字段按列存在性写入；默认状态同快速表单惯例） */
 async function demoRow(
+    plugin: Plugin,
     settings: HomeSettings,
     moduleId: string,
     schemaCatalog: Record<string, any>,
     fields: Record<string, unknown>,
-    collected: Record<string, string[]>,
 ): Promise<boolean> {
     const ref = settings.dbRefs[moduleId];
     const cols = ref?.columns;
     if (!ref?.avId || !cols) return false;
     const itemID = await addDetachedRow(ref.avId, `${DEMO_PREFIX}${fields.name}`);
-    collected[moduleId] = [...(collected[moduleId] ?? []), itemID];
+    settings.demoRows = {
+        ...(settings.demoRows ?? {}),
+        [moduleId]: [...(settings.demoRows?.[moduleId] ?? []), itemID],
+    };
+    await saveSettings(plugin, settings);
     const write = async (key: string, value: unknown) => {
         if (!cols[key]) return;
         await setCell(ref.avId!, cols[key], itemID, value);
@@ -55,7 +61,7 @@ async function demoRow(
     }
     // 默认状态（schema 显式声明优先，否则枚举首值；D11）与快速表单一致
     const statusCol = (schemaCatalog[moduleId]?.columns ?? []).find((c: any) => c.key === "status");
-    if (statusCol?.options?.length) await write("status", { type: "select", select: { content: statusCol.default ?? statusCol.options[0] } });
+    if (statusCol?.options?.length) await write("status", selectCellValue(statusCol.default ?? statusCol.options[0]));
     return true;
 }
 
@@ -72,7 +78,10 @@ export async function generateDemoData(
     schemaCatalog: Record<string, any>,
 ): Promise<DemoResult> {
     const result: DemoResult = { created: 0, cleared: 0, errors: [] };
-    const collected: Record<string, string[]> = {};
+    const hasTrackedRows = Object.values(settings.demoRows ?? {}).some((ids) => ids.length > 0);
+    if (hasTrackedRows || (settings.demoMemberIds ?? []).length > 0) {
+        return { ...result, alreadyPresent: true };
+    }
 
     // 示例成员（走成员 DAL：设置侧 + 台账行 + 生日）
     const demoMembers: { name: string; role: MemberRole; birthday: string; lunar: boolean }[] = [
@@ -81,8 +90,8 @@ export async function generateDemoData(
     ];
     for (const m of demoMembers) {
         const member = { id: newSiYuanId(), name: m.name, role: m.role, birthday: m.birthday, lunarBirthday: m.lunar, createdAt: new Date().toISOString() };
-        await addMember(plugin, settings, member);
         settings.demoMemberIds = [...(settings.demoMemberIds ?? []), member.id];
+        await addMember(plugin, settings, member);
         result.created++;
     }
 
@@ -94,21 +103,16 @@ export async function generateDemoData(
     ];
     for (const [moduleId, fields] of plan) {
         if (!settings.enabledModules.includes(moduleId)) continue;
+        const before = settings.demoRows?.[moduleId]?.length ?? 0;
         try {
-            if (await demoRow(settings, moduleId, schemaCatalog, fields, collected)) result.created++;
+            if (await demoRow(plugin, settings, moduleId, schemaCatalog, fields)) result.created++;
         } catch (e) {
+            if ((settings.demoRows?.[moduleId]?.length ?? 0) > before) result.created++;
             result.errors.push(`${moduleId}: ${e instanceof Error ? e.message : String(e)}`);
         }
     }
-    settings.demoRows = { ...(settings.demoRows ?? {}), ...mergeIds(settings.demoRows, collected) };
     await saveSettings(plugin, settings);
     return result;
-}
-
-function mergeIds(prev: Record<string, string[]> | undefined, added: Record<string, string[]>): Record<string, string[]> {
-    const out: Record<string, string[]> = { ...(prev ?? {}) };
-    for (const [k, v] of Object.entries(added)) out[k] = [...(out[k] ?? []), ...v];
-    return out;
 }
 
 function dateStr(daysAhead: number): string {
@@ -120,24 +124,40 @@ function dateStr(daysAhead: number): string {
 /** 清除示例数据：按生成清单删行（[待实测] 端点，失败逐行报告）+ 移除示例成员引用 */
 export async function clearDemoData(plugin: Plugin, settings: HomeSettings): Promise<DemoResult> {
     const result: DemoResult = { created: 0, cleared: 0, errors: [] };
+    const remainingRows: Record<string, string[]> = {};
     for (const [moduleId, itemIds] of Object.entries(settings.demoRows ?? {})) {
         const ref = settings.dbRefs[moduleId];
-        if (!ref?.avId) continue;
+        if (!ref?.avId) {
+            remainingRows[moduleId] = [...itemIds];
+            result.errors.push(`${moduleId}: ledger is not available`);
+            continue;
+        }
+        const failedIds: string[] = [];
         for (const itemID of itemIds) {
             try {
                 await removeLedgerRows(ref.avId, [itemID]);
                 result.cleared++;
             } catch (e) {
                 result.errors.push(`${moduleId}/${itemID}: ${e instanceof Error ? e.message : String(e)}`);
+                failedIds.push(itemID);
             }
         }
+        if (failedIds.length > 0) remainingRows[moduleId] = failedIds;
     }
-    settings.demoRows = {};
+    settings.demoRows = remainingRows;
+    const remainingMembers: string[] = [];
     for (const id of settings.demoMemberIds ?? []) {
         const m = settings.members.find((x) => x.id === id);
-        if (m) await removeMember(plugin, settings, id);
+        if (!m) continue;
+        try {
+            await removeMember(plugin, settings, id);
+            result.cleared++;
+        } catch (e) {
+            result.errors.push(`${m.name}: ${e instanceof Error ? e.message : String(e)}`);
+            remainingMembers.push(id);
+        }
     }
-    settings.demoMemberIds = [];
+    settings.demoMemberIds = remainingMembers;
     await saveSettings(plugin, settings);
     return result;
 }
