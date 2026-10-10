@@ -92,7 +92,6 @@ describe("OCR API（沿用当前设备配置）", () => {
         });
     });
 });
-
 /** 分页 mock：按 page 返回 200/页 */
 function paginatedPK(total: number) {
     return (payload: any) => {
