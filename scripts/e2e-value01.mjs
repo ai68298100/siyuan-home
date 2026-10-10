@@ -36,7 +36,10 @@ const clickByText = (texts, scope = "button, .b3-chip, [role=tab], option") =>
     }, [texts, scope]);
 
 // 2) 引导（含建库）
-rec("首启向导出现", !!(await p.evaluate(() => document.body.innerText.includes("STEP 1 / 2"))));
+rec("首启向导出现", !!(await p.evaluate(() => {
+    const text = document.body.innerText;
+    return text.includes("STEP 1 / 2") || /第\s*1\s*步[，,]?\s*共\s*2\s*步/.test(text);
+})));
 await p.evaluate(() => {
     const input = document.querySelector(".lv-quick + * input, .lv-card input[placeholder*='例如']");
 });
@@ -80,12 +83,17 @@ await p.evaluate(() => {
     const sel = Array.from(document.querySelectorAll(".lv-screen select")).find((s) => Array.from(s.options).some((o) => o.textContent === "妈妈"));
     if (sel) { sel.value = Array.from(sel.options).find((o) => o.textContent === "妈妈").value; sel.dispatchEvent(new Event("change", { bubbles: true })); }
 });
+// 证件流程要求先选择证件类型，身份证用于覆盖最常见的完整编号录入路径。
+await p.evaluate(() => {
+    const sel = Array.from(document.querySelectorAll(".lv-screen select")).find((s) => Array.from(s.options).some((o) => o.textContent === "身份证"));
+    if (sel) { sel.value = Array.from(sel.options).find((o) => o.textContent === "身份证").value; sel.dispatchEvent(new Event("change", { bubbles: true })); }
+});
 await p.evaluate((d) => {
     const dateInput = Array.from(document.querySelectorAll(".lv-screen input[type=date]")).find((e) => !e.disabled);
     if (dateInput) { dateInput.value = d; dateInput.dispatchEvent(new Event("input", { bubbles: true })); dateInput.dispatchEvent(new Event("change", { bubbles: true })); }
 }, dueStr);
 await sleep(500);
-const saveHit = await clickByText(["＋ 新建", "＋新建"], ".lv-screen button"); await sleep(5000);
+const saveHit = await clickByText(["保存", "保存并继续新增"], ".lv-screen button"); await sleep(5000);
 const rows = await p.evaluate(() => document.querySelectorAll(".lv-table tbody tr").length);
 const rowNamed = await p.evaluate(() => Array.from(document.querySelectorAll(".lv-table tbody tr")).some((r) => (r.textContent || "").includes("妈妈身份证")));
 rec("快速表单录证件（行出现且带名称）", saveHit !== null && rowNamed, `rows=${rows} named=${rowNamed}`);

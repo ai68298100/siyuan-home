@@ -322,6 +322,40 @@ export async function uploadAsset(file: File, assetsPath = "/assets/siyuan-home/
     return { name: entry[0], path: entry[1] };
 }
 
+// ── OCR（手动识别使用思源当前设备的 OCR 配置；不改变自动识别开关）──
+
+export interface OCRConfigData {
+    config: {
+        provider: string;
+        model: string;
+        auto: boolean;
+        aiModelId?: string;
+    };
+    providers: { id: string; available: boolean }[];
+    models: { id: string; name: string; builtIn: boolean }[];
+    aiModels: { id: string; name: string; provider: string }[];
+}
+
+/** 获取当前设备 OCR 设置；旧内核不支持时由调用方提供升级/设置指引。 */
+export function getOCRConfig(): Promise<OCRConfigData> {
+    return post<OCRConfigData>("/api/asset/getOCRConfig", {});
+}
+
+/** 读取资源已保存的 OCR 文本，不触发识别。 */
+export async function getImageOCRText(path: string): Promise<string> {
+    const data = await post<{ text?: string }>("/api/asset/getImageOCRText", { path });
+    return typeof data?.text === "string" ? data.text : "";
+}
+
+/** 按当前思源 OCR 提供商识别图片；内核会保存结果并更新 OCR 索引。 */
+export async function recognizeAsset(path: string): Promise<{ text: string; ocrJSON: Record<string, string>[] }> {
+    const data = await post<{ text?: string; ocrJSON?: Record<string, string>[] }>("/api/asset/ocr", { path });
+    return {
+        text: typeof data?.text === "string" ? data.text : "",
+        ocrJSON: Array.isArray(data?.ocrJSON) ? data.ocrJSON : [],
+    };
+}
+
 /** 单元格写值（value 按列类型：{type:"text",text:{content}} / {type:"date",date:{content,isNotEmpty}} / {type:"relation",relation:{blockIDs}} …）。
  * 217 波：迁移到文档化公开端点 setAttributeViewBlockAttr（itemID=render row.id，D02 一致）——
  * 此前用的 batchSetAttributeViewBlockAttrs 是未入文档的内部路由（无兼容性保证，上游 API.md 141 行明示）。 */

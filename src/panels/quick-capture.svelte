@@ -190,7 +190,9 @@
             }
             let refreshFailed = false;
             try {
-                await plugin.refreshHub?.();
+                // A capture can create a new reminder row. Bypass the normal
+                // full-scan debounce so overview/reminders reflect it now.
+                await plugin.refreshHub?.(undefined, true);
             } catch (e) {
                 refreshFailed = true;
                 console.warn("[siyuan-home] quick capture saved but refresh failed:", e);

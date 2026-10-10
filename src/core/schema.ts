@@ -261,7 +261,7 @@ const CERT_PROFILE_COLUMNS: ColumnDef[] = Object.values(CERTIFICATE_PROFILE_COLU
 
 const CERT_PRIVATE: ColumnDef[] = [
     { key: "x_cert_holder_name", type: "text", labelKey: "field.x_cert_holder_name" },
-    { key: "holder_no", type: "text", labelKey: "field.holder_no" },      // 证件号后四位，脱敏
+    { key: "holder_no", type: "text", labelKey: "field.holder_no" },      // 完整证件号码，界面默认脱敏展示
     { key: "issue_date", type: "date", labelKey: "field.issue_date" },
     { key: "x_cert_valid_from", type: "date", labelKey: "field.x_cert_valid_from" },
     { key: "issuance_rule", type: "select", labelKey: "field.issuance_rule",
@@ -691,18 +691,31 @@ export const VEHICLES_SCHEMA: ModuleSchema = {
     columns: [
         ...d("name", "member"),
         { key: "plate", type: "text", labelKey: "field.plate" },
+        { key: "brand_model", type: "text", labelKey: "field.brand_model" },
+        { key: "vin", type: "text", labelKey: "field.vin" },
+        { key: "color", type: "text", labelKey: "field.color" },
+        { key: "energy_type", type: "select", labelKey: "field.energy_type", options: ["gasoline", "diesel", "hybrid", "electric", "other"], default: "gasoline" },
         ...d("expiry", "note"),
         { key: "mileage", type: "number", labelKey: "field.mileage" },
+        { key: "purchase_date", type: "date", labelKey: "field.purchase_date" },
+        { key: "purchase_price", type: "number", labelKey: "field.purchase_price" },
+        { key: "current_value", type: "number", labelKey: "field.current_value" },
         { key: "inspection_due", type: "date", labelKey: "field.inspection_due" },
+        { key: "insurance_company", type: "text", labelKey: "field.insurance_company" },
+        { key: "insurance_due", type: "date", labelKey: "field.insurance_due" },
+        { key: "vehicle_tax_due", type: "date", labelKey: "field.vehicle_tax_due" },
+        { key: "battery_capacity", type: "number", labelKey: "field.battery_capacity" },
         // 电池更换（grocy 印证：铅酸 1.5-2 年/锂 5-8 年——用户按实际记录下次更换日）
         { key: "battery_due", type: "date", labelKey: "field.battery_due" },
         // 违章手动记录（12123 功能面：日期/地点/行为/罚款 摘要，多条例以换行分隔；官方数据不做对接）
         { key: "violations", type: "text", labelKey: "field.violations" },
     ],
-    capture: ["name", "plate", "expiry", "inspection_due"],
+    capture: ["name", "plate", "energy_type", "mileage", "inspection_due"],
     reminders: [
         { key: "expiry", field: "expiry", kind: "oneoff", leadDays: 30 },
         { key: "inspection", field: "inspection_due", kind: "oneoff", leadDays: 30 },
+        { key: "insurance", field: "insurance_due", kind: "oneoff", leadDays: 30 },
+        { key: "vehicle_tax", field: "vehicle_tax_due", kind: "oneoff", leadDays: 30 },
         { key: "battery", field: "battery_due", kind: "oneoff", leadDays: 30 },
     ],
 };

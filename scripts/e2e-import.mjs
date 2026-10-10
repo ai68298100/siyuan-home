@@ -46,10 +46,15 @@ const openImport = async () => {
     await sleep(2000);
     await p.evaluate(() => {
         // 268 波适配：设置面板改侧栏导航（lv-setnav），页签文案带 emoji 前缀
-        const el = Array.from(document.querySelectorAll(".lv-setnav__item, .b3-dialog button")).find((e) => (e.textContent || "").includes("关于"));
+        const el = Array.from(document.querySelectorAll(".lv-setnav__item, .b3-dialog button")).find((e) => (e.textContent || "").includes("数据与帮助"));
         el?.click();
     });
-    await sleep(1200);
+    await sleep(700);
+    await p.evaluate(() => {
+        const el = Array.from(document.querySelectorAll(".lv-settings__subnav .lv-setnav__item, .b3-dialog button")).find((e) => (e.textContent || "").includes("迁移") || (e.textContent || "").includes("导出"));
+        el?.click();
+    });
+    await sleep(500);
     return p;
 };
 const toastOf = (p) => p.evaluate(() => document.querySelector("#message")?.textContent?.trim().slice(0, 100) ?? "");

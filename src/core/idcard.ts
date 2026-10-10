@@ -61,3 +61,15 @@ export function maskIdNumber(input: string): string {
     if (id.length < 10) return id.replace(/./g, "*");
     return `${id.slice(0, 6)}${"*".repeat(id.length - 10)}${id.slice(-4)}`;
 }
+
+/**
+ * 展示证件类通用编号的掩码。证件号在存储和编辑时保留完整内容，
+ * 列表/详情默认只露出少量首尾字符，避免侧窥泄露。
+ */
+export function maskCredentialNumber(input: string): string {
+    const value = String(input ?? "").trim();
+    if (!value) return "";
+    if (value.length <= 4) return "*".repeat(value.length);
+    if (value.length <= 8) return `${value.slice(0, 2)}${"*".repeat(value.length - 4)}${value.slice(-2)}`;
+    return `${value.slice(0, 2)}${"*".repeat(value.length - 6)}${value.slice(-4)}`;
+}

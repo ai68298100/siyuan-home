@@ -1,12 +1,12 @@
 <script lang="ts">
-    import { renderLedgerAll, addDetachedRow, setCell, RowIdentityPendingError } from "@/core/siyuan";
+    import { renderLedgerAll, addDetachedRow, setCell, RowIdentityPendingError, isKernelError, getOCRConfig, getImageOCRText, recognizeAsset } from "@/core/siyuan";
     import { generateQRDataUrl, blockDeepLink } from "@/core/qr";
     import { buildShoppingList } from "@/core/shopping";
     import { AMOUNT_KEYS, formatAmount, optLabel, optLabelText } from "@/core/format";
     import { parseCsv } from "@/core/csv";
     import { planImport, guessMapping } from "@/core/importer";
     import { buildCsv } from "@/core/csv";
-    import { maskIdNumber, parseIdNumber } from "@/core/idcard";
+    import { maskCredentialNumber, maskIdNumber, parseIdNumber } from "@/core/idcard";
     import { selectCellValue, selectCellContent } from "@/core/avcell";
     import { renderRecordCardPng, copyPngToClipboard, downloadPng } from "@/core/sharecard";
     import { localDateKey } from "@/core/hub/rule";
@@ -16,11 +16,14 @@
     import { ensurePinyin, pinyinReady, searchMatch } from "@/core/pinyin";
     import { openContactPicker } from "@/libs/contact-picker";
     import { getCertificateProfile, getCertificateReminderField } from "@/core/schema";
-    import { assetHref, downloadAsset } from "@/core/assets";
+    import { assetHref, downloadAsset, isImageAsset, isEncryptedNotebookAsset } from "@/core/assets";
+    import { calculateEnergyStats, type EnergyKind, type EnergyRecord } from "@/core/fuel";
+    import { calculateMaintenanceStats, calculateVehicleCostSummary, type MaintenanceRecord } from "@/core/vehicle";
+    import { loadRowLogs, saveRowLogs, getEntries, appendEntry, removeEntry } from "@/core/rowlog";
 
     let { plugin, t, version }: { plugin: HomePluginLike; t: (k: string) => string; version?: number } = $props();
 
-    // 台账页模块下拉：已建库 + 已启用但未建库的模块（26.7：后者可从页面直接触发重建）
+    // Ledger module selector includes provisioned and enabled-but-unprovisioned modules.
     // 263 波（262 波同款缺陷类）：enabledModules 无响应性——设置保存新启用模块后，
     // 已挂载台账页的下拉不出现新模块；version 驱动重算修复
     const ledgers = $derived.by(() => {
@@ -33,7 +36,7 @@
     // svelte-ignore state_referenced_locally
     let active = $state(plugin.activeLedger ?? "certs");
     let rows: any[] = $state([]);
-    // C4b 收尾：renderLedger 的原始列数组（含用户在思源视图手建的列，schema 映射之外）
+    // Preserve raw columns created directly in the host database view.
     let avCols: any[] = $state([]);
     let loading = $state(false);
     let loadError = $state("");
@@ -41,13 +44,24 @@
     let rebuilding = $state(false);
     let exporting = $state(false);
     let printing = $state(false);
-    // 17 组：台账内搜索（标题/备注 contains + 拼音全拼/首字母，与成员过滤不叠加——本页无成员过滤）
+    // Search matches title/note and pinyin; it is independent from member filtering.
     let searchText = $state("");
-    // 229 波性能（真机批 S6：1000 行挂表 3.7-7.3s）：渐进渲染——首屏 200 行 + "加载更多"按需追加；
-    // 排序/筛选在切片前作用于全量，CSV 导出与详情不受影响；切模块/改搜索时重置页大小
+
+    // Settings can disable the currently open module while this screen stays
+    // mounted. Keep the selector and form aligned with the enabled set instead
+    // of leaving the user on a blank, unselectable ledger.
+    $effect(() => {
+        const available = ledgers;
+        if (available.length > 0 && !available.some((entry) => entry.id === active)) {
+            active = available[0].id;
+            plugin.activeLedger = active;
+            searchText = "";
+        }
+    });
+    // Progressive rendering keeps the initial table responsive.
     const RENDER_PAGE = 200;
     let renderLimit = $state(RENDER_PAGE);
-    // 提案 C（227 波）：拼音字典懒加载，就绪后 pyTick 驱动筛选重算（一次性）
+    // Load the pinyin dictionary lazily and recompute once it is ready.
     let pyTick = $state(0);
     $effect(() => {
         void active;
@@ -85,7 +99,7 @@
         const q = searchText.trim().toLowerCase();
         let list = rows;
         if (q) {
-            // 提案 C（227 波）：拼音检索——全拼/首字母；字典懒加载完成后 pyTick 驱动重算
+            // Search by full pinyin or initials once the dictionary is ready.
             void pyTick;
             list = list.filter((r) => rowMatchesSearch(r, q, ref?.columns));
         }
@@ -103,7 +117,7 @@
             return ascending ? cmp : -cmp;
         });
     }
-    // 229 波性能：渐进渲染切片（排序/筛选已作用于全量，这里只切显示窗口）
+    // Sorting and filtering apply to all rows; only the visible window is sliced.
     const visibleRows = $derived(filteredRows.slice(0, renderLimit));
 
     function rowMatchesSearch(row: any, q: string, columns?: Record<string, string>) {
@@ -114,14 +128,33 @@
         return searchMatch(name, q) || searchMatch(note, q);
     }
 
-    const ref = $derived(plugin.settings.dbRefs[active]);
+    // Resolve only enabled modules. A disabled module may still have an old
+    // dbRef in settings; exposing that ref here would show stale rows after a
+    // settings change and make the empty-state actions misleading.
+    const ref = $derived(ledgers.find((entry) => entry.id === active)?.ref);
     const schemaKeys = $derived<string[]>(ref?.columns ? Object.keys(ref.columns) : []);
+    function switchLedger(event: Event) {
+        const next = (event.currentTarget as HTMLSelectElement).value;
+        const hasDraft = hasAnyInput
+            || !!pendingItemID
+            || identityPending
+            || Object.values(certificateFiles).some((files) => files.length > 0)
+            || Object.values(uploadedCertificateFiles).some((files) => files.length > 0);
+        if (next !== active && hasDraft) {
+            (event.currentTarget as HTMLSelectElement).value = active;
+            showMessage(t("ledger.draftModuleSwitchBlocked"), 5000, "info");
+            return;
+        }
+        active = next;
+        plugin.activeLedger = active;
+        searchText = "";
+    }
 
-    // 13 组/DL11：CSV 导出（当前模块、schema 全列、BOM 头兼容 Excel；本地生成不外传）
-    // G1（UG12 研究产出）：高后果模块导出前点名确认——健康/证件/财务/儿童相关
+    // CSV export uses schema columns and a BOM for spreadsheet compatibility.
+    // Sensitive modules require an explicit confirmation before export.
     const HIGH_CONSEQUENCE_MODULES = new Set(["health", "parenting", "certs", "insurance", "assets-real", "assets-virtual", "contracts", "medicine", "schooling"]);
 
-    // 246 波（QR 标签打印页）：当前模块全量行 → QR（块深链，无绑定行回退台账文档深链）+ 名称，隐藏 iframe 调起打印
+    // Print QR labels for all rows in the current module.
     async function printLabels() {
         const sourceRef = ref;
         const query = searchText.trim().toLowerCase();
@@ -159,7 +192,7 @@
 .printbtn:hover{background:#0860c4}
 @media print{.noprint{display:none}body{padding:0}}</style></head><body>
 <div class="head"><b>${t("ledger.printTitle")}</b><span class="sub">${t("ledger.printScanTip")} · ${new Date().toLocaleString()}</span></div>
-<div class="noprint" style="text-align:center;margin-bottom:14px"><button class="printbtn" onclick="window.print()">打印</button></div>
+<div class="noprint" style="text-align:center;margin-bottom:14px"><button class="printbtn" onclick="window.print()">${t("ledger.printButton")}</button></div>
 <div class="grid">${labels.map((l) => `<div class="label"><img src="${l.qr}" alt="QR">${l.name ? `<div class="nm">${esc(l.name)}</div>` : ""}<div class="tip">${t("ledger.printScanTip")}</div></div>`).join("")}</div>
 <script>window.print()<\/script></body></html>`;
             const w = window.open("", "_blank");
@@ -197,7 +230,7 @@
                 list = sortRows(list, sortField, ascending);
                 const cols = (plugin.schemaCatalog?.[moduleId]?.columns ?? []).filter((c: any) => sourceRef.columns![c.key]);
                 const label = (c: any) => (t(`field.${c.key}`) !== `field.${c.key}` ? t(`field.${c.key}`) : c.key);
-                const csv = buildCsv(cols.map(label), list.map((r) => cols.map((c: any) => cellText(r.cells[sourceRef.columns![c.key]]))));
+                const csv = buildCsv(cols.map(label), list.map((r) => cols.map((c: any) => cellText(r.cells[sourceRef.columns![c.key]], c.key, true))));
                 const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
                 const a = document.createElement("a");
                 a.href = URL.createObjectURL(blob);
@@ -215,7 +248,106 @@
         void download();
     }
 
-    // 第七十四轮：生长曲线（parenting）——身高/体重时间线 SVG；WHO 参考带待核实数据源后加入
+    /** Show fuel and charging usage per vehicle without combining hybrid energy types. */
+    async function openEnergyDashboard() {
+        const sourceRef = ref;
+        if (!sourceRef?.avId || active !== "vehicles") return;
+        const dlg = new Dialog({
+            title: t("fuel.dashboardTitle"),
+            content: `<div class="b3-dialog__content b3-dialog__content--wrap" id="lv-fuel-dashboard" style="max-height:68vh;overflow:auto"></div>`,
+            width: "620px",
+        });
+        dlg.element.classList.add("lv-energy-dialog");
+        const body = dlg.element.querySelector("#lv-fuel-dashboard") as HTMLElement;
+        const loading = document.createElement("div");
+        loading.className = "ft__on-surface";
+        loading.textContent = t("fuel.loading");
+        body.appendChild(loading);
+        try {
+            const result = await renderLedgerAll(sourceRef.avId);
+            if (!result.complete) throw new Error(t("ledger.loadIncomplete"));
+            if (ref?.avId !== sourceRef.avId) { dlg.destroy(); return; }
+            const cols = sourceRef.columns ?? {};
+            const vehicles = result.rows;
+            body.replaceChildren();
+            const intro = document.createElement("p");
+            intro.className = "ft__on-surface";
+            intro.style.cssText = "font-size:12px;line-height:1.65;margin:0 0 10px";
+            intro.textContent = t("fuel.dashboardHint");
+            body.appendChild(intro);
+            if (vehicles.length === 0) {
+                const empty = document.createElement("div");
+                empty.className = "lv-empty";
+                const icon = document.createElement("div"); icon.className = "eic"; icon.textContent = "🚗";
+                const title = document.createElement("b"); title.textContent = t("fuel.noVehicles");
+                const hint = document.createElement("span"); hint.textContent = t("fuel.noVehiclesHint");
+                const add = document.createElement("button"); add.className = "b3-button"; add.textContent = `+ ${t("fuel.addVehicle")}`;
+                add.onclick = () => { dlg.destroy(); openNewRecord(); };
+                empty.append(icon, title, hint, add);
+                body.appendChild(empty);
+                return;
+            }
+            const logs = await loadRowLogs(plugin as any);
+            const vehicleType = (row: any) => selectCellContent(row.cells?.[cols.energy_type ?? ""]) ?? "gasoline";
+            const miniStat = (label: string, value: string) => {
+                const item = document.createElement("div");
+                item.style.cssText = "min-width:0;padding:8px 10px;border-radius:8px;background:var(--b3-theme-background-light);display:flex;flex-direction:column;gap:3px";
+                const name = document.createElement("span"); name.className = "ft__on-surface"; name.style.fontSize = "11px"; name.textContent = label;
+                const val = document.createElement("b"); val.style.cssText = "font-size:14px;overflow-wrap:anywhere"; val.textContent = value;
+                item.append(name, val);
+                return item;
+            };
+            for (const vehicle of vehicles) {
+                const card = document.createElement("section");
+                card.className = "lv-card";
+                card.style.cssText = "padding:12px;margin-bottom:10px";
+                const head = document.createElement("div");
+                head.style.cssText = "display:flex;align-items:flex-start;justify-content:space-between;gap:8px;flex-wrap:wrap;margin-bottom:10px";
+                const title = document.createElement("b");
+                title.style.fontSize = "14px";
+                title.textContent = cellText(vehicle.cells?.[cols.name ?? ""], "name") || t("ledger.unnamed");
+                const plate = document.createElement("span");
+                plate.className = "ft__on-surface";
+                plate.style.fontSize = "12px";
+                plate.textContent = cellText(vehicle.cells?.[cols.plate ?? ""]);
+                head.append(title, plate);
+                const records = getEntries<EnergyRecord>(logs, sourceRef.avId, vehicle.itemID, "fuelings")
+                    .concat(getEntries<EnergyRecord>(logs, sourceRef.avId, vehicle.itemID, "chargings"));
+                const fuel = calculateEnergyStats(records, "fuel");
+                const charge = calculateEnergyStats(records, "charging");
+                const hybrid = vehicleType(vehicle) === "hybrid";
+                const grid = document.createElement("div");
+                grid.style.cssText = "display:grid;grid-template-columns:repeat(auto-fit,minmax(126px,1fr));gap:6px";
+                const consumption = (stats: ReturnType<typeof calculateEnergyStats>, suffix: string) =>
+                    stats.consumptionPer100Km !== undefined ? `${stats.consumptionPer100Km.toFixed(2)} ${suffix}/100km${stats.method === "estimated" ? ` · ${t("fuel.estimated")}` : ""}` : "—";
+                const cost = (stats: ReturnType<typeof calculateEnergyStats>) => stats.costPer100Km !== undefined
+                    ? `${formatAmount(stats.costPer100Km / 100)} ${t("fuel.currencyPerKm")}` : "—";
+                grid.append(
+                    miniStat(t("fuel.fuelConsumption"), fuel.recordCount ? hybrid ? `${fuel.totalQuantity.toFixed(1)} L · ${t("fuel.totalRecorded")}` : consumption(fuel, "L") : "—"),
+                    miniStat(t("fuel.fuelCostPerKm"), fuel.recordCount ? hybrid ? t("fuel.hybridNoRate") : cost(fuel) : "—"),
+                    miniStat(t("fuel.chargeConsumption"), charge.recordCount ? hybrid ? `${charge.totalQuantity.toFixed(1)} kWh · ${t("fuel.totalRecorded")}` : consumption(charge, "kWh") : "—"),
+                    miniStat(t("fuel.chargeCostPerKm"), charge.recordCount ? hybrid ? t("fuel.hybridNoRate") : cost(charge) : "—"),
+                    miniStat(t("fuel.fuelRecordedSpending"), fuel.costRecordCount === 0 ? t("fuel.costUnknown") : `${formatAmount(fuel.totalCost)} ${t("fuel.currency")}${fuel.costRecordCount < fuel.recordCount ? ` · ${t("fuel.subtotal")}` : ""}`),
+                    miniStat(t("fuel.chargeRecordedSpending"), charge.costRecordCount === 0 ? t("fuel.costUnknown") : `${formatAmount(charge.totalCost)} ${t("fuel.currency")}${charge.costRecordCount < charge.recordCount ? ` · ${t("fuel.subtotal")}` : ""}`),
+                );
+                const action = document.createElement("button");
+                action.className = "b3-button b3-button--text";
+                action.style.cssText = "margin-top:6px;padding:4px 0";
+                action.textContent = `${t("fuel.openVehicle")} →`;
+                action.onclick = () => { dlg.destroy(); openDetail(vehicle); };
+                card.append(head, grid, action);
+                body.appendChild(card);
+            }
+        } catch (error) {
+            body.replaceChildren();
+            const message = document.createElement("div");
+            message.className = "lv-record-error";
+            message.textContent = t("ledger.readFailed").replace("${msg}", error instanceof Error ? error.message : String(error));
+            body.appendChild(message);
+        }
+    }
+
+    // Growth chart for parenting records, including an optional WHO reference band.
     function openGrowthChart() {
         import("@/core/growth").then(({ collectGrowthSeries, whoBand, whoPercentile }) => {
             const members = plugin.settings.members ?? [];
@@ -238,7 +370,7 @@
                 if (textContent !== undefined) e.textContent = textContent;
                 return e;
             };
-            // D23：参考带性别——自动（面板内全部系列同性别时启用）/手选/关闭
+            // Reference-band sex can be automatic, selected, or disabled.
             let bandMode: "auto" | "male" | "female" | "off" = "auto";
             const sexById = new Map(members.map((m) => [m.id, m.sex as "male" | "female" | undefined]));
             const controls = document.createElement("div");
@@ -251,7 +383,7 @@
             for (const [v, key] of [["auto", "ledger.growthWhoAuto"], ["male", "members.sex.male"], ["female", "members.sex.female"], ["off", "ledger.growthWhoOff"]] as const) {
                 const o = document.createElement("option");
                 o.value = v;
-                o.textContent = t(key); // i18n 文案走 textContent（19 组安全）
+                o.textContent = t(key); // textContent keeps translated labels safe.
                 sel.appendChild(o);
             }
             sel.addEventListener("change", () => { bandMode = sel.value as typeof bandMode; renderPanels(); });
@@ -274,7 +406,7 @@
                     const xs = all.map((p) => p.x), ys = all.map((p) => p.y);
                     const xMin = Math.min(...xs), xMax = Math.max(...xs);
                     let yMin = Math.min(...ys), yMax = Math.max(...ys);
-                    // 参考带：裁剪到 0–60 月与数据窗口的交集；带值并入 y 域防裁剪
+                    // Clip the reference band to the data window and 0-60 months.
                     const knownSexes = [...new Set(ss.map((s) => sexById.get(s.memberId)).filter(Boolean))] as ("male" | "female")[];
                     const bandSex: "male" | "female" | null =
                         bandMode === "off" ? null : bandMode === "auto" ? (knownSexes.length === 1 ? knownSexes[0] : null) : bandMode;
@@ -292,7 +424,7 @@
                     const sy = (y: number) => (yMax === yMin ? H / 2 : H - PAD - ((y - yMin) / (yMax - yMin)) * (H - PAD * 2));
                     const fx = (x: number) => (Number.isInteger(x) ? String(x) : (Math.round(x * 10) / 10).toFixed(1)); // 小数月龄标签
                     const svg = el("svg", { width: W, height: H, viewBox: `0 0 ${W} ${H}` });
-                    // 轴与端点标注（数值轴 min/max；月龄轴 first/last）
+                    // Axes and endpoint labels.
                     svg.appendChild(el("line", { x1: PAD, y1: H - PAD, x2: W - PAD / 2, y2: H - PAD, stroke: "var(--b3-border-color)" }));
                     svg.appendChild(el("line", { x1: PAD, y1: PAD / 2, x2: PAD, y2: H - PAD, stroke: "var(--b3-border-color)" }));
                     svg.appendChild(el("text", { x: PAD - 6, y: PAD / 2 + 4, "text-anchor": "end", "font-size": 10 }, String(Math.round(yMax * 10) / 10)));
@@ -314,7 +446,7 @@
                         const memberSex = sexById.get(s.memberId);
                         const pointEl = (x: number, y: number, p: { date: string; value: number; ageMonths: number | null }) => {
                             const dot = el("circle", { cx: sx(x), cy: sy(y), r: pts.length === 1 ? 3 : 2.5, fill: color });
-                            // 原生悬停标注：有性别+月龄 → WHO 百分位；否则日期+数值（textContent 安全）
+                            // Native hover label shows percentile when sex and age are known.
                             const pct = memberSex && p.ageMonths !== null ? whoPercentile(memberSex, metric, p.ageMonths, p.value) : null;
                             const label = document.createElementNS(NS, "title");
                             label.textContent = pct !== null ? `P${Math.round(pct)} · ${p.date} ${p.value}` : `${p.date} ${p.value}`;
@@ -331,7 +463,7 @@
                             for (const p of pts) svg.appendChild(pointEl(p.ageMonths ?? 0, p.value, p));
                         }
                         const legend = el("text", { x: PAD + 4, y: PAD / 2 + 16 + i * 14, "font-size": 11, fill: color });
-                        legend.textContent = s.memberName; // 用户内容走 textContent（19 组安全）
+                        legend.textContent = s.memberName; // User content is assigned via textContent.
                         svg.appendChild(legend);
                     });
                     panel.appendChild(svg);
@@ -354,13 +486,15 @@
         try {
             const report = await plugin.ensureCoreLedgers();
             try {
-                await plugin.refreshHub();
+                // Rebuilding/provisioning changes the set of readable ledgers;
+                // a cached scan can otherwise hide the new module for 30s.
+                await plugin.refreshHub(undefined, true);
             } catch (e) {
                 showMessage(t("ledger.rebuildRefreshFailed").replace("${msg}", e instanceof Error ? e.message : String(e)), 6000, "error");
                 return;
             }
             if (report.issues.length > 0) {
-                const modules = report.issues.map(({ moduleId }) => t(`module.${moduleId}`)).join("、");
+                const modules = report.issues.map(({ moduleId }) => t(`module.${moduleId}`)).join(", ");
                 showMessage(t("ledger.rebuildPartial").replace("${modules}", modules), 7000, "error");
             } else {
                 showMessage(t("ledger.rebuildDone"), 3000, "info");
@@ -372,7 +506,7 @@
         }
     }
 
-    // 16 组/188 波：囤货采购建议——低库存（qty≤阈值，H15 同口径）汇总，逐项可改建议量，一键复制清单
+    // Shopping suggestions aggregate low-stock items and support copying the list.
     async function openShoppingList() {
         if (!ref?.avId || !ref.columns?.name || !ref.columns.qty || !ref.columns.low_stock_at) return;
         try {
@@ -441,7 +575,7 @@
         }
     }
 
-    // 16 组/191 波：assets CSV 批量导入——列映射向导（解析/规划纯函数在 core，UI 只做映射与写入）
+    // CSV import uses a schema-driven mapping wizard; core owns the planning logic.
     function openCsvImport() {
         if (!ref?.avId) return;
         const input = document.createElement("input");
@@ -536,15 +670,15 @@
                                 return;
                             }
                             try {
-                                await plugin.refreshHub([active]); // PF06：只重扫本模块
+                                await plugin.refreshHub([active]); // Refresh only the active module.
                             } catch (e) {
                                 showMessage(t("ledger.importRefreshFailed").replace("${msg}", e instanceof Error ? e.message : String(e)), 6000, "error");
                             }
-                            const failTxt = failed.length ? ` · ${t("ledger.importRowFail").replace("${n}", String(failed.length))} (#${failed.slice(0, 3).join(", #")}${failed.length > 3 ? "…" : ""})` : "";
-                            const partialTxt = partial.length ? ` · ${t("ledger.importPartial").replace("${n}", String(partial.length))} (#${partial.slice(0, 3).join(", #")}${partial.length > 3 ? "…" : ""})` : "";
-                            const pendingTxt = pending.length ? ` · ${t("ledger.importPending").replace("${n}", String(pending.length))} (#${pending.slice(0, 3).join(", #")}${pending.length > 3 ? "…" : ""})` : "";
+                            const failTxt = failed.length ? ` · ${t("ledger.importRowFail").replace("${n}", String(failed.length))} (#${failed.slice(0, 3).join(", #")}${failed.length > 3 ? "..." : ""})` : "";
+                            const partialTxt = partial.length ? ` · ${t("ledger.importPartial").replace("${n}", String(partial.length))} (#${partial.slice(0, 3).join(", #")}${partial.length > 3 ? "..." : ""})` : "";
+                            const pendingTxt = pending.length ? ` · ${t("ledger.importPending").replace("${n}", String(pending.length))} (#${pending.slice(0, 3).join(", #")}${pending.length > 3 ? "..." : ""})` : "";
                             const warningRows = plan.rows.flatMap((row, i) => row.warnings.map((warning) => `#${i + 1} ${t(`field.${warning.key}`) !== `field.${warning.key}` ? t(`field.${warning.key}`) : warning.key}: ${warning.message}`));
-                            const warningTxt = warningRows.length ? ` · ${t("ledger.importWarnings").replace("${n}", String(warningRows.length))}: ${warningRows.slice(0, 3).join("; ")}${warningRows.length > 3 ? "…" : ""}` : "";
+                            const warningTxt = warningRows.length ? ` · ${t("ledger.importWarnings").replace("${n}", String(warningRows.length))}: ${warningRows.slice(0, 3).join("; ")}${warningRows.length > 3 ? "..." : ""}` : "";
                             const hasIssues = failed.length + partial.length + pending.length + warningRows.length > 0;
                             showMessage(t("ledger.importDone").replace("${ok}", String(ok)).replace("${skip}", String(plan.skipped)) + failTxt + partialTxt + pendingTxt + warningTxt, 10000, hasIssues ? "error" : "info");
                         } catch (e) {
@@ -566,7 +700,7 @@
         if (!avID) { loading = false; return; }
         loading = true;
         try {
-            // 226 波修复（真机 e2e 发现）：renderLedger 单次调用受内核 pageSize 封顶（默认 50），
+            // Bound each render request to the kernel page size.
             // 表格永远只显示前 50 行——改用分页聚合的 renderLedgerAll
             const res = await renderLedgerAll(avID);
             if (request !== loadRequest || avID !== ref?.avId) return;
@@ -586,8 +720,8 @@
     }
     $effect(() => { void version; void active; void plugin.scan?.scannedAt; load(); });
 
-    // D09：capture 驱动的快速表单——列集/类型/枚举全部来自 schema（不再写死字段）。
-    // asset/mAsset/mSelect 列快速表单不支持，显式说明（不静默省略）。
+    // Capture form fields and enum options come from the schema.
+    // Asset and multi-value fields remain explicitly unsupported in this form.
     const captureCols = $derived.by(() => {
         const schema = plugin.schemaCatalog?.[active];
         if (!schema?.capture) return [] as { key: string; type: string; options?: string[]; labelKey?: string }[];
@@ -602,15 +736,20 @@
     const UNSUPPORTED_TYPES = ["asset", "mAsset", "mSelect"];
     const supportableCols = $derived(captureCols.filter((e) => !UNSUPPORTED_TYPES.includes(e.type)));
     const unsupportedCount = $derived(captureCols.filter((e) => UNSUPPORTED_TYPES.includes(e.type) && e.type !== "mAsset").length);
-    // 表单值：列 key → 输入值（select/relation 为字符串值，checkbox 为布尔）
+    // Form values are keyed by schema key.
     let form: Record<string, any> = $state({});
     let nameInput: HTMLInputElement | undefined = $state();
+    let newRecordOpen = $state(false);
+    let closeAfterSave = $state(true);
+    let savedDocId = $state("");
+    let savedRecordName = $state("");
     const certificateProfile = $derived(active === "certs" && form.category ? getCertificateProfile(String(form.category)) : null);
     const certificateScalarCols = $derived.by(() => {
         if (!certificateProfile) return [] as { key: string; type: string; options?: string[] }[];
         const schemaCols: any[] = plugin.schemaCatalog?.certs?.columns ?? [];
         const keys = new Set(["x_cert_holder_name", "holder_no", "x_cert_id_number", "issue_date", "x_cert_valid_from", "issuance_rule", "store_place", "location", "copy_location", "note", ...certificateProfile.fieldKeys]);
         if (!getCertificateReminderField(certificateProfile.category)) keys.add("due");
+        if (certificateProfile.category === "id") keys.delete("holder_no");
         return schemaCols.filter((col: any) => keys.has(col.key) && col.type !== "mAsset")
             .map((col: any) => ({ key: col.key, type: col.type, options: col.options }));
     });
@@ -639,7 +778,7 @@
         }
         return out;
     });
-    // 上传缓存跨部分失败保留：File 仅在上传前暂存，上传成功后以 assets 路径暂存，重试不会重复上传。
+    // Keep local files across partial failures; successful uploads are cached by asset path.
     let certificateFiles: Record<string, File[]> = $state({});
     let uploadedCertificateFiles: Record<string, { name: string; content: string }[]> = $state({});
     let lastCertificateCategory = $state("");
@@ -657,15 +796,34 @@
         });
         certificateFiles = { ...certificateFiles, [key]: [...previous, ...unique] };
     }
+    async function removeCertificateFile(key: string, source: "local" | "uploaded", index: number) {
+        if (source === "local") {
+            certificateFiles = { ...certificateFiles, [key]: (certificateFiles[key] ?? []).filter((_, i) => i !== index) };
+        } else {
+            const next = (uploadedCertificateFiles[key] ?? []).filter((_, i) => i !== index);
+            if (pendingItemID && ref?.avId && ref.columns?.[key]) {
+                try {
+                    await setCell(ref.avId, ref.columns[key], pendingItemID, {
+                        type: "mAsset",
+                        mAsset: next.map(({ name, content }) => ({ name, content })),
+                    });
+                } catch (e) {
+                    showMessage(t("ledger.attachmentRemoveFailed").replace("${msg}", e instanceof Error ? e.message : String(e)), 5000, "error");
+                    return;
+                }
+            }
+            uploadedCertificateFiles = { ...uploadedCertificateFiles, [key]: next };
+        }
+    }
     function selectedFileText(key: string): string {
-        const count = certificateFiles[key]?.length ?? 0;
+        const count = (certificateFiles[key]?.length ?? 0) + (uploadedCertificateFiles[key]?.length ?? 0);
         return count > 0 ? t("ledger.selectedFiles").replace("${n}", String(count)) : t("ledger.chooseAttachment");
     }
     function handleCertificateCategoryChange(category: string) {
         const hasDraft = active === "certs" && (
-            supportableCols.some((entry) => entry.key !== "category" && form[entry.key] !== undefined && form[entry.key] !== "" && form[entry.key] !== false)
-            || Object.keys(form).some((key) => key.startsWith("x_cert_") && form[key] !== undefined && form[key] !== "" && form[key] !== false)
-            || quickAssetCols.some((entry) => (certificateFiles[entry.key]?.length ?? 0) > 0 || (uploadedCertificateFiles[entry.key]?.length ?? 0) > 0)
+            Object.entries(form).some(([key, value]) => key !== "category" && value !== undefined && value !== "" && value !== false)
+            || Object.values(certificateFiles).some((files) => files.length > 0)
+            || Object.values(uploadedCertificateFiles).some((files) => files.length > 0)
             || !!pendingItemID
         );
         if (lastCertificateCategory && category !== lastCertificateCategory && hasDraft) {
@@ -679,19 +837,92 @@
         certificateFiles = Object.fromEntries(Object.entries(certificateFiles).filter(([key]) => key === "attachments"));
         uploadedCertificateFiles = Object.fromEntries(Object.entries(uploadedCertificateFiles).filter(([key]) => key === "attachments"));
     }
-            // D03：保存状态与恢复——saving 防双击；失败保留输入；已建行 itemID 保留，重试补写同一行
+            // Saving prevents double submits; retries preserve the item ID and form values.
     let saving = $state(false);
     let saveError = $state("");
     let identityPending = $state(false); // 行已提交但身份未确认（D02）：禁止自动重试，防重复建行
-    let savedModule = $state(""); // C6b：保存成功回执（"保存并查看"入口，8 秒自动消失）
-    let pendingItemID: string | null = null;
+    let savedModule = $state(""); // Brief save confirmation state.
+    let pendingItemID = $state<string | null>(null);
+
+    function onNewRecordKeydown(event: KeyboardEvent) {
+        if (!newRecordOpen || saving) return;
+        if (event.key === "Escape") {
+            event.preventDefault();
+            closeNewRecord();
+            return;
+        }
+        if (event.key !== "Tab") return;
+        const sheet = document.querySelector(".lv-record-modal.open .lv-record-sheet");
+        if (!sheet) return;
+        const focusables = Array.from(sheet.querySelectorAll<HTMLElement>('button, input, select, textarea, [tabindex]:not([tabindex="-1"])'))
+            .filter((element) => !element.hasAttribute("disabled") && element.getClientRects().length > 0);
+        if (focusables.length === 0) return;
+        const first = focusables[0];
+        const last = focusables[focusables.length - 1];
+        if (event.shiftKey && document.activeElement === first) { event.preventDefault(); last.focus(); }
+        else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first.focus(); }
+    }
+
+    function fieldLabel(key: string): string {
+        return t(`field.${key}`) !== `field.${key}` ? t(`field.${key}`) : key;
+    }
+
+    function openNewRecord() {
+        if (!ref?.avId) {
+            showMessage(t("ledger.notProvisionedHint"), 4500, "info");
+            return;
+        }
+        newRecordOpen = true;
+        requestAnimationFrame(() => nameInput?.focus());
+    }
+
+    function closeNewRecord() {
+        if (saving) return;
+        newRecordOpen = false;
+    }
+
+    function clearNewRecord() {
+        if (pendingItemID) {
+            void discardPartialRecord();
+            return;
+        }
+        if (!hasAnyInput) {
+            resetForm();
+            return;
+        }
+        confirm(t("ledger.clearDraft"), t("ledger.clearDraftConfirm"), () => resetForm());
+    }
+
+    async function discardPartialRecord() {
+        if (!pendingItemID || !ref?.avId || saving || identityPending) return;
+        confirm(t("ledger.discardPartial"), t("ledger.discardPartialConfirm"), async () => {
+            saving = true;
+            try {
+                const { removeLedgerRows } = await import("@/core/siyuan");
+                await removeLedgerRows(ref!.avId!, [pendingItemID!]);
+                resetForm();
+                await load();
+                try { await plugin.refreshHub([active]); } catch { /* cleanup succeeded; refresh is best effort */ }
+                showMessage(t("ledger.discardPartialDone"), 3000, "info");
+            } catch (e) {
+                showMessage(t("ledger.discardPartialFailed").replace("${msg}", e instanceof Error ? e.message : String(e)), 6000, "error");
+            } finally {
+                saving = false;
+            }
+        });
+    }
+
+    function saveNewRecord(continueAfter: boolean) {
+        closeAfterSave = !continueAfter;
+        void createRow();
+    }
 
     function cellValue(type: string, v: any): unknown | null {
         switch (type) {
             case "select": return selectCellValue(v);
             case "relation": {
-                // relation 录入当前仅面向 members 库。选项虽已禁用未绑定成员，旧草稿或
-                // stale value 仍可能绕过控件；最终写入前只接受当前仍存在的合法行 ID。
+                // Relations currently target the members ledger. Disabled options may still exist in stale drafts.
+                // Validate the selected row ID again before writing it.
                 const relationID = typeof v === "string" ? v.trim() : "";
                 const linked = relationID && (plugin.settings.members ?? []).some((m) => m.avItemId === relationID);
                 return linked ? { type: "relation", relation: { blockIDs: [relationID], contents: null } } : null;
@@ -708,7 +939,7 @@
         return e.key === "name" ? !!(v && String(v).trim()) : v !== undefined && v !== "" && v !== false;
     }) || certificateScalarCols.some((e) => form[e.key] !== undefined && form[e.key] !== "" && form[e.key] !== false)
         || quickAssetCols.some((e) => (certificateFiles[e.key]?.length ?? 0) > 0 || (uploadedCertificateFiles[e.key]?.length ?? 0) > 0));
-    // UI05：name 必填——为空但有其他字段时阻止提交（不允许"（未命名）"兜底）
+    // A name is required whenever any other field has been entered.
     const nameMissing = $derived(hasAnyInput && !(form.name && String(form.name).trim()));
 
     function resetForm() {
@@ -719,33 +950,33 @@
         saveError = ""; identityPending = false; pendingItemID = null;
     }
 
-    /** 单元格值 → 显示文本（详情抽屉/表格共用；日期走本地时区；select 值带列上下文走枚举 i18n——
-     * optLabel/optLabelText 纯函数在 core/format，212 波抽核心可单测） */
-    function cellText(v: any, colKey?: string): string {
+    /** Format a cell for both the table and the detail drawer. */
+    function cellText(v: any, colKey?: string, revealSensitive = false): string {
         if (!v) return "—";
         switch (v.type) {
             case "text": {
                 const content = v.text?.content ?? "—";
                 // 完整证件号在表格默认掩码（防侧窥）；详情抽屉内可显文明本
-                if (colKey === "x_cert_id_number" && content !== "—") return maskIdNumber(content);
+                if (!revealSensitive && colKey === "x_cert_id_number" && content !== "—") return maskIdNumber(content);
+                if (!revealSensitive && ["holder_no", "x_cert_birth_registration_no_last4", "x_cert_vocational_registration_last4", "x_cert_professional_registration_last4", "x_cert_graduation_no_last4", "x_cert_degree_no_last4"].includes(colKey ?? "") && content !== "—") return maskCredentialNumber(content);
                 return content;
             }
             case "date": return v.date?.isNotEmpty ? localDateKey(new Date(v.date.content)) : "—";
             case "select": {
-                // R8：内核 3.8.x 把 select 值存为 mSelect 数组——双形态读取
+                // Select values can be stored as either scalar or mSelect cells.
                 const s = selectCellContent(v) ?? "—";
                 return colKey ? optLabel(t, colKey, s) : s;
             }
             case "mSelect": {
-                const list = v.mSelect?.length ? v.mSelect.map((o: any) => o.content).join("、") : "—";
+                const list = v.mSelect?.length ? v.mSelect.map((o: any) => o.content).join(", ") : "—";
                 return colKey && list !== "—" ? optLabelText(t, colKey, list) : list;
             }
             case "number": return v.number?.isNotEmpty ? String(v.number.content) : "—";
             case "url": return v.url?.content ?? "—";
-            case "checkbox": return v.checkbox?.checked ? "✓" : "—";
+            case "checkbox": return v.checkbox?.checked ? "是" : "—";
             case "block": return v.block?.content ?? "—";
-            case "relation": return (v.relation?.contents ?? []).map((c: any) => c.block?.content ?? "").join("、") || "—";
-            case "mAsset": return (v.mAsset ?? []).map((asset: any) => asset?.name ?? asset?.content ?? "").filter(Boolean).join("、") || "—";
+            case "relation": return (v.relation?.contents ?? []).map((c: any) => c.block?.content ?? "").join(", ") || "—";
+            case "mAsset": return (v.mAsset ?? []).map((asset: any) => asset?.name ?? asset?.content ?? "").filter(Boolean).join(", ") || "—";
             default: return "—";
         }
     }
@@ -753,8 +984,7 @@
     // 252 波（对齐原型台账状态语义）：由到期日推导展示级色调——只读日期比较，
     // 不写数据、不参与提醒派生
     type LedgerTone = "danger" | "warn" | "ok" | "none";
-    // 256 波：warn 阈值跟随该模块提醒规则的生效提前量（leadOverrides 覆盖 > schema 默认，
-    // 取最大值 = 最早的提醒时点），色点语义与提醒中枢的触发时点一致；无规则模块回退 30 天
+    // Warning thresholds follow each module's reminder lead time.
     const warnDays = $derived.by(() => {
         void version;
         const rules = (plugin.schemaCatalog?.[active]?.reminders ?? []) as { key: string; leadDays: number }[];
@@ -783,7 +1013,7 @@
         return tone === "danger" ? "var(--lv-danger)" : tone === "warn" ? "var(--lv-warn)" : "";
     }
 
-    // 详情抽屉：值 ↔ 编辑态互转（A5 行编辑 UI 层；relation 复杂编辑暂不开放）
+    // Detail drawer view/edit state is kept at the UI layer.
     function rawFromValue(type: string, v: any): any {
         switch (type) {
             case "number": return v?.number?.isNotEmpty && typeof v.number.content === "number" ? v.number.content : "";
@@ -795,7 +1025,7 @@
         }
     }
 
-    // EC13：从人脉选人（共享对话框见 src/libs/contact-picker.ts；快照格式 `名称 [docId]`）
+    // Select a person from the shared contacts picker.
     function pickFromContacts(onPicked: (snapshot: string) => void) {
         openContactPicker({
             t: (key, vars) => {
@@ -807,15 +1037,15 @@
         }, onPicked);
     }
 
-    // C4b：行点击 → 详情抽屉（全列 kv；DOM 构建用户内容，不走 HTML 模板——19 组安全）
+    // Row click opens a detail drawer; user content is assigned through DOM APIs.
     function openDetail(row: any) {
         if (!ref?.columns) return;
-        // 263 波：抽屉头显示行名（对齐原型 drawer-head；空名回退通用标题）
+        // Show the row name in the drawer header, with a generic fallback.
         const detailTitle = (ref.columns.name && cellText(row.cells[ref.columns.name], "name")) || t("ledger.detail");
         const dlg = new Dialog({
             title: detailTitle,
             content: `<div class="b3-dialog__content b3-dialog__content--wrap" id="lv-detail-body" style="max-height:60vh;overflow:auto"></div>
-<div class="b3-dialog__action"><button class="b3-button b3-button--cancel" id="lv-detail-del">${t("delete")}</button><span style="flex:1"></span><button class="b3-button b3-button--cancel" id="lv-detail-card-copy">${t("ledger.copyAsImage")}</button><button class="b3-button b3-button--cancel" id="lv-detail-card-png">${t("ledger.downloadPng")}</button><button class="b3-button b3-button--cancel" id="lv-detail-card-text">${t("ledger.copyAsText")}</button><button class="b3-button b3-button--cancel" id="lv-detail-close">${t("cancel")}</button><button class="b3-button b3-button--text" id="lv-detail-edit">${t("members.edit")}</button><button class="b3-button" id="lv-detail-open">${t("ledger.openDoc")} ↗</button></div>`,
+<div class="b3-dialog__action"><button class="b3-button b3-button--cancel" id="lv-detail-del">${t("delete")}</button><span style="flex:1"></span><button class="b3-button b3-button--cancel" id="lv-detail-card-copy">${t("ledger.copyAsImage")}</button><button class="b3-button b3-button--cancel" id="lv-detail-card-png">${t("ledger.downloadPng")}</button><button class="b3-button b3-button--cancel" id="lv-detail-card-text">${t("ledger.copyAsText")}</button><button class="b3-button b3-button--cancel" id="lv-detail-close">${t("cancel")}</button><button class="b3-button b3-button--text" id="lv-detail-edit">${t("members.edit")}</button><button class="b3-button" id="lv-detail-open">${t("ledger.openDoc")} →</button></div>`,
             width: "520px",
         });
         const body = dlg.element.querySelector("#lv-detail-body") as HTMLElement;
@@ -823,7 +1053,7 @@
         const activeCertFields = active === "certs" ? new Set(getCertificateProfile(rowCategory).fieldKeys) : null;
         const schemaCols: any[] = (plugin.schemaCatalog?.[active]?.columns ?? []).filter((col: any) =>
             active !== "certs" || !String(col.key).startsWith("x_cert_") || activeCertFields?.has(col.key));
-        // A5 行编辑 UI 层：可编辑类型（relation/mAsset 等复杂类型仍在台账文档编辑）
+        // Editable scalar fields are handled here; complex relations remain in the host view.
         const EDITABLE = new Set(["text", "number", "date", "select", "url", "checkbox"]);
         const colLabel = (col: any) => (t(`field.${col.key}`) !== `field.${col.key}` ? t(`field.${col.key}`) : col.key);
         function labelSpan(col: any) {
@@ -851,6 +1081,117 @@
         function addAttachmentsSection() {
             const assetCols = schemaCols.filter((col) => col.type === "mAsset" && ref!.columns[col.key]);
             const pendingDetailAssets: Record<string, { name?: string; content?: string }[]> = {};
+
+            function showOCRGuide() {
+                const guide = new Dialog({
+                    title: t("ledger.ocrSetupTitle"),
+                    content: `<div class="b3-dialog__content b3-dialog__content--wrap" style="line-height:1.7;max-height:60vh;overflow:auto"><p>${t("ledger.ocrSetupIntro")}</p><ol><li>${t("ledger.ocrSetupStep1")}</li><li>${t("ledger.ocrSetupStep2")}</li><li>${t("ledger.ocrSetupStep3")}</li></ol><p>${t("ledger.ocrSetupStorage")}</p><p>${t("ledger.ocrSetupAI")}</p></div><div class="b3-dialog__action"><button class="b3-button" id="lv-ocr-guide-close">${t("close")}</button></div>`,
+                    width: "460px",
+                });
+                guide.element.querySelector("#lv-ocr-guide-close")?.addEventListener("click", () => guide.destroy());
+            }
+
+            function escapeOCRHtml(value: string): string {
+                return value.replace(/[&<>"']/g, (char) => ({
+                    "&": "&amp;", "<": "&lt;", ">": "&gt;", "\"": "&quot;", "'": "&#39;",
+                })[char] ?? char);
+            }
+
+            function showOCRText(fileName: string, text: string, rerun: () => void) {
+                const result = new Dialog({
+                    title: t("ledger.ocrResultTitle"),
+                    content: `<div class="b3-dialog__content b3-dialog__content--wrap" style="display:flex;flex-direction:column;gap:8px"><div class="ft__on-surface" id="lv-ocr-result-name" style="word-break:break-all"></div><textarea id="lv-ocr-result-text" class="b3-text-field fn__block" readonly style="min-height:180px;resize:vertical"></textarea><div class="ft__on-surface" style="font-size:12px">${t("ledger.ocrResultStored")}</div></div><div class="b3-dialog__action"><button class="b3-button b3-button--cancel" id="lv-ocr-rerun">${t("ledger.ocrRerun")}</button><span style="flex:1"></span><button class="b3-button b3-button--cancel" id="lv-ocr-copy" ${text ? "" : "disabled"}>${t("ledger.ocrCopy")}</button><button class="b3-button" id="lv-ocr-close">${t("close")}</button></div>`,
+                    width: "520px",
+                });
+                (result.element.querySelector("#lv-ocr-result-name") as HTMLElement).textContent = fileName;
+                (result.element.querySelector("#lv-ocr-result-text") as HTMLTextAreaElement).value = text || t("ledger.ocrNoText");
+                result.element.querySelector("#lv-ocr-close")?.addEventListener("click", () => result.destroy());
+                result.element.querySelector("#lv-ocr-copy")?.addEventListener("click", async () => {
+                    try {
+                        await navigator.clipboard.writeText(text);
+                        showMessage(t("ledger.ocrCopyDone"), 2500, "info");
+                    } catch {
+                        showMessage(t("ledger.ocrCopyFailed"), 4000, "error");
+                    }
+                });
+                result.element.querySelector("#lv-ocr-rerun")?.addEventListener("click", () => {
+                    result.destroy();
+                    rerun();
+                });
+            }
+
+            function confirmAIOCR(modelName: string, providerName: string): Promise<boolean> {
+                return new Promise((resolve) => {
+                    let settled = false;
+                    const finish = (accepted: boolean, dialog?: Dialog) => {
+                        if (settled) return;
+                        settled = true;
+                        resolve(accepted);
+                        dialog?.destroy();
+                    };
+                    const dialog = new Dialog({
+                        title: t("ledger.ocrAIConfirmTitle"),
+                        content: `<div class="b3-dialog__content b3-dialog__content--wrap" style="line-height:1.7"><p>${t("ledger.ocrAIConfirmBody")
+                            .replace("${model}", escapeOCRHtml(modelName))
+                            .replace("${provider}", escapeOCRHtml(providerName))}</p></div><div class="b3-dialog__action"><button class="b3-button b3-button--cancel" id="lv-ocr-ai-cancel">${t("cancel")}</button><span style="flex:1"></span><button class="b3-button" id="lv-ocr-ai-send">${t("ledger.ocrAISend")}</button></div>`,
+                        width: "460px",
+                        destroyCallback: () => finish(false),
+                    });
+                    dialog.element.querySelector("#lv-ocr-ai-cancel")?.addEventListener("click", () => finish(false, dialog));
+                    dialog.element.querySelector("#lv-ocr-ai-send")?.addEventListener("click", () => finish(true, dialog));
+                });
+            }
+
+            async function recognizeImage(path: string, fileName: string, button: HTMLButtonElement) {
+                button.disabled = true;
+                const previousLabel = button.textContent;
+                button.textContent = t("ledger.ocrRunning");
+                try {
+                    const config = await getOCRConfig();
+                    const provider = config.config?.provider;
+                    const providerState = config.providers?.find((item) => item.id === provider);
+                    if (!providerState?.available) {
+                        showOCRGuide();
+                        return;
+                    }
+                    if (provider === "ai") {
+                        const model = config.config.aiModelId
+                            ? config.aiModels?.find((item) => item.id === config.config.aiModelId)
+                            : undefined;
+                        if (!model) {
+                            showOCRGuide();
+                            return;
+                        }
+                        const accepted = await confirmAIOCR(model.name, model.provider);
+                        if (accepted) await runRecognition();
+                    } else if (provider === "tesseract" || provider === "paddleocr") {
+                        await runRecognition();
+                    } else {
+                        showOCRGuide();
+                    }
+                } catch (error) {
+                    if (isKernelError(error)) showOCRGuide();
+                    else showMessage(t("ledger.ocrConfigFailed").replace("${msg}", error instanceof Error ? error.message : String(error)), 7000, "error");
+                } finally {
+                    button.disabled = false;
+                    button.textContent = previousLabel;
+                }
+
+                async function runRecognition() {
+                    button.disabled = true;
+                    button.textContent = t("ledger.ocrRunning");
+                    try {
+                        const result = await recognizeAsset(path);
+                        showOCRText(fileName, result.text, () => { void recognizeImage(path, fileName, button); });
+                    } catch (error) {
+                        showMessage(t("ledger.ocrFailed").replace("${msg}", error instanceof Error ? error.message : String(error)), 7000, "error");
+                    } finally {
+                        button.disabled = false;
+                        button.textContent = previousLabel;
+                    }
+                }
+            }
+
             for (const attCol of assetCols) {
                 const attKeyID = ref!.columns[attCol.key];
                 const attHead = document.createElement("div");
@@ -894,6 +1235,33 @@
                             }
                         };
                         line.appendChild(download);
+
+                        if (isImageAsset(f.content) && isEncryptedNotebookAsset(f.content, window.siyuan.notebooks ?? [])) {
+                            const encryptedHint = document.createElement("span");
+                            encryptedHint.className = "ft__on-surface";
+                            encryptedHint.style.cssText = "padding:2px 4px;font-size:12px";
+                            encryptedHint.textContent = t("ledger.ocrEncrypted");
+                            line.appendChild(encryptedHint);
+                        } else if (isImageAsset(f.content)) {
+                            const ocr = document.createElement("button");
+                            ocr.className = "b3-button b3-button--text";
+                            ocr.style.cssText = "padding:2px 4px;font-size:12px";
+                            ocr.textContent = t("ledger.ocrOpen");
+                            ocr.onclick = async () => {
+                                ocr.disabled = true;
+                                try {
+                                    const text = await getImageOCRText(f.content!);
+                                    if (text) showOCRText(f.name ?? f.content!, text, () => { void recognizeImage(f.content!, f.name ?? f.content!, ocr); });
+                                    else await recognizeImage(f.content!, f.name ?? f.content!, ocr);
+                                } catch (error) {
+                                    if (isKernelError(error)) showOCRGuide();
+                                    else showMessage(t("ledger.ocrConfigFailed").replace("${msg}", error instanceof Error ? error.message : String(error)), 7000, "error");
+                                } finally {
+                                    ocr.disabled = false;
+                                }
+                            };
+                            line.appendChild(ocr);
+                        }
                     }
                     body.appendChild(line);
                 }
@@ -954,8 +1322,15 @@
                 };
                 body.append(uploadBtn, fileInput);
             }
+            if (assetCols.length > 0) {
+                const hint = document.createElement("div");
+                hint.className = "ft__on-surface";
+                hint.style.cssText = "font-size:12px;line-height:1.6;margin-top:6px";
+                hint.textContent = t("ledger.ocrHint");
+                body.appendChild(hint);
+            }
         }
-        // 查看模式：kv 行 + 历史 + 附件
+        // View mode includes key/value rows, history, and attachments.
         let cardRows: { label: string; value: string }[] = [];
         function buildView() {
             body.innerHTML = "";
@@ -976,11 +1351,12 @@
                 } else {
                     v.textContent = cellText(cell, col.key); // 211 波：select 值走枚举 i18n
                 }
-                // R7 资料强化：完整证件号默认掩码 + 显示/复制（明文只在显式动作后可见/离机）
-                if (active === "certs" && col.key === "x_cert_id_number") {
-                    const full = String(cellText(cell, col.key));
-                    if (full !== "—") {
-                        v.textContent = maskIdNumber(full);
+                // Sensitive certificate values are masked by default and can be explicitly revealed.
+                if (active === "certs" && ["x_cert_id_number", "holder_no", "x_cert_birth_registration_no_last4", "x_cert_vocational_registration_last4", "x_cert_professional_registration_last4", "x_cert_graduation_no_last4", "x_cert_degree_no_last4"].includes(col.key)) {
+                    const full = String(rawFromValue("text", cell) ?? "").trim();
+                    if (full) {
+                        const mask = col.key === "x_cert_id_number" ? maskIdNumber(full) : maskCredentialNumber(full);
+                        v.textContent = mask;
                         const reveal = document.createElement("button");
                         reveal.className = "b3-button b3-button--text";
                         reveal.style.cssText = "padding:0 6px;font-size:12px";
@@ -988,7 +1364,7 @@
                         let shown = false;
                         reveal.onclick = () => {
                             shown = !shown;
-                            v.textContent = shown ? full : maskIdNumber(full);
+                            v.textContent = shown ? full : mask;
                             reveal.textContent = shown ? t("ledger.idNumberHide") : t("ledger.idNumberShow");
                         };
                         const copy = document.createElement("button");
@@ -1004,11 +1380,12 @@
                             }
                         };
                         line.append(reveal, copy);
-                        // R7 识别深化：号码校验通过且关联成员生日为空 → 一键回填成员生日（公历；农历生日不覆写）
-                        const parsedId = parseIdNumber(full);
-                        const memberBid = row.cells[ref.columns.member]?.relation?.blockIDs?.[0];
+                        // Valid ID cards can fill a linked member's birth date.
+                        // Other certificate numbers support reveal/copy without ID parsing.
+                        const parsedId = col.key === "x_cert_id_number" ? parseIdNumber(full) : null;
+                        const memberBid = ref.columns.member ? row.cells[ref.columns.member]?.relation?.blockIDs?.[0] : undefined;
                         const member = memberBid ? (plugin.settings.members ?? []).find(m => m.avItemId === memberBid) : undefined;
-                        if (parsedId.ok && parsedId.birth && member && !member.birthday && !member.lunarBirthday) {
+                        if (parsedId?.ok && parsedId.birth && member && !member.birthday && !member.lunarBirthday) {
                             const birthFill = document.createElement("button");
                             birthFill.className = "b3-button b3-button--text";
                             birthFill.style.cssText = "padding:0 6px;font-size:12px";
@@ -1021,6 +1398,9 @@
                                 try {
                                     const { updateMember } = await import("@/core/members");
                                     await updateMember(plugin as any, plugin.settings, target);
+                                    // Filling a member birthday changes the
+                                    // birthday reminder provider immediately.
+                                    await plugin.refreshHub(undefined, true);
                                     showMessage(t("ledger.idBirthFilled").replace("${birth}", parsedId.birth), 3000, "info");
                                     birthFill.disabled = true;
                                 } catch (e) {
@@ -1036,8 +1416,7 @@
                 body.appendChild(line);
                 cardRows.push({ label: colLabel(col), value: String(v.textContent) });
             }
-            // C4b 收尾：用户在思源视图手建的列（schema 映射之外）追加展示——独立分区、
-            // 原始列名直出（不做 i18n 包装），只读；编辑仍走思源视图，不冒充 schema 字段。
+            // Append user-created columns outside the schema as a read-only section.
             const schemaKeyIDs = new Set(Object.values<string>(ref!.columns));
             const customCols = avCols.filter((c: any) => c?.id && !schemaKeyIDs.has(c.id) && String(c.name ?? "").trim() !== "");
             if (customCols.length > 0) {
@@ -1062,7 +1441,7 @@
                     body.appendChild(line);
                 }
             }
-        // 子记录模型（2026-10-04 定案）：行日志时间线分区通用构造器（rowlogs.json；行删除联动清理）
+        // Shared row-log timeline section; deletion cleanup is handled with the row.
         async function addRowLogSection(opts: {
             title: string;
             emptyText: string;
@@ -1086,7 +1465,7 @@
                     const del = document.createElement("button");
                     del.className = "b3-button b3-button--text";
                     del.style.cssText = "padding:0 4px;font-size:12px";
-                    del.textContent = "✕";
+                    del.textContent = t("delete");
                     del.onclick = async () => {
                         del.disabled = true;
                         try {
@@ -1184,6 +1563,481 @@
             render();
         }
 
+        /** Show a compact, read-only vehicle cost/event overview above the detailed sections. */
+        async function addVehicleCostSummarySection() {
+            if (!ref?.avId) return;
+            const wrap = document.createElement("section");
+            wrap.style.cssText = "margin-top:12px;padding-top:10px;border-top:1px solid var(--b3-border-color)";
+            body.appendChild(wrap);
+            const logs = await loadRowLogs(plugin as any);
+            const fuelRecords = getEntries<EnergyRecord>(logs, ref.avId, row.itemID, "fuelings");
+            const chargingRecords = getEntries<EnergyRecord>(logs, ref.avId, row.itemID, "chargings");
+            const maintenanceRecords = getEntries<MaintenanceRecord>(logs, ref.avId, row.itemID, "maintenance");
+            const currentOdometer = Number(cellText(row.cells[ref.columns.mileage ?? ""], "mileage"));
+            const summary = calculateVehicleCostSummary(
+                fuelRecords,
+                chargingRecords,
+                maintenanceRecords,
+                new Date().toISOString().slice(0, 10),
+                Number.isFinite(currentOdometer) ? currentOdometer : undefined,
+            );
+            const title = document.createElement("h3");
+            title.style.cssText = "font-size:14px;margin:0 0 8px";
+            title.textContent = t("vehicle.summary.title");
+            wrap.appendChild(title);
+            const hint = document.createElement("div");
+            hint.className = "ft__on-surface";
+            hint.style.cssText = "font-size:11px;line-height:1.5;margin:0 0 8px";
+            hint.textContent = t("vehicle.summary.hint");
+            wrap.appendChild(hint);
+            const grid = document.createElement("div");
+            grid.style.cssText = "display:grid;grid-template-columns:repeat(auto-fit,minmax(112px,1fr));gap:6px";
+            const metric = (label: string, value: string) => {
+                const box = document.createElement("div");
+                box.style.cssText = "min-width:0;padding:8px;border-radius:8px;background:var(--b3-theme-background-light)";
+                const cap = document.createElement("span");
+                cap.className = "ft__on-surface";
+                cap.style.cssText = "display:block;font-size:11px;margin-bottom:3px";
+                cap.textContent = label;
+                const val = document.createElement("b");
+                val.style.cssText = "font-size:14px;overflow-wrap:anywhere";
+                val.textContent = value;
+                box.append(cap, val);
+                grid.appendChild(box);
+            };
+            const money = (amount: number) => `${formatAmount(amount)} ${t("fuel.currency")}`;
+            const costLabel = (records: number, known: number, amount: number) =>
+                records === 0 ? "—" : known === 0 ? t("fuel.costUnknown") : `${money(amount)}${known < records ? ` · ${t("fuel.subtotal")}` : ""}`;
+            const knownCosts = summary.fuel.costRecordCount + summary.charging.costRecordCount + summary.maintenance.costRecordCount;
+            metric(t("vehicle.summary.totalCost"), summary.eventCount === 0 ? "—" : knownCosts === 0 ? t("fuel.costUnknown") : `${money(summary.totalCost)}${!summary.costComplete ? ` · ${t("fuel.subtotal")}` : ""}`);
+            metric(t("vehicle.summary.fuelCost"), costLabel(summary.fuel.recordCount, summary.fuel.costRecordCount, summary.fuelCost));
+            metric(t("vehicle.summary.chargingCost"), costLabel(summary.charging.recordCount, summary.charging.costRecordCount, summary.chargingCost));
+            metric(t("vehicle.summary.maintenanceCost"), costLabel(summary.maintenance.recordCount, summary.maintenance.costRecordCount, summary.maintenanceCost));
+            metric(t("vehicle.summary.eventCount"), String(summary.eventCount));
+            metric(t("vehicle.summary.latestEvent"), summary.latestDate ?? "—");
+            wrap.appendChild(grid);
+            if (summary.eventCount && !summary.costComplete) {
+                const incomplete = document.createElement("div");
+                incomplete.className = "ft__on-surface";
+                incomplete.style.cssText = "font-size:10px;line-height:1.5;margin-top:6px";
+                incomplete.textContent = t("vehicle.summary.incomplete");
+                wrap.appendChild(incomplete);
+            }
+            const reminders: string[] = [];
+            if (summary.maintenance.nextDate) reminders.push(`${t("vehicle.maintenance.nextDateShort")} ${summary.maintenance.nextDate}`);
+            if (summary.maintenance.nextOdometer !== undefined) reminders.push(`${t("vehicle.maintenance.nextOdometerShort")} ${formatAmount(summary.maintenance.nextOdometer)} ${t("fuel.km")}`);
+            if (summary.maintenance.overdueDate) reminders.push(`${t("vehicle.maintenance.overdueDate")} ${summary.maintenance.overdueDate}`);
+            if (summary.maintenance.overdueOdometer !== undefined) reminders.push(`${t("vehicle.maintenance.overdueOdometer")} ${formatAmount(summary.maintenance.overdueOdometer)} ${t("fuel.km")}`);
+            if (reminders.length) {
+                const reminder = document.createElement("div");
+                reminder.className = "lv-record-next";
+                reminder.style.cssText = "font-size:11px;line-height:1.6;margin-top:6px";
+                reminder.textContent = `${t("vehicle.summary.nextAction")}：${reminders.join(" · ")}`;
+                wrap.appendChild(reminder);
+            }
+        }
+
+        /** Record and summarize fuel and charging separately per vehicle row. */
+        async function addVehicleEnergySection() {
+            if (!ref?.avId) return;
+            const energyWrap = document.createElement("section");
+            energyWrap.style.cssText = "margin-top:12px;padding-top:10px;border-top:1px solid var(--b3-border-color)";
+            body.appendChild(energyWrap);
+            const hint = document.createElement("p");
+            hint.className = "ft__on-surface";
+            hint.style.cssText = "font-size:12px;line-height:1.6;margin:0 0 10px";
+            hint.textContent = t("fuel.vehicleHint");
+            energyWrap.appendChild(hint);
+
+            let logs = await loadRowLogs(plugin as any);
+            const energyKinds: EnergyKind[] = ["fuel", "charging"];
+            const vehicleEnergyType = selectCellContent(row.cells[ref.columns.energy_type ?? ""]) ?? "gasoline";
+            const isHybridVehicle = vehicleEnergyType === "hybrid";
+            const entriesFor = (kind: EnergyKind) => getEntries<EnergyRecord>(logs, ref!.avId!, row.itemID, kind === "fuel" ? "fuelings" : "chargings");
+            const compactNumber = (value: number | undefined, digits = 2) => value === undefined || !Number.isFinite(value) ? "—" : String(Number(value.toFixed(digits)));
+
+            function openEnergyForm(kind: EnergyKind, existing?: EnergyRecord) {
+                const isFuel = kind === "fuel";
+                const dialog = new Dialog({
+                    title: t(existing ? "fuel.editRecord" : isFuel ? "fuel.addFuel" : "fuel.addCharging"),
+                    content: `<div class="b3-dialog__content b3-dialog__content--wrap" id="lv-energy-form-body" style="max-height:65vh;overflow:auto"></div><div class="b3-dialog__action"><button class="b3-button b3-button--cancel" id="lv-energy-cancel">${t("cancel")}</button><span style="flex:1"></span><button class="b3-button" id="lv-energy-save">${t(existing ? "fuel.update" : "save")}</button></div>`,
+                    width: "560px",
+                });
+                dialog.element.classList.add("lv-energy-dialog");
+                const formBody = dialog.element.querySelector("#lv-energy-form-body") as HTMLElement;
+                const grid = document.createElement("div");
+                grid.style.cssText = "display:grid;grid-template-columns:repeat(auto-fit,minmax(145px,1fr));gap:10px 8px";
+                const controls: Record<string, HTMLInputElement | HTMLSelectElement> = {};
+                const field = (key: string, type: "date" | "number" | "text" | "select", opts?: string[]) => {
+                    const label = document.createElement("label");
+                    label.style.cssText = "display:flex;flex-direction:column;gap:4px;min-width:0;font-size:12px";
+                    const caption = document.createElement("span"); caption.className = "ft__on-surface"; caption.textContent = t(`fuel.field.${key}`);
+                    const input = type === "select" ? document.createElement("select") : document.createElement("input");
+                    input.className = type === "select" ? "b3-select" : "b3-text-field";
+                    if (input instanceof HTMLInputElement) {
+                        input.type = type;
+                        if (type === "number") { input.step = key === "odometer" || key === "quantity" ? "0.1" : "0.01"; input.min = "0"; }
+                        if (type === "date" && key === "date") input.value = localDateKey(new Date());
+                    } else {
+                        input.append(new Option(t("fuel.chooseOptional"), ""));
+                        for (const value of opts ?? []) input.append(new Option(t(`fuel.option.${value}`), value));
+                    }
+                    controls[key] = input;
+                    label.append(caption, input);
+                    grid.appendChild(label);
+                };
+                field("date", "date");
+                field("odometer", "number");
+                const odometerInput = controls.odometer as HTMLInputElement;
+                const currentOdometer = rawFromValue("number", row.cells[ref!.columns.mileage ?? ""]);
+                if (currentOdometer !== "") odometerInput.value = String(currentOdometer);
+                field("quantity", "number");
+                if (isFuel) field("fuelGrade", "select", ["92", "95", "98", "0", "diesel", "other"]);
+                else field("chargingMode", "select", ["ac", "dc", "other"]);
+                field("unitPrice", "number");
+                field("totalCost", "number");
+                field("station", "text");
+                field("note", "text");
+                formBody.appendChild(grid);
+
+                if (existing) {
+                    for (const key of ["date", "odometer", "quantity", "unitPrice", "totalCost", "fuelGrade", "chargingMode", "station", "note"]) {
+                        if (!(key in controls)) continue;
+                        const value = (existing as any)[key];
+                        if (value !== undefined && value !== null) (controls[key] as HTMLInputElement | HTMLSelectElement).value = String(value);
+                    }
+                }
+
+                const fullLabel = document.createElement("label");
+                fullLabel.style.cssText = "display:flex;align-items:center;gap:8px;margin-top:10px;font-size:13px";
+                const full = document.createElement("input"); full.type = "checkbox"; full.className = "b3-switch";
+                full.checked = existing?.full === true;
+                const fullText = document.createElement("span"); fullText.textContent = t(isFuel ? "fuel.fullTank" : "fuel.fullCharge");
+                fullLabel.append(full, fullText);
+                formBody.appendChild(fullLabel);
+                const formHint = document.createElement("p");
+                formHint.className = "ft__on-surface";
+                formHint.style.cssText = "font-size:11px;line-height:1.6;margin:10px 0 0";
+                formHint.textContent = t("fuel.formHint");
+                formBody.appendChild(formHint);
+
+                const cancel = dialog.element.querySelector("#lv-energy-cancel") as HTMLButtonElement;
+                const save = dialog.element.querySelector("#lv-energy-save") as HTMLButtonElement;
+                cancel.onclick = () => dialog.destroy();
+                save.onclick = async () => {
+                    const date = (controls.date as HTMLInputElement).value;
+                    const odometer = Number((controls.odometer as HTMLInputElement).value);
+                    const quantity = Number((controls.quantity as HTMLInputElement).value);
+                    const priceText = (controls.unitPrice as HTMLInputElement).value.trim();
+                    const costText = (controls.totalCost as HTMLInputElement).value.trim();
+                    const unitPrice = priceText ? Number(priceText) : undefined;
+                    const totalCost = costText ? Number(costText) : undefined;
+                    // Cost is optional for both fuel and charging. Users can
+                    // record odometer/quantity first and fill the amount later.
+                    if (!date || !Number.isFinite(odometer) || odometer <= 0 || !Number.isFinite(quantity) || quantity <= 0 || (unitPrice !== undefined && (!Number.isFinite(unitPrice) || unitPrice < 0)) || (totalCost !== undefined && (!Number.isFinite(totalCost) || totalCost < 0))) {
+                        showMessage(t("fuel.invalidRecord"), 4000, "error");
+                        return;
+                    }
+                    save.disabled = true;
+                    cancel.disabled = true;
+                    try {
+                        const entry: EnergyRecord = {
+                            kind, date, odometer, quantity, full: full.checked,
+                            ...(unitPrice !== undefined ? { unitPrice } : {}),
+                            ...(totalCost !== undefined ? { totalCost } : {}),
+                            ...(isFuel && (controls.fuelGrade as HTMLSelectElement).value ? { fuelGrade: (controls.fuelGrade as HTMLSelectElement).value } : {}),
+                            ...(!isFuel && (controls.chargingMode as HTMLSelectElement).value ? { chargingMode: (controls.chargingMode as HTMLSelectElement).value as EnergyRecord["chargingMode"] } : {}),
+                            ...((controls.station as HTMLInputElement).value.trim() ? { station: (controls.station as HTMLInputElement).value.trim() } : {}),
+                            ...((controls.note as HTMLInputElement).value.trim() ? { note: (controls.note as HTMLInputElement).value.trim() } : {}),
+                        };
+                        const latest = await loadRowLogs(plugin as any);
+                        const logKind = kind === "fuel" ? "fuelings" : "chargings";
+                        const base = existing ? removeEntry(latest, ref!.avId!, row.itemID, logKind, existing as unknown as Record<string, unknown>) : latest;
+                        const next = appendEntry(base, ref!.avId!, row.itemID, logKind, { ...entry, at: new Date().toISOString() });
+                        await saveRowLogs(plugin as any, next);
+                        logs = next;
+                        dialog.destroy();
+                        renderEnergy();
+                        try {
+                            await plugin.refreshHub(["vehicles"], true);
+                        } catch (refreshError) {
+                            showMessage(t("ledger.logSavedRefreshFailed").replace("${msg}", refreshError instanceof Error ? refreshError.message : String(refreshError)), 5000, "error");
+                        }
+                        showMessage(t(existing ? "fuel.updated" : "fuel.saved"), 2500, "info");
+                    } catch (error) {
+                        showMessage(t("ledger.logSaveFailed").replace("${msg}", error instanceof Error ? error.message : String(error)), 6000, "error");
+                        save.disabled = false;
+                        cancel.disabled = false;
+                    }
+                };
+            }
+
+            function renderEnergy() {
+                energyWrap.replaceChildren(hint);
+                const title = document.createElement("h3");
+                title.style.cssText = "font-size:14px;margin:0 0 8px";
+                title.textContent = t("fuel.sectionTitle");
+                energyWrap.appendChild(title);
+                const hybridHint = document.createElement("div");
+                hybridHint.className = "lv-record-next";
+                hybridHint.style.cssText = "margin-bottom:10px;font-size:11px";
+                hybridHint.textContent = t(isHybridVehicle ? "fuel.hybridHint" : "fuel.separateEnergyHint");
+                energyWrap.appendChild(hybridHint);
+
+                for (const kind of energyKinds) {
+                    const isFuel = kind === "fuel";
+                    const records = entriesFor(kind);
+                    const stats = calculateEnergyStats(records, kind);
+                    const section = document.createElement("section");
+                    section.className = "lv-card";
+                    section.style.cssText = "padding:10px;margin:8px 0";
+                    const head = document.createElement("div");
+                    head.style.cssText = "display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap;margin-bottom:8px";
+                    const heading = document.createElement("b"); heading.textContent = t(isFuel ? "fuel.fuelTitle" : "fuel.chargingTitle");
+                    const add = document.createElement("button"); add.className = "b3-button b3-button--outline"; add.textContent = `+ ${t(isFuel ? "fuel.addFuel" : "fuel.addCharging")}`;
+                    add.onclick = () => openEnergyForm(kind);
+                    head.append(heading, add);
+                    section.appendChild(head);
+
+                    const statsGrid = document.createElement("div");
+                    statsGrid.style.cssText = "display:grid;grid-template-columns:repeat(auto-fit,minmax(112px,1fr));gap:6px";
+                    const metric = (label: string, value: string) => {
+                        const box = document.createElement("div"); box.style.cssText = "min-width:0;padding:8px;border-radius:8px;background:var(--b3-theme-background-light)";
+                        const cap = document.createElement("span"); cap.className = "ft__on-surface"; cap.style.cssText = "display:block;font-size:11px;margin-bottom:3px"; cap.textContent = label;
+                        const val = document.createElement("b"); val.style.cssText = "font-size:14px;overflow-wrap:anywhere"; val.textContent = value;
+                        box.append(cap, val); statsGrid.appendChild(box);
+                    };
+                    const unit = isFuel ? "L" : "kWh";
+                    const average = stats.consumptionPer100Km === undefined ? "—" : `${compactNumber(stats.consumptionPer100Km)} ${unit}/100km`;
+                    const costPerKm = isHybridVehicle ? t("fuel.hybridNoRate") : stats.costPer100Km === undefined ? "—" : `${formatAmount(stats.costPer100Km / 100)} ${t("fuel.currencyPerKm")}`;
+                    metric(t("fuel.avgConsumption"), isHybridVehicle ? `${formatAmount(stats.totalQuantity)} ${unit} · ${t("fuel.totalRecorded")}` : `${average}${stats.method === "estimated" && stats.intervals.length ? ` · ${t("fuel.estimated")}` : ""}`);
+                    metric(t("fuel.avgCostPerKm"), costPerKm);
+                    metric(t("fuel.totalSpent"), stats.costRecordCount === 0 ? t("fuel.costUnknown") : `${formatAmount(stats.totalCost)} ${t("fuel.currency")}${stats.costRecordCount < stats.recordCount ? ` · ${t("fuel.subtotal")}` : ""}`);
+                    if (!isHybridVehicle) metric(t("fuel.totalDistance"), `${formatAmount(stats.totalDistance)} ${t("fuel.km")}`);
+                    section.appendChild(statsGrid);
+                    if (stats.warnings.includes("non_increasing_odometer")) {
+                        const warning = document.createElement("div"); warning.className = "lv-record-error lv-record-warning"; warning.style.cssText = "font-size:11px;margin-top:8px"; warning.textContent = t("fuel.odometerWarning"); section.appendChild(warning);
+                    }
+                    if (stats.warnings.includes("incomplete_initial_interval") || stats.warnings.includes("incomplete_latest_interval")) {
+                        const boundary = document.createElement("div"); boundary.className = "ft__on-surface"; boundary.style.cssText = "font-size:10px;line-height:1.5;margin-top:6px"; boundary.textContent = t("fuel.boundaryWarning"); section.appendChild(boundary);
+                    }
+
+                    const intervals = stats.intervals.slice(-8);
+                    if (!isHybridVehicle && intervals.length) {
+                        const chartTitle = document.createElement("div"); chartTitle.className = "ft__on-surface"; chartTitle.style.cssText = "font-size:11px;margin:10px 0 3px"; chartTitle.textContent = t("fuel.trendTitle");
+                        const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+                        svg.setAttribute("viewBox", "0 0 300 76"); svg.setAttribute("width", "100%"); svg.setAttribute("height", "76"); svg.setAttribute("role", "img"); svg.setAttribute("aria-label", t("fuel.trendTitle"));
+                        const values = intervals.map((item) => item.consumptionPer100Km);
+                        const min = Math.min(...values), max = Math.max(...values), range = max - min || 1;
+                        const points = values.map((value, index) => `${12 + index * (276 / Math.max(1, values.length - 1))},${62 - ((value - min) / range) * 46}`).join(" ");
+                        const line = document.createElementNS("http://www.w3.org/2000/svg", "polyline");
+                        line.setAttribute("points", points); line.setAttribute("fill", "none"); line.setAttribute("stroke", "var(--b3-theme-primary)"); line.setAttribute("stroke-width", "2.5"); line.setAttribute("stroke-linecap", "round"); line.setAttribute("stroke-linejoin", "round");
+                        svg.appendChild(line);
+                        for (const [index, interval] of intervals.entries()) {
+                            const dot = document.createElementNS("http://www.w3.org/2000/svg", "circle");
+                            dot.setAttribute("cx", String(12 + index * (276 / Math.max(1, intervals.length - 1))));
+                            dot.setAttribute("cy", String(62 - ((interval.consumptionPer100Km - min) / range) * 46));
+                            dot.setAttribute("r", "3.5"); dot.setAttribute("fill", "var(--b3-theme-primary)");
+                            const tip = document.createElementNS("http://www.w3.org/2000/svg", "title"); tip.textContent = `${interval.toDate} · ${compactNumber(interval.consumptionPer100Km)} ${unit}/100km`;
+                            dot.appendChild(tip); svg.appendChild(dot);
+                        }
+                        section.append(chartTitle, svg);
+                    } else if (!isHybridVehicle) {
+                        const guidance = document.createElement("div"); guidance.className = "ft__on-surface"; guidance.style.cssText = "font-size:11px;line-height:1.6;margin-top:8px";
+                        guidance.textContent = t(records.length ? "fuel.baselineHint" : "fuel.emptyHint");
+                        section.appendChild(guidance);
+                    }
+
+                    const monthlyCosts = new Map<string, { amount: number; count: number }>();
+                    for (const entry of records) {
+                        const amount = typeof entry.totalCost === "number" && Number.isFinite(entry.totalCost)
+                            ? entry.totalCost
+                            : typeof entry.unitPrice === "number" && Number.isFinite(entry.unitPrice) ? entry.quantity * entry.unitPrice : undefined;
+                        if (amount === undefined) continue;
+                        const month = entry.date.slice(0, 7);
+                        const current = monthlyCosts.get(month) ?? { amount: 0, count: 0 };
+                        current.amount += amount; current.count += 1; monthlyCosts.set(month, current);
+                    }
+                    const monthRows = [...monthlyCosts.entries()].sort(([a], [b]) => a.localeCompare(b)).slice(-6);
+                    if (monthRows.length) {
+                        const monthlyTitle = document.createElement("div"); monthlyTitle.className = "ft__on-surface"; monthlyTitle.style.cssText = "font-size:11px;margin:10px 0 5px"; monthlyTitle.textContent = t("fuel.monthlyCostTrend");
+                        const monthly = document.createElement("div"); monthly.style.cssText = "display:grid;grid-template-columns:repeat(6,minmax(32px,1fr));gap:5px;align-items:end;height:88px";
+                        const maxSpend = Math.max(...monthRows.map(([, v]) => v.amount), 1);
+                        for (const [month, value] of monthRows) {
+                            const column = document.createElement("div"); column.style.cssText = "height:100%;display:flex;flex-direction:column;justify-content:flex-end;align-items:center;gap:3px;min-width:0";
+                            const amount = document.createElement("span"); amount.className = "ft__on-surface"; amount.style.cssText = "font-size:9px;max-width:100%;overflow:hidden;text-overflow:ellipsis"; amount.textContent = formatAmount(value.amount); amount.title = `${month} · ${formatAmount(value.amount)} ${t("fuel.currency")} · ${value.count}`;
+                            const bar = document.createElement("i"); bar.style.cssText = `display:block;width:min(24px,70%);min-height:3px;height:${Math.max(4, (value.amount / maxSpend) * 52)}px;background:var(--b3-theme-primary);border-radius:4px 4px 1px 1px`;
+                            const label = document.createElement("span"); label.style.cssText = "font-size:9px;white-space:nowrap"; label.textContent = month.slice(5);
+                            column.append(amount, bar, label); monthly.appendChild(column);
+                        }
+                        const monthlyHint = document.createElement("div"); monthlyHint.className = "ft__on-surface"; monthlyHint.style.cssText = "font-size:10px;line-height:1.5;margin-top:3px"; monthlyHint.textContent = t("fuel.monthlyCostHint");
+                        section.append(monthlyTitle, monthly, monthlyHint);
+                    }
+
+                    const historyTitle = document.createElement("div"); historyTitle.className = "ft__on-surface"; historyTitle.style.cssText = "font-size:11px;margin:10px 0 4px"; historyTitle.textContent = `${t("fuel.historyTitle")} · ${records.length}`;
+                    section.appendChild(historyTitle);
+                    const recent = [...records].reverse().slice(0, 5);
+                    if (!recent.length) {
+                        const empty = document.createElement("div"); empty.className = "ft__on-surface"; empty.style.fontSize = "12px"; empty.textContent = t("fuel.noRecords"); section.appendChild(empty);
+                    }
+                    for (const entry of recent) {
+                        const line = document.createElement("div");
+                        line.style.cssText = "display:flex;align-items:flex-start;justify-content:space-between;gap:6px;padding:6px 0;border-top:1px solid var(--b3-border-color);font-size:12px;flex-wrap:wrap";
+                        const desc = document.createElement("span"); desc.style.cssText = "flex:1;min-width:180px;overflow-wrap:anywhere";
+                        const volume = `${compactNumber(entry.quantity)} ${unit}`;
+                        const type = isFuel ? (entry.fuelGrade ? t(`fuel.option.${entry.fuelGrade}`) : "") : (entry.chargingMode ? t(`fuel.option.${entry.chargingMode}`) : "");
+                        const price = typeof entry.totalCost === "number" ? `${formatAmount(entry.totalCost)} ${t("fuel.currency")}` : typeof entry.unitPrice === "number" ? `${compactNumber(entry.unitPrice)} ${t("fuel.unitPrice")}` : t("fuel.costUnknown");
+                        desc.textContent = `${entry.date} · ${volume}${type ? ` · ${type}` : ""} · ${formatAmount(entry.odometer)} ${t("fuel.km")}${entry.full ? ` · ${t(isFuel ? "fuel.fullTankShort" : "fuel.fullChargeShort")}` : ""} · ${price}${entry.station ? ` · ${entry.station}` : ""}`;
+                        const del = document.createElement("button"); del.className = "b3-button b3-button--text"; del.textContent = t("delete"); del.style.cssText = "padding:0 4px;font-size:11px";
+                        const edit = document.createElement("button"); edit.className = "b3-button b3-button--text"; edit.textContent = t("members.edit"); edit.style.cssText = "padding:0 4px;font-size:11px";
+                        edit.onclick = () => openEnergyForm(kind, entry);
+                        del.onclick = () => confirm(t("fuel.deleteEntry"), t("fuel.deleteEntryConfirm"), async () => {
+                            del.disabled = true;
+                            try {
+                                const latest = await loadRowLogs(plugin as any);
+                                const next = removeEntry(latest, ref!.avId!, row.itemID, kind === "fuel" ? "fuelings" : "chargings", entry as unknown as Record<string, unknown>);
+                                await saveRowLogs(plugin as any, next); logs = next; renderEnergy();
+                                try {
+                                    await plugin.refreshHub(["vehicles"], true);
+                                } catch (refreshError) {
+                                    showMessage(t("ledger.logSavedRefreshFailed").replace("${msg}", refreshError instanceof Error ? refreshError.message : String(refreshError)), 5000, "error");
+                                }
+                            } catch (error) {
+                                del.disabled = false;
+                                showMessage(t("ledger.logDeleteFailed").replace("${msg}", error instanceof Error ? error.message : String(error)), 5000, "error");
+                            }
+                        });
+                        line.append(desc, edit, del); section.appendChild(line);
+                    }
+                    energyWrap.appendChild(section);
+                }
+            }
+            renderEnergy();
+        }
+
+        /** Track maintenance/repair costs and future date/odometer reminders per vehicle. */
+        async function addVehicleMaintenanceSection() {
+            if (!ref?.avId) return;
+            const wrap = document.createElement("section");
+            wrap.style.cssText = "margin-top:12px;padding-top:10px;border-top:1px solid var(--b3-border-color)";
+            body.appendChild(wrap);
+            let records = getEntries<MaintenanceRecord>(await loadRowLogs(plugin as any), ref.avId, row.itemID, "maintenance");
+            const categories = ["routine", "repair", "tires", "battery", "inspection", "cleaning", "other"];
+            const categoryLabel = (category: string) => {
+                const key = `vehicle.maintenance.category.${category}`;
+                return t(key) === key ? category : t(key);
+            };
+            const currentOdometer = Number(cellText(row.cells[ref.columns.mileage ?? ""], "mileage"));
+            const formatMoney = (value: number) => `${formatAmount(value)} ${t("fuel.currency")}`;
+            const openForm = (existing?: MaintenanceRecord) => {
+                const dialog = new Dialog({
+                    title: t(existing ? "vehicle.maintenance.edit" : "vehicle.maintenance.add"),
+                    content: `<div class="b3-dialog__content b3-dialog__content--wrap" id="lv-maintenance-form" style="max-height:65vh;overflow:auto"></div><div class="b3-dialog__action"><button class="b3-button b3-button--cancel" id="lv-maintenance-cancel">${t("cancel")}</button><span style="flex:1"></span><button class="b3-button" id="lv-maintenance-save">${t(existing ? "vehicle.maintenance.update" : "save")}</button></div>`,
+                    width: "500px",
+                });
+                dialog.element.classList.add("lv-energy-dialog");
+                const form = dialog.element.querySelector("#lv-maintenance-form") as HTMLElement;
+                const controls: Record<string, HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement> = {};
+                const addField = (key: string, type: "text" | "date" | "number" | "select" | "textarea", label: string, value = "", options?: string[]) => {
+                    const rowEl = document.createElement("label");
+                    rowEl.style.cssText = "display:flex;flex-direction:column;gap:4px;margin:0 0 9px";
+                    const caption = document.createElement("span"); caption.className = "ft__on-surface"; caption.textContent = label;
+                    let input: HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement;
+                    if (type === "select") {
+                        const select = document.createElement("select"); select.className = "b3-select";
+                        select.append(new Option(t("vehicle.maintenance.chooseCategory"), ""));
+                        for (const option of options ?? []) select.append(new Option(categoryLabel(option), option));
+                        select.value = value; input = select;
+                    } else if (type === "textarea") {
+                        const area = document.createElement("textarea"); area.className = "b3-text-field"; area.rows = 2; area.value = value; area.style.resize = "vertical"; input = area;
+                    } else {
+                        const field = document.createElement("input"); field.className = "b3-text-field"; field.type = type; field.value = value; field.step = type === "number" ? "any" : ""; input = field;
+                    }
+                    input.id = `lv-maintenance-${key}`;
+                    if (type !== "select") (input as HTMLInputElement | HTMLTextAreaElement).placeholder = label;
+                    rowEl.htmlFor = input.id; rowEl.append(caption, input); form.appendChild(rowEl); controls[key] = input;
+                };
+                addField("category", "select", t("vehicle.maintenance.field.category"), existing?.category, categories);
+                addField("date", "date", t("vehicle.maintenance.field.date"), existing?.date ?? new Date().toISOString().slice(0, 10));
+                addField("odometer", "number", t("vehicle.maintenance.field.odometer"), existing ? String(existing.odometer) : "");
+                addField("cost", "number", t("vehicle.maintenance.field.cost"), existing?.cost === undefined ? "" : String(existing.cost));
+                addField("nextDate", "date", t("vehicle.maintenance.field.nextDate"), existing?.nextDate ?? "");
+                addField("nextOdometer", "number", t("vehicle.maintenance.field.nextOdometer"), existing?.nextOdometer === undefined ? "" : String(existing.nextOdometer));
+                addField("shop", "text", t("vehicle.maintenance.field.shop"), existing?.shop ?? "");
+                addField("note", "textarea", t("vehicle.maintenance.field.note"), existing?.note ?? "");
+                const cancel = dialog.element.querySelector("#lv-maintenance-cancel") as HTMLButtonElement;
+                const save = dialog.element.querySelector("#lv-maintenance-save") as HTMLButtonElement;
+                cancel.onclick = () => dialog.destroy();
+                save.onclick = async () => {
+                    const value = (key: string) => String((controls[key] as HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement).value ?? "").trim();
+                    const category = value("category");
+                    const date = value("date");
+                    const odometer = Number(value("odometer"));
+                    const costText = value("cost");
+                    const nextDate = value("nextDate");
+                    const nextOdometerText = value("nextOdometer");
+                    if (!category || !date || !(odometer > 0) || (costText !== "" && !(Number(costText) >= 0)) || (nextOdometerText !== "" && !(Number(nextOdometerText) > 0))) {
+                        showMessage(t("vehicle.maintenance.invalid"), 3500, "error");
+                        return;
+                    }
+                    save.disabled = true; cancel.disabled = true;
+                    const entry: MaintenanceRecord = {
+                        category, date, odometer,
+                        ...(costText === "" ? {} : { cost: Number(costText) }),
+                        ...(nextDate ? { nextDate } : {}),
+                        ...(nextOdometerText === "" ? {} : { nextOdometer: Number(nextOdometerText) }),
+                        ...(value("shop") ? { shop: value("shop") } : {}),
+                        ...(value("note") ? { note: value("note") } : {}),
+                    };
+                    try {
+                        const latest = await loadRowLogs(plugin as any);
+                        const base = existing ? removeEntry(latest, ref!.avId!, row.itemID, "maintenance", existing as unknown as Record<string, unknown>) : latest;
+                        const next = appendEntry(base, ref!.avId!, row.itemID, "maintenance", { ...entry, at: new Date().toISOString() });
+                        await saveRowLogs(plugin as any, next);
+                        records = getEntries<MaintenanceRecord>(next, ref!.avId!, row.itemID, "maintenance");
+                        dialog.destroy(); render();
+                        try {
+                            await plugin.refreshHub(["vehicles"], true);
+                        } catch (refreshError) {
+                            showMessage(t("ledger.logSavedRefreshFailed").replace("${msg}", refreshError instanceof Error ? refreshError.message : String(refreshError)), 5000, "error");
+                        }
+                        showMessage(t(existing ? "vehicle.maintenance.updated" : "vehicle.maintenance.saved"), 2500, "info");
+                    } catch (error) {
+                        showMessage(t("ledger.logSaveFailed").replace("${msg}", error instanceof Error ? error.message : String(error)), 5000, "error");
+                        save.disabled = false; cancel.disabled = false;
+                    }
+                };
+            };
+            const render = () => {
+                wrap.replaceChildren();
+                const head = document.createElement("div"); head.style.cssText = "display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap;margin-bottom:8px";
+                const title = document.createElement("h3"); title.style.cssText = "font-size:14px;margin:0"; title.textContent = t("vehicle.maintenance.title");
+                const add = document.createElement("button"); add.className = "b3-button b3-button--outline"; add.textContent = `+ ${t("vehicle.maintenance.add")}`; add.onclick = () => openForm();
+                head.append(title, add); wrap.appendChild(head);
+                const stats = calculateMaintenanceStats(records, new Date().toISOString().slice(0, 10), Number.isFinite(currentOdometer) ? currentOdometer : undefined);
+                const summary = document.createElement("div"); summary.style.cssText = "display:grid;grid-template-columns:repeat(auto-fit,minmax(112px,1fr));gap:6px;margin-bottom:8px";
+                const metric = (label: string, value: string) => { const box = document.createElement("div"); box.style.cssText = "min-width:0;padding:8px;border-radius:8px;background:var(--b3-theme-background-light)"; const cap = document.createElement("span"); cap.className = "ft__on-surface"; cap.style.cssText = "display:block;font-size:11px;margin-bottom:3px"; cap.textContent = label; const val = document.createElement("b"); val.style.cssText = "font-size:14px;overflow-wrap:anywhere"; val.textContent = value; box.append(cap, val); summary.appendChild(box); };
+                metric(t("vehicle.maintenance.totalRecords"), String(stats.recordCount));
+                metric(t("vehicle.maintenance.totalCost"), stats.costRecordCount ? formatMoney(stats.totalCost) : t("fuel.costUnknown"));
+                metric(t("vehicle.maintenance.nextDate"), stats.nextDate ?? "—");
+                metric(t("vehicle.maintenance.nextOdometer"), stats.nextOdometer === undefined ? "—" : `${formatAmount(stats.nextOdometer)} ${t("fuel.km")}`);
+                if (stats.overdueDate) metric(t("vehicle.maintenance.overdueDate"), stats.overdueDate);
+                if (stats.overdueOdometer !== undefined) metric(t("vehicle.maintenance.overdueOdometer"), `${formatAmount(stats.overdueOdometer)} ${t("fuel.km")}`);
+                wrap.appendChild(summary);
+                const byCategory = Object.entries(stats.byCategory);
+                if (byCategory.length) { const line = document.createElement("div"); line.className = "ft__on-surface"; line.style.cssText = "font-size:11px;line-height:1.6;margin:0 0 6px"; line.textContent = `${t("vehicle.maintenance.byCategory")}：${byCategory.map(([key, value]) => `${categoryLabel(key)} ${value.count}${value.cost ? ` · ${formatMoney(value.cost)}` : ""}`).join(" · ")}`; wrap.appendChild(line); }
+                if (!records.length) { const empty = document.createElement("div"); empty.className = "ft__on-surface"; empty.style.cssText = "font-size:12px;line-height:1.6"; empty.textContent = t("vehicle.maintenance.empty"); wrap.appendChild(empty); return; }
+                for (const entry of [...records].reverse().slice(0, 8)) {
+                    const line = document.createElement("div"); line.style.cssText = "display:flex;align-items:flex-start;justify-content:space-between;gap:6px;padding:6px 0;border-top:1px solid var(--b3-border-color);font-size:12px;flex-wrap:wrap";
+                    const desc = document.createElement("span"); desc.style.cssText = "flex:1;min-width:180px;overflow-wrap:anywhere"; desc.textContent = `${entry.date} · ${categoryLabel(entry.category)} · ${formatAmount(entry.odometer)} ${t("fuel.km")}${entry.cost !== undefined ? ` · ${formatMoney(entry.cost)}` : ""}${entry.shop ? ` · ${entry.shop}` : ""}${entry.nextDate ? ` · ${t("vehicle.maintenance.nextDateShort")} ${entry.nextDate}` : ""}${entry.nextOdometer !== undefined ? ` · ${t("vehicle.maintenance.nextOdometerShort")} ${formatAmount(entry.nextOdometer)}` : ""}`;
+                    const edit = document.createElement("button"); edit.className = "b3-button b3-button--text"; edit.style.cssText = "padding:0 4px;font-size:11px"; edit.textContent = t("members.edit"); edit.onclick = () => openForm(entry);
+                    const del = document.createElement("button"); del.className = "b3-button b3-button--text"; del.style.cssText = "padding:0 4px;font-size:11px"; del.textContent = t("delete"); del.onclick = () => confirm(t("vehicle.maintenance.delete"), t("vehicle.maintenance.deleteConfirm"), async () => { del.disabled = true; try { const latest = await loadRowLogs(plugin as any); const next = removeEntry(latest, ref!.avId!, row.itemID, "maintenance", entry as unknown as Record<string, unknown>); await saveRowLogs(plugin as any, next); records = getEntries<MaintenanceRecord>(next, ref!.avId!, row.itemID, "maintenance"); render(); try { await plugin.refreshHub(["vehicles"], true); } catch (refreshError) { showMessage(t("ledger.logSavedRefreshFailed").replace("${msg}", refreshError instanceof Error ? refreshError.message : String(refreshError)), 5000, "error"); } } catch (error) { del.disabled = false; showMessage(t("ledger.logDeleteFailed").replace("${msg}", error instanceof Error ? error.message : String(error)), 5000, "error"); } });
+                    line.append(desc, edit, del); wrap.appendChild(line);
+                }
+            };
+            render();
+        }
+
         addHistorySection();
         addAttachmentsSection();
         // 26.6 QR 标签（路线图 QR 项，235 波接线）：扫码直达——行有绑定块用块深链，否则回退台账文档深链
@@ -1212,13 +2066,17 @@
             body.appendChild(wrap);
             generateQRDataUrl(link, 128).then((url) => { img.src = url; }).catch(() => { wrap.remove(); });
         }
-        // 各模块时间线分区（只读通道共用 rowlogs.json；估值=口径日覆盖，其余=追加去重）
+        // Module timelines share the rowlogs storage and are read-only here.
         (async () => {
             const rl = await import("@/core/rowlog");
             const at = () => new Date().toISOString();
             const fresh = () => rl.loadRowLogs(plugin as any);
-            // v0.3.13 只修了 CSV 导入按钮的组名错位，抽屉估值/移动分区仍查不存在的 "assets"
-            // （2026-10-09 审计实锤：模块真实 id 为 assets-real，分区自上线从未渲染）
+            if (active === "vehicles") {
+                await addVehicleCostSummarySection();
+                await addVehicleEnergySection();
+                await addVehicleMaintenanceSection();
+            }
+            // Keep the assets-real module ID aligned with the CSV import entry point.
             if (active === "assets-real") {
                 await addRowLogSection({
                     title: t("ledger.valuations"), emptyText: t("ledger.noValuations"), addLabel: t("ledger.valAdd"),
@@ -1252,7 +2110,7 @@
                     format: (e) => `${e.date} · ${e.from} → ${e.to}`,
                 });
             } else if (active === "shopping") {
-                // 提案 A/210 波：愿望存钱进度（wish 行 target_amount + rowlog deposits 流水）
+                // Wish progress combines target_amount with deposit row logs.
                 (async () => {
                     const targetCell = row.cells[ref!.columns.target_amount ?? ""]?.number;
                     const target = targetCell?.isNotEmpty && typeof targetCell.content === "number" ? targetCell.content : undefined;
@@ -1264,9 +2122,9 @@
                         head.style.cssText = "margin-top:10px;font-size:12px";
                         const line = document.createElement("div");
                         line.className = "lv-caption";
-                        line.textContent = `${t("ledger.savedOf").replace("${s}", formatAmount(saved)).replace("${t2}", target !== undefined ? formatAmount(target) : "—")}${target !== undefined && target > 0 ? `（${Math.min(999, Math.round((saved / target) * 100))}%）` : ""}`;
+                        line.textContent = `${t("ledger.savedOf").replace("${s}", formatAmount(saved)).replace("${t2}", target !== undefined ? formatAmount(target) : "—")}${target !== undefined && target > 0 ? ` (${Math.min(999, Math.round((saved / target) * 100))}%)` : ""}`;
                         head.appendChild(line);
-                        // 215 波：进度条可视化（>100% 封顶显示满条）
+                        // Progress bars cap their visual width at 100%.
                         if (target !== undefined && target > 0) {
                             const bar = document.createElement("div");
                             bar.style.cssText = "height:6px;border-radius:3px;background:var(--b3-theme-background-light);overflow:hidden;margin-top:4px";
@@ -1329,7 +2187,7 @@
                     format: (e) => `${e.date} · ${e.from} → ${e.to}`,
                 });
             } else if (active === "house") {
-                // 16 组/187 波：水电煤抄表流水（rowlog meters 类型；用量=与前一读数之差，换表/倒转不记）
+                // Utility meter logs record usage as the positive delta from the previous reading.
                 await addRowLogSection({
                     title: t("ledger.meters"), emptyText: t("ledger.noMeters"), addLabel: t("ledger.valAdd"),
                     fields: [
@@ -1343,10 +2201,10 @@
                         return true;
                     },
                     remove: async (e) => { await rl.saveRowLogs(plugin as any, rl.removeMeterReading(await fresh(), ref!.avId!, row.itemID, e.date)); },
-                    format: (e: any) => `${e.date} · ${e.reading}${typeof e.usage === "number" ? `（+${e.usage}）` : ""}`,
+                    format: (e: any) => `${e.date} · ${e.reading}${typeof e.usage === "number" ? ` (${e.usage})` : ""}`,
                 });
             } else if (active === "travel-plan") {
-                // 16 组/189 波：行前证件检查结果存档（rowlog checks 类型；追加去重，结论文本自由记录）
+                // Certificate checks are appended and deduplicated by the row-log helper.
                 await addRowLogSection({
                     title: t("ledger.checks"), emptyText: t("ledger.noChecks"), addLabel: t("ledger.valAdd"),
                     fields: [
@@ -1363,7 +2221,7 @@
                     format: (e) => `${e.date} · ${e.result}`,
                 });
             } else if (active === "media") {
-                // 16 组/200 波：图书借出记录（rowlog loans；归还日留空=在借）
+                // Book loans leave the return date empty while still borrowed.
                 await addRowLogSection({
                     title: t("ledger.loans"), emptyText: t("ledger.noLoans"), addLabel: t("ledger.valAdd"),
                     fields: [
@@ -1383,7 +2241,7 @@
             }
         })();
 
-        // 模板基建（第七十轮）：有模板的模块给"生成文档"按钮——行字段注入模板 → 台账笔记本内建文档
+        // Modules with templates expose a document generation action.
         (async () => {
             const tplList = ((plugin.schemaCatalog?.[active] as any)?.templates ?? []) as { key: string; nameKey: string; file: string }[];
             for (const tp of tplList) {
@@ -1391,7 +2249,7 @@
                 const btn = document.createElement("button");
                 btn.className = "b3-button b3-button--outline";
                 btn.style.cssText = "margin-top:8px;font-size:12px";
-                btn.textContent = `${t("ledger.genDoc")}：${label}`;
+                btn.textContent = `${t("ledger.genDoc")} · ${label}`;
                 btn.onclick = async () => {
                     try {
                         const { getTemplate, renderTemplate, sanitizeDocTitle } = await import("@/core/templates");
@@ -1403,7 +2261,7 @@
                         if (!notebook) throw new Error("notebook not found for " + ref!.docId);
                         const vars: Record<string, string> = { name: String(cellText(row.cells[ref!.columns.name])), date: localDateKey(new Date()) };
                         for (const c of schemaCols) vars[c.key] = cellText(row.cells[ref!.columns[c.key]]);
-                        // G3（UG03 威胁建模）：标题消毒防文档树意外嵌套（纯函数在 core/templates）
+                        // Sanitize titles before creating documents in the notebook tree.
                         const title = sanitizeDocTitle(`${vars.name} · ${label} · ${vars.date}`);
                         // G2（UG12 研究产出）：落点说明——文档建在台账笔记本内，随思源同步/分享范围流转
                         confirm(t("ledger.genDoc"), t("ledger.genDocConfirm").replace("${title}", title), async () => {
@@ -1423,7 +2281,7 @@
                 body.appendChild(btn);
             }
         })();
-        // 16 组联动：health 处方/用药记录 → 药箱建行（category=rx、成员 relation 复制；未建库不出现按钮）
+        // Link health prescriptions to medicine stock rows when both ledgers exist.
         function addRxToMedicineButton() {
             if (active !== "health") return;
             const medRef = plugin.settings.dbRefs?.["medicine"];
@@ -1460,7 +2318,7 @@
         }
         addRxToMedicineButton();
 
-        // 16 组联动：shopping 购入 → 囤货库存（同名药箱行 stock_qty 增量；无匹配新建囤货行；数量缺省 1）
+        // Link shopping purchases to stock rows, creating a row when needed.
         function addStockInButton() {
             if (active !== "shopping") return;
             const medRef = plugin.settings.dbRefs?.["medicine"];
@@ -1525,7 +2383,7 @@
                             dialog.destroy();
                             btn.textContent = t("ledger.stockIn");
                             try {
-                                await plugin.refreshHub?.(["medicine"]); // 低库存提醒即时重算
+                                await plugin.refreshHub?.(["medicine"]); // Refresh low-stock reminders.
                             } catch (e) {
                                 showMessage(t("ledger.stockInRefreshFailed").replace("${msg}", e instanceof Error ? e.message : String(e)), 6000, "error");
                             } finally {
@@ -1555,7 +2413,7 @@
         }
         addStockInButton();
 
-        // 16 组：certs 换证链——renewed_to relation 正向（新证）/反向（旧证）展示 + 关联新证行内选择器
+        // Certificate renewal chains show both forward and reverse relations.
         function addRenewChainSection() {
             if (active !== "certs") return;
             const relKey = ref!.columns.renewed_to;
@@ -1624,13 +2482,13 @@
             for (const id of forward) {
                 const line = document.createElement("div");
                 line.style.cssText = "padding:2px 0;font-size:12.5px";
-                line.textContent = `→ ${nameOf(id)}（${t("ledger.newCert")}）`;
+                line.textContent = `→ ${nameOf(id)} (${t("ledger.newCert")})`;
                 body.appendChild(line);
             }
             for (const r of backward) {
                 const line = document.createElement("div");
                 line.style.cssText = "padding:2px 0;font-size:12.5px";
-                line.textContent = `← ${String(cellText(r.cells[ref!.columns.name]))}（${t("ledger.oldCert")}）`;
+                line.textContent = `← ${String(cellText(r.cells[ref!.columns.name]))} (${t("ledger.oldCert")})`;
                 body.appendChild(line);
             }
             body.appendChild(linkBtn());
@@ -1639,8 +2497,7 @@
 
             addFavorsSyncSection();
         }
-        // EC15：人情往来 → 人脉交集记录（ensurePerson + recordInteraction，externalRef 幂等；
-        // 重复点击不产生重复记录；人脉未装/未初始化时降级提示）
+        // Favor interactions use an idempotent external reference and degrade gracefully when contacts are unavailable.
         function addFavorsSyncSection() {
             if (active !== "favors") return;
             const personName = (row.cells[ref!.columns.person ?? ""]?.text?.content ?? "").trim();
@@ -1697,7 +2554,7 @@
             }
             body.appendChild(btn);
         }
-        // 编辑模式（A5）：可编辑类型表单化，保存时逐字段容错写回（D03 语义：失败保留现场并报告）
+        // Edit mode writes supported fields independently and reports partial failures.
         function buildEdit() {
             body.innerHTML = "";
             const inputs: { keyID: string; type: string; label: string; get: () => any }[] = [];
@@ -1726,7 +2583,7 @@
                     control = input;
                 }
                 wrap.append(control);
-                // EC13：contact 列附加"从人脉选择"（window.LvContacts.searchPeople；未装人脉则不显示按钮）
+                // Contact fields can use the shared contacts picker when available.
                 if (col.key === "contact" && control instanceof HTMLInputElement) {
                     const pick = document.createElement("button");
                     pick.className = "b3-button b3-button--outline";
@@ -1767,10 +2624,10 @@
                             changed++;
                             if (personKeyID && e.keyID === personKeyID) personChanged = true;
                         } catch {
-                            failed.push(e.label); // D03 语义：失败字段聚合报告
+                            failed.push(e.label); // Aggregate field-level failures.
                         }
                     }
-                    // EC15：person 变更 → favorSyncs 失效（新对手方的交集需重新记录）
+                    // A person change invalidates favor syncs and requires a fresh interaction.
                     if (personChanged && previousFavorSync) {
                         delete plugin.runtime.favorSyncs[row.itemID];
                         try {
@@ -1786,12 +2643,12 @@
                         await load();
                         if (loadError) showMessage(t("ledger.refreshFailed").replace("${msg}", loadError), 5000, "error");
                         try {
-                            await plugin.refreshHub([active]); // PF06：只重扫本模块
+                            await plugin.refreshHub([active]); // Refresh only the active module.
                         } catch (err) {
                             showMessage(t("ledger.refreshFailed").replace("${msg}", err instanceof Error ? err.message : String(err)), 5000, "error");
                         }
                     }
-                    if (failed.length > 0) showMessage(t("ledger.savePartial").replace("${fields}", failed.join("、")), 6000, "error");
+                    if (failed.length > 0) showMessage(t("ledger.savePartial").replace("${fields}", failed.join(", ")), 6000, "error");
                     else if (changed > 0) showMessage(t("ledger.editSaved"), 2500, "info");
                 } catch (err) {
                     showMessage(t("ledger.saveFailed").replace("${msg}", err instanceof Error ? err.message : String(err)), 6000, "error");
@@ -1837,9 +2694,9 @@
                 showMessage(t("ledger.copyAsImageFail").replace(": Downloaded instead", "") + ` (${e instanceof Error ? e.message : String(e)})`, 5000, "error");
             } finally { this.disabled = false; }
         };
-        // R7 资料强化：复制为文本（label: value 行，便于贴到聊天/邮件）
+        // Copy the detail card as label/value text.
         (dlg.element.querySelector("#lv-detail-card-text") as HTMLButtonElement).onclick = async () => {
-            const text = cardRows.map((r) => `${r.label}：${r.value}`).join("\n");
+            const text = cardRows.map((r) => `${r.label}: ${r.value}`).join("\n");
             try {
                 await navigator.clipboard.writeText(`${cardTitle}\n${text}`);
                 showMessage(t("ledger.copyAsTextOk"), 2500, "info");
@@ -1847,7 +2704,7 @@
                 showMessage(t("ledger.copyAsImageFail") + ` (${e instanceof Error ? e.message : String(e)})`, 5000, "error");
             }
         };
-        // 17 组：行删除（detached 行走内核 av 删除端点 [待实测]；删除是显式用户动作，双确认说明影响范围）
+        // Row deletion is explicit and confirmed before mutation.
         (dlg.element.querySelector("#lv-detail-del") as HTMLButtonElement).onclick = () => {
             confirm(t("ledger.delTitle"), t("ledger.delBody").replace("${name}", cellText(row.cells[ref.columns.name])), async () => {
                 try {
@@ -1861,7 +2718,7 @@
                 dlg.destroy();
                 const followupErrors: string[] = [];
                 try {
-                    // 行删除后清理孤儿运行态数据（handled/handledYear/handledUntil/snoozed/renewHistory/favorSyncs）
+                    // Clean orphaned runtime state after deleting the row.
                     const { cleanupRowRuntimeData } = await import("@/core/hub/runtime");
                     const dirty = cleanupRowRuntimeData(plugin.runtime, row.itemID);
                     if (dirty) {
@@ -1871,7 +2728,7 @@
                     followupErrors.push(e instanceof Error ? e.message : String(e));
                 }
                 try {
-                    // 子记录模型：行日志（估值时间线等）一并清理
+                    // Remove child row-log records as well.
                     const { loadRowLogs, saveRowLogs, removeRowLog } = await import("@/core/rowlog");
                     const logs = removeRowLog(await loadRowLogs(plugin as any), ref!.avId!, row.itemID);
                     await saveRowLogs(plugin as any, logs);
@@ -1880,11 +2737,11 @@
                 }
                 try {
                     await load();
-                    await plugin.refreshHub([active]); // PF06：只重扫本模块
+                    await plugin.refreshHub([active]); // Refresh only the active module.
                 } catch (e) {
                     followupErrors.push(e instanceof Error ? e.message : String(e));
                 }
-                // 行已删除；后续元数据清理或刷新失败不能提示用户再删一次。
+                // The row is already deleted; follow-up failures must not trigger a second deletion.
                 if (followupErrors.length) showMessage(t("ledger.delFollowupFailed").replace("${msg}", followupErrors.join("; ")), 6000, "error");
             });
         };
@@ -1897,10 +2754,15 @@
             showMessage(t("ledger.nameRequired"), 4000, "info");
             return;
         }
-        // UI05：name 必填——有其他输入但姓名为空时阻止建行（避免产生"（未命名）"行）
+        // Name validation prevents unnamed rows when other fields are present.
         if (nameMissing) {
             saveError = t("ledger.nameRequired");
             showMessage(saveError, 4000, "error");
+            return;
+        }
+        if (active === "certs" && !String(form.category ?? "").trim()) {
+            saveError = t("ledger.categoryRequired");
+            showMessage(saveError, 4000, "info");
             return;
         }
         // D24（UG04 数据质量）：同名行确认——对照已加载行（render 窗口）提示同名数，确认可继续；D06 成员同名确认同款交互
@@ -1935,8 +2797,7 @@
                     failed.push(label);
                     return;
                 }
-                // cellValue 返回 null 表示值未通过最终类型/关系校验；不要把 null
-                // 交给内核，避免生成空关系或覆盖已有数据。
+                // Null means final type validation failed; do not write an empty relation.
                 if (value === null) {
                     failed.push(label);
                     return;
@@ -1944,13 +2805,13 @@
                 try {
                     await setCell(ref.avId!, key, itemID, value);
                 } catch {
-                    failed.push(label); // D03：单字段失败不清空表单，逐字段保留现场
+                    failed.push(label); // Preserve the field value for retry.
                 }
             };
             for (const e of supportableCols) {
                 const v = form[e.key];
                 if (e.key !== "name" && (v === undefined || v === "" || v === false)) continue;
-                if (e.key === "name" && !(v && String(v).trim()) && pendingItemID) continue; // 重试时不写空名
+                if (e.key === "name" && !(v && String(v).trim()) && pendingItemID) continue; // Do not overwrite a name on retry.
                 if (e.type === "number" && (v === undefined || isNaN(Number(v)))) continue;
                 await tryCell(t(`field.${e.key}`), cols[e.key], cellValue(e.type, e.key === "name" ? String(v ?? "").trim() : v));
             }
@@ -1960,8 +2821,8 @@
                 if (e.type === "number" && isNaN(Number(v))) continue;
                 await tryCell(t(`field.${e.key}`), cols[e.key], cellValue(e.type, v));
             }
-            // 证件快速上传：先把照片/扫描件放入 assets，再把引用写回对应 mAsset 列。
-            // 上传与写回均逐项容错；失败时保留已上传引用和 File 选择，重试不会重复上传成功项。
+            // Certificate attachments are uploaded before mAsset references are written.
+            // Successful uploads remain cached so retries do not duplicate them.
             if (active === "certs") {
                 for (const target of quickAssetCols) {
                     const previous = uploadedCertificateFiles[target.key] ?? [];
@@ -1990,22 +2851,29 @@
                     });
                 }
             }
-            // C6a 增量 3：自动写入默认状态（schema 显式声明优先，否则枚举首值；D11）
+            // Fill the schema default status, falling back to the first enum option.
             const statusCol = (plugin.schemaCatalog?.[active]?.columns ?? []).find((c: any) => c.key === "status");
             if (statusCol?.options?.length) await tryCell(t("field.status"), cols.status, selectCellValue(statusCol.default ?? statusCol.options[0]));
             if (failed.length > 0) {
-                // 输入与 itemID 均保留：再次保存补写同一行（同键 60s 合并，重试不重复轰炸——17 组）
-                saveError = t("ledger.savePartial").replace("${fields}", failed.join("、"));
+                // Preserve input and item ID so a retry updates the same row.
+                saveError = t("ledger.savePartial").replace("${fields}", failed.join(", "));
                 const { coalescedNotify } = await import("@/libs/notify-queue");
                 coalescedNotify("ledger-save-error", () => showMessage(saveError, 6000, "error"));
             } else {
+                savedRecordName = String(form.name ?? "").trim();
+                savedDocId = ref.docId ?? "";
                 resetForm();
-                // C6b 保存回执：模块去向 + "保存并查看"入口（短暂展示，不打断录入）
+                // Brief save confirmation keeps the user in the recording flow.
                 savedModule = active;
                 setTimeout(() => { savedModule = ""; }, 8000);
+                if (closeAfterSave) newRecordOpen = false;
             }
             await load();
-            await plugin.refreshHub([active]); // PF06：只重扫本模块（新行可能产生提醒）
+            try {
+                await plugin.refreshHub([active]); // Refresh only the active module.
+            } catch (e) {
+                showMessage(t("ledger.refreshFailed").replace("${msg}", e instanceof Error ? e.message : String(e)), 6000, "error");
+            }
         } catch (e) {
             if (e instanceof RowIdentityPendingError) {
                 // D02：行已提交但身份未确认——不自动重试（会重复建行），提示人工核对
@@ -2024,15 +2892,24 @@
 <div class="lv-hero"><h1>{t("ledger.title")}</h1><p>{t("ledger.subtitle")}</p></div>
 
 <div class="lv-toolbar" style="margin:14px 0">
-    <!-- 263 波：切模块清空搜索词——旧模块的关键词对新模块往往就是"空结果"的制造者 -->
-    <select class="b3-select" bind:value={active} onchange={() => { plugin.activeLedger = active; searchText = ""; }}>
-        {#each ledgers as l (l.id)}
-            <option value={l.id}>{t(`module.${l.id}`)}{l.ref?.avId ? "" : `（${t("diag.missing")}）`}</option>
-        {/each}
-    </select>
+    {#if ledgers.length > 0}
+        <!-- Switching modules clears the previous search query. -->
+        <select class="b3-select" value={active} onchange={switchLedger}>
+            {#each ledgers as l (l.id)}
+                <option value={l.id}>{t(`module.${l.id}`)}{l.ref?.avId ? "" : ` (${t("diag.missing")})`}</option>
+            {/each}
+        </select>
+    {:else}
+        <div class="lv-ledger-no-modules" role="status">
+            <span>{t("ledger.noEnabledModules")}</span>
+            <button class="b3-button b3-button--outline" onclick={() => plugin.openSetting()}>{t("startGuide.openSettings")}</button>
+        </div>
+    {/if}
     <span class="fn__flex-1"></span>
     {#if rebuilding}
         <span class="lv-caption">{t("diag.rebuilding")}</span>
+    {:else if ledgers.length === 0}
+        <span class="lv-caption">{t("ledger.noEnabledModulesHint")}</span>
     {:else if !ref?.avId}
         <button class="b3-button" onclick={rebuildLedger}>{t("ledger.rebuild")}</button>
     {:else}
@@ -2043,143 +2920,175 @@
         <!-- 246 波：QR 标签打印页（扫码直达对应行） -->
         <button class="b3-button b3-button--outline" title={t("ledger.printLabels")}
             disabled={filteredRows.length === 0 || printing || exporting} aria-busy={printing} onclick={printLabels}>{printing ? t("ledger.saving") : t("ledger.printLabels")}</button>
+        {#if active === "vehicles"}
+            <button class="b3-button b3-button--outline" onclick={openEnergyDashboard}>{t("fuel.dashboardButton")}</button>
+        {/if}
         {#if active === "parenting"}
             <button class="b3-button b3-button--outline" onclick={openGrowthChart}>{t("ledger.growthChart")}</button>
         {/if}
         {#if active === "stock"}
-            <!-- 16 组/188 波：采购建议（低库存汇总） -->
+            <!-- Low-stock purchasing suggestions. -->
             <button class="b3-button b3-button--outline" onclick={openShoppingList}>{t("ledger.shoppingList")}</button>
         {/if}
         {#if active !== "members" && active !== "adhoc"}
-            <!-- R7 资料强化：CSV 批量导入通用化（向导本身按模块 schema 通用）——此前仅 assets-real -->
+            <!-- Schema-driven CSV import is available for supported ledgers. -->
             <button class="b3-button b3-button--outline" disabled={printing || exporting} onclick={openCsvImport}>{t("ledger.importCsv")}</button>
         {/if}
-        <button class="b3-button b3-button--outline" onclick={() => plugin.showTabDocs(ref?.docId)}>{t("ledger.openDoc")} ↗</button>
+        <button class="b3-button b3-button--outline" onclick={() => plugin.showTabDocs(ref?.docId)}>{t("ledger.openDoc")} →</button>
+        <button class="lv-btn primary" onclick={openNewRecord} disabled={rebuilding}>＋ {t("ledger.newRecord")}</button>
     {/if}
 </div>
 
-<div class="lv-card lv-toolbar" style="padding:14px">
-    {#each supportableCols as e (e.key)}
-        {#if e.type === "select"}
-            <select class="b3-select" bind:value={form[e.key]} onfocus={active === "certs" && e.key === "category" ? () => { lastCertificateCategory = String(form.category ?? ""); } : undefined} onchange={active === "certs" && e.key === "category" ? (event) => handleCertificateCategoryChange((event.currentTarget as HTMLSelectElement).value) : undefined} title={t(`field.${e.key}`)}>
-                <option value="">{t(`field.${e.key}`)}</option>
-                {#each e.options ?? [] as opt (opt)}
-                    <option value={opt}>{t(`field.${e.key}.opt.${opt}`) !== `field.${e.key}.opt.${opt}` ? t(`field.${e.key}.opt.${opt}`) : opt}</option>
-                {/each}
-            </select>
-        {:else if e.type === "relation"}
-            <select class="b3-select" bind:value={form[e.key]} title={t(`field.${e.key}`)}>
-                <option value="">{t(`field.${e.key}`)}: {t("members.all")}</option>
-                {#each plugin.settings.members ?? [] as m (m.avItemId ?? m.id)}
-                    <option value={m.avItemId ?? ""} disabled={!m.avItemId}>
-                        {m.name}{m.avItemId ? "" : ` · ${t("members.notLinked")}`}
-                    </option>
-                {/each}
-            </select>
-        {:else if e.type === "date"}
-            <input class="b3-text-field" type="date" title={t(`field.${e.key}`)} bind:value={form[e.key]} />
-        {:else if e.type === "number"}
-            <input class="b3-text-field" type="number" style="width:90px" placeholder={t(`field.${e.key}`)} bind:value={form[e.key]} />
-        {:else if e.type === "url"}
-            <input class="b3-text-field" style="min-width:140px" type="url" placeholder={t(`field.${e.key}`)} bind:value={form[e.key]} />
-        {:else if e.type === "checkbox"}
-            <label style="display:flex;gap:5px;align-items:center;font-size:12.5px;cursor:pointer">
-                <input type="checkbox" class="b3-switch" bind:checked={form[e.key]} />{t(`field.${e.key}`)}
-            </label>
-        {:else if e.key === "name"}
-            <!-- 260 波：名称是录入主字段，min-width 220 保证第一行视觉重心；261 波回车提交（守卫在 createRow 内） -->
-            <input bind:this={nameInput} class="b3-text-field fn__flex-1" style="min-width:220px" placeholder={t("ledger.newName")} bind:value={form[e.key]}
-                onkeydown={(e: KeyboardEvent) => { if (e.key === "Enter" && !e.isComposing) createRow(); }} />
-        {:else}
-            <input class="b3-text-field" style="min-width:140px" placeholder={t(`field.${e.key}`)} bind:value={form[e.key]} />
-        {/if}
-    {/each}
-    {#each certificateScalarCols as e (e.key)}
-        {#if e.type === "select"}
-            <select class="b3-select" bind:value={form[e.key]} title={t(`field.${e.key}`)}>
-                <option value="">{t(`field.${e.key}`)}</option>
-                {#each e.options ?? [] as opt (opt)}
-                    <option value={opt}>{t(`field.${e.key}.opt.${opt}`) !== `field.${e.key}.opt.${opt}` ? t(`field.${e.key}.opt.${opt}`) : opt}</option>
-                {/each}
-            </select>
-        {:else if e.type === "date"}
-            <input class="b3-text-field" type="date" title={t(`field.${e.key}`)} bind:value={form[e.key]} />
-        {:else if e.type === "number"}
-            <input class="b3-text-field" type="number" style="width:90px" placeholder={t(`field.${e.key}`)} bind:value={form[e.key]} />
-        {:else if e.key === "x_cert_id_number"}
-            <!-- R7 资料强化：完整证件号 + GB11643 实时校验（校验通过自动回填性别；明文仅存行内） -->
-            <div style="display:flex;flex-direction:column;gap:3px">
-                <input class="b3-text-field" style="min-width:220px;font-family:var(--b3-font-family-code, monospace)"
-                    placeholder={t(`field.${e.key}`)} bind:value={form[e.key]} />
-                {#if idcardCheck}
-                    {#if idcardCheck.ok}
-                        <span class="lv-caption" role="status" style="color:var(--lv-ok)">✓ {t("ledger.idcardValid").replace("${birth}", idcardCheck.birth ?? "").replace("${sex}", t(`ledger.idcardGender.${idcardCheck.sex}`))}</span>
-                    {:else}
-                        <span class="lv-caption" role="alert" style="color:var(--lv-warn)">⚠ {t("ledger.idcardBad").replace("${reason}", t(`ledger.idcardReason.${idcardCheck.reason ?? "format"}`))}</span>
+{#if savedModule}
+    <div class="lv-record-save-status" role="status">
+        {t("ledger.newRecordSaved").replace("${name}", savedRecordName)} · {t("ledger.savedTo").replace("${module}", t(`module.${savedModule}`) !== `module.${savedModule}` ? t(`module.${savedModule}`) : savedModule)}
+        <button class="b3-button b3-button--text" onclick={() => plugin.showTabDocs(savedDocId || undefined)}>{t("ledger.openDoc")} →</button>
+    </div>
+{/if}
+
+<div class="lv-mask" class:open={newRecordOpen} aria-hidden="true" onclick={closeNewRecord}></div>
+<svelte:window onkeydown={onNewRecordKeydown} />
+<div class="lv-modal lv-record-modal" class:open={newRecordOpen} role="dialog" aria-modal="true" aria-label={t("ledger.newRecord")} inert={!newRecordOpen}>
+    <div class="lv-sheet lv-record-sheet">
+        <div class="lv-sheet-head">
+            <div class="lv-record-title">
+                <b>{t("ledger.newRecordTitle").replace("${module}", t(`module.${active}`) !== `module.${active}` ? t(`module.${active}`) : active)}</b>
+                <span>{t("ledger.newRecordIntro")}</span>
+            </div>
+            <button class="lv-iconbtn" aria-label={t("cancel")} title={t("cancel")} onclick={closeNewRecord} disabled={saving}>×</button>
+        </div>
+        <div class="lv-sheet-body lv-record-body">
+            <section class="lv-record-section">
+                <h3>{t("ledger.newRecordBasic")}</h3>
+                <div class="lv-record-grid">
+                    {#each supportableCols as e (e.key)}
+                        <div class="lv-record-field" class:lv-record-field-wide={e.key === "name" || e.type === "url"}>
+                            <label for="lv-new-{e.key}">{fieldLabel(e.key)}{e.key === "name" || (active === "certs" && e.key === "category") ? " *" : ""}</label>
+                            {#if e.type === "select"}
+                                <select id="lv-new-{e.key}" class="b3-select" bind:value={form[e.key]} onfocus={active === "certs" && e.key === "category" ? () => { lastCertificateCategory = String(form.category ?? ""); } : undefined} onchange={active === "certs" && e.key === "category" ? (event) => handleCertificateCategoryChange((event.currentTarget as HTMLSelectElement).value) : undefined} disabled={saving || identityPending}>
+                                    <option value="">{fieldLabel(e.key)}</option>
+                                    {#each e.options ?? [] as opt (opt)}
+                                        <option value={opt}>{t(`field.${e.key}.opt.${opt}`) !== `field.${e.key}.opt.${opt}` ? t(`field.${e.key}.opt.${opt}`) : opt}</option>
+                                    {/each}
+                                </select>
+                            {:else if e.type === "relation"}
+                                <select id="lv-new-{e.key}" class="b3-select" bind:value={form[e.key]} disabled={saving || identityPending}>
+                                    <option value="">{fieldLabel(e.key)}: {t("members.all")}</option>
+                                    {#each plugin.settings.members ?? [] as m (m.avItemId ?? m.id)}
+                                        <option value={m.avItemId ?? ""} disabled={!m.avItemId}>{m.name}{m.avItemId ? "" : ` · ${t("members.notLinked")}`}</option>
+                                    {/each}
+                                </select>
+                            {:else if e.type === "date"}
+                                <input id="lv-new-{e.key}" class="b3-text-field" type="date" bind:value={form[e.key]} disabled={saving || identityPending} />
+                            {:else if e.type === "number"}
+                                <input id="lv-new-{e.key}" class="b3-text-field" type="number" step="any" placeholder={fieldLabel(e.key)} bind:value={form[e.key]} disabled={saving || identityPending} />
+                            {:else if e.type === "url"}
+                                <input id="lv-new-{e.key}" class="b3-text-field" type="url" placeholder={fieldLabel(e.key)} bind:value={form[e.key]} disabled={saving || identityPending} />
+                            {:else if e.type === "checkbox"}
+                                <label class="lv-record-check"><input id="lv-new-{e.key}" type="checkbox" class="b3-switch" bind:checked={form[e.key]} disabled={saving || identityPending} />{t(`field.${e.key}`)}</label>
+                            {:else if e.key === "name"}
+                                <input bind:this={nameInput} id="lv-new-{e.key}" class="b3-text-field" type="text" placeholder={t("ledger.newName")} bind:value={form[e.key]} disabled={saving || identityPending} onkeydown={(event: KeyboardEvent) => { if (event.key === "Enter" && !event.isComposing) saveNewRecord(false); }} />
+                            {:else}
+                                <input id="lv-new-{e.key}" class="b3-text-field" type="text" placeholder={fieldLabel(e.key)} bind:value={form[e.key]} disabled={saving || identityPending} />
+                            {/if}
+                        </div>
+                    {/each}
+                </div>
+            </section>
+
+            {#if active === "certs"}
+                {#if !form.category}
+                    <div class="lv-record-next" role="status">{t("ledger.chooseCategoryFirst")}</div>
+                {:else}
+                    <section class="lv-record-section">
+                        <h3>{t("ledger.newRecordDetails")}</h3>
+                        <div class="lv-record-grid">
+                            {#each certificateScalarCols as e (e.key)}
+                                <div class="lv-record-field" class:lv-record-field-wide={e.key === "x_cert_id_number" || e.key === "note"}>
+                                    <label for="lv-new-{e.key}">{fieldLabel(e.key)}</label>
+                                    {#if e.type === "select"}
+                                        <select id="lv-new-{e.key}" class="b3-select" bind:value={form[e.key]} disabled={saving || identityPending}>
+                                            <option value="">{fieldLabel(e.key)}</option>
+                                            {#each e.options ?? [] as opt (opt)}<option value={opt}>{t(`field.${e.key}.opt.${opt}`) !== `field.${e.key}.opt.${opt}` ? t(`field.${e.key}.opt.${opt}`) : opt}</option>{/each}
+                                        </select>
+                                    {:else if e.type === "date"}
+                                        <input id="lv-new-{e.key}" class="b3-text-field" type="date" bind:value={form[e.key]} disabled={saving || identityPending} />
+                                    {:else if e.key === "x_cert_id_number"}
+                                        <div class="lv-record-field-stack">
+                                            <input id="lv-new-{e.key}" class="b3-text-field lv-sensitive-input" type="text" inputmode="numeric" autocomplete="off" placeholder={fieldLabel(e.key)} bind:value={form[e.key]} disabled={saving || identityPending} />
+                                            {#if idcardCheck}
+                                                {#if idcardCheck.ok}<span class="lv-caption lv-valid" role="status">{t("ledger.idcardValid").replace("${birth}", idcardCheck.birth ?? "").replace("${sex}", t(`ledger.idcardGender.${idcardCheck.sex}`))}</span>
+                                                {:else}<span class="lv-caption lv-warn" role="alert">{t("ledger.idcardBad").replace("${reason}", t(`ledger.idcardReason.${idcardCheck.reason ?? "format"}`))}</span>{/if}
+                                            {/if}
+                                        </div>
+                                    {:else}
+                                        <input id="lv-new-{e.key}" class="b3-text-field" type="text" placeholder={fieldLabel(e.key)} bind:value={form[e.key]} disabled={saving || identityPending} />
+                                    {/if}
+                                </div>
+                            {/each}
+                        </div>
+                    </section>
+                    {#if quickAssetCols.length > 0}
+                        <section class="lv-record-section">
+                            <h3>{t("ledger.newRecordAttachments")}</h3>
+                            <div class="lv-record-assets">
+                                {#each quickAssetCols as e (e.key)}
+                                    <label class="b3-button b3-button--outline lv-record-upload">
+                                        <input type="file" accept="image/*,.pdf" multiple={e.key === "attachments"} capture={e.key === "attachments" ? undefined : "environment"} aria-label={fieldLabel(e.key)} onchange={(event) => { const input = event.currentTarget as HTMLInputElement; setCertificateFiles(e.key, Array.from(input.files ?? [])); input.value = ""; }} disabled={saving || identityPending} />
+                                        {fieldLabel(e.key)} · {selectedFileText(e.key)}
+                                    </label>
+                                    {#each certificateFiles[e.key] ?? [] as file, index (`${e.key}-local-${index}`)}
+                                        <span class="lv-record-file">{file.name}<button class="b3-button b3-button--text" aria-label={t("ledger.removeAttachment")} title={t("ledger.removeAttachment")} onclick={() => removeCertificateFile(e.key, "local", index)} disabled={saving}>×</button></span>
+                                    {/each}
+                                    {#each uploadedCertificateFiles[e.key] ?? [] as file, index (`${e.key}-uploaded-${index}`)}
+                                        <span class="lv-record-file">{file.name}<button class="b3-button b3-button--text" aria-label={t("ledger.removeAttachment")} title={t("ledger.removeAttachment")} onclick={() => removeCertificateFile(e.key, "uploaded", index)} disabled={saving}>×</button></span>
+                                    {/each}
+                                {/each}
+                                <span class="lv-caption">{t("ledger.photoUploadTip")}</span>
+                            </div>
+                        </section>
                     {/if}
                 {/if}
-            </div>
-        {:else}
-            <input class="b3-text-field" style="min-width:140px" placeholder={t(`field.${e.key}`)} bind:value={form[e.key]} />
-        {/if}
-    {/each}
-    {#if active === "certs" && quickAssetCols.length > 0}
-        <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;flex-basis:100%">
-            {#each quickAssetCols as e (e.key)}
-                <label class="b3-button b3-button--outline" style="position:relative;overflow:hidden;font-size:12px">
-                    <input type="file" accept="image/*,.pdf" multiple={e.key === "attachments"}
-                        capture={e.key === "attachments" ? undefined : "environment"}
-                        aria-label={t(`field.${e.key}`)}
-                        style="position:absolute;inset:0;width:100%;height:100%;opacity:0;cursor:pointer"
-                        onchange={(event) => setCertificateFiles(e.key, Array.from((event.currentTarget as HTMLInputElement).files ?? []))} />
-                    {t(`field.${e.key}`)} · {selectedFileText(e.key)}
-                </label>
-            {/each}
-            <span class="lv-caption">{t("ledger.photoUploadTip")}</span>
+            {/if}
+            {#if unsupportedCount > 0}<span class="lv-caption">{t("ledger.unsupportedInForm")}</span>{/if}
+            {#if saveError}<div class="lv-record-error" role="alert">{saveError}</div>{:else if nameMissing}<div class="lv-record-error lv-record-warning" role="status">{t("ledger.nameRequired")}</div>{:else if active === "certs" && !form.category}<div class="lv-record-error lv-record-warning" role="status">{t("ledger.categoryRequired")}</div>{/if}
         </div>
-    {/if}
-    {#if unsupportedCount > 0}
-        <span class="lv-caption" title={t("ledger.unsupportedInForm")}>ⓘ {t("ledger.unsupportedInForm")}</span>
-    {/if}
-    {#if savedModule}
-        <div class="lv-caption" role="status" style="color:var(--lv-accent);flex-basis:100%">
-            ✓ {t("ledger.savedTo").replace("${module}", t(`module.${savedModule}`) !== `module.${savedModule}` ? t(`module.${savedModule}`) : savedModule)}
-            <button class="b3-button b3-button--text" style="padding:0 4px" onclick={() => plugin.showTabDocs(ref?.docId)}>{t("ledger.openDoc")} ↗</button>
+        <div class="lv-sheet-foot lv-record-foot">
+            <button class="b3-button b3-button--text" onclick={clearNewRecord} disabled={saving || identityPending}>{pendingItemID ? t("ledger.discardPartial") : t("ledger.clearDraft")}</button>
+            <span class="fn__flex-1"></span>
+            <button class="lv-btn ghost" onclick={closeNewRecord} disabled={saving}>{t("ledger.closeKeepDraft")}</button>
+            <button class="lv-btn" onclick={() => saveNewRecord(true)} disabled={saving || identityPending || nameMissing || (active === "certs" && !form.category)}>{t("ledger.saveContinue")}</button>
+            <button class="lv-btn primary" onclick={() => saveNewRecord(false)} disabled={saving || identityPending || nameMissing || (active === "certs" && !form.category)}>{saving ? t("ledger.saving") : t("save")}</button>
         </div>
-    {/if}
-    {#if saveError}
-        <div class="lv-caption" role="alert" style="color:var(--lv-danger);flex-basis:100%">⚠ {saveError}</div>
-        <button class="b3-button b3-button--text" onclick={resetForm}>{t("ledger.reset")}</button>
-    {:else if nameMissing}
-        <div class="lv-caption" role="status" style="color:var(--lv-warn);flex-basis:100%">{t("ledger.nameRequired")}</div>
-    {/if}
-    <!-- 主 CTA：台账快速录入是本视图唯一核心动作（对齐原型"主按钮每视图 ≤1 个"）；
-         260 波右置——多控件折行后 CTA 独占行尾，不再吊在字段流中间 -->
-    <button class="lv-btn primary" style="margin-left:auto" onclick={createRow} disabled={!ref?.avId || saving || identityPending || nameMissing}>
-        {saving ? t("ledger.saving") : `＋ ${t("ledger.add")}`}
-    </button>
+    </div>
 </div>
 
 {#if loading}
     <div class="lv-card" style="padding:20px"><div class="lv-skel" style="height:16px;width:60%"></div></div>
 {:else if loadError}
-    <div class="lv-card"><div class="lv-empty" role="alert"><div class="eic">⚠</div><b>{loadError}</b>
+    <div class="lv-card"><div class="lv-empty" role="alert"><div class="eic">!</div><b>{loadError}</b>
         <button class="b3-button b3-button--outline" onclick={() => void load()}>{t("ledger.retryRead")}</button>
     </div></div>
 {:else if filteredRows.length === 0}
-    {#if !ref?.avId}
+    {#if ledgers.length === 0}
+        <div class="lv-card"><div class="lv-empty" role="status"><div class="eic">⚙</div><b>{t("ledger.noEnabledModules")}</b><span>{t("ledger.noEnabledModulesHint")}</span>
+            <button class="lv-btn primary" style="margin-top:4px" onclick={() => plugin.openSetting()}>{t("startGuide.openSettings")}</button>
+        </div></div>
+    {:else if !ref?.avId}
         <div class="lv-card"><div class="lv-empty" role="status"><div class="eic">🚧</div><b>{t("ledger.notProvisioned")}</b><span>{t("ledger.notProvisionedHint")}</span></div></div>
     {:else if rows.length > 0}
-        <!-- 搜索无命中 ≠ 台账为空（UI16/34 组空态语义） -->
+        <!-- Empty state for a search with no matches. -->
         <div class="lv-card"><div class="lv-empty" role="status"><div class="eic">🔍</div><b>{t("ledger.searchEmpty")}</b><span>{t("ledger.searchEmptyHint").replace("${q}", searchText.trim())}</span></div></div>
     {:else}
-        <div class="lv-card"><div class="lv-empty" role="status"><div class="eic">🗂</div><b>{t("ledger.empty")}</b><span>{t("ledger.emptyHint")}</span></div></div>
+        <div class="lv-card"><div class="lv-empty" role="status"><div class="eic">🗂</div><b>{t("ledger.empty")}</b><span>{t("ledger.emptyHint")}</span>
+            <button class="lv-btn primary" style="margin-top:4px" onclick={openNewRecord} disabled={rebuilding}>+ {t("ledger.newRecord")}</button>
+        </div></div>
     {/if}
 {:else}
     <div class="lv-card lv-table-wrap lv-table" style="margin-top:12px">
         <table>
             <thead><tr>
-                <!-- 252 波：色点列（对齐原型表格首列 sev） -->
+                <!-- Severity indicator column. -->
                 <th class="lv-sev-col"></th>
                 {#each schemaKeys.filter((k) => ["name", "status", "expiry", "due"].includes(k)) as k (k)}
                     <th>
@@ -2208,7 +3117,7 @@
                     </tr>
                 {/each}
                 {#if filteredRows.length > visibleRows.length}
-                    <!-- 229 波性能：渐进渲染加载更多 -->
+                    <!-- Progressive rendering load-more row. -->
                     <tr class="lv-more">
                         <td colspan={schemaKeys.filter((k) => ["name", "status", "expiry", "due"].includes(k)).length + 1}>
                             <button class="b3-button b3-button--outline" style="margin:0 auto;display:block"

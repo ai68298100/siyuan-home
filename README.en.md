@@ -27,7 +27,7 @@ Certificates expire, medicine expires, insurance needs renewal, subscriptions au
 | ⏰ **Unified expiry reminders** | Certificates, medicine, policies, subscriptions, inspections, birthdays (lunar supported) — all derived automatically, lead time configurable per type (passport 1 year, medicine 30 days), overdue shown in red on top |
 | 👥 **Members as first-class citizens** | Self / spouse / partner / children / elders / kin — every ledger is organized per member, filter "everything about my son" in one click |
 | 🗃 **31 life modules** | People & records · assets & shopping · daily living · parenting & school · travel · media (details below) |
-| 📋 **Rich detail drawer** | Type-specific certificate fields (ID/passport/permits/licences/qualifications/degrees/titles), full ID-card number with GB 11643 validation (region/birth/checksum), gender & birthday auto-fill, masked display, record share card (copy as image / download PNG / copy as text), quick camera/photo/PDF upload, same-origin attachment preview/download, renewal history, replacement chains & timeline journals |
+| 📋 **Rich detail drawer** | Type-specific certificate fields (ID/passport/permits/licences/qualifications/degrees/titles), full ID-card number with GB 11643 validation (region/birth/checksum), gender & birthday auto-fill, masked display, record share card (copy as image / download PNG / copy as text), quick camera/photo/PDF upload, same-origin attachment preview/download, on-demand SiYuan OCR for image attachments, renewal history, replacement chains & timeline journals |
 | 📈 **Growth charts (parenting)** | Height/weight timelines with official WHO reference bands (P3–P97, 0–13 weeks weekly + 0–60 months), percentile on hover |
 | 🛒 **Smart lists** | Shopping suggestions from low stock (editable, copy-to-clipboard), media update reminders, reciprocation reminders for received gifts |
 | 📊 **Check-in & exam integration** | Display study streaks and accuracy from 小驴考试, check-in strength summaries from 小驴打卡 |
@@ -37,15 +37,20 @@ Certificates expire, medicine expires, insurance needs renewal, subscriptions au
 | 🧩 **Modules on demand** | Disabled modules create no data and stay out of the UI; parenting/school only suggested when you have kids |
 | 🔌 **Ecosystem ready** | Quick capture sheet (⚡ / `N`, schema-driven, auto-provision), statusbar badge with scan-health pulse, service bridge (`window.LvHome`), contacts picker via 小驴人脉 |
 
-## 🆕 What's new in v0.4.2
+Image OCR uses the engine configured in SiYuan Settings → OCR. It runs only when requested and does not require automatic OCR to be enabled. AI OCR asks before each run because the image is sent to the selected AI service. Results are saved to SiYuan OCR text and included in search; re-running replaces the previous result. Encrypted notebook images and PDFs are not supported, and OCR text is never written into ledger fields automatically.
 
-This patch release fixes first-install provisioning on SiYuan 3.8.6+ by normalizing the changed `createNotebook` response before creating ledger documents.
+## 🆕 What's new in v0.5.0
 
-- **Added**: regression coverage for string IDs, `{ notebook: id }`, `{ notebook: { id } }`, `{ id }`, and invalid responses.
-- **Improved**: notebook creation now always returns a validated string ID and reports a clear kernel error when the response is unusable.
-- **Fixed**: `Field [notebook] has an invalid type` during first install when the kernel returns a notebook object.
+This release adds a vehicle workspace for refueling, charging, maintenance and cost tracking, while tightening first-install provisioning and everyday feedback across the plugin.
 
-## 📦 Install (v0.4.2)
+- **Added**: per-vehicle refueling, charging and maintenance logs with consumption, cost, trend, category and next date/odometer summaries.
+- **Added**: energy entries for date, odometer, grade/mode, quantity, unit/total cost, full-tank/full-charge boundary, station and notes. Full-to-full calculations are preferred; incomplete data is labeled as estimated or pending.
+- **Improved**: first-install provisioning accepts the object response returned by SiYuan 3.8.6+; save, failure, retry and empty states now have visible feedback across the main flows.
+- **Improved**: complete ID-card entry with validation and masking; on-demand SiYuan OCR explains engine setup, privacy and the fact that results never auto-fill ledger fields.
+- **Fixed**: empty member-card menus, select persistence on SiYuan 3.8.x, storage error-envelope contamination and cramped mobile top-bar actions.
+- **Validation**: TypeScript, Svelte, i18n, metadata, unit tests, production build, package smoke and isolated-kernel E2E all pass (40/40, 6/6, 4/4 and 5/5).
+
+## 📦 Install (v0.5.0)
 
 1. Download `package.zip` from [Releases](https://github.com/ai68298100/siyuan-home/releases/latest)
 2. SiYuan → Settings → Marketplace → Download → **Import** the zip
@@ -53,7 +58,7 @@ This patch release fixes first-install provisioning on SiYuan 3.8.6+ by normaliz
 4. Press `Ctrl+Alt+H` anytime to open the hub
 
 > **Validation status:** core data paths have automated tests and live-kernel coverage. The six-stage real SiYuan UI batch, including Android WebView and accessibility checks, is still pending; marketplace submission follows manual host validation. `icon.png` and `preview.png` were redesigned for v0.3.13 (brand-gradient tile + geometric mark; dark overview with sample data).
-> **Version note:** the tagged v0.4.2 package is the current GitHub release candidate; the release branch has passed local quality checks and currently reports 329 unit tests.
+> **Version note:** the tagged v0.5.0 package is the current GitHub release; local quality checks report 350 unit tests.
 >
 > Family sharing depends on SiYuan's collaboration, permissions, sync and conflict behavior. Test with non-sensitive data before sharing; this plugin does not provide a separate permission system.
 >
@@ -88,7 +93,7 @@ National immunization schedule (22 doses), growth records, school phases & miles
 <details open>
 <summary><b>Travel & Vehicles</b> — Vehicles · Transit Cards · Trip Plans · Bookings · Packing Lists · Trip Journal</summary>
 
-Service/inspection/insurance/battery reminders, itinerary timeline, voucher archive, document self-check
+Vehicle profiles, separate refueling and charging logs, consumption and cost statistics. Fuel economy uses full-to-full intervals; charging consumption is an estimate across full-charge cycles, and incomplete data is labeled clearly. Also includes service/inspection/insurance/battery reminders, itinerary timeline, voucher archive and document self-check.
 </details>
 
 <details open>

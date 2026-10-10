@@ -4,9 +4,11 @@
  */
 import type { Reminder, ReminderRuleSpec } from "@/types";
 import { buildReminder, localDateKey, type LedgerRowDates } from "./rule";
-import { renderLedgerAll } from "../siyuan";
+import { renderLedgerAll, type AvRow } from "../siyuan";
 import { CERTS_SCHEMA, MEMBERS_SCHEMA, type ModuleSchema, type NumericRuleSpec } from "../schema";
 import type { DbRef, HomeSettings } from "@/types";
+import { getEntries, type RowLogs } from "../rowlog";
+import { normalizeMaintenanceRecords, type MaintenanceRecord } from "../vehicle";
 
 export interface DataProvider {
     readonly moduleId: string;
@@ -68,6 +70,10 @@ export interface ProviderDeps {
     /** 264 波：行数口径上报——providers 本就全量读表，顺手上报台账行数与成员行分布，
      * 供模块卡主数字 / 成员卡统计格（原型层次）；扫描成功才计入（失败沿用旧快照） */
     onStats?: (moduleId: string, stats: { rowCount: number; memberCounts: Record<string, number> }) => void;
+    /** 可选的行日志读取器；车辆 provider 用它派生维护/维修提醒。 */
+    loadRowLogs?: () => Promise<RowLogs>;
+    /** 可选的界面文案读取器；提醒标题需跟随当前语言。 */
+    t?: (key: string) => string;
 }
 
 /** relation 成员列 → settings 成员 id 的行计数（模块卡/成员卡统计共用口径） */
@@ -144,20 +150,26 @@ export class SchemaLedgerProvider implements DataProvider {
     readonly moduleId: string;
     constructor(
         moduleId: string,
-        private schema: ModuleSchema,
-        private deps: ProviderDeps,
+        protected schema: ModuleSchema,
+        protected deps: ProviderDeps,
     ) {
         this.moduleId = moduleId;
     }
 
-    async collect(today: Date): Promise<Reminder[]> {
+    /** 读取一次主表并校验 schema 列；车辆 provider 会复用此结果追加 rowlogs 提醒。 */
+    protected async readLedger(): Promise<{ ref: DbRef; rows: AvRow[] } | undefined> {
         const ref = this.deps.getDbRef(this.moduleId);
-        if (!ref?.avId || !ref.columns) return [];
-        const out: Reminder[] = [];
+        if (!ref?.avId || !ref.columns) return undefined;
         const read = await renderLedgerAll(ref.avId);
         if (!read.complete) throw new Error(`ledger read incomplete (${read.rows.length}/${read.rowCount} rows)`);
         requireReminderColumns(ref.columns!, this.schema);
-        const { rows } = read;
+        return { ref, rows: read.rows };
+    }
+
+    /** 根据已读取的主表行派生 schema 声明的提醒。 */
+    protected async collectLedgerReminders(today: Date, loaded: { ref: DbRef; rows: AvRow[] }): Promise<Reminder[]> {
+        const { ref, rows } = loaded;
+        const out: Reminder[] = [];
         const members = this.deps.settings.members ?? [];
         // 通用终态过滤：状态命中即跳过（字典 status 枚举的非活跃值）
         const skip = new Set(["archived", "void", "expired", "renewed", "refunded", "discarded", "surrendered", "ins_expired", "med_expired", "m_expired"]);
@@ -186,8 +198,100 @@ export class SchemaLedgerProvider implements DataProvider {
                 if (r) out.push(r);
             }
         }
+        return out;
+    }
+
+    async collect(today: Date): Promise<Reminder[]> {
+        const loaded = await this.readLedger();
+        if (!loaded) return [];
+        const out = await this.collectLedgerReminders(today, loaded);
+        const members = this.deps.settings.members ?? [];
         // 264 波：行数口径（同 certs）
-        this.deps.onStats?.(this.moduleId, { rowCount: rows.length, memberCounts: memberCountsFrom(rows, ref, members) });
+        this.deps.onStats?.(this.moduleId, { rowCount: loaded.rows.length, memberCounts: memberCountsFrom(loaded.rows, loaded.ref, members) });
+        return out;
+    }
+}
+
+/**
+ * 车辆专属提醒 provider：复用车辆主表扫描，同时读取 rowlogs maintenance，
+ * 将按日期和按里程的下次保养提醒汇入全局提醒中心。
+ */
+export class VehiclesProvider extends SchemaLedgerProvider {
+    readonly moduleId = "vehicles";
+
+    constructor(schema: ModuleSchema, deps: ProviderDeps) {
+        super("vehicles", schema, deps);
+    }
+
+    async collect(today: Date): Promise<Reminder[]> {
+        const loaded = await this.readLedger();
+        if (!loaded) return [];
+        const out = await this.collectLedgerReminders(today, loaded);
+        const members = this.deps.settings.members ?? [];
+        this.deps.onStats?.(this.moduleId, {
+            rowCount: loaded.rows.length,
+            memberCounts: memberCountsFrom(loaded.rows, loaded.ref, members),
+        });
+        if (!this.deps.loadRowLogs) return out;
+
+        const logs = await this.deps.loadRowLogs();
+        const todayKey = localDateKey(today);
+        const categoryLabels: Record<string, string> = {
+            routine: "保养", repair: "维修", tires: "轮胎", battery: "电池",
+            inspection: "年检", cleaning: "清洁", other: "其他",
+        };
+        const dateRule: ReminderRuleSpec = { key: "maintenance_date", field: "nextDate", kind: "oneoff", leadDays: 30 };
+        const skip = new Set(["archived", "void", "expired", "renewed", "refunded", "discarded", "surrendered", "ins_expired", "med_expired", "m_expired"]);
+        for (const row of loaded.rows) {
+            const cell = (key: string) => row.cells[loaded.ref.columns![key]];
+            if (skip.has(selectFromValue(cell("status")) ?? "")) continue;
+            const name = textFromValue(cell("name")) ?? "车辆";
+            const relation: string[] | undefined = cell("member")?.relation?.blockIDs ?? undefined;
+            const memberId = relation?.[0] ? members.find((m) => m.avItemId === relation[0])?.id : undefined;
+            const currentMileage = numberFromValue(cell("mileage"));
+            const records = normalizeMaintenanceRecords(getEntries<MaintenanceRecord>(logs, loaded.ref.avId!, row.itemID, "maintenance"));
+            for (const record of records) {
+                const category = this.deps.t?.(`vehicle.maintenance.category.${record.category}`)
+                    || categoryLabels[record.category]
+                    || record.category;
+                const titleTemplate = this.deps.t?.("vehicle.maintenance.reminderTitle");
+                const title = titleTemplate && titleTemplate !== "vehicle.maintenance.reminderTitle"
+                    ? titleTemplate.replace("${vehicle}", name).replace("${category}", category)
+                    : `${name} · ${category}`;
+                const stableSuffix = [record.date, record.odometer, record.nextDate ?? "", record.nextOdometer ?? "", record.category, record.at ?? ""]
+                    .map((part) => String(part).replace(/[^a-zA-Z0-9._-]/g, "_"))
+                    .join(".");
+                if (record.nextDate) {
+                    const reminder = await buildReminder(dateRule, this.moduleId, {
+                        rowId: row.itemID,
+                        title,
+                        memberId,
+                        fieldValue: record.nextDate,
+                    }, { today, leadOverride: leadFor(this.deps.settings, this.moduleId, dateRule) });
+                    if (reminder) {
+                        out.push({ ...reminder, id: `${row.itemID}::vehicles.maintenance_date.${stableSuffix}`, ruleKey: dateRule.key });
+                    }
+                }
+                if (record.nextOdometer !== undefined && currentMileage !== undefined && currentMileage >= record.nextOdometer) {
+                    const odometerTemplate = this.deps.t?.("vehicle.maintenance.odometerReminderTitle");
+                    const odometerTitle = odometerTemplate && odometerTemplate !== "vehicle.maintenance.odometerReminderTitle"
+                        ? odometerTemplate.replace("${title}", title).replace("${odometer}", String(record.nextOdometer))
+                        : `${title} · ${record.nextOdometer} km`;
+                    out.push({
+                        id: `${row.itemID}::vehicles.maintenance_odometer.${stableSuffix}`,
+                        moduleId: this.moduleId,
+                        ruleKey: "maintenance_odometer",
+                        rowId: row.itemID,
+                        memberId,
+                        title: odometerTitle,
+                        dueDate: todayKey,
+                        daysLeft: -1,
+                        level: "overdue",
+                        kind: "oneoff",
+                    });
+                }
+            }
+        }
         return out;
     }
 }

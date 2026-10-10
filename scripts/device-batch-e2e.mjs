@@ -111,7 +111,10 @@ const browser = await chromium.launch({ channel: "msedge", headless: true });
     await page.goto(`${BASE}/`, { waitUntil: "domcontentloaded" });
     await sleep(12000);
     await pOpenPanel(page);
-    const wiz = await page.evaluate(() => document.body.innerText.includes("STEP 1 / 2"));
+    const wiz = await page.evaluate(() => {
+        const text = document.body.innerText;
+        return text.includes("STEP 1 / 2") || /第\s*1\s*步[，,]?\s*共\s*2\s*步/.test(text);
+    });
     rec(stage, "首启显示两步引导向导", wiz);
     await page.screenshot({ path: `${OUT}/s1-onboarding.png` });
     // 走向导：配偶+子女（子女计数默认 1，无需点 ＋——裸 "＋" 会误点总览成员 chips 的添加钮并跳页）
@@ -142,7 +145,8 @@ const browser = await chromium.launch({ channel: "msedge", headless: true });
     await pOpenPanel(page);
     await pClickSettingsGear(page);
     await sleep(2000);
-    await pClickByText(page, ["ℹ️ 关于", "关于"], ".lv-setnav__item, .b3-dialog button"); await sleep(1200);
+    await pClickByText(page, ["数据与帮助", "数据"], ".lv-setnav__item, .b3-dialog button"); await sleep(500);
+    await pClickByText(page, ["示例数据"], ".lv-settings__subnav .lv-setnav__item, .b3-dialog button"); await sleep(800);
     await pClickByText(page, ["生成示例数据"], "button");
     // 268 波：断言以磁盘结果为主（成员+行落盘），toast 时序受扫描耗时/系统条影响仅作辅助
     let diskDemo = { ids: 0, rows: 0 };
@@ -244,8 +248,9 @@ const browser = await chromium.launch({ channel: "msedge", headless: true });
     const del = await page.evaluate(() => {
         const card = Array.from(document.querySelectorAll(".lv-people > *")).find((c) => (c.textContent || "").includes("e2e成员"));
         if (!card) return "no card";
-        card.querySelector(".lv-person-head")?.dispatchEvent(new MouseEvent("contextmenu", { bubbles: true, clientX: 400, clientY: 300 }));
-        return "menu";
+        const more = card.querySelector("button[aria-label*='更多'], button[title*='更多']");
+        more?.click();
+        return more ? "menu" : "no action";
     });
     await sleep(900);
     await pClickByText(page, ["删除"], ".b3-menu__item, .b3-menu button"); await sleep(900);
@@ -257,7 +262,8 @@ const browser = await chromium.launch({ channel: "msedge", headless: true });
     // 演示数据生成回执
     await pClickSettingsGear(page);
     await sleep(2000);
-    await pClickByText(page, ["关于"], ".b3-dialog button"); await sleep(1200);
+    await pClickByText(page, ["数据与帮助", "数据"], ".lv-setnav__item, .b3-dialog button"); await sleep(500);
+    await pClickByText(page, ["示例数据"], ".lv-settings__subnav .lv-setnav__item, .b3-dialog button"); await sleep(800);
     await pClickByText(page, ["生成示例数据"], "button");
     let diskDemo2 = { ids: 0 };
     const demoSettings2 = await waitForSettings((s) => (s.demoMemberIds ?? []).length >= 2);

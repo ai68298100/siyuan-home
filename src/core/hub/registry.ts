@@ -5,10 +5,10 @@
  */
 import type { ModuleSchema } from "@/core/schema";
 import type { DataProvider, ProviderDeps } from "./providers";
-import { CertsProvider, MembersProvider, SchemaLedgerProvider, NumericRuleProvider } from "./providers";
+import { CertsProvider, MembersProvider, SchemaLedgerProvider, NumericRuleProvider, VehiclesProvider } from "./providers";
 
 /** certs/members 有专属 provider（双规则/生日语义），其余模块走 schema 通用派生 */
-const SPECIAL_PROVIDERS = new Set(["certs", "members"]);
+const SPECIAL_PROVIDERS = new Set(["certs", "members", "vehicles"]);
 
 /**
  * 遍历 schemaCatalog 生成全部 provider：
@@ -21,6 +21,10 @@ export function buildScanProviders(schemaCatalog: Record<string, ModuleSchema>, 
         new CertsProvider(deps),
         new MembersProvider(deps),
     ];
+    const vehiclesSchema = schemaCatalog.vehicles;
+    if (vehiclesSchema && ((vehiclesSchema.reminders?.length ?? 0) > 0 || (vehiclesSchema.numericRules?.length ?? 0) > 0)) {
+        providers.push(new VehiclesProvider(vehiclesSchema, deps));
+    }
     for (const [moduleId, schema] of Object.entries(schemaCatalog)) {
         if (SPECIAL_PROVIDERS.has(moduleId)) continue;
         const hasRules = (schema?.reminders?.length ?? 0) > 0 || (schema?.numericRules?.length ?? 0) > 0;

@@ -89,6 +89,20 @@
         const enabled = new Set(plugin.settings.enabledModules);
         return quickModuleIds.filter((id) => enabled.has(id));
     });
+    // A user may have disabled every optional module. Keep the first-record
+    // guide actionable in that state instead of routing to a non-existent
+    // `certs` ledger. The CTA then opens module settings where one can be
+    // enabled and provisioned.
+    const starterModule = $derived(
+        quickModules.find((id) => id !== "members")
+        ?? plugin.settings.enabledModules.find((id) => id !== "members" && id !== "adhoc")
+        ?? undefined,
+    );
+
+    function openStarterRecord() {
+        if (starterModule) openLedgerFor(starterModule);
+        else plugin.openSetting();
+    }
 
     // 266 波（模块卡趋势条）：近 5 日待办计数序列（数据源 moduleHistory，refreshHub 每日记录）。
     // 已知天数 ≥3 才出趋势条（新装不足两日无趋势语义）；条高按窗口内最大值归一（保底 15%）。
@@ -141,6 +155,8 @@
         return plugin.runtime?.cache?.byModule ?? {};
     });
     const rowCountOf = (mid: string): number | undefined => statsByModule[mid]?.rowCount;
+    const hasLedgerRows = $derived.by(() => Object.values(statsByModule).some((stats: any) => typeof stats?.rowCount === "number" && stats.rowCount > 0));
+    const showStartGuide = $derived(plugin.settings.onboarded && (members.length === 0 || !hasLedgerRows));
 
     // 262 波（Todoist/Linear assignee avatar 语言）：行级成员微头像——"这是谁的事"一眼可辨
     const memberOf = (id: string | undefined) => (id ? members.find((m) => m.id === id) : undefined);
@@ -155,6 +171,11 @@
     function drillReminders(mid: string) {
         plugin.runtime.hubModuleId = mid;
         onGoto("reminders");
+    }
+
+    function openLedgerFor(moduleId: string) {
+        plugin.setActiveLedger(moduleId);
+        onGoto("ledger");
     }
 
     // 261 波：「查看全部」= 新意图——清掉上次会话遗留的筛选（逾期/某成员/某模块）再进入；
@@ -188,7 +209,7 @@
         retryingScan = true;
         try {
             if (onRetryScan) await onRetryScan();
-            else await plugin.refreshHub();
+            else await plugin.refreshHub(undefined, true);
         } catch (e) {
             showMessage(t("hub.rescanFailed").replace("${msg}", e instanceof Error ? e.message : String(e)), 5000, "error");
         } finally {
@@ -276,6 +297,41 @@
     </div>
 </div>
 
+{#if showStartGuide}
+    <section class="lv-start-guide" aria-labelledby="lv-start-guide-title">
+        <div class="lv-start-guide__head">
+            <div>
+                <span class="lv-kicker">{t("startGuide.kicker")}</span>
+                <h2 id="lv-start-guide-title">{t("startGuide.title")}</h2>
+                <p>{t("startGuide.intro")}</p>
+            </div>
+            <span class="lv-start-guide__mark" aria-hidden="true">✦</span>
+        </div>
+        <div class="lv-start-guide__steps">
+            <div class="lv-start-guide__step">
+                <span class="lv-start-guide__num">1</span>
+                <div><b>{t("startGuide.stepMembers")}</b><span>{t("startGuide.stepMembersHint")}</span></div>
+                <button class="b3-button b3-button--outline" onclick={() => onGoto("members")}>{t("startGuide.openMembers")}</button>
+            </div>
+            <div class="lv-start-guide__step">
+                <span class="lv-start-guide__num">2</span>
+                <div><b>{t("startGuide.stepRecord")}</b><span>{starterModule ? t("startGuide.stepRecordHint") : t("startGuide.stepRecordNoModule")}</span></div>
+                <button class="b3-button b3-button--outline" onclick={openStarterRecord}>{starterModule ? t("startGuide.openLedger") : t("startGuide.openSettings")}</button>
+            </div>
+            <div class="lv-start-guide__step">
+                <span class="lv-start-guide__num">3</span>
+                <div><b>{t("startGuide.stepModules")}</b><span>{t("startGuide.stepModulesHint")}</span></div>
+                <button class="b3-button b3-button--outline" onclick={() => plugin.openSetting()}>{t("startGuide.openSettings")}</button>
+            </div>
+            <div class="lv-start-guide__step">
+                <span class="lv-start-guide__num">4</span>
+                <div><b>{t("startGuide.stepReminders")}</b><span>{t("startGuide.stepRemindersHint")}</span></div>
+                <button class="b3-button b3-button--outline" onclick={() => onGoto("reminders")}>{t("startGuide.openReminders")}</button>
+            </div>
+        </div>
+    </section>
+{/if}
+
 <div class="lv-focus" aria-label={t("dash.focusLabel")}>
     <div class="lv-focus-card">
         <span class="lv-focus-icon">◷</span>
@@ -301,7 +357,7 @@
             <span class="lv-avatar" aria-hidden="true" style="background:linear-gradient(135deg, hsl({memberHue(m.id)} 62% 52%), hsl({(memberHue(m.id) + 42) % 360} 62% 40%))">{m.name.slice(0, 1)}</span>{m.name}
         </button>
     {/each}
-    <button class="lv-chip" onclick={() => onGoto("members")}>＋</button>
+    <button class="lv-chip" aria-label={t("add")} title={t("add")} onclick={() => onGoto("members")}>＋</button>
 </div>
 
 <div class="lv-sec"><h2 class="lv-title-sec">{t("dash.upcoming")}</h2><span class="lv-sub">{t("dash.upcomingSub")}</span>

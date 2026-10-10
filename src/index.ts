@@ -14,6 +14,7 @@ import { complete, snooze, mute, unmute, renew, restore, addMemo, removeMemo, up
 import { getProvisioningReport, provisionModule, type ProvisioningReport } from "@/core/provisioner";
 import { createSingleFlightUntilStable } from "@/core/single-flight";
 import { addDetachedRow, setCell } from "@/core/siyuan";
+import { loadRowLogs } from "@/core/rowlog";
 import { mountLvHomeBridge } from "@/bridge/external-bridge";
 import { SCHEMA_CATALOG, validateSchema } from "@/core/schema";
 import type { HomeSettings } from "@/types";
@@ -422,6 +423,8 @@ export default class LvHomePlugin extends Plugin {
         const deps = {
             settings: this.settings,
             getDbRef: (id: string) => this.settings.dbRefs[id],
+            loadRowLogs: () => loadRowLogs(this),
+            t: (key: string) => this.i18nText(key),
             onStats: (id: string, stats: { rowCount: number; memberCounts: Record<string, number> }) => moduleStats.set(id, stats),
         };
         // 12 轮修复：provider 由 schemaCatalog 程序化派生（手工清单曾漏掉 parenting/schooling，
@@ -744,7 +747,9 @@ export default class LvHomePlugin extends Plugin {
         } else {
             showMessage(this.i18nText("wiz.provisioned").replace("${n}", String(moduleIds.length)), 3000, "info");
         }
-        await this.refreshHub();
+        // Onboarding provisions ledgers and may add member rows. Force the
+        // first post-wizard scan so the overview is built from fresh data.
+        await this.refreshHub(undefined, true);
     }
 
     /** Tab 面板挂载入口（tab callback 由框架调 addTab 注册的 destroy 之外回调） */
@@ -761,7 +766,8 @@ export default class LvHomePlugin extends Plugin {
             title: this.i18nText("settingsTitle"),
             component: HomeSettingsPanel,
             props: { plugin: this, settings: this.settings },
-            width: "860px",
+            width: "min(920px, calc(100vw - 32px))",
+            height: "min(760px, calc(100vh - 96px))",
         });
     }
 

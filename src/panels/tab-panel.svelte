@@ -91,10 +91,10 @@
     // 动作/扫描后留在当前页即时更新，不靠切页重挂载；多实例安全）
     let version = $state(0);
     let initialScanError = $state("");
-    async function refreshInitialScan() {
+    async function refreshInitialScan(force = false) {
         initialScanError = "";
         try {
-            await plugin.refreshHub();
+            await plugin.refreshHub(undefined, force);
             initialScanError = "";
         } catch (e) {
             initialScanError = e instanceof Error ? e.message : String(e);
@@ -120,7 +120,7 @@
 <div class="lv-home lv-tab" bind:this={homeEl}>
     <header class="lv-tabbar">
         <div class="lv-appbrand">
-            <span class="lv-logo" aria-hidden="true">🏠</span>
+            <span class="lv-logo" aria-hidden="true"><span class="lv-logo-mark">⌂</span></span>
             <div class="lv-appbrand-t">
                 <b>{t("butler")}</b>
                 <span>LV HOME</span>
@@ -163,7 +163,7 @@
         <div id={`lv-panel-${screen}`} class="lv-screen lv-anim" role="tabpanel" tabindex="0" aria-labelledby={`lv-tab-${screen}`}>
             <ErrorBoundary {t} onretry={() => { /* screen switch resets naturally via {#key} */ }}>
                 {#if screen === "overview"}
-                    <Overview {plugin} {t} {version} {initialScanError} onRetryScan={refreshInitialScan} onGoto={(s: ScreenId) => gotoScreen(s)} />
+                    <Overview {plugin} {t} {version} {initialScanError} onRetryScan={() => refreshInitialScan(true)} onGoto={(s: ScreenId) => gotoScreen(s)} />
                 {:else if screen === "reminders"}
                     <Reminders {plugin} {t} {version} />
                 {:else if screen === "ledger"}

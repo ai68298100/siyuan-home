@@ -3,7 +3,7 @@
     import { MODULE_GROUPS, modulesByGroup } from "@/core/modules";
     import { newMember, saveSettings, normalizeCheckinBindings } from "@/core/settings";
     import type { ProvisioningReport } from "@/core/provisioner";
-    import type { HomeSettings, MemberRole, FamilyMember, CheckinBinding } from "@/types";
+    import type { HomeSettings, MemberRole, FamilyMember, CheckinBinding, ModuleGroupId } from "@/types";
 
     interface IHomePluginLike {
         i18n: Record<string, unknown>;
@@ -35,7 +35,11 @@
         return t("settings.provisionPartial").replace("${modules}", modules);
     }
 
-    let tab: "modules" | "members" | "reminders" | "about" = $state("modules");
+    type SettingsArea = "modules" | "members" | "reminders" | "data" | "about";
+    let area: SettingsArea = $state("modules");
+    let moduleGroup: ModuleGroupId = $state("people");
+    let reminderSection: "schedule" | "webhook" | "leads" | "checkin" = $state("schedule");
+    let dataSection: "migration" | "demo" | "ecosystem" | "shortcuts" = $state("migration");
     let saving = $state(false);
     // 33.4 编辑事务：draft 副本，保存才落盘（取消/关闭不污染 settings）。
     // 此处捕获初始快照是设计意图，抑制 svelte 的 locally-referenced 提示。
@@ -348,7 +352,7 @@
                 if (applied > 0) {
                     await import("@/core/settings").then((m) => m.saveSettings(plugin as any, plugin.settings));
                     try {
-                        await plugin.refreshHub?.();
+                        await plugin.refreshHub?.(undefined, true);
                     } catch (error) {
                         showMessage(`${t("diag.ambigDone").replace("${n}", String(applied))} (${settingHint("刷新失败", "refresh failed")}: ${error instanceof Error ? error.message : String(error)})`, 6000, "error");
                         return;
@@ -375,6 +379,19 @@
                 .replace("${n}", String(res.linked.length))
                 .replace("${amb}", String(res.ambiguous.length))
                 .replace("${stale}", String(res.stale.length)), 6000, "info");
+            // Backfill changes the settings-side avItemId mapping used by all
+            // providers to derive memberId. Refresh only when the mapping
+            // actually changed so overview/reminders pick up ownership now.
+            if (res.linked.length > 0 || res.stale.length > 0) {
+                // The mapping has already been persisted by backfillMemberLinks.
+                // A transient scan failure must not roll the in-memory settings
+                // back to a snapshot that disagrees with disk.
+                try {
+                    await plugin.refreshHub?.(undefined, true);
+                } catch (refreshError) {
+                    showMessage(`${settingHint("关联已保存，但提醒刷新失败", "Links saved, but reminder refresh failed")}${refreshError instanceof Error ? ` (${refreshError.message})` : ""}`, 6000, "error");
+                }
+            }
             if (res.ambiguous.length > 0) openAmbiguityDialog(res.ambiguous);
         } catch (error) {
             plugin.settings = previous;
@@ -427,7 +444,7 @@
             plugin.settings = next;
             await import("@/core/settings").then((m) => m.saveSettings(plugin as any, next));
             try {
-                await plugin.refreshHub?.();
+                await plugin.refreshHub?.(undefined, true);
             } catch (error) {
                 showMessage(`${t("wiz.rerunHint")} (${settingHint("刷新失败", "refresh failed")}: ${error instanceof Error ? error.message : String(error)})`, 6000, "error");
                 return;
@@ -458,7 +475,7 @@
                 let provisioningWarning = "";
                 try {
                     provisioningWarning = describeProvisioningIssues(await plugin.ensureCoreLedgers?.());
-                    await plugin.refreshHub?.();
+                    await plugin.refreshHub?.(undefined, true);
                 } catch (error) {
                     followupError = error;
                 }
@@ -520,7 +537,7 @@
                     let provisioningWarning = "";
                     try {
                         provisioningWarning = describeProvisioningIssues(await plugin.ensureCoreLedgers?.());
-                        await plugin.refreshHub?.();
+                        await plugin.refreshHub?.(undefined, true);
                     } catch (error) {
                         followupError = error;
                     }
@@ -639,7 +656,7 @@
                 return;
             }
             let refreshError: unknown;
-            try { await plugin.refreshHub?.(); }
+            try { await plugin.refreshHub?.(undefined, true); }
             catch (e) { refreshError = e; }
             const details = [...res.errors.slice(0, 3)];
             if (refreshError) details.push(`${settingHint("提醒刷新失败", "reminder refresh failed")}: ${refreshError instanceof Error ? refreshError.message : String(refreshError)}`);
@@ -666,7 +683,7 @@
                 const { clearDemoData } = await import("@/core/demo");
                 const res = await clearDemoData(plugin as any, plugin.settings);
                 let refreshError: unknown;
-                try { await plugin.refreshHub?.(); }
+                try { await plugin.refreshHub?.(undefined, true); }
                 catch (e) { refreshError = e; }
                 const details = [...res.errors.slice(0, 3)];
                 if (refreshError) details.push(`${settingHint("提醒刷新失败", "reminder refresh failed")}: ${refreshError instanceof Error ? refreshError.message : String(refreshError)}`);
@@ -686,21 +703,30 @@
 </script>
 
 <div class="lv-home lv-settings">
-    <!-- 251 波（对齐原型设置屏）：左侧锚点导航 + 右侧分组卡片；b3-tab-bar 横排页签退役 -->
+    <!-- 左侧主分类；模块和提醒等复杂页面在右侧继续细分。 -->
     <nav class="lv-setnav" aria-label={t("settingsTitle")} inert={saving || migrationBusy || demoBusy}>
-        <button class="lv-setnav__item {tab === 'modules' ? 'on' : ''}" aria-current={tab === 'modules' ? 'true' : undefined} onclick={() => (tab = "modules")}>🧩 {t("tabModules")}</button>
-        <button class="lv-setnav__item {tab === 'members' ? 'on' : ''}" aria-current={tab === 'members' ? 'true' : undefined} onclick={() => (tab = "members")}>👪 {t("tabMembers")}</button>
-        <button class="lv-setnav__item {tab === 'reminders' ? 'on' : ''}" aria-current={tab === 'reminders' ? 'true' : undefined} onclick={() => (tab = "reminders")}>⏰ {t("tabReminders")}</button>
-        <button class="lv-setnav__item {tab === 'about' ? 'on' : ''}" aria-current={tab === 'about' ? 'true' : undefined} onclick={() => (tab = "about")}>ℹ️ {t("tabAbout")}</button>
+        <div class="lv-setnav__brand"><span class="lv-setnav__brand-mark" aria-hidden="true">⌂</span><div><b>{t("butler")}</b><span>{t("settingsTitle")}</span></div></div>
+        <div class="lv-setnav__label">{t("settingsTitle")}</div>
+        <button class="lv-setnav__item {area === 'modules' ? 'on' : ''}" aria-current={area === 'modules' ? 'true' : undefined} onclick={() => (area = "modules")}><span class="lv-setnav__icon" aria-hidden="true">▦</span>{t("tabModules")}</button>
+        <button class="lv-setnav__item {area === 'members' ? 'on' : ''}" aria-current={area === 'members' ? 'true' : undefined} onclick={() => (area = "members")}><span class="lv-setnav__icon" aria-hidden="true">♧</span>{t("tabMembers")}</button>
+        <button class="lv-setnav__item {area === 'reminders' ? 'on' : ''}" aria-current={area === 'reminders' ? 'true' : undefined} onclick={() => (area = "reminders")}><span class="lv-setnav__icon" aria-hidden="true">◷</span>{t("tabReminders")}</button>
+        <button class="lv-setnav__item {area === 'data' ? 'on' : ''}" aria-current={area === 'data' ? 'true' : undefined} onclick={() => (area = "data")}><span class="lv-setnav__icon" aria-hidden="true">▤</span>{t("settings.dataTitle")}</button>
+        <button class="lv-setnav__item {area === 'about' ? 'on' : ''}" aria-current={area === 'about' ? 'true' : undefined} onclick={() => (area = "about")}><span class="lv-setnav__icon" aria-hidden="true">ⓘ</span>{t("tabAbout")}</button>
     </nav>
 
     <div class="lv-setpane" aria-busy={saving || migrationBusy || demoBusy} inert={saving || migrationBusy || demoBusy}>
-    {#if tab === "modules"}
-        <div class="lv-card lv-setcard lv-setcard--hint">{t("settings.modulesHint")}</div>
-        {#each MODULE_GROUPS as gid (gid)}
+    {#if area === "modules"}
+        <div class="lv-settings__pane-title">{t("tabModules")}</div>
+        <nav class="lv-settings__subnav" aria-label={t("settings.moduleCategory")}>
+            {#each MODULE_GROUPS as gid (gid)}
+                <button class="lv-setnav__item {moduleGroup === gid ? 'on' : ''}" aria-current={moduleGroup === gid ? 'true' : undefined} onclick={() => (moduleGroup = gid)}>{t(`group.${gid}`)}</button>
+            {/each}
+        </nav>
+        <div class="lv-settings__scroll" aria-label={t(`group.${moduleGroup}`)}>
+            <div class="lv-card lv-setcard lv-setcard--hint">{t("settings.modulesHint")}</div>
             <div class="lv-card lv-setcard">
-                <div class="lv-setcard__title">{t(`group.${gid}`)}</div>
-                {#each modulesByGroup(gid) as mod (mod.id)}
+                <div class="lv-setcard__title">{t(`group.${moduleGroup}`)}</div>
+                {#each modulesByGroup(moduleGroup) as mod (mod.id)}
                     <div class="fn__flex lv-settings__row">
                         <input
                             type="checkbox"
@@ -728,8 +754,10 @@
                     </div>
                 {/each}
             </div>
-        {/each}
-    {:else if tab === "members"}
+        </div>
+    {:else if area === "members"}
+        <div class="lv-settings__pane-title">{t("tabMembers")}</div>
+        <div class="lv-settings__scroll">
         <div class="lv-card lv-setcard">
             <div class="lv-setcard__hint">{t("settings.membersHint")}</div>
             {#if draftMembers.length === 0}
@@ -759,7 +787,17 @@
             {/each}
             <button class="b3-button b3-button--outline lv-setcard__action" onclick={addMember}>＋ {t("add")}</button>
         </div>
-    {:else if tab === "reminders"}
+        </div>
+    {:else if area === "reminders"}
+        <div class="lv-settings__pane-title">{t("tabReminders")}</div>
+        <nav class="lv-settings__subnav" aria-label={t("tabReminders")}>
+            <button class="lv-setnav__item {reminderSection === 'schedule' ? 'on' : ''}" aria-current={reminderSection === 'schedule' ? 'true' : undefined} onclick={() => (reminderSection = "schedule")}>{t("settings.reminderSchedule")}</button>
+            <button class="lv-setnav__item {reminderSection === 'webhook' ? 'on' : ''}" aria-current={reminderSection === 'webhook' ? 'true' : undefined} onclick={() => (reminderSection = "webhook")}>{t("settings.webhookTitle")}</button>
+            <button class="lv-setnav__item {reminderSection === 'leads' ? 'on' : ''}" aria-current={reminderSection === 'leads' ? 'true' : undefined} onclick={() => (reminderSection = "leads")}>{t("settings.leadsTitle")}</button>
+            <button class="lv-setnav__item {reminderSection === 'checkin' ? 'on' : ''}" aria-current={reminderSection === 'checkin' ? 'true' : undefined} onclick={() => (reminderSection = "checkin")}>{t("settings.checkinBindingsTitle")}</button>
+        </nav>
+        <div class="lv-settings__scroll">
+        {#if reminderSection === "schedule"}
         <div class="lv-card lv-setcard">
             <div class="lv-setcard__title">{t("tabReminders")}</div>
             <div class="lv-setcard__hint">{t("settings.remindersHint")}</div>
@@ -776,6 +814,7 @@
                 <span class="lv-caption fn__flex-1">{t("settings.silentHoursHint")}</span>
             </div>
         </div>
+        {:else if reminderSection === "webhook"}
         <div class="lv-card lv-setcard">
             <div class="lv-setcard__title">{t("settings.webhookTitle")}</div>
             <div class="lv-setcard__hint">{t("settings.webhookHint")}</div>
@@ -800,6 +839,7 @@
             <button class="b3-button b3-button--outline lv-setcard__action" disabled={testingWebhook || !draftWebhookUrl.trim()}
                 onclick={testWebhook}>{testingWebhook ? t("settings.webhookTesting") : t("settings.webhookTest")}</button>
         </div>
+        {:else if reminderSection === "leads"}
         <div class="lv-card lv-setcard">
             <div class="lv-setcard__title">{t("settings.leadsTitle")}</div>
             <div class="lv-setcard__hint">{t("settings.leadsHint")}</div>
@@ -818,6 +858,7 @@
                 </div>
             {/each}
         </div>
+        {:else}
         <!-- EC09（D20）：打卡习惯 → 成员指标绑定（只读消费） -->
         <div class="lv-card lv-setcard">
             <div class="lv-setcard__title">{t("settings.checkinBindingsTitle")}</div>
@@ -849,7 +890,67 @@
                 <button class="b3-button b3-button--outline lv-setcard__action" disabled={!checkinItems.length} onclick={addBinding}>＋ {t("settings.checkinAdd")}</button>
             {/if}
         </div>
+        {/if}
+        </div>
+    {:else if area === "data"}
+        <div class="lv-settings__pane-title">{t("settings.dataTitle")}</div>
+        <nav class="lv-settings__subnav" aria-label={t("settings.dataTitle")}>
+            <button class="lv-setnav__item {dataSection === 'migration' ? 'on' : ''}" aria-current={dataSection === 'migration' ? 'true' : undefined} onclick={() => (dataSection = "migration")}>{t("settings.migrateTitle")}</button>
+            <button class="lv-setnav__item {dataSection === 'demo' ? 'on' : ''}" aria-current={dataSection === 'demo' ? 'true' : undefined} onclick={() => (dataSection = "demo")}>{t("settings.demoTitle")}</button>
+            <button class="lv-setnav__item {dataSection === 'ecosystem' ? 'on' : ''}" aria-current={dataSection === 'ecosystem' ? 'true' : undefined} onclick={() => (dataSection = "ecosystem")}>{t("settings.ecoTitle")}</button>
+            <button class="lv-setnav__item {dataSection === 'shortcuts' ? 'on' : ''}" aria-current={dataSection === 'shortcuts' ? 'true' : undefined} onclick={() => (dataSection = "shortcuts")}>{t("faq.shortcuts")}</button>
+        </nav>
+        <div class="lv-settings__scroll">
+        {#if dataSection === "migration"}
+        <!-- 设置导出/导入（跨设备/重装迁移辅助） -->
+        <div class="lv-card lv-setcard">
+            <div class="lv-setcard__title">{t("settings.migrateTitle")}</div>
+            <div class="lv-setcard__hint" style="color:var(--lv-warn)">⚠ {t("settings.migratePrivacy")}</div>
+            <div class="lv-setcard__actions">
+                <button class="b3-button b3-button--outline" disabled={migrationBusy || saving} onclick={exportSettings}>{t("settings.export")}</button>
+                <button class="b3-button b3-button--outline" disabled={migrationBusy || saving} onclick={() => importInput?.click()}>{migrationAction === "import" ? t("ledger.saving") : t("settings.import")}</button>
+                <input type="file" accept="application/json,.json" style="display:none"
+                    bind:this={importInput} onchange={(e) => importSettings(e)} />
+                {#if preImportBackupExists}
+                    <button class="b3-button b3-button--outline" disabled={migrationBusy || saving} onclick={restorePreImport}>{migrationAction === "restore" ? t("ledger.saving") : t("settings.restoreBtn")}</button>
+                {/if}
+            </div>
+        </div>
+        {:else if dataSection === "demo"}
+        <!-- 示例数据一键生成/清除 -->
+        <div class="lv-card lv-setcard">
+            <div class="lv-setcard__title">{t("settings.demoTitle")}</div>
+            <div class="lv-setcard__hint">{t("settings.demoHint")}</div>
+            <div class="lv-setcard__actions">
+                <button class="b3-button b3-button--outline" disabled={demoBusy} aria-busy={demoBusy && demoAction === "generate"} onclick={generateDemo}>{demoAction === "generate" ? t("ledger.saving") : t("settings.demoGenerate")}</button>
+                <button class="b3-button b3-button--outline" disabled={demoBusy} aria-busy={demoBusy && demoAction === "clear"} onclick={clearDemo}>{demoAction === "clear" ? t("ledger.saving") : t("settings.demoClear")}</button>
+            </div>
+        </div>
+        {:else if dataSection === "ecosystem"}
+        <!-- 生态分区占位：明确标为规划能力，避免禁用开关被误解为故障。 -->
+        <div class="lv-card lv-setcard">
+            <div class="lv-setcard__title">{t("settings.ecoTitle")}</div>
+            <div class="lv-setcard__hint">{t("settings.ecoHint")} · {t("settings.ecoPlanned")}</div>
+            {#each ["qiandao", "contacts", "glean", "exam", "flashcard", "leiqie"] as eco (eco)}
+                <div class="fn__flex lv-settings__row">
+                    <span class="lv-setnav__icon" aria-hidden="true">◇</span>
+                    <span class="fn__flex-1">{t(`eco.${eco}`)}</span>
+                    <span class="lv-badge gray">{t("settings.ecoPlanned")}</span>
+                </div>
+            {/each}
+        </div>
+        {:else}
+        <div class="lv-card lv-setcard">
+            <div class="lv-setcard__title">⌨ {t("faq.shortcuts")}</div>
+            <p class="lv-caption" style="margin:2px 0">· {t("openButler")}：{t("faq.topbarOrCommand")}</p>
+            <p class="lv-caption" style="margin:2px 0">· {t("faq.quickCapture")}：{t("faq.topbarBolt")}</p>
+        </div>
+        {/if}
+        </div>
     {:else}
+        {@const diag = plugin.getDiagnostics?.()}
+        <div class="lv-settings__pane-title">{t("tabAbout")}</div>
+        <div class="lv-settings__scroll">
         <div class="lv-card lv-setcard">
             <div class="lv-settings__about">
                 <p>{t("about.line1")}</p>
@@ -863,48 +964,6 @@
                     onclick={() => window.open("https://github.com/ai68298100/siyuan-home", "_blank")}>{t("about.repo")}</button>
             </div>
         </div>
-        <!-- 24 组：设置导出/导入（跨设备/重装迁移辅助） -->
-        <div class="lv-card lv-setcard">
-            <div class="lv-setcard__title">{t("settings.migrateTitle")}</div>
-            <div class="lv-setcard__hint" style="color:var(--lv-warn)">⚠ {t("settings.migratePrivacy")}</div>
-            <div class="lv-setcard__actions">
-                <button class="b3-button b3-button--outline" disabled={migrationBusy || saving} onclick={exportSettings}>{t("settings.export")}</button>
-                <button class="b3-button b3-button--outline" disabled={migrationBusy || saving} onclick={() => importInput?.click()}>{migrationAction === "import" ? t("ledger.saving") : t("settings.import")}</button>
-                <input type="file" accept="application/json,.json" style="display:none"
-                    bind:this={importInput} onchange={(e) => importSettings(e)} />
-                {#if preImportBackupExists}
-                    <!-- UG03/DL07：导入前自动备份的回滚入口 -->
-                    <button class="b3-button b3-button--outline" disabled={migrationBusy || saving} onclick={restorePreImport}>{migrationAction === "restore" ? t("ledger.saving") : t("settings.restoreBtn")}</button>
-                {/if}
-            </div>
-        </div>
-        <!-- 24 组/CM07：示例数据一键生成/清除（新用户体验与截图；【示例】前缀可识别可回滚） -->
-        <div class="lv-card lv-setcard">
-            <div class="lv-setcard__title">{t("settings.demoTitle")}</div>
-            <div class="lv-setcard__hint">{t("settings.demoHint")}</div>
-            <div class="lv-setcard__actions">
-                <button class="b3-button b3-button--outline" disabled={demoBusy} aria-busy={demoBusy && demoAction === "generate"} onclick={generateDemo}>{demoAction === "generate" ? t("ledger.saving") : t("settings.demoGenerate")}</button>
-                <button class="b3-button b3-button--outline" disabled={demoBusy} aria-busy={demoBusy && demoAction === "clear"} onclick={clearDemo}>{demoAction === "clear" ? t("ledger.saving") : t("settings.demoClear")}</button>
-            </div>
-        </div>
-        <!-- C8d：生态分区占位（v0.3 接线；开关仅展示，不可用） -->
-        <div class="lv-card lv-setcard">
-            <div class="lv-setcard__title">{t("settings.ecoTitle")}</div>
-            <div class="lv-setcard__hint">{t("settings.ecoHint")}</div>
-            {#each ["qiandao", "contacts", "glean", "exam", "flashcard", "leiqie"] as eco (eco)}
-                <div class="fn__flex lv-settings__row">
-                    <input type="checkbox" class="b3-switch" disabled />
-                    <span class="fn__flex-1">{t(`eco.${eco}`)} <span class="lv-badge gray">{t("settings.ecoPlanned")}</span></span>
-                </div>
-            {/each}
-        </div>
-        <div class="lv-card lv-setcard">
-            <div class="lv-setcard__title">⌨ {t("faq.shortcuts")}</div>
-            <p class="lv-caption" style="margin:2px 0">· {t("openButler")}：{t("faq.topbarOrCommand")}</p>
-            <p class="lv-caption" style="margin:2px 0">· {t("faq.quickCapture")}：{t("faq.topbarBolt")}</p>
-        </div>
-        {#if tab === "about"}
-            {@const diag = plugin.getDiagnostics?.()}
             {#if diag}
                 <div class="lv-card lv-setcard">
                     <div class="lv-setcard__title">{t("diag.title")} · v{diag.version}</div>
@@ -949,12 +1008,12 @@
                     </div>
                 </div>
             {/if}
-        {/if}
+        </div>
     {/if}
     </div>
 
     <div class="fn__flex lv-settings__footer">
-        {#if tab === "modules"}
+        {#if area === "modules"}
             <button class="b3-button b3-button--text" disabled={saving || migrationBusy || demoBusy} onclick={enableAll}>{t("enableAll")}</button>
             <button class="b3-button b3-button--text" disabled={saving || migrationBusy || demoBusy} onclick={coreOnly}>{t("coreOnly")}</button>
         {/if}
