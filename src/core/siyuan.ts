@@ -76,8 +76,29 @@ export function listNotebooks(): Promise<NotebookInfo[]> {
         .then((d) => d?.notebooks ?? []);
 }
 
-export function createNotebook(name: string): Promise<string> {
-    return post<string>("/api/notebook/createNotebook", { name });
+/**
+ * 归一化 createNotebook 的返回值。
+ * 思源 3.8.5 返回裸 ID，3.8.6+ 部分版本返回 { notebook: { id } }；
+ * 同时兼容过渡版本的 { notebook: id } 与 { id }，避免对象继续流入文档 API。
+ */
+function notebookIdFromCreateResponse(data: unknown): string {
+    if (typeof data === "string" && data) return data;
+    if (!data || typeof data !== "object") {
+        throw new KernelError("/api/notebook/createNotebook", -3, "invalid notebook id in response");
+    }
+    const response = data as { notebook?: unknown; id?: unknown };
+    if (typeof response.notebook === "string" && response.notebook) return response.notebook;
+    if (response.notebook && typeof response.notebook === "object") {
+        const nestedId = (response.notebook as { id?: unknown }).id;
+        if (typeof nestedId === "string" && nestedId) return nestedId;
+    }
+    if (typeof response.id === "string" && response.id) return response.id;
+    throw new KernelError("/api/notebook/createNotebook", -3, "invalid notebook id in response");
+}
+
+export async function createNotebook(name: string): Promise<string> {
+    const data = await post<unknown>("/api/notebook/createNotebook", { name });
+    return notebookIdFromCreateResponse(data);
 }
 
 /** 重新打开已关闭的笔记本（D07：笔记本被用户关闭 → 恢复而非新建。[待实测] payload 以 3.8.x 实例为准） */

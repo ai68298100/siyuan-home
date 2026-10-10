@@ -6,6 +6,7 @@ import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import {
     setTransport,
     setUploadTransport,
+    createNotebook,
     primaryRowItemIDs,
     renderLedger,
     renderLedgerAll,
@@ -30,6 +31,31 @@ beforeEach(() => {
 afterEach(() => setTransport(null));
 
 const ids = (n: number, prefix = "row") => Array.from({ length: n }, (_, i) => `${prefix}-${i}`);
+
+describe("createNotebook 返回值兼容", () => {
+    it.each([
+        ["裸字符串 ID", "nb-string", "nb-string"],
+        ["对象 notebook.id", { notebook: { id: "nb-nested" } }, "nb-nested"],
+        ["对象 notebook 字符串", { notebook: "nb-legacy" }, "nb-legacy"],
+        ["对象顶层 id", { id: "nb-top-level" }, "nb-top-level"],
+    ])("兼容%s", async (_label, data, expected) => {
+        handler = (endpoint, payload) => {
+            expect(endpoint).toBe("/api/notebook/createNotebook");
+            expect(payload).toEqual({ name: "小驴管家" });
+            return { code: 0, msg: "", data };
+        };
+        await expect(createNotebook("小驴管家")).resolves.toBe(expected);
+    });
+
+    it("无法提取笔记本 ID 时抛出 KernelError，不把对象继续传给下游 API", async () => {
+        handler = () => ({ code: 0, msg: "", data: { notebook: {} } });
+        await expect(createNotebook("小驴管家")).rejects.toMatchObject({
+            name: "KernelError",
+            endpoint: "/api/notebook/createNotebook",
+            code: -3,
+        });
+    });
+});
 
 /** 分页 mock：按 page 返回 200/页 */
 function paginatedPK(total: number) {

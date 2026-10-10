@@ -1,18 +1,14 @@
-# v0.4.1 · 小驴管家（内测版）按钮可用性与失败恢复
+# v0.4.2 · 小驴管家（内测版）首次安装建库兼容修复
 
 ## 变更
 
-- 新增建库结果报告、身份待确认恢复入口，以及重建/导入/恢复后的明确失败回执。
-- 优化建库单飞与状态变更复查，避免并发重复建库并补建过程中启用的新模块。
-- 修复 CSV 导出不沿用当前排序、快速录入身份待确认重开后目标台账丢失等问题。
-- 收口提醒、成员、台账、总览、设置和引导中的保存中、失败、重试、空态与导出反馈。
-- 总览快捷记录按已启用模块显示；提醒批量处理期间锁定筛选、视图切换、重扫和行内操作；手机端顶栏分层并提供关闭入口，全屏面板去除重复标题栏、统一滚动并支持顶栏吸附。
-- 农历转换改用内置 1900–2100 月表，保留提醒行为并将 `index.js` gzip 降至约 129 KB。
+- 修复思源 3.8.6+ `createNotebook` 返回对象格式导致首次安装建库时报 `Field [notebook] has an invalid type` 的问题。
+- 兼容裸字符串、`{ notebook: id }`、`{ notebook: { id } }` 和 `{ id }` 四种响应格式；无效响应会立即显示明确错误。
 
 ## 验证
 
-- 324 项单测通过；Svelte、TypeScript、i18n、meta、loader、生产构建和发布包 smoke 通过。
-- `pnpm audit` 因当前环境访问 npm registry 时的 `UnknownIssuer` 证书错误未能完成，待 CI 网络环境复核。
+- 329 项单测通过；Svelte、TypeScript、i18n、meta、loader、生产构建和发布包 smoke 通过。
+- `pnpm audit --prod --audit-level moderate` 本机通过，未发现已知漏洞。
 - 真实思源 UI 六阶段走查（含 Android WebView 和无障碍检查）仍需人工宿主验收；本版继续保留 `disabledInPublish: true`。
 
 完整变更见 [CHANGELOG.md](./CHANGELOG.md)。
