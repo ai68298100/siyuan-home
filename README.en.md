@@ -37,7 +37,15 @@ Certificates expire, medicine expires, insurance needs renewal, subscriptions au
 | 🧩 **Modules on demand** | Disabled modules create no data and stay out of the UI; parenting/school only suggested when you have kids |
 | 🔌 **Ecosystem ready** | Quick capture sheet (⚡ / `N`, schema-driven, auto-provision), statusbar badge with scan-health pulse, service bridge (`window.LvHome`), contacts picker via 小驴人脉 |
 
-## 📦 Install (v0.4.1)
+## 🆕 What's new in v0.4.2
+
+This patch release fixes first-install provisioning on SiYuan 3.8.6+ by normalizing the changed `createNotebook` response before creating ledger documents.
+
+- **Added**: regression coverage for string IDs, `{ notebook: id }`, `{ notebook: { id } }`, `{ id }`, and invalid responses.
+- **Improved**: notebook creation now always returns a validated string ID and reports a clear kernel error when the response is unusable.
+- **Fixed**: `Field [notebook] has an invalid type` during first install when the kernel returns a notebook object.
+
+## 📦 Install (v0.4.2)
 
 1. Download `package.zip` from [Releases](https://github.com/ai68298100/siyuan-home/releases/latest)
 2. SiYuan → Settings → Marketplace → Download → **Import** the zip
@@ -45,7 +53,7 @@ Certificates expire, medicine expires, insurance needs renewal, subscriptions au
 4. Press `Ctrl+Alt+H` anytime to open the hub
 
 > **Validation status:** core data paths have automated tests and live-kernel coverage. The six-stage real SiYuan UI batch, including Android WebView and accessibility checks, is still pending; marketplace submission follows manual host validation. `icon.png` and `preview.png` were redesigned for v0.3.13 (brand-gradient tile + geometric mark; dark overview with sample data).
-> **Version note:** the tagged v0.4.1 package is the current GitHub release candidate; the release branch has passed local quality checks and currently reports 324 unit tests.
+> **Version note:** the tagged v0.4.2 package is the current GitHub release candidate; the release branch has passed local quality checks and currently reports 329 unit tests.
 >
 > Family sharing depends on SiYuan's collaboration, permissions, sync and conflict behavior. Test with non-sensitive data before sharing; this plugin does not provide a separate permission system.
 >
