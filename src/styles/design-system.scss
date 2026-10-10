@@ -564,12 +564,19 @@
     .lv-rem .lv-rem-ops { grid-column: 2 / -1; flex-wrap: wrap; }
     // 26.7 窄屏 tabbar：品牌/状态/动作保持一行，页签独占下一行，避免多次换行挤压入口。
     .lv-tabbar {
+      position: sticky;
+      top: 0;
+      z-index: var(--lv-z-topbar);
       display: grid;
       grid-template-columns: minmax(0, 1fr) auto auto;
       grid-template-areas: "brand status actions" "tabs tabs tabs";
       align-items: center;
       gap: 8px 10px;
       padding: 9px 10px;
+      background: color-mix(in srgb, var(--lv-surface) 94%, transparent);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      box-shadow: var(--lv-shadow-1), inset 0 1px 0 var(--lv-inset);
     }
     .lv-appbrand { grid-area: brand; min-width: 0; }
     .lv-hubstatus { grid-area: status; justify-self: end; }
@@ -586,8 +593,11 @@
   }
   // 26.7 超窄屏（<400px）：页签等分收窄
   @media (max-width: 400px) {
-    .lv-tabbar { grid-template-columns: minmax(0, 1fr) auto; grid-template-areas: "brand actions" "status status" "tabs tabs"; }
+    // 内测版中文全名在 320px 下会挤压三枚操作按钮；品牌独占首行，
+    // 状态与操作并列，页签保持第三行，保证标题完整且每个入口都可点。
+    .lv-tabbar { grid-template-columns: minmax(0, 1fr) auto; grid-template-areas: "brand brand" "status actions" "tabs tabs"; }
     .lv-hubstatus { justify-self: start; }
+    .lv-tabbar-actions { justify-self: end; }
     .lv-tabs__item { padding: 6px 8px; font-size: 12px; flex: 1; text-align: center; min-height: 34px; }
     .lv-tabbar > .lv-tabs { width: 100%; }
   }
