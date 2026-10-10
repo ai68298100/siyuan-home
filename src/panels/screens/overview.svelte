@@ -81,6 +81,15 @@
         return plugin.settings.enabledModules.filter((id: string) => id !== "members");
     });
 
+    // 快捷录入只展示当前已启用的模块。固定展示未启用模块会把用户带到
+    // 不存在的台账页，随后点击“重建”也不会真正创建该模块。
+    const quickModuleIds = ["certs", "medicine", "memberships", "media", "favors", "members"];
+    const quickModules = $derived.by(() => {
+        void version;
+        const enabled = new Set(plugin.settings.enabledModules);
+        return quickModuleIds.filter((id) => enabled.has(id));
+    });
+
     // 266 波（模块卡趋势条）：近 5 日待办计数序列（数据源 moduleHistory，refreshHub 每日记录）。
     // 已知天数 ≥3 才出趋势条（新装不足两日无趋势语义）；条高按窗口内最大值归一（保底 15%）。
     const moduleHistory = $derived.by(() => {
@@ -352,12 +361,11 @@
 
 <div class="lv-sec"><h2 class="lv-title-sec">{t("dash.quickRecord")}</h2><span class="lv-sub">{t("dash.quickRecordSub")}</span></div>
 <div class="lv-quick" style="margin-bottom:4px">
-    <button class="lv-qbtn" onclick={() => { plugin.setActiveLedger("certs"); onGoto("ledger"); }}><span class="qi">🪪</span>{t("module.certs")}</button>
-    <button class="lv-qbtn" onclick={() => { plugin.setActiveLedger("medicine"); onGoto("ledger"); }}><span class="qi">💊</span>{t("module.medicine")}</button>
-    <button class="lv-qbtn" onclick={() => { plugin.setActiveLedger("memberships"); onGoto("ledger"); }}><span class="qi">🔁</span>{t("module.memberships")}</button>
-    <button class="lv-qbtn" onclick={() => { plugin.setActiveLedger("media"); onGoto("ledger"); }}><span class="qi">🎬</span>{t("module.media")}</button>
-    <button class="lv-qbtn" onclick={() => { plugin.setActiveLedger("favors"); onGoto("ledger"); }}><span class="qi">🧧</span>{t("module.favors")}</button>
-    <button class="lv-qbtn" onclick={() => { plugin.setActiveLedger("members"); onGoto("members"); }}><span class="qi">👪</span>{t("tab.members")}</button>
+    {#each quickModules as mid (mid)}
+        <button class="lv-qbtn" onclick={() => { plugin.setActiveLedger(mid); onGoto(mid === "members" ? "members" : "ledger"); }}>
+            <span class="qi">{moduleIcon(mid)}</span>{mid === "members" ? t("tab.members") : t(`module.${mid}`)}
+        </button>
+    {/each}
 </div>
 <div class="lv-sec"><h2 class="lv-title-sec">{t("memo.quick")}</h2><span class="lv-sub">{t("memo.quickSub")}</span></div>
 <div class="lv-card lv-memo" style="margin-top:0">

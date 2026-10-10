@@ -45,7 +45,7 @@ Certificates expire, medicine expires, insurance needs renewal, subscriptions au
 4. Press `Ctrl+Alt+H` anytime to open the hub
 
 > **Validation status:** core data paths have automated tests and live-kernel coverage. The six-stage real SiYuan UI batch, including Android WebView and accessibility checks, is still pending; marketplace submission follows manual host validation. `icon.png` and `preview.png` were redesigned for v0.3.13 (brand-gradient tile + geometric mark; dark overview with sample data).
-> **Version note:** the tagged v0.4.1 package is the current GitHub release candidate; `main` is in sync with it and currently reports 323 unit tests.
+> **Version note:** the tagged v0.4.1 package is the current GitHub release candidate; the release branch has passed local quality checks and currently reports 324 unit tests.
 >
 > Family sharing depends on SiYuan's collaboration, permissions, sync and conflict behavior. Test with non-sensitive data before sharing; this plugin does not provide a separate permission system.
 >

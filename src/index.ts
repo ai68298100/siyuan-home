@@ -662,7 +662,10 @@ export default class LvHomePlugin extends Plugin {
         }
         // 全屏化样式钩子（100vw/100dvh、无圆角、内容滚动）
         dialog.element.classList.add("b3-dialog--lvmobile");
-        this.mobileDialogUnmount = mount(TabPanel, { target: host, props: { plugin: self } }) as () => void;
+        this.mobileDialogUnmount = mount(TabPanel, {
+            target: host,
+            props: { plugin: self, onMobileClose: () => dialog.destroy() },
+        }) as () => void;
         this.mobileDialog = dialog;
     }
 

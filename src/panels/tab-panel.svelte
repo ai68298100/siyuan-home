@@ -7,7 +7,7 @@
     import ErrorBoundary from "./error-boundary.svelte";
     import type { HomePluginLike } from "@/types/plugin";
 
-    let { plugin }: { plugin: HomePluginLike } = $props();
+    let { plugin, onMobileClose }: { plugin: HomePluginLike; onMobileClose?: () => void } = $props();
     // i18n 取值统一转 string（1.2.8 起 JSONValue；screens 以 props 接收 string 返回的 t）
     const t = (key: string) => String(plugin.i18n[key] ?? key);
 
@@ -150,8 +150,13 @@
             {#if plugin.scan?.stale}<span class="lv-badge orange" title={plugin.scan.errors.map((e) => e.moduleId).join(", ")}>{t("hub.stale")}</span>{/if}
         </span>
         <!-- 267 波：⚡ 快速记录（原型 top-actions 主入口；268 波支持 N 键呼出） -->
-        <button class="lv-iconbtn" aria-label={t("capture.title")} title={`${t("capture.title")} (N)`} style="font-size:15px" onclick={() => (captureOpen = true)}>⚡</button>
-        <button class="lv-iconbtn" aria-label={t("tab.settings")} title={t("tab.settings")} style="font-size:15px" onclick={() => plugin.openSetting()}>⚙</button>
+        <div class="lv-tabbar-actions">
+            <button class="lv-iconbtn" aria-label={t("capture.title")} title={`${t("capture.title")} (N)`} style="font-size:15px" onclick={() => (captureOpen = true)}>⚡</button>
+            <button class="lv-iconbtn" aria-label={t("tab.settings")} title={t("tab.settings")} style="font-size:15px" onclick={() => plugin.openSetting()}>⚙</button>
+            {#if onMobileClose}
+                <button class="lv-iconbtn lv-mobile-close" aria-label={t("close")} title={t("close")} onclick={onMobileClose}>×</button>
+            {/if}
+        </div>
     </header>
 
     {#key screen}

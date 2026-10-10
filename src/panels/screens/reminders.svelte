@@ -553,7 +553,7 @@
     <div class="lv-rem {r.level}" out:fade={{ duration: 150 }}>
     {#if batchMode && viewMode === "list" && filter !== "handled"}
             <input type="checkbox" class="b3-checkbox" aria-label={t("hub.select")}
-                checked={selected.has(r.id)} onchange={() => toggleSelect(r.id)} style="flex-shrink:0" />
+                checked={selected.has(r.id)} disabled={batchBusy} onchange={() => toggleSelect(r.id)} style="flex-shrink:0" />
         {/if}
         <!-- 259 波：图标砖收回中性（对齐原型 .rem .ic）——级别语义由色轨+右侧大字承载 -->
         <div class="lv-rem-ic" aria-hidden="true">{r.moduleId === "adhoc" ? "📝" : moduleIcon(r.moduleId)}</div>
@@ -567,27 +567,28 @@
             <b class="lv-num" style="color:var(--lv-{r.level === 'overdue' ? 'danger' : r.level === 'soon' ? 'warn' : 'amber'})">{relDue(r.daysLeft, r.dueDate)}</b>
         </div>
         <div class="lv-rem-ops">
-            <button class="b3-button b3-button--text" onclick={() => void runReminderAction(() => plugin.complete(r))}>{t("act.done")}</button>
+            <button class="b3-button b3-button--text" disabled={batchBusy} onclick={() => void runReminderAction(() => plugin.complete(r))}>{t("act.done")}</button>
             {#if ["certs", "insurance", "contracts"].includes(r.moduleId)}
                 <!-- 续保/换证/合同续约：新到期日写回规则 field 列（26.6 + 98 波：contracts 规则带 field=expiry 与
                      autoRenewField 升级路径，此前 🔄 决策提醒无"续"动作入口——漏项补齐） -->
-                <button class="b3-button b3-button--text" onclick={() => renewDialog(r)}>{t("act.renew")}</button>
+                <button class="b3-button b3-button--text" disabled={batchBusy} onclick={() => renewDialog(r)}>{t("act.renew")}</button>
             {/if}
             {#if r.moduleId !== "adhoc" && plugin.settings.dbRefs[r.moduleId]?.docId}
-                <button class="b3-button b3-button--text" title={t("act.locate")} onclick={() => plugin.showTabDocs(plugin.settings.dbRefs[r.moduleId].docId)}>{t("act.locate")}</button>
+                <button class="b3-button b3-button--text" disabled={batchBusy} title={t("act.locate")} onclick={() => plugin.showTabDocs(plugin.settings.dbRefs[r.moduleId].docId)}>{t("act.locate")}</button>
             {/if}
-            <button class="b3-button b3-button--text" onclick={(e) => snoozeMenu(r, e)}>{t("act.snooze")} ▾</button>
-            <button class="b3-button b3-button--text" onclick={() => void runReminderAction(() => plugin.mute(r.id))}>{t("act.mute")}</button>
+            <button class="b3-button b3-button--text" disabled={batchBusy} onclick={(e) => snoozeMenu(r, e)}>{t("act.snooze")} ▾</button>
+            <button class="b3-button b3-button--text" disabled={batchBusy} onclick={() => void runReminderAction(() => plugin.mute(r.id))}>{t("act.mute")}</button>
             {#if r.moduleId === "adhoc"}
                 <!-- 246 波（收件箱深化）：备忘置顶（置顶项组内排最前） -->
                 <button class="b3-button b3-button--text" title={isPinned(r) ? t("act.unpin") : t("act.pin")}
+                    disabled={batchBusy}
                     onclick={() => void runReminderAction(async () => { await toggleMemoPin(plugin, r.id); await plugin.refreshHub(); })}>{isPinned(r) ? t("act.unpin") : t("act.pin")}</button>
                 <!-- 246 波（收件箱深化）：备忘编辑（标题/到期日） -->
-                <button class="b3-button b3-button--text" onclick={() => editMemoDialog(r)}>{t("memo.edit")}</button>
+                <button class="b3-button b3-button--text" disabled={batchBusy} onclick={() => editMemoDialog(r)}>{t("memo.edit")}</button>
                 <!-- H03：备忘的显式删除（唯一物理删除路径；未处理项不自动清理） -->
-                <button class="b3-button b3-button--text" onclick={() => confirmDeleteMemo(r)}>{t("delete")}</button>
+                <button class="b3-button b3-button--text" disabled={batchBusy} onclick={() => confirmDeleteMemo(r)}>{t("delete")}</button>
                 <!-- 240 波（收件箱分诊）：备忘 → 正式台账行 -->
-                <button class="b3-button b3-button--text" onclick={() => toLedgerDialog(r)}>{t("triage.title")}</button>
+                <button class="b3-button b3-button--text" disabled={batchBusy} onclick={() => toLedgerDialog(r)}>{t("triage.title")}</button>
             {/if}
         </div>
     </div>
@@ -596,60 +597,60 @@
 <div class="lv-hero"><h1>{t("hub.title")}</h1><p>{t("hub.subtitle")}</p></div>
 
 <div class="lv-toolbar" style="margin:16px 0">
-    <select class="b3-select" value={filter} onchange={(e) => changeFilter((e.target as HTMLSelectElement).value)}>
+    <select class="b3-select" value={filter} disabled={batchBusy} onchange={(e) => changeFilter((e.target as HTMLSelectElement).value)}>
         <option value="all">{t("hub.filterAll")}</option>
         <option value="overdue">{t("hub.filterOverdue")}</option>
         <option value="soon">{t("hub.filterSoon")}</option>
         <option value="lead">{t("hub.filterLead")}</option>
         <option value="handled">{t("hub.filterHandled")}</option>
     </select>
-    <select class="b3-select" value={filterMember ?? ""} onchange={(e) => { filterMember = (e.target as HTMLSelectElement).value || undefined; pruneSelection(); persistFilter(); }}>
+    <select class="b3-select" value={filterMember ?? ""} disabled={batchBusy} onchange={(e) => { filterMember = (e.target as HTMLSelectElement).value || undefined; pruneSelection(); persistFilter(); }}>
         <option value="">{t("field.member")}: {t("members.all")}</option>
         {#each memberOptions as m (m.id)}
             <option value={m.id}>{m.name}</option>
         {/each}
     </select>
-    <select class="b3-select" value={filterModule ?? ""} onchange={(e) => { filterModule = (e.target as HTMLSelectElement).value || undefined; pruneSelection(); persistFilter(); }}>
+    <select class="b3-select" value={filterModule ?? ""} disabled={batchBusy} onchange={(e) => { filterModule = (e.target as HTMLSelectElement).value || undefined; pruneSelection(); persistFilter(); }}>
         <option value="">{t("hub.filterAllModule")}</option>
         {#each moduleOptions as mid (mid)}
             <option value={mid}>{mid === "adhoc" ? t("adhoc.name") : (t(`module.${mid}`) !== `module.${mid}` ? t(`module.${mid}`) : mid)}</option>
         {/each}
     </select>
-    <select class="b3-select" value={dueWithin} onchange={(e) => { dueWithin = (e.target as HTMLSelectElement).value; pruneSelection(); persistFilter(); }}>
+    <select class="b3-select" value={dueWithin} disabled={batchBusy} onchange={(e) => { dueWithin = (e.target as HTMLSelectElement).value; pruneSelection(); persistFilter(); }}>
         <option value="all">{t("hub.dueAll")}</option>
         <option value="0">{t("hub.dueToday")}</option>
         <option value="7">{t("hub.due7")}</option>
         <option value="30">{t("hub.due30")}</option>
     </select>
-    <button class="b3-button b3-button--outline" disabled={exportingIcs} aria-busy={exportingIcs} onclick={exportIcs}>{exportingIcs ? t("ledger.saving") : t("hub.icsExport")}</button>
+    <button class="b3-button b3-button--outline" disabled={batchBusy || exportingIcs} aria-busy={exportingIcs} onclick={exportIcs}>{exportingIcs ? t("ledger.saving") : t("hub.icsExport")}</button>
     <!-- 243 波（收件箱分诊）：一键切片到备忘项集合（转行/完成/延后集中处理） -->
-    <button class="b3-button b3-button--outline {filterModule === "adhoc" ? "b3-button--text" : ""}"
+    <button class="b3-button b3-button--outline {filterModule === "adhoc" ? "b3-button--text" : ""}" disabled={batchBusy}
         onclick={() => { filterModule = filterModule === "adhoc" ? undefined : "adhoc"; persistFilter(); }}>
         {t("hub.triageChip")}{#if filterModule === "adhoc"} ✓{/if}
     </button>
     <span class="fn__flex-1"></span>
     <span class="lv-tabs" style="padding:2px" role="group" aria-label={t("view.list") + "/" + t("view.calendar")}>
         <button class="lv-tabs__item" class:on={viewMode === "list"} style="min-height:28px;padding:4px 12px"
-            aria-pressed={viewMode === "list"} onclick={() => setViewMode("list")}>{t("view.list")}</button>
+            disabled={batchBusy} aria-pressed={viewMode === "list"} onclick={() => setViewMode("list")}>{t("view.list")}</button>
         <button class="lv-tabs__item" class:on={viewMode === "calendar"} style="min-height:28px;padding:4px 12px"
-            aria-pressed={viewMode === "calendar"} onclick={() => setViewMode("calendar")}>{t("view.calendar")}</button>
+            disabled={batchBusy} aria-pressed={viewMode === "calendar"} onclick={() => setViewMode("calendar")}>{t("view.calendar")}</button>
     </span>
     <button class="b3-button b3-button--outline" class:b3-button--text={todaySilentOn}
         aria-pressed={todaySilentOn} title={t("hub.todaySilentTip")}
-        onclick={toggleTodaySilent}>{todaySilentOn ? "🔕 " : ""}{t("hub.todaySilent")}{todaySilentOn ? " ✓" : ""}</button>
-    <button class="b3-button b3-button--outline" class:b3-button--text={batchMode} onclick={() => (batchMode ? clearSelection() : (batchMode = true))}>{t("hub.batch")}</button>
-    <button class="b3-button b3-button--outline" disabled={rescanning} aria-busy={rescanning} onclick={rescan}>{t("hub.rescan")}</button>
+        disabled={batchBusy} onclick={toggleTodaySilent}>{todaySilentOn ? "🔕 " : ""}{t("hub.todaySilent")}{todaySilentOn ? " ✓" : ""}</button>
+    <button class="b3-button b3-button--outline" class:b3-button--text={batchMode} disabled={batchBusy} onclick={() => (batchMode ? clearSelection() : (batchMode = true))}>{t("hub.batch")}</button>
+    <button class="b3-button b3-button--outline" disabled={batchBusy || rescanning} aria-busy={rescanning} onclick={rescan}>{t("hub.rescan")}</button>
 </div>
 
 {#if batchMode && filter !== "handled" && viewMode === "list"}
     <div class="lv-card lv-toolbar" style="padding:8px 14px;margin-bottom:10px">
         <b class="lv-caption">{t("hub.selectedN").replace("${n}", String(selectedCount))}</b>
-        <button class="b3-button b3-button--text" onclick={selectAllFiltered}>{t("hub.selectAll")}</button>
+        <button class="b3-button b3-button--text" disabled={batchBusy} onclick={selectAllFiltered}>{t("hub.selectAll")}</button>
         <span class="fn__flex-1"></span>
         <button class="b3-button b3-button--text" disabled={batchBusy || selectedCount === 0} onclick={() => runBatch("done")}>{t("act.done")}</button>
         <button class="b3-button b3-button--text" disabled={batchBusy || selectedCount === 0} onclick={() => runBatch("snooze7")}>{t("act.snooze7")}</button>
         <button class="b3-button b3-button--text" disabled={batchBusy || selectedCount === 0} onclick={() => runBatch("mute")}>{t("act.mute")}</button>
-        <button class="b3-button b3-button--outline" onclick={clearSelection}>{t("cancel")}</button>
+        <button class="b3-button b3-button--outline" disabled={batchBusy} onclick={clearSelection}>{t("cancel")}</button>
     </div>
 {/if}
 
