@@ -57,7 +57,7 @@ This release adds a vehicle workspace for refueling, charging, maintenance and c
 3. Enable the plugin → complete the 2-step onboarding (household → module picks and provisioning)
 4. Press `Ctrl+Alt+H` anytime to open the hub
 
-> **Validation status:** core data paths have automated tests and live-kernel coverage. The six-stage real SiYuan UI batch, including Android WebView and accessibility checks, is still pending; marketplace submission follows manual host validation. `icon.png` and `preview.png` were redesigned for v0.3.13 (brand-gradient tile + geometric mark; dark overview with sample data).
+> **Validation status:** core data paths have automated tests and isolated-kernel coverage. The v0.5.0 GitHub Release and SiYuan Marketplace publication are complete; Android WebView behavior remains host-specific validation. `icon.png` and `preview.png` were redesigned for v0.3.13 (brand-gradient tile + geometric mark; dark overview with sample data).
 > **Version note:** the tagged v0.5.0 package is the current GitHub release; local quality checks report 350 unit tests.
 >
 > Family sharing depends on SiYuan's collaboration, permissions, sync and conflict behavior. Test with non-sensitive data before sharing; this plugin does not provide a separate permission system.
@@ -112,11 +112,11 @@ Full accounting · password vaults · official data integrations · real-time tr
 
 ## 🗺 Roadmap
 
-The current release is in a trust-and-validation phase: complete the real SiYuan UI batch, mobile/accessibility checks, recovery paths and production screenshots before marketplace submission. The next feature slice should optimize the five-minute path from a member to a first reminder and its source record. Pinyin search, webhooks, QR labels, AI and family collaboration remain an observation pool until host capability and user evidence are available.
+The v0.5.0 release has completed GitHub Release and SiYuan Marketplace publication, with isolated-kernel coverage for the main UI, mobile layouts, accessibility, recovery paths and performance. The next feature slice should optimize the five-minute path from a member to a first reminder and its source record. Pinyin search, webhooks, QR labels, AI and family collaboration remain an observation pool until host capability and user evidence are available.
 
 | Phase | Content |
 |---|---|
-| ✅ v0.3.12 (current) | v0.3.10 baseline plus Windows Corepack live-test startup fix, independent backend e2e evidence, and explicit AI outbound boundary |
+| ✅ v0.5.0 (current) | Vehicle energy and maintenance workspace, first-install provisioning compatibility, complete ID-card entry, OCR guidance, mobile/accessibility polish, and isolated-kernel E2E evidence |
 | 🔜 Next | Task workbench, evidence center, inbox, health recovery |
 | 🔭 Later | Family collaboration, template packs, yearly family report, AI capabilities |
 
@@ -134,7 +134,7 @@ pnpm run dev      # dev (app + kernel watch)
 pnpm run build    # dist/ + package.zip
 pnpm run check    # 5-layer gate (types + svelte + i18n + meta + audit)
 pnpm run smoke    # release package and single-file loader smoke checks
-pnpm test         # unit tests (293)
+pnpm test         # unit tests (350)
 ```
 
 - Setup & conventions: [CONTRIBUTING.md](./CONTRIBUTING.md)
