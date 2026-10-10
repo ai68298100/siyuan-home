@@ -10,7 +10,7 @@
 ## 验证
 
 - 350 项单测通过；Svelte、TypeScript、i18n、meta、loader、生产构建和发布包 smoke 通过。
-- `pnpm audit --prod --audit-level moderate` 本机通过，未发现已知漏洞。
-- 真实思源 UI 六阶段走查（含 Android WebView 和无障碍检查）仍需人工宿主验收；本版继续保留 `disabledInPublish: true`。
+- `pnpm audit --prod --audit-level moderate` 因本机到 npm registry 的 TCP 连接超时未完成；未得到漏洞报告结果。
+- 独立思源内核 E2E 已通过设备批、首录、恢复和导入四组测试；真实 Android WebView 仍需人工宿主验收，本版继续保留 `disabledInPublish: true`。
 
 完整变更见 [CHANGELOG.md](./CHANGELOG.md)。
