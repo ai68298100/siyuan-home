@@ -1522,5 +1522,12 @@
     "vehicle.maintenance.overdueOdometer": "Overdue mileage",
     "vehicle.maintenance.nextDateShort": "Next",
     "vehicle.maintenance.nextOdometerShort": "Next km",
-    "vehicle.maintenance.byCategory": "By category"
+    "vehicle.maintenance.byCategory": "By category",
+    "membership.banner.title": "Subscriptions & Spending",
+    "membership.banner.monthly": "Estimated Monthly",
+    "membership.banner.annual": "Estimated Annual",
+    "membership.banner.active": "Active Services",
+    "membership.banner.autoRenew": "Auto-Renewing",
+    "membership.banner.top": "Top Subscriptions",
+    "membership.banner.unitCnyPerMonth": "/mo"
 }

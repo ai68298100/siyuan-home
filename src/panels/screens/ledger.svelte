@@ -1,10 +1,7 @@
 <script lang="ts">
     import { renderLedgerAll, addDetachedRow, setCell, RowIdentityPendingError, isKernelError, getOCRConfig, getImageOCRText, recognizeAsset } from "@/core/siyuan";
     import { generateQRDataUrl, blockDeepLink } from "@/core/qr";
-    import { buildShoppingList } from "@/core/shopping";
     import { AMOUNT_KEYS, formatAmount, optLabel, optLabelText } from "@/core/format";
-    import { parseCsv } from "@/core/csv";
-    import { planImport, guessMapping } from "@/core/importer";
     import { buildCsv } from "@/core/csv";
     import { maskCredentialNumber, maskIdNumber, parseIdNumber } from "@/core/idcard";
     import { selectCellValue, selectCellContent } from "@/core/avcell";
@@ -27,8 +24,12 @@
     import { rowLogActivityId, type ActivityTarget } from "@/core/activity";
     import { onDestroy } from "svelte";
     import UiIcon from "@/ui/icon.svelte";
-    import { uiIcon } from "@/ui/icons";
     import { panelSession } from "../panel-session";
+    import { openGrowthModal } from "../ledger/growth-modal";
+    import { openShoppingModal } from "../ledger/shopping-modal";
+    import { openCsvModal } from "../ledger/csv-modal";
+    import { openEnergyDashboardModal } from "../ledger/vehicle-dashboard-modal";
+    import { calculateMembershipSpending } from "@/core/memberships";
 
     let { plugin, t, version }: { plugin: HomePluginLike; t: (k: string) => string; version?: number } = $props();
 
@@ -210,6 +211,11 @@
     // settings change and make the empty-state actions misleading.
     const ref = $derived(ledgers.find((entry) => entry.id === active)?.ref);
     const schemaKeys = $derived<string[]>(ref?.columns ? Object.keys(ref.columns) : []);
+
+    const membershipSummary = $derived.by(() => {
+        if (active !== "memberships" || !ref?.columns) return undefined;
+        return calculateMembershipSpending(rows, ref.columns);
+    });
     // Keep the list useful across all modules. A fixed expiry/status list made
     // travel, shopping and other ledgers render only an empty severity column.
     const tableKeys = $derived.by(() => {
@@ -342,235 +348,26 @@
     }
 
     /** Show fuel and charging usage per vehicle without combining hybrid energy types. */
-    async function openEnergyDashboard() {
-        const sourceRef = ref;
-        if (!sourceRef?.avId || active !== "vehicles") return;
-        const dlg = new Dialog({
-            title: t("fuel.dashboardTitle"),
-            content: `<div class="b3-dialog__content b3-dialog__content--wrap" id="lv-fuel-dashboard" style="max-height:68vh;overflow:auto"></div>`,
-            width: "620px",
+    function openEnergyDashboard() {
+        openEnergyDashboardModal({
+            ref,
+            active,
+            plugin,
+            t,
+            cellText: (c, k) => cellText(c, k),
+            openDetail: (v) => openDetail(v),
+            openNewRecord: () => openNewRecord(),
         });
-        dlg.element.classList.add("lv-energy-dialog");
-        const body = dlg.element.querySelector("#lv-fuel-dashboard") as HTMLElement;
-        const loading = document.createElement("div");
-        loading.className = "ft__on-surface";
-        loading.textContent = t("fuel.loading");
-        body.appendChild(loading);
-        try {
-            const result = await renderLedgerAll(sourceRef.avId);
-            if (!result.complete) throw new Error(t("ledger.loadIncomplete"));
-            if (ref?.avId !== sourceRef.avId) { dlg.destroy(); return; }
-            const cols = sourceRef.columns ?? {};
-            const vehicles = result.rows;
-            body.replaceChildren();
-            const intro = document.createElement("p");
-            intro.className = "ft__on-surface";
-            intro.style.cssText = "font-size:12px;line-height:1.65;margin:0 0 10px";
-            intro.textContent = t("fuel.dashboardHint");
-            body.appendChild(intro);
-            if (vehicles.length === 0) {
-                const empty = document.createElement("div");
-                empty.className = "lv-empty";
-                const icon = document.createElement("div"); icon.className = "eic"; icon.innerHTML = uiIcon("car");
-                const title = document.createElement("b"); title.textContent = t("fuel.noVehicles");
-                const hint = document.createElement("span"); hint.textContent = t("fuel.noVehiclesHint");
-                const add = document.createElement("button"); add.className = "b3-button"; add.textContent = `+ ${t("fuel.addVehicle")}`;
-                add.onclick = () => { dlg.destroy(); openNewRecord(); };
-                empty.append(icon, title, hint, add);
-                body.appendChild(empty);
-                return;
-            }
-            const logs = await loadRowLogs(plugin as any);
-            const vehicleType = (row: any) => selectCellContent(row.cells?.[cols.energy_type ?? ""]) ?? "gasoline";
-            const miniStat = (label: string, value: string) => {
-                const item = document.createElement("div");
-                item.style.cssText = "min-width:0;padding:8px 10px;border-radius:8px;background:var(--b3-theme-background-light);display:flex;flex-direction:column;gap:3px";
-                const name = document.createElement("span"); name.className = "ft__on-surface"; name.style.fontSize = "11px"; name.textContent = label;
-                const val = document.createElement("b"); val.style.cssText = "font-size:14px;overflow-wrap:anywhere"; val.textContent = value;
-                item.append(name, val);
-                return item;
-            };
-            for (const vehicle of vehicles) {
-                const card = document.createElement("section");
-                card.className = "lv-card";
-                card.style.cssText = "padding:12px;margin-bottom:10px";
-                const head = document.createElement("div");
-                head.style.cssText = "display:flex;align-items:flex-start;justify-content:space-between;gap:8px;flex-wrap:wrap;margin-bottom:10px";
-                const title = document.createElement("b");
-                title.style.fontSize = "14px";
-                title.textContent = cellText(vehicle.cells?.[cols.name ?? ""], "name") || t("ledger.unnamed");
-                const plate = document.createElement("span");
-                plate.className = "ft__on-surface";
-                plate.style.fontSize = "12px";
-                plate.textContent = cellText(vehicle.cells?.[cols.plate ?? ""]);
-                head.append(title, plate);
-                const records = getEntries<EnergyRecord>(logs, sourceRef.avId, vehicle.itemID, "fuelings")
-                    .concat(getEntries<EnergyRecord>(logs, sourceRef.avId, vehicle.itemID, "chargings"));
-                const fuel = calculateEnergyStats(records, "fuel");
-                const charge = calculateEnergyStats(records, "charging");
-                const hybrid = vehicleType(vehicle) === "hybrid";
-                const grid = document.createElement("div");
-                grid.style.cssText = "display:grid;grid-template-columns:repeat(auto-fit,minmax(126px,1fr));gap:6px";
-                const consumption = (stats: ReturnType<typeof calculateEnergyStats>, suffix: string) =>
-                    stats.consumptionPer100Km !== undefined ? `${stats.consumptionPer100Km.toFixed(2)} ${suffix}/100km${stats.method === "estimated" ? ` · ${t("fuel.estimated")}` : ""}` : "—";
-                const cost = (stats: ReturnType<typeof calculateEnergyStats>) => stats.costPer100Km !== undefined
-                    ? `${formatAmount(stats.costPer100Km / 100)} ${t("fuel.currencyPerKm")}` : "—";
-                grid.append(
-                    miniStat(t("fuel.fuelConsumption"), fuel.recordCount ? hybrid ? `${fuel.totalQuantity.toFixed(1)} L · ${t("fuel.totalRecorded")}` : consumption(fuel, "L") : "—"),
-                    miniStat(t("fuel.fuelCostPerKm"), fuel.recordCount ? hybrid ? t("fuel.hybridNoRate") : cost(fuel) : "—"),
-                    miniStat(t("fuel.chargeConsumption"), charge.recordCount ? hybrid ? `${charge.totalQuantity.toFixed(1)} kWh · ${t("fuel.totalRecorded")}` : consumption(charge, "kWh") : "—"),
-                    miniStat(t("fuel.chargeCostPerKm"), charge.recordCount ? hybrid ? t("fuel.hybridNoRate") : cost(charge) : "—"),
-                    miniStat(t("fuel.fuelRecordedSpending"), fuel.costRecordCount === 0 ? t("fuel.costUnknown") : `${formatAmount(fuel.totalCost)} ${t("fuel.currency")}${fuel.costRecordCount < fuel.recordCount ? ` · ${t("fuel.subtotal")}` : ""}`),
-                    miniStat(t("fuel.chargeRecordedSpending"), charge.costRecordCount === 0 ? t("fuel.costUnknown") : `${formatAmount(charge.totalCost)} ${t("fuel.currency")}${charge.costRecordCount < charge.recordCount ? ` · ${t("fuel.subtotal")}` : ""}`),
-                );
-                const action = document.createElement("button");
-                action.className = "b3-button b3-button--text";
-                action.style.cssText = "margin-top:6px;padding:4px 0";
-                action.textContent = `${t("fuel.openVehicle")} →`;
-                action.onclick = () => { dlg.destroy(); openDetail(vehicle); };
-                card.append(head, grid, action);
-                body.appendChild(card);
-            }
-        } catch (error) {
-            body.replaceChildren();
-            const message = document.createElement("div");
-            message.className = "lv-record-error";
-            message.textContent = t("ledger.readFailed").replace("${msg}", error instanceof Error ? error.message : String(error));
-            body.appendChild(message);
-        }
     }
 
     // Growth chart for parenting records, including an optional WHO reference band.
     function openGrowthChart() {
-        import("@/core/growth").then(({ collectGrowthSeries, whoBand, whoPercentile }) => {
-            const members = plugin.settings.members ?? [];
-            const series = collectGrowthSeries(rows, (ref?.columns ?? {}) as Record<string, string | undefined>, members);
-            const dlg = new Dialog({
-                title: t("ledger.growthChart"),
-                content: `<div class="b3-dialog__content" id="lv-growth-body" style="max-height:60vh;overflow:auto"></div>`,
-                width: "560px",
-            });
-            const body = dlg.element.querySelector("#lv-growth-body") as HTMLElement;
-            if (series.length === 0) {
-                body.innerHTML = `<div class="ft__on-surface" style="font-size:13px">${t("ledger.noGrowthData")}</div>`;
-                return;
-            }
-            const COLORS = ["#4a6785", "#ac503d", "#5a8a48", "#8a5aa0", "#b08030"];
-            const NS = "http://www.w3.org/2000/svg";
-            const el = (tag: string, attrs: Record<string, string | number>, textContent?: string) => {
-                const e = document.createElementNS(NS, tag);
-                for (const [k, v] of Object.entries(attrs)) e.setAttribute(k, String(v));
-                if (textContent !== undefined) e.textContent = textContent;
-                return e;
-            };
-            // Reference-band sex can be automatic, selected, or disabled.
-            let bandMode: "auto" | "male" | "female" | "off" = "auto";
-            const sexById = new Map(members.map((m) => [m.id, m.sex as "male" | "female" | undefined]));
-            const controls = document.createElement("div");
-            controls.style.cssText = "display:flex;align-items:center;gap:6px;font-size:12px";
-            const ctlLabel = document.createElement("span");
-            ctlLabel.className = "ft__on-surface";
-            ctlLabel.textContent = t("ledger.growthWhoSex");
-            const sel = document.createElement("select");
-            sel.className = "b3-select";
-            for (const [v, key] of [["auto", "ledger.growthWhoAuto"], ["male", "members.sex.male"], ["female", "members.sex.female"], ["off", "ledger.growthWhoOff"]] as const) {
-                const o = document.createElement("option");
-                o.value = v;
-                o.textContent = t(key); // textContent keeps translated labels safe.
-                sel.appendChild(o);
-            }
-            sel.addEventListener("change", () => { bandMode = sel.value as typeof bandMode; renderPanels(); });
-            controls.append(ctlLabel, sel);
-            body.appendChild(controls);
-
-            function renderPanels() {
-                body.querySelectorAll(".lv-growth-panel, .lv-growth-note").forEach((n) => n.remove());
-                for (const metric of ["height", "weight"] as const) {
-                    const ss = series.filter((s) => s.metric === metric);
-                    if (!ss.length) continue;
-                    const panel = document.createElement("div");
-                    panel.className = "lv-growth-panel";
-                    const head = document.createElement("div");
-                    head.style.cssText = "font-weight:600;font-size:13px;margin:10px 0 4px";
-                    head.textContent = t(metric === "height" ? "ledger.growthHeight" : "ledger.growthWeight");
-                    panel.appendChild(head);
-                    const W = 500, H = 170, PAD = 40;
-                    const all = ss.flatMap((s) => s.points.map((p, pi) => ({ x: p.ageMonths ?? pi, y: p.value })));
-                    const xs = all.map((p) => p.x), ys = all.map((p) => p.y);
-                    const xMin = Math.min(...xs), xMax = Math.max(...xs);
-                    let yMin = Math.min(...ys), yMax = Math.max(...ys);
-                    // Clip the reference band to the data window and 0-60 months.
-                    const knownSexes = [...new Set(ss.map((s) => sexById.get(s.memberId)).filter(Boolean))] as ("male" | "female")[];
-                    const bandSex: "male" | "female" | null =
-                        bandMode === "off" ? null : bandMode === "auto" ? (knownSexes.length === 1 ? knownSexes[0] : null) : bandMode;
-                    const x0b = Math.max(xMin, 0), x1b = Math.min(xMax, 60);
-                    let bandPts: { x: number; p3: number; p50: number; p97: number }[] = [];
-                    if (bandSex && x1b >= x0b) {
-                        const samples = new Set<number>([x0b, x1b]);
-                        for (let m = Math.ceil(x0b); m <= Math.floor(x1b); m++) samples.add(m);
-                        for (const x of [...samples].sort((a, b) => a - b)) {
-                            const b = whoBand(bandSex, metric, x);
-                            if (b) { bandPts.push({ x, p3: b.p3, p50: b.p50, p97: b.p97 }); yMin = Math.min(yMin, b.p3); yMax = Math.max(yMax, b.p97); }
-                        }
-                    }
-                    const sx = (x: number) => (xMax === xMin ? W / 2 : PAD + ((x - xMin) / (xMax - xMin)) * (W - PAD * 2));
-                    const sy = (y: number) => (yMax === yMin ? H / 2 : H - PAD - ((y - yMin) / (yMax - yMin)) * (H - PAD * 2));
-                    const fx = (x: number) => (Number.isInteger(x) ? String(x) : (Math.round(x * 10) / 10).toFixed(1)); // 小数月龄标签
-                    const svg = el("svg", { width: W, height: H, viewBox: `0 0 ${W} ${H}` });
-                    // Axes and endpoint labels.
-                    svg.appendChild(el("line", { x1: PAD, y1: H - PAD, x2: W - PAD / 2, y2: H - PAD, stroke: "var(--b3-border-color)" }));
-                    svg.appendChild(el("line", { x1: PAD, y1: PAD / 2, x2: PAD, y2: H - PAD, stroke: "var(--b3-border-color)" }));
-                    svg.appendChild(el("text", { x: PAD - 6, y: PAD / 2 + 4, "text-anchor": "end", "font-size": 10 }, String(Math.round(yMax * 10) / 10)));
-                    svg.appendChild(el("text", { x: PAD - 6, y: H - PAD + 4, "text-anchor": "end", "font-size": 10 }, String(Math.round(yMin * 10) / 10)));
-                    svg.appendChild(el("text", { x: PAD, y: H - PAD + 14, "font-size": 10 }, fx(xMin)));
-                    svg.appendChild(el("text", { x: W - PAD / 2, y: H - PAD + 14, "text-anchor": "end", "font-size": 10 }, `${fx(xMax)}${xs.some((x) => x > 0) ? "月龄" : ""}`));
-                    if (bandPts.length >= 2) {
-                        const top = bandPts.map((b) => `${sx(b.x)},${sy(b.p97)}`).join(" ");
-                        const bottom = [...bandPts].reverse().map((b) => `${sx(b.x)},${sy(b.p3)}`).join(" ");
-                        svg.appendChild(el("polygon", { points: `${top} ${bottom}`, fill: "var(--b3-theme-primary)", opacity: 0.08 }));
-                        svg.appendChild(el("polyline", { points: bandPts.map((b) => `${sx(b.x)},${sy(b.p50)}`).join(" "), fill: "none", stroke: "var(--b3-theme-primary)", opacity: 0.45, "stroke-width": 1.2, "stroke-dasharray": "4 3" }));
-                        const bandLabel = el("text", { x: W - PAD / 2, y: PAD / 2 - 8, "text-anchor": "end", "font-size": 10, fill: "var(--b3-theme-primary)", opacity: 0.85 });
-                        bandLabel.textContent = `WHO P3–P97 · ${t(bandSex === "male" ? "members.sex.male" : "members.sex.female")}`;
-                        svg.appendChild(bandLabel);
-                    }
-                    ss.forEach((s, i) => {
-                        const color = COLORS[i % COLORS.length];
-                        const pts = s.points;
-                        const memberSex = sexById.get(s.memberId);
-                        const pointEl = (x: number, y: number, p: { date: string; value: number; ageMonths: number | null }) => {
-                            const dot = el("circle", { cx: sx(x), cy: sy(y), r: pts.length === 1 ? 3 : 2.5, fill: color });
-                            // Native hover label shows percentile when sex and age are known.
-                            const pct = memberSex && p.ageMonths !== null ? whoPercentile(memberSex, metric, p.ageMonths, p.value) : null;
-                            const label = document.createElementNS(NS, "title");
-                            label.textContent = pct !== null ? `P${Math.round(pct)} · ${p.date} ${p.value}` : `${p.date} ${p.value}`;
-                            dot.appendChild(label);
-                            return dot;
-                        };
-                        if (pts.length === 1) {
-                            svg.appendChild(pointEl(sx(pts[0].ageMonths ?? 0), sy(pts[0].value), pts[0]));
-                        } else {
-                            svg.appendChild(el("polyline", {
-                                points: pts.map((p) => `${sx(p.ageMonths ?? 0)},${sy(p.value)}`).join(" "),
-                                fill: "none", stroke: color, "stroke-width": 2,
-                            }));
-                            for (const p of pts) svg.appendChild(pointEl(p.ageMonths ?? 0, p.value, p));
-                        }
-                        const legend = el("text", { x: PAD + 4, y: PAD / 2 + 16 + i * 14, "font-size": 11, fill: color });
-                        legend.textContent = s.memberName; // User content is assigned via textContent.
-                        svg.appendChild(legend);
-                    });
-                    panel.appendChild(svg);
-                    body.appendChild(panel);
-                }
-                const note = document.createElement("div");
-                note.className = "lv-growth-note ft__on-surface";
-                note.style.cssText = "font-size:11.5px;margin-top:6px";
-                note.textContent = t("ledger.growthWhoNote");
-                body.appendChild(note);
-            }
-            renderPanels();
-        }).catch((e) => {
-            showMessage(t("ledger.growthFailed").replace("${msg}", e instanceof Error ? e.message : String(e)), 6000, "error");
+        openGrowthModal({
+            rows,
+            columns: ref?.columns,
+            members: plugin.settings.members ?? [],
+            t,
+            showMessage: (msg, timeout, type) => showMessage(msg, timeout, type),
         });
     }
 
@@ -600,192 +397,26 @@
     }
 
     // Shopping suggestions aggregate low-stock items and support copying the list.
-    async function openShoppingList() {
-        if (!ref?.avId || !ref.columns?.name || !ref.columns.qty || !ref.columns.low_stock_at) return;
-        try {
-            const all = await renderLedgerAll(ref.avId);
-            if (!all.complete) {
-                showMessage(t("ledger.loadIncomplete"), 5000, "error");
-                return;
-            }
-            const items = buildShoppingList(all.rows, {
-                nameKey: ref.columns.name, qtyKey: ref.columns.qty, thresholdKey: ref.columns.low_stock_at,
-            });
-            const dlg = new Dialog({
-                title: t("ledger.shoppingList"),
-                content: `<div class="b3-dialog__content" id="lv-shop-body" style="max-height:60vh;overflow:auto"></div>
-<div class="b3-dialog__action"><span class="lv-caption" id="lv-shop-total" style="flex:1"></span><button class="b3-button b3-button--cancel" id="lv-shop-close">${t("cancel")}</button><button class="b3-button b3-button--text" id="lv-shop-copy" ${items.length === 0 ? "disabled" : ""}>${t("ledger.shopCopy")}</button></div>`,
-                width: "520px",
-            });
-        const body = dlg.element.querySelector("#lv-shop-body") as HTMLElement;
-        if (items.length === 0) {
-            const none = document.createElement("div");
-            none.className = "ft__on-surface";
-            none.style.cssText = "font-size:13px;padding:8px 0";
-            none.textContent = t("ledger.shopEmpty");
-            body.appendChild(none);
-        }
-        const qtyInputs: HTMLInputElement[] = [];
-        for (const it of items) {
-            const line = document.createElement("div");
-            line.className = "fn__flex";
-            line.style.cssText = "gap:8px;align-items:center;padding:4px 0;font-size:13px";
-            const label = document.createElement("span");
-            label.style.cssText = "flex:1;word-break:break-all";
-            label.textContent = it.name;
-            const meta = document.createElement("span");
-            meta.className = "lv-caption";
-            meta.style.cssText = "flex-shrink:0";
-            meta.textContent = t("ledger.shopExisting").replace("${q}", String(it.qty)).replace("${t2}", String(it.threshold));
-            const input = document.createElement("input");
-            input.type = "number";
-            input.className = "b3-text-field";
-            input.style.cssText = "width:74px;flex-shrink:0";
-            input.min = "1";
-            input.value = String(it.suggest);
-            input.title = t("ledger.shopBuy");
-            qtyInputs.push(input);
-            line.append(label, meta, input);
-            body.appendChild(line);
-        }
-        const total = dlg.element.querySelector("#lv-shop-total") as HTMLElement;
-        total.textContent = t("ledger.shopTotal").replace("${n}", String(items.length));
-        (dlg.element.querySelector("#lv-shop-close") as HTMLButtonElement).onclick = () => dlg.destroy();
-        (dlg.element.querySelector("#lv-shop-copy") as HTMLButtonElement).onclick = async () => {
-            const lines = items
-                .map((it, i) => `${it.name} ×${Math.max(1, Math.floor(Number(qtyInputs[i].value) || 1))}`)
-                .join("\n");
-            const text = `${t("ledger.shoppingList")} · ${localDateKey(new Date())}\n${lines}`;
-            try {
-                await navigator.clipboard.writeText(text);
-                showMessage(t("ledger.shopCopied"), 2500, "info");
-            } catch {
-                showMessage(t("ledger.shopCopyFailed"), 4000, "error");
-            }
-        };
-        } catch (e) {
-            showMessage(t("ledger.shoppingFailed").replace("${msg}", e instanceof Error ? e.message : String(e)), 6000, "error");
-        }
+    function openShoppingList() {
+        openShoppingModal({
+            avId: ref?.avId,
+            columns: ref?.columns,
+            t,
+            showMessage: (msg, timeout, type) => showMessage(msg, timeout, type),
+        });
     }
 
     // CSV import uses a schema-driven mapping wizard; core owns the planning logic.
     function openCsvImport() {
-        if (!ref?.avId) return;
-        const input = document.createElement("input");
-        input.type = "file";
-        input.accept = ".csv,text/csv";
-        input.style.display = "none";
-        input.onchange = async () => {
-            const file = input.files?.[0];
-            if (!file) return;
-            let table: string[][];
-            try {
-                table = parseCsv(await file.text());
-            } catch (e) {
-                showMessage(t("ledger.importBadCsv") + ` (${e instanceof Error ? e.message : String(e)})`, 5000, "error");
-                return;
-            }
-            if (table.length < 2) { showMessage(t("ledger.importBadCsv"), 5000, "error"); return; }
-            const headers = table[0];
-            const importableTypes = new Set(["text", "number", "date", "checkbox", "select"]);
-            const schemaCols: any[] = (plugin.schemaCatalog?.[active]?.columns ?? []).filter((c: any) => importableTypes.has(c.type));
-            const labelOf = (key: string) => (t(`field.${key}`) !== `field.${key}` ? t(`field.${key}`) : key);
-            let mapping = guessMapping(headers, schemaCols, labelOf);
-            const dlg = new Dialog({
-                title: t("ledger.importCsv"),
-                content: `<div class="b3-dialog__content" id="lv-csvimp-body" style="max-height:60vh;overflow:auto">
-<p class="lv-caption ft__on-surface">${t("ledger.importMapHint").replace("${file}", file.name).replace("${n}", String(table.length - 1))}</p>
-<div id="lv-csvimp-map"></div></div>
-<div class="b3-dialog__action"><span class="lv-caption" style="flex:1" id="lv-csvimp-stat"></span><button class="b3-button b3-button--cancel" id="lv-csvimp-close">${t("cancel")}</button><button class="b3-button" id="lv-csvimp-start">${t("ledger.importStart")}</button></div>`,
-                width: "560px",
-            });
-            const mapBox = dlg.element.querySelector("#lv-csvimp-map") as HTMLElement;
-            const selects: HTMLSelectElement[] = [];
-            headers.forEach((h, i) => {
-                const line = document.createElement("div");
-                line.className = "fn__flex";
-                line.style.cssText = "gap:8px;align-items:center;padding:3px 0;font-size:13px";
-                const label = document.createElement("span");
-                label.style.cssText = "flex:1;word-break:break-all";
-                label.textContent = h || `#${i + 1}`;
-                const sel = document.createElement("select");
-                sel.className = "b3-select";
-                sel.style.cssText = "width:200px;flex-shrink:0";
-                sel.add(new Option(t("ledger.importSkip"), ""));
-                for (const c of schemaCols) sel.add(new Option(labelOf(c.key), c.key));
-                sel.value = mapping[i] ?? "";
-                selects.push(sel);
-                line.append(label, sel);
-                mapBox.appendChild(line);
-            });
-            (dlg.element.querySelector("#lv-csvimp-close") as HTMLButtonElement).onclick = () => dlg.destroy();
-            (dlg.element.querySelector("#lv-csvimp-start") as HTMLButtonElement).onclick = async (event) => {
-                const startBtn = event.currentTarget as HTMLButtonElement;
-                if (startBtn.disabled) return;
-                mapping = Object.fromEntries(selects.map((s, i) => [i, s.value || undefined]));
-                const mappedCount = Object.values(mapping).filter(Boolean).length;
-                if (mappedCount === 0) { showMessage(t("ledger.importNoMap"), 4000, "error"); return; }
-                const plan = planImport(table, mapping, schemaCols, "name");
-                if (plan.rows.length === 0) { showMessage(t("ledger.importNoRows"), 4000, "error"); return; }
-                startBtn.disabled = true;
-                dlg.destroy();
-                confirm(
-                    t("ledger.importCsv"),
-                    t("ledger.importConfirm")
-                        .replace("${n}", String(plan.rows.length))
-                        .replace("${skip}", String(plan.skipped))
-                        .replace("${warnings}", String(plan.rows.reduce((n, row) => n + row.warnings.length, 0))),
-                    async () => {
-                        try {
-                            let ok = 0;
-                            const importOperationKey = `ledger-import:${active}:${file.name}:${file.size}:${file.lastModified}`;
-                            const failed: number[] = [];
-                            const partial: number[] = [];
-                            const pending: number[] = [];
-                            for (let i = 0; i < plan.rows.length; i++) {
-                                const row = plan.rows[i];
-                                let created = false;
-                                try {
-                                    const rowOperationKey = `${importOperationKey}:row:${i}`;
-                                    const itemID = await addDetachedRow(ref!.avId!, row.name, { idempotencyKey: rowOperationKey });
-                                    created = true;
-                                    for (const c of row.cells) {
-                                        if (ref!.columns![c.key]) await setCell(ref!.avId!, ref!.columns![c.key], itemID, cellValue(c.type, c.value), {
-                                            idempotencyKey: `${rowOperationKey}:cell:${c.key}`,
-                                        });
-                                    }
-                                    ok++;
-                                } catch (e) {
-                                    if (e instanceof RowIdentityPendingError) pending.push(i + 1);
-                                    else if (created) partial.push(i + 1);
-                                    else failed.push(i + 1);
-                                }
-                            }
-                            await load();
-                            if (loadError) {
-                                showMessage(t("ledger.importRefreshFailed").replace("${msg}", loadError), 6000, "error");
-                                return;
-                            }
-                            try {
-                                await plugin.refreshHub([active]); // Refresh only the active module.
-                            } catch (e) {
-                                showMessage(t("ledger.importRefreshFailed").replace("${msg}", e instanceof Error ? e.message : String(e)), 6000, "error");
-                            }
-                            const failTxt = failed.length ? ` · ${t("ledger.importRowFail").replace("${n}", String(failed.length))} (#${failed.slice(0, 3).join(", #")}${failed.length > 3 ? "..." : ""})` : "";
-                            const partialTxt = partial.length ? ` · ${t("ledger.importPartial").replace("${n}", String(partial.length))} (#${partial.slice(0, 3).join(", #")}${partial.length > 3 ? "..." : ""})` : "";
-                            const pendingTxt = pending.length ? ` · ${t("ledger.importPending").replace("${n}", String(pending.length))} (#${pending.slice(0, 3).join(", #")}${pending.length > 3 ? "..." : ""})` : "";
-                            const warningRows = plan.rows.flatMap((row, i) => row.warnings.map((warning) => `#${i + 1} ${t(`field.${warning.key}`) !== `field.${warning.key}` ? t(`field.${warning.key}`) : warning.key}: ${warning.message}`));
-                            const warningTxt = warningRows.length ? ` · ${t("ledger.importWarnings").replace("${n}", String(warningRows.length))}: ${warningRows.slice(0, 3).join("; ")}${warningRows.length > 3 ? "..." : ""}` : "";
-                            const hasIssues = failed.length + partial.length + pending.length + warningRows.length > 0;
-                            showMessage(t("ledger.importDone").replace("${ok}", String(ok)).replace("${skip}", String(plan.skipped)) + failTxt + partialTxt + pendingTxt + warningTxt, 10000, hasIssues ? "error" : "info");
-                        } catch (e) {
-                            showMessage(t("ledger.importRefreshFailed").replace("${msg}", e instanceof Error ? e.message : String(e)), 6000, "error");
-                        }
-                    },
-                );
-            };
-        };
-        input.click();
+        openCsvModal({
+            active,
+            ref,
+            schemaCatalog: plugin.schemaCatalog,
+            members: plugin.settings.members ?? [],
+            t,
+            onReload: load,
+            onRefreshHub: (modules) => plugin.refreshHub?.(modules),
+        });
     }
 
     async function load() {
@@ -3665,6 +3296,40 @@
         </details>
     {/if}
 </div>
+
+{#if active === "memberships" && membershipSummary && membershipSummary.activeCount > 0}
+    <section class="lv-membership-banner lv-card" aria-label={t("membership.banner.title")}>
+        <div class="lv-membership-hero">
+            <div class="lv-membership-metric">
+                <span class="lv-membership-label">{t("membership.banner.monthly")}</span>
+                <b class="lv-membership-amount lv-num">¥ {formatAmount(membershipSummary.monthlyTotal)}</b>
+                <span class="lv-membership-sub">{t("membership.banner.annual")}：¥ {formatAmount(membershipSummary.annualTotal)}</span>
+            </div>
+            <div class="lv-membership-stats">
+                <div class="lv-membership-chip">
+                    <UiIcon name="repeat" size={14} />
+                    <span><b>{membershipSummary.activeCount}</b> {t("membership.banner.active")}</span>
+                </div>
+                {#if membershipSummary.autoRenewCount > 0}
+                    <div class="lv-membership-chip highlight">
+                        <UiIcon name="bolt" size={14} />
+                        <span><b>{membershipSummary.autoRenewCount}</b> {t("membership.banner.autoRenew")}</span>
+                    </div>
+                {/if}
+            </div>
+        </div>
+        {#if membershipSummary.topItems.length > 0}
+            <div class="lv-membership-top">
+                <span class="lv-membership-top__title">{t("membership.banner.top")}：</span>
+                {#each membershipSummary.topItems as item (item.name)}
+                    <span class="lv-membership-top__tag">
+                        {item.name} · ¥{formatAmount(item.monthlyCost)}{t("membership.banner.unitCnyPerMonth")}
+                    </span>
+                {/each}
+            </div>
+        {/if}
+    </section>
+{/if}
 
 {#if savedModule}
     <div class="lv-record-save-status" role="status">

@@ -1522,5 +1522,12 @@
     "vehicle.maintenance.overdueOdometer": "已逾期里程",
     "vehicle.maintenance.nextDateShort": "下次",
     "vehicle.maintenance.nextOdometerShort": "下次里程",
-    "vehicle.maintenance.byCategory": "分类统计"
+    "vehicle.maintenance.byCategory": "分类统计",
+    "membership.banner.title": "订阅与开销看板",
+    "membership.banner.monthly": "预估月均支出",
+    "membership.banner.annual": "预估年度支出",
+    "membership.banner.active": "项有效服务",
+    "membership.banner.autoRenew": "项自动续费",
+    "membership.banner.top": "主要支出项",
+    "membership.banner.unitCnyPerMonth": "元/月"
 }
