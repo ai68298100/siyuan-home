@@ -1293,7 +1293,7 @@
         const dlg = new Dialog({
             title: detailTitle,
             content: `<div class="b3-dialog__content b3-dialog__content--wrap" id="lv-detail-body" style="max-height:60vh;overflow:auto"></div>
-<div class="b3-dialog__action lv-detail-actions"><button class="b3-button" id="lv-detail-edit">${t("ledger.detailEditAll")}</button><button class="b3-button b3-button--cancel" id="lv-detail-close">${t("close")}</button><details class="lv-detail-more"><summary class="b3-button b3-button--text">${t("ledger.detailMore")}</summary><div class="lv-detail-more-menu"><button class="b3-button b3-button--cancel" id="lv-detail-del">${t("delete")}</button><button class="b3-button b3-button--cancel" id="lv-detail-card-copy">${t("ledger.copyAsImage")}</button><button class="b3-button b3-button--cancel" id="lv-detail-card-png">${t("ledger.downloadPng")}</button><button class="b3-button b3-button--cancel" id="lv-detail-card-text">${t("ledger.copyAsText")}</button><button class="b3-button b3-button--cancel" id="lv-detail-open">${t("ledger.openDoc")} →</button></div></details></div>`,
+<div class="b3-dialog__action lv-detail-actions"><button class="b3-button b3-button--text ft__error" id="lv-detail-del" style="color:var(--b3-theme-error)">${t("delete")}</button><span class="fn__flex-1"></span><details class="lv-detail-more"><summary class="b3-button b3-button--outline">${t("ledger.detailMore")}</summary><div class="lv-detail-more-menu"><button class="b3-button b3-button--cancel" id="lv-detail-card-copy">${t("ledger.copyAsImage")}</button><button class="b3-button b3-button--cancel" id="lv-detail-card-png">${t("ledger.downloadPng")}</button><button class="b3-button b3-button--cancel" id="lv-detail-card-text">${t("ledger.copyAsText")}</button><button class="b3-button b3-button--cancel" id="lv-detail-open">${t("ledger.openDoc")} →</button></div></details><button class="b3-button b3-button--cancel" id="lv-detail-close">${t("close")}</button><button class="b3-button" id="lv-detail-edit">${t("ledger.detailEditAll")}</button></div>`,
             width: "520px",
         });
         const body = dlg.element.querySelector("#lv-detail-body") as HTMLElement;
@@ -3624,9 +3624,7 @@
     }
 </script>
 
-<div class="lv-hero"><h1>{t("ledger.title")}</h1><p>{t("ledger.subtitle")}</p></div>
-
-<div class="lv-toolbar lv-ledger-toolbar" style="margin:14px 0">
+<div class="lv-toolbar lv-ledger-toolbar" style="margin:0 0 14px">
     {#if ledgers.length > 0}
         <!-- Switching modules clears the previous search query. -->
         <select class="b3-select" value={active} onchange={switchLedger}>

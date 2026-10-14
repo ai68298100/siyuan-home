@@ -365,7 +365,14 @@
             <span><strong>{t("dash.stripScope")}</strong> {scopeLabel}</span>
             <span><strong>{t("dash.stripErrors")}</strong> {scanErrors.length}</span>
         </div>
-        <h1>{greet}，{t("dash.heroTitle")}</h1><p class="lv-hero-lead">{t("dash.heroLead")}</p>
+        <h1>{greet}，{t("dash.heroTitle")}</h1>
+        <p class="lv-hero-lead">
+            {#if reminders.length > 0}
+                {reminders.length} {reminders.length === 1 ? t("dash.needAttentionOne") : t("dash.needAttention")} · {t("dash.focusTodayBody").replace("${od}", String(overdueCount)).replace("${s}", String(soon7Count))}
+            {:else}
+                {t("dash.heroLead")}
+            {/if}
+        </p>
         <div class="lv-hero-actions">
             <button class="b3-button lv-hero-open" onclick={() => onGoto("reminders")}><UiIcon name="clock" size={17} />{t("dash.heroOpen")}</button>
             {#if onCapture}<button class="b3-button b3-button--outline lv-hero-capture" onclick={() => onCapture()}><UiIcon name="add" size={16} />{t("dash.quickRecord")}</button>{/if}
@@ -426,21 +433,34 @@
 {/if}
 
 <div class="lv-focus" aria-label={t("dash.focusLabel")}>
-    <div class="lv-focus-card">
-        <span class="lv-focus-icon"><UiIcon name="clock" size={17} /></span>
-        <div><b>{t("dash.focusToday")}</b><span>{t("dash.focusTodayBody").replace("${od}", String(overdueCount)).replace("${s}", String(soon7Count))}</span></div>
-        <button class="b3-button b3-button--text" onclick={() => onGoto("reminders")}>{t("dash.focusOpen")}</button>
-    </div>
-    <div class="lv-focus-card">
-        <span class="lv-focus-icon"><UiIcon name="users" size={17} /></span>
-        <div><b>{t("dash.focusReview")}</b><span>{syncErrCount > 0 ? t("dash.focusReviewBody").replace("${n}", String(syncErrCount)) : t("dash.focusReviewOk")}</span></div>
-        <button class="b3-button b3-button--text" onclick={() => onGoto("members")}>{t("dash.focusView")}</button>
-    </div>
-    <div class="lv-focus-card">
-        <span class="lv-focus-icon" style={scanStale || scanErrors.length ? "color:var(--lv-warn)" : "color:var(--lv-ok)"}><UiIcon name="check" size={17} /></span>
-        <div><b>{t("dash.focusData")}</b><span>{scanStale ? t("dash.focusStale") : scanErrors.length > 0 ? t("dash.focusDataErr").replace("${t}", snapshotLabel).replace("${n}", String(scanErrors.length)) : t("dash.focusDataOk").replace("${t}", snapshotLabel)}</span></div>
-        <button class="b3-button b3-button--text" onclick={() => plugin.openSetting()}>{t("dash.focusView")}</button>
-    </div>
+    <button type="button" class="lv-focus-card" onclick={() => onGoto("reminders")} aria-label={`${t("dash.focusToday")}：${overdueCount + soon7Count}`}>
+        <div class="lv-focus-copy">
+            <span class="lv-focus-label">{t("dash.focusToday")}</span>
+            <strong class="lv-focus-num lv-num">{overdueCount + soon7Count}</strong>
+            <span class="lv-focus-sub">{t("dash.focusTodayBody").replace("${od}", String(overdueCount)).replace("${s}", String(soon7Count))}</span>
+        </div>
+        <span class="lv-focus-icon" aria-hidden="true"><UiIcon name="clock" size={18} /></span>
+    </button>
+    <button type="button" class="lv-focus-card" onclick={() => onGoto("members")} aria-label={`${t("dash.focusReview")}：${syncErrCount}`}>
+        <div class="lv-focus-copy">
+            <span class="lv-focus-label">{t("dash.focusReview")}</span>
+            <strong class="lv-focus-num lv-num" style={syncErrCount > 0 ? "color:var(--lv-warn)" : ""}>{syncErrCount}</strong>
+            <span class="lv-focus-sub">{syncErrCount > 0 ? t("dash.focusReviewBody").replace("${n}", String(syncErrCount)) : t("dash.focusReviewOk")}</span>
+        </div>
+        <span class="lv-focus-icon" aria-hidden="true"><UiIcon name="users" size={18} /></span>
+    </button>
+    <button type="button" class="lv-focus-card" onclick={() => plugin.openSetting()} aria-label={`${t("dash.focusData")}`}>
+        <div class="lv-focus-copy">
+            <span class="lv-focus-label">{t("dash.focusData")}</span>
+            <strong class="lv-focus-num" style={scanStale || scanErrors.length ? "color:var(--lv-warn);font-size:20px" : "color:var(--lv-ok);font-size:20px"}>
+                {scanStale || scanErrors.length ? t("dash.stale") : t("diag.ok")}
+            </strong>
+            <span class="lv-focus-sub">{scanStale ? t("dash.focusStale") : scanErrors.length > 0 ? t("dash.focusDataErr").replace("${t}", snapshotLabel).replace("${n}", String(scanErrors.length)) : t("dash.focusDataOk").replace("${t}", snapshotLabel)}</span>
+        </div>
+        <span class="lv-focus-icon" style={scanStale || scanErrors.length ? "color:var(--lv-warn);background:var(--lv-warn-soft)" : "color:var(--lv-ok);background:var(--lv-ok-soft)"} aria-hidden="true">
+            <UiIcon name={scanStale || scanErrors.length ? "alert" : "check"} size={18} />
+        </span>
+    </button>
 </div>
 
 <div class="lv-members" style="margin-bottom:4px">
@@ -485,7 +505,18 @@
         </div>
         <p class="lv-caption" style="margin:8px 2px">{t("hub.firstScan")}</p>
     {:else}
-        <div class="lv-card"><div class="lv-empty" role="status"><div class="eic"><UiIcon name="check" size={22} /></div><b>{t("dash.allClear")}</b><span>{t("hub.emptyHint")}</span></div></div>
+        <div class="lv-card lv-empty-compact" role="status">
+            <div class="eic-sm"><UiIcon name="check" size={18} /></div>
+            <div class="lv-empty-compact__text">
+                <b>{t("dash.allClear")}</b>
+                <span>{t("hub.emptyHint")}</span>
+            </div>
+            {#if starterModule}
+                <button class="b3-button b3-button--outline" onclick={openStarterRecord}>
+                    ＋ {t("ledger.newRecord")}
+                </button>
+            {/if}
+        </div>
     {/if}
 {:else}
     <div class="lv-card lv-rems">
@@ -508,21 +539,24 @@
     </div>
 {/if}
 
-<ActivityFeed {plugin} {t} {version} />
+<ActivityFeed {plugin} {t} {version} compact={true} />
 
 <div class="lv-sec"><h2 class="lv-title-sec">{t("dash.quickRecord")}</h2><span class="lv-sub">{t("dash.quickRecordSub")}</span>
     {#if onCapture}<button class="b3-button b3-button--text" onclick={() => onCapture()}>{t("capture.openFull")}</button>{/if}
 </div>
-<div id="lv-quick-modules" class="lv-quick" style="margin-bottom:4px">
+<div id="lv-quick-modules" class="lv-quick" style="margin-bottom:8px">
     {#each quickVisibleModules as mid (mid)}
-        <button class="lv-qbtn" onclick={() => mid === "members" ? onGoto("members") : openQuickCapture(mid)}>
-            <span class="qi"><UiIcon name={moduleUiIcon(mid)} size={15} /></span>{mid === "members" ? t("tab.members") : t(`module.${mid}`)}
+        {@const tone = moduleTone(mid)}
+        <button class="lv-qbtn {tone}" onclick={() => mid === "members" ? onGoto("members") : openQuickCapture(mid)}>
+            <span class="qi"><UiIcon name={moduleUiIcon(mid)} size={18} /></span>
+            <span class="ql">{mid === "members" ? t("tab.members") : t(`module.${mid}`)}</span>
         </button>
     {/each}
     {#if quickModules.length > 6}
         <button class="lv-qbtn lv-qbtn--toggle" aria-expanded={quickExpanded}
             onclick={() => (quickExpanded = !quickExpanded)}>
-            {quickExpanded ? t("dash.quickModulesLess") : t("dash.quickModulesMore").replace("${n}", String(quickModules.length - 6))}
+            <span class="qi" aria-hidden="true" style="font-size:15px;font-weight:600">{quickExpanded ? "⌃" : "⌄"}</span>
+            <span class="ql">{quickExpanded ? t("dash.quickModulesLess") : t("dash.quickModulesMore").replace("${n}", String(quickModules.length - 6))}</span>
         </button>
     {/if}
 </div>
@@ -595,12 +629,15 @@
         <div class="lv-mods">
     {#each section.ids as mid (mid)}
         {@const pending = pendingByModule.get(mid) ?? 0}
-        <article class="lv-card lv-mod" aria-label={t(`module.${mid}`)}>
-            <button type="button" class="lv-module-open" aria-label={t(`module.${mid}`)} onclick={() => { plugin.setActiveLedger(mid); onGoto("ledger"); }}>
+        <div class="lv-card lv-mod" aria-label={t(`module.${mid}`)}
+            role="button" tabindex="0"
+            onclick={() => { plugin.setActiveLedger(mid); onGoto("ledger"); }}
+            onkeydown={(e: KeyboardEvent) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); plugin.setActiveLedger(mid); onGoto("ledger"); } }}>
+            <div class="lv-module-open">
                 <span class="lv-mi" class:tone-blue={moduleTone(mid) === "t-blue"} class:tone-green={moduleTone(mid) === "t-green"}
                     class:tone-rose={moduleTone(mid) === "t-rose"} class:tone-amber={moduleTone(mid) === "t-amber"}
                     aria-hidden="true"><UiIcon name={moduleUiIcon(mid)} size={20} /></span><b>{t(`module.${mid}`)}</b>
-            </button>
+            </div>
             <div class="lv-stat" title={t("dash.statScope").replace("${t}", snapshotLabel)}>
             {#if rowCountOf(mid) !== undefined}
                 <!-- 264 波：主数字=台账行数（原型 "12 条 · 1 待办" 层次）；265 波零值弱色降噪——
@@ -647,7 +684,7 @@
                     ⏱ {t("mod.checkinBound").replace("${n}", String(healthBound.length))}
                 </div>
             {/if}
-        </article>
+        </div>
     {/each}
         </div>
         </div>

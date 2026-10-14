@@ -224,21 +224,18 @@
     color: var(--lv-tx-3); background: var(--lv-surface);
     box-shadow: none;
     strong { color: var(--lv-tx-2); font-weight: 500; margin-right: 4px; } }
-  .lv-focus { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--lv-space-5); margin: var(--lv-space-5) 2px 2px; }
-  .lv-focus-card { display: flex; align-items: center; gap: var(--lv-space-3); min-width: 0; padding: 18px 20px;
+  .lv-focus { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--lv-space-4); margin: var(--lv-space-5) 2px 2px; }
+  .lv-focus-card { display: flex; align-items: center; justify-content: space-between; gap: var(--lv-space-3); min-width: 0; padding: 16px 20px;
     border: 1px solid var(--lv-line); border-radius: var(--lv-r-3); background: var(--lv-surface);
-    box-shadow: none;
-    transition: border-color var(--lv-t-med) var(--lv-ease);
-    &:hover { border-color: var(--lv-line-strong); }
-    // 259 波：图标砖收回原型形态（30px 中性 surface-2 底 + accent 字符）——
-    // 此前 36px accent-soft 底+描边让三张卡过艳，违反"主色只给核心动作"的克制原则
-    .lv-focus-icon { width: 30px; height: 30px; border-radius: 9px; display: grid; place-items: center;
-      flex: none; font-size: 15px; color: var(--lv-accent); background: var(--lv-surface-2); }
-    div { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px;
-      b { font-size: 14px; font-weight: 600; }
-      span { font-size: 12px; color: var(--lv-tx-3); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; } }
-    .b3-button { flex-shrink: 0; font-size: 12px; padding: 5px 10px; min-height: var(--lv-control-md); color: var(--lv-tx-2);
-      &:hover { color: var(--lv-accent); } } }
+    box-shadow: none; cursor: pointer; text-align: left;
+    transition: all var(--lv-t-med) var(--lv-ease);
+    &:hover { border-color: var(--lv-line-strong); transform: translateY(-1px); box-shadow: var(--lv-shadow-1); }
+    .lv-focus-copy { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 3px;
+      .lv-focus-label { font-size: 11.5px; color: var(--lv-tx-3); font-weight: 500; }
+      .lv-focus-num { font-size: 24px; font-weight: 700; line-height: 1.25; color: var(--lv-tx); }
+      .lv-focus-sub { font-size: 11px; color: var(--lv-tx-3); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; } }
+    .lv-focus-icon { width: 38px; height: 38px; border-radius: 12px; display: grid; place-items: center;
+      flex: none; font-size: 16px; color: var(--lv-accent); background: var(--lv-surface-2); border: 1px solid var(--lv-line); } }
   @media (max-width: 640px) {
     .lv-focus { grid-template-columns: 1fr; }
   }
@@ -396,8 +393,12 @@
         &:hover { background: var(--lv-surface-2); color: var(--lv-tx); box-shadow: none; } } }
     // 173 波（13 §3.3 对齐原型）：键盘聚焦行时操作显现（触屏常显另有 hover:none 分支）
     &:hover .lv-rem-ops, &:focus-within .lv-rem-ops { opacity: 1; transform: none; }
-    &.overdue { background: var(--lv-danger-soft);
-      &::before { background: var(--lv-danger); } &:hover::before { box-shadow: 0 0 8px 1px var(--lv-danger); } }
+    &.overdue {
+      // 保持底色通透中性，仅融入 5% 警示色调，杜绝整行高饱和深红导致的视觉疲劳
+      background: color-mix(in srgb, var(--lv-danger) 5%, var(--lv-surface));
+      &::before { background: var(--lv-danger); }
+      &:hover { background: color-mix(in srgb, var(--lv-danger) 8%, var(--lv-surface-2)); }
+      &:hover::before { box-shadow: 0 0 8px 1px var(--lv-danger); } }
     &.soon::before { background: var(--lv-warn); } &.soon:hover::before { box-shadow: 0 0 8px 1px var(--lv-warn); }
     &.lead::before { background: var(--lv-amber); } &.lead:hover::before { box-shadow: 0 0 8px 1px var(--lv-amber); } }
   // R54：完成是提醒行唯一的即时动作，其余动作通过更多菜单渐进披露。
@@ -409,7 +410,7 @@
 
   // ── 8. 模块卡 / 色砖 / 趋势条 / 进度条 ──────────────────
   // 250 波：补上 .lv-mods 网格（此前模板使用但样式表从未定义，模块卡退化成全宽单列堆叠）
-  .lv-mods { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(210px, 100%), 1fr)); gap: 20px; }
+  .lv-mods { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(240px, 100%), 1fr)); gap: 16px; }
   // 269 波：模块多时先按功能分组，再用筛选/搜索缩小视野；控件保持一行紧凑，窄容器自动换行。
   .lv-module-tools { display: grid; grid-template-columns: minmax(0, 1fr) minmax(170px, 240px) auto;
     align-items: center; gap: var(--lv-space-2); margin: -2px 2px 14px; }
@@ -451,14 +452,16 @@
     font-size: 16px; background: var(--tile-bg, var(--lv-surface-2));
     border: 1px solid var(--tile-border, var(--lv-line));
     box-shadow: none; }
-  .lv-mod { padding: 20px; display: flex; flex-direction: column; gap: var(--lv-space-3); min-height: 136px; min-width: 0; cursor: default;
-    position: relative; overflow: hidden;
+  .lv-mod { padding: 18px 20px; display: flex; flex-direction: column; justify-content: space-between; gap: var(--lv-space-3); min-height: 128px; min-width: 0; cursor: pointer;
+    position: relative; overflow: hidden; border-radius: var(--lv-r-3); border: 1px solid var(--lv-line); background: var(--lv-surface);
+    transition: all var(--lv-t-med) var(--lv-ease);
+    &:hover { border-color: var(--lv-line-strong); transform: translateY(-2px); box-shadow: var(--lv-shadow-1); }
     > b { font-size: 14px; font-weight: 600; position: relative; }
     .lv-stat { display: flex; align-items: baseline; gap: 6px; position: relative;
-      b { font-size: 18px; font-weight: 600; letter-spacing: 0; }
+      b { font-size: 22px; font-weight: 700; letter-spacing: 0; color: var(--lv-tx); line-height: 1.2; }
       // 265 波：零值降噪——空台账的 0 转三级文字，不与活跃数字抢视觉权重
-      b.zero { color: var(--lv-tx-3); }
-      span { font-size: 11.5px; color: var(--lv-tx-3); }
+      b.zero { color: var(--lv-tx-3); font-weight: 500; font-size: 18px; }
+      span { font-size: 12px; color: var(--lv-tx-3); }
       .up { margin-left: auto; }
       // 259 波：无待办时的 fallback 做成导航出口而非灰字（原型卡面有主数字+单位的层次，
       // 生产行数口径未接入前，至少给卡片一个"可点"的视觉重心）。
@@ -606,12 +609,12 @@
   .lv-record-warning { color: var(--lv-warn); background: color-mix(in srgb, var(--lv-warn) 10%, transparent); }
   .lv-record-save-status { display: flex; align-items: center; gap: 6px; margin: 10px 2px; color: var(--lv-accent); font-size: 12.5px; }
   .lv-record-foot { align-items: center; flex-wrap: wrap; }
-  .lv-capture-context { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: var(--lv-space-1) 12px; padding: 12px 13px; border: 1px solid var(--lv-accent-line); border-radius: var(--lv-r-2); background: var(--lv-surface); }
-  .lv-capture-context__main { display: flex; align-items: baseline; gap: var(--lv-space-2); min-width: 0; }
-  .lv-capture-context__eyebrow { color: var(--lv-accent); font-size: 11px; font-weight: 650; white-space: nowrap; }
-  .lv-capture-context__main strong { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 13px; font-weight: 650; }
-  .lv-capture-context__hint { grid-column: 1 / -1; color: var(--lv-tx-3); font-size: 11.5px; line-height: 1.45; }
-  .lv-capture-context__count { align-self: center; color: var(--lv-tx-3); font-size: 11px; white-space: nowrap; }
+  .lv-capture-context { display: flex; align-items: center; justify-content: space-between; gap: 8px 12px; flex-wrap: wrap; padding: 8px 12px; border: 1px solid color-mix(in srgb, var(--lv-accent) 20%, transparent); border-radius: var(--lv-r-2); background: color-mix(in srgb, var(--lv-accent) 5%, var(--lv-surface)); }
+  .lv-capture-context__main { display: flex; align-items: center; gap: 6px; min-width: 0; }
+  .lv-capture-context__eyebrow { color: var(--lv-accent); font-size: 11px; font-weight: 600; white-space: nowrap; }
+  .lv-capture-context__main strong { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 12.5px; font-weight: 650; color: var(--lv-tx); }
+  .lv-capture-context__hint { width: 100%; color: var(--lv-tx-3); font-size: 11px; line-height: 1.4; }
+  .lv-capture-context__count { color: var(--lv-tx-3); font-size: 11px; white-space: nowrap; font-variant-numeric: tabular-nums; }
   .lv-capture-required { margin-left: 4px; color: var(--lv-danger); font-size: 10px; font-weight: 600; }
   .lv-capture-field-hint { display: block; margin-top: 4px; color: var(--lv-tx-3); font-size: 11px; line-height: 1.45; }
   .lv-capture-field-error { display: block; margin-top: 3px; color: var(--lv-danger); font-size: 12px; line-height: 1.45; }
@@ -651,6 +654,18 @@
     .lv-vehicle-grid { grid-template-columns: 1fr; }
     .lv-vehicle-card { padding: 12px; }
     .lv-vehicle-photo { width: 78px; height: 64px; }
+    .lv-table { border: none; background: transparent; box-shadow: none;
+      table { display: block; width: 100%;
+        thead { display: none; }
+        tbody { display: flex; flex-direction: column; gap: 8px; width: 100%;
+          tr.lv-row-link { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 10px;
+            padding: 12px 14px; border: 1px solid var(--lv-line); border-radius: var(--lv-r-2);
+            background: var(--lv-surface); box-shadow: var(--lv-shadow-1);
+            td { padding: 0; border: none; white-space: normal; }
+            .lv-sev-cell { order: 1; width: auto; }
+            td:nth-child(2) { order: 2; font-weight: 600; font-size: 14px; flex: 1 1 auto; color: var(--lv-tx); }
+            td:nth-child(n+3) { order: 3; font-size: 12px; color: var(--lv-tx-2); background: var(--lv-surface-2); padding: 2px 8px; border-radius: 4px; } }
+          .lv-more td { display: block; width: 100%; } } } }
   }
   // Virtualized ledger rows use spacer cells to preserve the native scroll track.
   // Remove table padding/borders so the measured row height is exact.
@@ -680,6 +695,17 @@
       background: var(--lv-accent-soft); color: var(--lv-accent); border: 1px solid var(--lv-line); box-shadow: none; }
     b { font-size: 14px; font-weight: 500; }
     span { font-size: 12.5px; color: var(--lv-tx-3); max-width: 300px; } }
+  .lv-empty-compact { display: flex; align-items: center; gap: 14px; padding: 14px 18px; min-height: auto; border-radius: var(--lv-r-3);
+    .eic-sm { width: 36px; height: 36px; border-radius: 10px; display: grid; place-items: center; font-size: 16px;
+      background: var(--lv-accent-soft); color: var(--lv-accent); flex: none; border: 1px solid var(--lv-line); }
+    .lv-empty-compact__text { display: flex; flex-direction: column; gap: 2px; flex: 1; min-width: 0;
+      b { font-size: 13.5px; font-weight: 600; color: var(--lv-tx); }
+      span { font-size: 12px; color: var(--lv-tx-3); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; } }
+    .b3-button { flex: none; min-height: 32px; padding: 4px 12px; font-size: 12px; } }
+  @media (max-width: 600px) {
+    .lv-empty-compact { flex-wrap: wrap; gap: 10px;
+      .lv-empty-compact__text span { white-space: normal; }
+      .b3-button { width: 100%; justify-content: center; } } }
   .lv-skel { border-radius: 8px; background: linear-gradient(90deg, var(--lv-surface-2) 25%,
       color-mix(in srgb, var(--lv-surface-2) 55%, var(--lv-tx)) 45%, var(--lv-surface-2) 65%);
     background-size: 200% 100%; animation: lv-shimmer 1.4s linear infinite; }
@@ -692,18 +718,31 @@
     dt { color: var(--lv-tx-3); } dd { color: var(--lv-tx); } }
 
   // ── 13. 快速记录 / 备忘卡 / 成员卡 ─────────────────────
-  .lv-quick { display: flex; gap: var(--lv-space-2); flex-wrap: wrap; }
-  .lv-qbtn { display: inline-flex; align-items: center; gap: var(--lv-space-2); min-height: var(--lv-control-lg); min-width: 0; max-width: 100%; padding: var(--lv-space-2) 14px; border-radius: 12px;
-    background: var(--lv-surface);
-    border: 1px solid var(--lv-line);
-    font-size: 13px; color: var(--lv-tx-2); white-space: normal; overflow-wrap: anywhere;
-    box-shadow: none; transition: background var(--lv-t-fast) var(--lv-ease), border-color var(--lv-t-fast) var(--lv-ease), color var(--lv-t-fast) var(--lv-ease);
-    &:hover { color: var(--lv-tx); border-color: var(--lv-accent-line); }
+  .lv-quick { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(96px, 100%), 1fr)); gap: 12px; }
+  .lv-qbtn { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px;
+    min-height: 86px; padding: 12px 6px; border-radius: var(--lv-r-3); background: var(--lv-surface);
+    border: 1px solid var(--lv-line); color: var(--lv-tx); cursor: pointer; text-align: center;
+    box-shadow: none; transition: all var(--lv-t-med) var(--lv-ease);
+    &:hover { color: var(--lv-accent); border-color: var(--lv-accent-line); transform: translateY(-2px); box-shadow: var(--lv-shadow-1); }
     &:active { transform: none; }
-    .qi { width: 22px; height: 22px; border-radius: 7px; display: grid; place-items: center; font-size: 12px;
-      color: var(--lv-accent); background: var(--lv-accent-soft); box-shadow: none; } }
-  .lv-qbtn--toggle { border-style: dashed; background: transparent; color: var(--lv-tx-3);
-    &:hover { color: var(--lv-accent); border-color: var(--lv-accent-line); background: var(--lv-surface); } }
+    .qi { width: 36px; height: 36px; border-radius: 11px; display: grid; place-items: center; font-size: 16px;
+      color: var(--lv-accent); background: var(--tile-bg, var(--lv-accent-soft));
+      border: 1px solid var(--tile-border, var(--lv-line)); transition: transform var(--lv-t-fast) var(--lv-ease); }
+    &:hover .qi { transform: scale(1.06); }
+    .ql { font-size: 12px; font-weight: 500; color: var(--lv-tx); max-width: 100%; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; } }
+  .lv-qbtn--toggle { border-style: dashed; background: transparent;
+    .ql { color: var(--lv-tx-3); }
+    .qi { background: var(--lv-surface-2); border-color: var(--lv-line); color: var(--lv-tx-3); }
+    &:hover { background: var(--lv-surface);
+      .ql { color: var(--lv-accent); }
+      .qi { color: var(--lv-accent); background: var(--lv-accent-soft); } } }
+  @media (max-width: 600px) {
+    .lv-quick { grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; }
+    .lv-qbtn { min-height: 78px; padding: 10px 4px;
+      .qi { width: 32px; height: 32px; font-size: 14px; }
+      .ql { font-size: 11px; } } }
+  @media (max-width: 380px) {
+    .lv-quick { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
   .lv-members { display: flex; gap: var(--lv-space-2); flex-wrap: nowrap; max-width: 100%; overflow-x: auto; overflow-y: hidden;
     padding: 2px 1px 6px; scrollbar-width: thin; scrollbar-color: var(--lv-line) transparent;
     .lv-avatar { width: 22px; height: 22px; font-size: 11px; } }
@@ -901,6 +940,18 @@
     .lv-ledger-toolbar > .lv-ledger-more { order: 4; }
     .lv-ledger-more > summary { min-height: var(--lv-control-md); }
     .lv-ledger-more__menu { position: fixed; top: auto; right: 12px; left: 12px; bottom: 12px; grid-template-columns: repeat(2, minmax(0, 1fr)); min-width: 0; padding: 10px; }
+    .lv-table { border: none; background: transparent; box-shadow: none;
+      table { display: block; width: 100%;
+        thead { display: none; }
+        tbody { display: flex; flex-direction: column; gap: 8px; width: 100%;
+          tr.lv-row-link { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 10px;
+            padding: 12px 14px; border: 1px solid var(--lv-line); border-radius: var(--lv-r-2);
+            background: var(--lv-surface); box-shadow: var(--lv-shadow-1);
+            td { padding: 0; border: none; white-space: normal; }
+            .lv-sev-cell { order: 1; width: auto; }
+            td:nth-child(2) { order: 2; font-weight: 600; font-size: 14px; flex: 1 1 auto; color: var(--lv-tx); }
+            td:nth-child(n+3) { order: 3; font-size: 12px; color: var(--lv-tx-2); background: var(--lv-surface-2); padding: 2px 8px; border-radius: 4px; } }
+          .lv-more td { display: block; width: 100%; } } } }
     .lv-modal .lv-sheet { max-height: calc(100% - 16px); border-radius: var(--lv-r-3); }
     .lv-record-grid { grid-template-columns: 1fr; }
     .lv-record-field-wide { grid-column: auto; }
@@ -973,28 +1024,31 @@
     &-grid { display: block; }
     &-row { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: var(--lv-space-1);
         & + & { margin-top: 4px; } }
-    &-wk { text-align: center; font-size: 11px; color: var(--lv-tx-3); padding: 4px 0; font-weight: 500; }
+    &-wk { text-align: center; font-size: 11px; color: var(--lv-tx-3); padding: 4px 0; font-weight: 500;
+        &:nth-child(6), &:nth-child(7) { color: var(--lv-accent); opacity: .8; } }
     &-cell { min-height: 64px; border: 1px solid var(--lv-line); border-radius: 10px;
         background: var(--lv-surface); display: flex; flex-direction: column; align-items: flex-start;
-        gap: 3px; padding: 6px; cursor: pointer; font: inherit; color: var(--lv-tx-2); text-align: left;
-        transition: border var(--lv-t-fast) var(--lv-ease), background var(--lv-t-fast) var(--lv-ease);
-        &:hover { border-color: var(--lv-line-strong); }
+        gap: 4px; padding: 6px 8px; cursor: pointer; font: inherit; color: var(--lv-tx-2); text-align: left;
+        transition: all var(--lv-t-fast) var(--lv-ease);
+        &:hover { border-color: var(--lv-line-strong); background: var(--lv-surface-2); }
         // 233 波：跨月真实日期（相邻月弱化显示但仍可点选看提醒）
-        &.out { opacity: .45; }
-        &.sel { border-color: var(--lv-accent-line); background: var(--lv-accent-soft); }
-        .d { font-size: 12px; font-weight: 600; min-width: 20px; text-align: center; padding: 1px 4px; }
-        .d.today { background: var(--lv-accent); color: var(--b3-theme-on-primary); border-radius: 999px; }
-        .dots { display: flex; gap: 3px; flex-wrap: wrap;
+        &.out { opacity: .4; }
+        &.sel { border-color: var(--lv-accent); background: var(--lv-accent-soft); box-shadow: 0 0 0 1px var(--lv-accent-line); }
+        .d { font-size: 12px; font-weight: 600; min-width: 22px; height: 22px; border-radius: 11px; display: inline-grid; place-items: center; padding: 0 2px; }
+        .d.today { background: var(--lv-accent); color: var(--b3-theme-on-primary); box-shadow: inset 0 1px 0 rgba(255, 255, 255, .28); }
+        .dots { display: flex; gap: 3px; flex-wrap: wrap; margin-top: 2px;
             // 251 波：事件点带同色柔光晕（对齐原型 .sev 的 halo 语言），暗色下不再难以辨认
-            i { width: 7px; height: 7px; border-radius: 50%; display: block;
+            i { width: 6px; height: 6px; border-radius: 50%; display: block;
                 &.danger { background: var(--lv-danger); box-shadow: 0 0 0 2px color-mix(in srgb, var(--lv-danger) 22%, transparent); }
                 &.warn { background: var(--lv-warn); box-shadow: 0 0 0 2px color-mix(in srgb, var(--lv-warn) 22%, transparent); }
                 &.amber { background: var(--lv-amber); box-shadow: 0 0 0 2px color-mix(in srgb, var(--lv-amber) 22%, transparent); } } } }
-    &-day-panel { margin-top: 12px; padding: 12px 14px; }
-    &-items { margin-top: 8px; display: flex; flex-direction: column; gap: var(--lv-space-2); }
-    &-item { display: flex; align-items: center; gap: 10px;
-        .lv-rem-ic { width: 30px; height: 30px; border-radius: 9px; display: grid; place-items: center;
-            flex: none; font-size: 14px; background: var(--lv-surface-2); border: 1px solid var(--lv-line); } }
+    &-day-panel { margin-top: 14px; padding: 16px 18px; border-radius: var(--lv-r-3); }
+    &-items { margin-top: 10px; display: flex; flex-direction: column; gap: var(--lv-space-2); }
+    &-item { display: flex; align-items: center; gap: 10px; padding: 8px 10px; border-radius: var(--lv-r-2);
+        background: var(--lv-surface); border: 1px solid var(--lv-line); transition: background var(--lv-t-fast) var(--lv-ease);
+        &:hover { background: var(--lv-surface-2); }
+        .lv-rem-ic { width: 32px; height: 32px; border-radius: 9px; display: grid; place-items: center;
+            flex: none; font-size: 15px; background: var(--lv-surface-2); border: 1px solid var(--lv-line); } }
 }
 @media (max-width: 640px) {
     .lv-home .lv-cal-cell { min-height: 46px; padding: 4px; }

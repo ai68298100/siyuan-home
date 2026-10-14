@@ -224,12 +224,21 @@
                         <button type="button" class="b3-button b3-button--text" disabled={loading} onclick={() => void refresh(true)}>{t("activity.retry")}</button>
                     </div>
                 {/if}
-                <div class="lv-card lv-empty" role="status">
-                    <div class="eic"><UiIcon name="calendar" size={22} /></div>
-                    <b>{query || moduleFilter !== "all" ? t("activity.noMatch") : t("activity.empty")}</b>
-                    <span>{snapshot?.errors.length ? t("activity.incompleteEmptyHint") : query || moduleFilter !== "all" ? t("activity.noMatchHint") : t("activity.emptyHint")}</span>
-                    {#if query || moduleFilter !== "all"}<button type="button" class="b3-button b3-button--outline" style="margin-top:8px" onclick={clearFilters}>{t("activity.clearFilters")}</button>{/if}
-                    {#if snapshot?.eligibleModules === 0}<button class="b3-button b3-button--outline" style="margin-top:8px" onclick={() => plugin.openSetting()}>{t("activity.configure")}</button>{/if}
+                <div class="lv-card {compact ? 'lv-empty-compact' : 'lv-empty'}" role="status">
+                    <div class={compact ? "eic-sm" : "eic"}><UiIcon name="calendar" size={compact ? 18 : 22} /></div>
+                    {#if compact}
+                        <div class="lv-empty-compact__text">
+                            <b>{query || moduleFilter !== "all" ? t("activity.noMatch") : t("activity.empty")}</b>
+                            <span>{snapshot?.errors.length ? t("activity.incompleteEmptyHint") : query || moduleFilter !== "all" ? t("activity.noMatchHint") : t("activity.emptyHint")}</span>
+                        </div>
+                        {#if query || moduleFilter !== "all"}<button type="button" class="b3-button b3-button--outline" onclick={clearFilters}>{t("activity.clearFilters")}</button>{/if}
+                        {#if snapshot?.eligibleModules === 0}<button class="b3-button b3-button--outline" onclick={() => plugin.openSetting()}>{t("activity.configure")}</button>{/if}
+                    {:else}
+                        <b>{query || moduleFilter !== "all" ? t("activity.noMatch") : t("activity.empty")}</b>
+                        <span>{snapshot?.errors.length ? t("activity.incompleteEmptyHint") : query || moduleFilter !== "all" ? t("activity.noMatchHint") : t("activity.emptyHint")}</span>
+                        {#if query || moduleFilter !== "all"}<button type="button" class="b3-button b3-button--outline" style="margin-top:8px" onclick={clearFilters}>{t("activity.clearFilters")}</button>{/if}
+                        {#if snapshot?.eligibleModules === 0}<button class="b3-button b3-button--outline" style="margin-top:8px" onclick={() => plugin.openSetting()}>{t("activity.configure")}</button>{/if}
+                    {/if}
                 </div>
             {:else}
                 {#if snapshot?.errors.length}

@@ -439,6 +439,8 @@
             {/if}
         </div>
         <div class="lv-sheet-foot">
+            <button class="b3-button b3-button--text" onclick={close} disabled={saving}>{t("cancel")}</button>
+            <span class="fn__flex-1"></span>
             {#if identityPending}
                 <button class="lv-btn ghost" onclick={openPendingLedger} disabled={saving}>{t("capture.checkLedger")}</button>
                 {#if identityChecked}<button class="lv-btn ghost" onclick={discardUncertainDraft}>{t("capture.discardUncertain")}</button>{/if}

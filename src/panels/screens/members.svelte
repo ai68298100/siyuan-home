@@ -276,9 +276,9 @@
     // Retain the new-member ID after a failed save so a user retry is the same
     // operation and cannot create a second settings row or AV row.
     let pendingNewMemberId = $state<string | undefined>();
-    // 初始无成员时展开首条录入；之后的展开状态由用户操作控制。
+    // 初始由用户操作控制展开，不默认霸占页面
     // svelte-ignore state_referenced_locally
-    let editorOpen = $state((plugin.settings.members?.length ?? 0) === 0);
+    let editorOpen = $state(false);
     let editorEl: HTMLDivElement | undefined = $state();
     const roles = ["self", "spouse", "partner", "child", "elder", "kin", "other"];
 
@@ -440,20 +440,33 @@
 </script>
 
 <div class="lv-members-screen">
-<div class="lv-hero lv-members-hero"><div><h1>{t("members.title")}</h1><p>{t("settings.membersHint")}</p></div><div class="lv-members-hero-count"><b class="lv-num">{members.length}</b><span>{t("members.title")}</span></div></div>
-
-<div class="lv-members-summary" role="status" aria-label={t("members.title")}>
-    <div class="lv-members-summary-item"><span class="lv-members-summary-mark">人</span><div><b class="lv-num">{members.length}</b><span>{t("members.title")}</span></div></div>
-    <div class="lv-members-summary-item"><span class="lv-members-summary-mark">事</span><div><b class="lv-num">{memberAlertCount}</b><span>{t("dash.needAttention")}</span></div></div>
+<div class="lv-hero lv-members-hero">
+    <div class="lv-hero-copy">
+        <h1>{t("members.title")}</h1>
+        <p class="lv-hero-lead">{t("settings.membersHint")}</p>
+    </div>
+    <div class="lv-hero-tools" style="display:flex;align-items:center;gap:16px">
+        <div class="lv-members-hero-count">
+            <b class="lv-num">{members.length}</b><span>{t("members.title")}</span>
+        </div>
+        {#if memberAlertCount > 0}
+            <div class="lv-members-hero-count" style="border-left:1px solid var(--lv-line);padding-left:16px">
+                <b class="lv-num" style="color:var(--lv-warn)">{memberAlertCount}</b><span>{t("dash.needAttention")}</span>
+            </div>
+        {/if}
+    </div>
 </div>
 
-<div class="lv-member-tools">
+<div class="lv-member-tools" style="display:flex;align-items:center;gap:10px;margin:12px 0">
     <button class={editorOpen ? "b3-button b3-button--outline" : "lv-btn primary"}
         aria-expanded={editorOpen} aria-controls="lv-member-editor"
         disabled={memberSaving} onclick={editorOpen ? cancelEdit : startNewMember}>
         {#if !editorOpen}<UiIcon name="add" size={15} />{/if}{editorOpen ? t("cancel") : t("add")}
     </button>
-    <button class="b3-button b3-button--outline" onclick={exportVcf} disabled={members.length === 0 || exportingVcf} aria-busy={exportingVcf}>{exportingVcf ? t("ledger.saving") : t("members.exportVcf")}</button>
+    <span class="fn__flex-1"></span>
+    <button class="b3-button b3-button--outline" onclick={exportVcf} disabled={members.length === 0 || exportingVcf} aria-busy={exportingVcf}>
+        {exportingVcf ? t("ledger.saving") : t("members.exportVcf")}
+    </button>
 </div>
 
 <div id="lv-member-editor" class="lv-card lv-member-editor" bind:this={editorEl} hidden={!editorOpen}>
@@ -479,8 +492,15 @@
     </div>
 </div>
 
-{#if members.length === 0}
-    <div class="lv-card"><div class="lv-empty" role="status"><div class="eic" aria-hidden="true">人</div><b>{t("members.empty")}</b><span>{t("members.emptyHint")}</span></div></div>
+{#if members.length === 0 && !editorOpen}
+    <div class="lv-card"><div class="lv-empty" role="status">
+        <div class="eic" aria-hidden="true"><UiIcon name="users" size={24} /></div>
+        <b>{t("members.empty")}</b>
+        <span>{t("members.emptyHint")}</span>
+        <button class="lv-btn primary" style="margin-top:8px" onclick={startNewMember}>
+            <UiIcon name="add" size={15} /> ＋ {t("add")}
+        </button>
+    </div></div>
 {:else}
     <div class="lv-people">
         {#each members as m (m.id)}
@@ -609,34 +629,6 @@
     .lv-members-hero-count b { color: var(--lv-tx); font-size: 30px; font-weight: 600; }
     .lv-members-hero-count span { font-size: 12px; }
 
-    .lv-members-summary {
-        display: grid;
-        grid-template-columns: repeat(2, minmax(120px, 170px));
-        align-items: center;
-        gap: 12px;
-        padding: 13px 16px;
-        border: 1px solid var(--lv-line);
-        border-radius: var(--lv-r-3);
-        background: var(--lv-surface);
-        box-shadow: inset 0 1px 0 var(--lv-inset);
-    }
-
-    .lv-members-summary-item { display: flex; align-items: center; gap: 9px; min-width: 0; }
-    .lv-members-summary-mark {
-        display: grid;
-        place-items: center;
-        width: 30px;
-        height: 30px;
-        border-radius: 9px;
-        color: var(--lv-accent);
-        background: var(--lv-accent-soft);
-        font-size: 13px;
-        font-weight: 600;
-    }
-    .lv-members-summary-item div { display: flex; flex-direction: column; min-width: 0; gap: 1px; }
-    .lv-members-summary-item b { font-size: 18px; line-height: 1.1; font-weight: 600; }
-    .lv-members-summary-item span:last-child { color: var(--lv-tx-3); font-size: 11.5px; white-space: nowrap; }
-
     .lv-member-tools { display: flex; align-items: center; justify-content: flex-end; gap: 8px; flex-wrap: wrap; margin: 0 2px 14px; }
     .lv-member-tools > button { min-height: 40px; }
     .lv-member-editor { padding: 16px; }
@@ -674,14 +666,12 @@
     .lv-members-screen .lv-drag-over { outline: 2px dashed var(--lv-accent); outline-offset: -2px; }
 
     @container lv-home (max-width: 680px) {
-        .lv-members-summary { grid-template-columns: repeat(2, minmax(0, 1fr)); }
         .lv-member-editor-fields { grid-template-columns: repeat(2, minmax(0, 1fr)); }
         .lv-member-editor-actions { grid-column: 1 / -1; }
     }
 
     @container lv-home (max-width: 420px) {
         .lv-members-hero-count { display: none; }
-        .lv-members-summary { padding: 11px 12px; gap: 8px; }
         .lv-member-tools > button { min-height: 44px; }
         .lv-member-editor-fields { grid-template-columns: 1fr; }
         .lv-member-editor-actions { grid-column: auto; }
