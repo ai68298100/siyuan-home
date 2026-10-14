@@ -7,7 +7,7 @@ import { APP, ensureKernel, login, openPanel, setTheme, sleep } from "./lib.mjs"
 mkdirSync("tmp/ui-shots/ui3-media", { recursive: true });
 await ensureKernel();
 
-const browser = await chromium.launch({ channel: "msedge", headless: true });
+const browser = await chromium.launch({ channel: "chrome", headless: true });
 
 // —— 打印：暗/浅两主题各一张（lv token 在 print 块整体翻纸面，暗色必须不残留深色块）
 for (const [mode, tag] of [[1, "dark"], [0, "light"]]) {
@@ -74,7 +74,7 @@ for (const [mode, tag] of [[1, "dark"], [0, "light"]]) {
     await page.evaluate(() => {
         const el = document.querySelector(".lv-home");
         if (el) { el.dataset.reparented = "1"; document.body.appendChild(el);
-            el.style.cssText = "position:fixed;inset:0;z-index:9999;background:var(--b3-theme-background);overflow:visible;height:auto;padding:16px"; }
+            el.style.cssText = "position:fixed;inset:0;z-index:9999;overflow:visible;height:auto;padding:16px"; }
     });
     await sleep(600);
     const el = await page.$(".lv-home");

@@ -66,7 +66,9 @@ describe("downloadAsset", () => {
             { origin: "https://notes.example/", fetchImpl, documentRef },
         );
 
-        expect(fetchImpl).toHaveBeenCalledWith("https://notes.example/assets/siyuan-home/passport.pdf", { credentials: "same-origin" });
+        expect(fetchImpl).toHaveBeenCalledWith("https://notes.example/assets/siyuan-home/passport.pdf", {
+            credentials: "same-origin", signal: expect.any(AbortSignal),
+        });
         expect(anchor.href).toBe("blob:asset");
         expect(anchor.download).toBe("护照.pdf");
         expect(appendChild).toHaveBeenCalledWith(anchor);

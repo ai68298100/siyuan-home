@@ -177,5 +177,32 @@ export async function loadRowLogs(plugin: Plugin): Promise<RowLogs> {
 }
 
 export async function saveRowLogs(plugin: Plugin, logs: RowLogs): Promise<void> {
-    await plugin.saveData(ROWLOGS_NAME, logs);
+    // Row-log editors are independent dialogs and can finish concurrently.
+    // Serialize snapshots per plugin so a slow delete cannot overwrite a
+    // newer append.  Clone before queueing because callers commonly keep
+    // mutating their local object after awaiting a refresh.
+    const snapshot = JSON.parse(JSON.stringify(logs)) as RowLogs;
+    await enqueueRowLogWrite(plugin, () => plugin.saveData(ROWLOGS_NAME, snapshot));
+}
+
+const rowLogSaveChains = new WeakMap<object, Promise<unknown>>();
+
+function enqueueRowLogWrite<T>(plugin: Plugin, action: () => Promise<T>): Promise<T> {
+    const previous = rowLogSaveChains.get(plugin) ?? Promise.resolve();
+    const run = previous.then(action);
+    rowLogSaveChains.set(plugin, run.catch(() => undefined));
+    return run;
+}
+
+/** Atomic in-process read/modify/write for child logs. The current snapshot is
+ * read only after earlier mutations have committed, so concurrent dialogs do
+ * not overwrite each other's append/delete changes. */
+export function updateRowLogs(plugin: Plugin, update: (current: RowLogs) => RowLogs): Promise<RowLogs> {
+    return enqueueRowLogWrite(plugin, async () => {
+        const current = await loadRowLogs(plugin);
+        const next = update(current);
+        const snapshot = JSON.parse(JSON.stringify(next)) as RowLogs;
+        await plugin.saveData(ROWLOGS_NAME, snapshot);
+        return snapshot;
+    });
 }

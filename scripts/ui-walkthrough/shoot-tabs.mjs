@@ -10,7 +10,7 @@ mkdirSync("tmp/ui-shots/ui3", { recursive: true });
 
 await ensureKernel();
 await setTheme(mode);
-const browser = await chromium.launch({ channel: "msedge", headless: true });
+const browser = await chromium.launch({ channel: "chrome", headless: true });
 const ctx = await browser.newContext({ viewport: { width: 1440, height: 960 }, locale: "zh-CN" });
 await login(ctx);
 const page = await ctx.newPage();

@@ -10,23 +10,41 @@
 import type { Plugin } from "siyuan";
 import type { Reminder } from "@/types";
 import { setCell } from "../siyuan";
-import { loadRuntime, saveRuntime, reminderKind, type HubRuntime, type HandledRecord } from "./runtime";
+import { loadRuntime, persistRuntimeUnderLock, withRuntimeSaveLock, reminderKind, type HubRuntime, type HandledRecord } from "./runtime";
 
-/** 运行态写队列（H01）：同一页面内所有动作串行；队列内失败不断链（吞掉让调用方各自的 promise 报错） */
-let runtimeChain: Promise<unknown> = Promise.resolve();
+function cloneRuntime(rt: HubRuntime): HubRuntime {
+    return JSON.parse(JSON.stringify(rt)) as HubRuntime;
+}
+
+function restoreRuntime(target: HubRuntime, snapshot: HubRuntime): void {
+    const mutable = target as unknown as Record<string, unknown>;
+    for (const key of Object.keys(mutable)) delete mutable[key];
+    Object.assign(target, snapshot);
+}
 
 export function withRuntime(plugin: Plugin, fn: (rt: HubRuntime) => void | Promise<void>): Promise<HubRuntime> {
-    const run = runtimeChain.then(async () => {
+    return withRuntimeSaveLock(plugin, async () => {
+        const pluginWithRuntime = plugin as unknown as { runtime: HubRuntime };
+        const previousRuntime = pluginWithRuntime.runtime;
         const rt = await loadRuntime(plugin);
+        const snapshot = cloneRuntime(rt);
         // 226 波修复（真机 e2e 发现的数据丢失竞态）：写回后必须同步插件活引用——
         // 否则 notifyHubChanged/扫描仍持有旧对象并整体回写，把刚落盘的备忘/延后/已办覆盖丢失
-        (plugin as unknown as { runtime: HubRuntime }).runtime = rt;
-        await fn(rt);
-        await saveRuntime(plugin, rt);
-        return rt;
+        pluginWithRuntime.runtime = rt;
+        try {
+            await fn(rt);
+            await persistRuntimeUnderLock(plugin, rt);
+            return rt;
+        } catch (error) {
+            // A local storage failure must not leave the in-memory panel in a
+            // state that was never committed.  Restore both the object passed
+            // to the callback and the plugin's previous live reference so a
+            // retry starts from exactly the pre-action snapshot.
+            restoreRuntime(rt, snapshot);
+            pluginWithRuntime.runtime = previousRuntime;
+            throw error;
+        }
     });
-    runtimeChain = run.catch(() => undefined);
-    return run;
 }
 
 function ymd(d: Date): string {
@@ -117,25 +135,76 @@ export async function renew(
     if (!parts || !parsed || parsed.getFullYear() !== Number(parts[1]) || parsed.getMonth() + 1 !== Number(parts[2]) || parsed.getDate() !== Number(parts[3])) {
         throw new Error("invalid due date");
     }
-    await setCell(dbRef.avId, targetKey, r.rowId, {
+    const nextCell = {
         type: "date", date: { content: ms, isNotEmpty: true, hasEndDate: false, isNotTime: true },
-    });
-    return withRuntime(plugin, (rt) => {
-        delete rt.snoozed[r.id];
-        delete rt.muted[r.id];
-        delete rt.handled[r.id];
-        rt.renewHistory[r.rowId] = [
-            ...(rt.renewHistory[r.rowId] ?? []),
-            { from: r.dueDate, to: newDueISO, at: new Date().toISOString() },
-        ];
-    });
+    };
+    const oldParts = /^(\d{4})-(\d{2})-(\d{2})$/.exec(r.dueDate);
+    const oldMs = oldParts ? new Date(`${r.dueDate}T00:00:00`).getTime() : Number.NaN;
+    try {
+        await setCell(dbRef.avId, targetKey, r.rowId, nextCell, {
+            idempotencyKey: `renew:${r.rowId}:${targetKey}:${newDueISO}`,
+        });
+        return await withRuntime(plugin, (rt) => {
+            delete rt.snoozed[r.id];
+            delete rt.muted[r.id];
+            delete rt.handled[r.id];
+            rt.renewHistory[r.rowId] = [
+                ...(rt.renewHistory[r.rowId] ?? []),
+                { from: r.dueDate, to: newDueISO, at: new Date().toISOString() },
+            ];
+        });
+    } catch (error) {
+        // The AV write and runtime marker are two separate stores.  If the
+        // second write fails, put the cell back so a retry cannot leave a
+        // visible due date that has no corresponding history/handled state.
+        if (Number.isFinite(oldMs)) {
+            try {
+                await setCell(dbRef.avId, targetKey, r.rowId, {
+                    type: "date", date: { content: oldMs, isNotEmpty: true, hasEndDate: false, isNotTime: true },
+                }, { idempotencyKey: `renew:rollback:${r.rowId}:${targetKey}:${r.dueDate}` });
+            } catch {
+                // Preserve the original error; the caller still surfaces a
+                // retry action and diagnostics can report the AV mismatch.
+            }
+        }
+        throw error;
+    }
 }
 
-/** 快速备忘（D1） */
-export function addMemo(plugin: Plugin, title: string, dueDate: string) {
-    return withRuntime(plugin, (rt) => {
-        rt.memos.push({ id: `m-${Date.now().toString(36)}${Math.random().toString(36).slice(2, 5)}`, title, dueDate, createdAt: new Date().toISOString() });
-    });
+/** 快速备忘（D1）。同一插件实例内相同标题/日期短时间重复提交只落一条。 */
+const memoIdempotency = new WeakMap<object, Map<string, number>>();
+const MEMO_IDEMPOTENCY_TTL_MS = 2_000;
+
+function validDate(value: string): boolean {
+    const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value);
+    if (!m) return false;
+    const d = new Date(`${value}T00:00:00`);
+    return Number.isFinite(d.getTime()) && d.getFullYear() === Number(m[1]) && d.getMonth() + 1 === Number(m[2]) && d.getDate() === Number(m[3]);
+}
+
+export async function addMemo(plugin: Plugin, title: string, dueDate: string, idempotencyKey?: string): Promise<HubRuntime> {
+    const normalizedTitle = title.trim();
+    if (!normalizedTitle) throw new Error("备忘标题不能为空");
+    if (!validDate(dueDate)) throw new Error("备忘日期无效");
+    const key = idempotencyKey?.trim() || `${normalizedTitle}\u0000${dueDate}`;
+    const seen = memoIdempotency.get(plugin) ?? new Map<string, number>();
+    memoIdempotency.set(plugin, seen);
+    let inserted = false;
+    try {
+        const result = await withRuntime(plugin, (rt) => {
+            const now = Date.now();
+            for (const [k, at] of seen) if (now - at > MEMO_IDEMPOTENCY_TTL_MS) seen.delete(k);
+            if (seen.has(key)) return;
+            seen.set(key, now);
+            rt.memos.push({ id: `m-${Date.now().toString(36)}${Math.random().toString(36).slice(2, 5)}`, title: normalizedTitle, dueDate, createdAt: new Date().toISOString() });
+            inserted = true;
+        });
+        if (!inserted) return result;
+        return result;
+    } catch (error) {
+        seen.delete(key);
+        throw error;
+    }
 }
 
 /** 删除备忘（显式用户动作；未处理备忘永不自动删除，H03） */

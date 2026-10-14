@@ -6,6 +6,20 @@
 /** 成员角色：家庭、伴侣、亲属等维度 */
 export type MemberRole = "self" | "spouse" | "partner" | "child" | "elder" | "kin" | "other";
 
+/** A member-row create may have committed even when its response was lost. */
+export interface MemberRowCreatePending {
+    avId: string;
+    baselineItemIds: string[];
+    candidateItemIds: string[];
+    fingerprint: {
+        name: string;
+        role: MemberRole;
+        birthday?: string;
+        lunarBirthday: boolean;
+    };
+    startedAt: string;
+}
+
 /** 家庭成员：所有模块共用的组织维度（台账本体在思源数据库，此为设置侧引用） */
 export interface FamilyMember {
     id: string;
@@ -21,6 +35,8 @@ export interface FamilyMember {
     avItemId?: string;
     /** 最近一次台账行同步失败的摘要（D05：可见可重试；成功后清除） */
     syncError?: string;
+    /** 上次建行结果未知时的核对快照；必须先核实，不能直接再次建行。 */
+    avRowCreatePending?: MemberRowCreatePending;
     /** EC14：人脉联系人绑定快照（`名称 [docId]`）；仅引用快照，不改写人脉数据 */
     contactSnapshot?: string;
     notes?: string;
@@ -154,6 +170,10 @@ export interface HomeSettings {
     webhookEnabled?: boolean;
     webhookUrl?: string;
     webhookMode?: "bark" | "ntfy";
+    /** 顶栏个人头像：单个字符预设或自定义短文字 */
+    avatar?: string;
+    /** 经裁剪压缩的本地头像 data URL（不超过 1 MB） */
+    avatarImage?: string;
 }
 
 /** EC09：打卡绑定。metric 显式区分（不把次数当体重）；itemName 为绑定时点快照（展示用） */

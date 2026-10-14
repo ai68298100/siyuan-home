@@ -1,4 +1,4 @@
-# v0.5.0 · 小驴管家（内测版）车辆管理与体验优化
+# v0.5.1 · 小驴管家（内测版）性能与体验优化
 
 ## 变更
 
@@ -6,11 +6,13 @@
 - 优化首次安装建库、成员/证件/附件/提醒/设置操作的反馈和失败恢复。
 - 修复思源 3.8.x 成员卡菜单、select 持久化、存储错误信封和移动端顶栏问题。
 - 完整身份证号码校验、脱敏与按需 OCR 入口继续可用，并提供必要的配置和隐私引导。
+- 总览、提醒、台账、成员与快速记录按需加载；台账表格采用窗口化渲染，车辆图片渐进加载。
+- 统一间距、字号、行高、控件高度、圆角、阴影、层级和动效令牌，图片补齐尺寸和异步解码属性。
 
 ## 验证
 
-- 350 项单测通过；Svelte、TypeScript、i18n、meta、loader、生产构建和发布包 smoke 通过。
-- `pnpm audit --prod --audit-level moderate` 因本机到 npm registry 的 TCP 连接超时未完成；未得到漏洞报告结果。
-- 独立思源内核 E2E 已通过设备批、首录、恢复和导入四组测试；真实 Android WebView 仍需人工宿主验收，本版继续保留 `disabledInPublish: true`。
+- 409 项单测通过；Svelte、TypeScript、i18n、meta、loader、生产构建和发布包 smoke 通过。
+- `pnpm audit --prod --audit-level moderate` 通过，未发现中等级别及以上生产依赖漏洞。
+- Chrome 双主题四页签走查通过；独立内核批测试在当前已有数据状态下部分场景受靶场首启与 token 环境影响，结果已在 CHANGELOG 记录。
 
 完整变更见 [CHANGELOG.md](./CHANGELOG.md)。

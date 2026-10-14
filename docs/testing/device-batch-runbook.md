@@ -8,7 +8,7 @@
 
 1. 一台隔离的 SiYuan 靶场实例（不要把写型脚本直打日常工作区），并取得该实例的 API token。Git Bash 中设置 `SIYUAN_URL`、`SIYUAN_TOKEN`，或通过 `SIYUAN_CONF` 指向包含这两个变量的 env 文件；不能只提供桌面浏览器登录态或授权码。
 2. Windows Git Bash、Node.js 24、pnpm 12、`curl`、`node`、`sha256sum`，以及 kernel-api skill 的 `sy` 包装器。若包装器不在默认路径，设置 `SIYUAN_SY=/path/to/sy`。
-3. 运行浏览器版独立 e2e 还需要安装 Playwright 依赖和 Edge；靶场地址必须显式传给脚本：`TEST_WS_URL="$SIYUAN_URL" SIYUAN_TOKEN="$SIYUAN_TOKEN" pnpm run e2e:device`。该脚本只覆盖 Chromium/Android UA 模拟，不能作为 Android WebView 通过证据。
+3. 运行浏览器版独立 e2e 还需要安装 Playwright 依赖和 Chrome；靶场地址必须显式传给脚本：`TEST_WS_URL="$SIYUAN_URL" SIYUAN_TOKEN="$SIYUAN_TOKEN" pnpm run e2e:device`。该脚本只覆盖 Chromium/Android UA 模拟，不能作为 Android WebView 通过证据。
 4. 阶段 5 需要实际安装并启用 `siyuan-checkin`、`siyuan-contacts`、`siyuan-glean`、`siyuan-exam`；阶段 6 的 S7 需要第二台设备或同一工作区的第二个独立前端会话。
 
 ## 前置状态（2026-10-07，执行时复核）

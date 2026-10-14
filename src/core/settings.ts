@@ -6,8 +6,12 @@
 import type { Plugin } from "siyuan";
 import type { HomeSettings, FamilyMember, MemberRole, CheckinBinding } from "@/types";
 import { BUILT_IN_MODULES } from "./modules";
+import { DEFAULT_AVATAR, normalizeAvatarImage, normalizeAvatarText } from "./avatar";
 
 const SETTINGS_NAME = "settings.json";
+/** Settings dialogs and avatar/member editors can save concurrently.  Queue
+ * snapshots per plugin so a slower first write cannot overwrite a newer one. */
+const settingsSaveChains = new WeakMap<object, Promise<unknown>>();
 
 export function defaultSettings(): HomeSettings {
     return {
@@ -22,6 +26,7 @@ export function defaultSettings(): HomeSettings {
         webhookEnabled: false,
         webhookUrl: "",
         webhookMode: "bark",
+        avatar: DEFAULT_AVATAR,
     };
 }
 
@@ -92,6 +97,38 @@ function normalizeMember(raw: unknown): FamilyMember | undefined {
     const out: Record<string, unknown> = { ...m, id, name, role, createdAt };
     for (const key of ["birthday", "avItemId", "syncError", "contactSnapshot", "notes"] as const) {
         if (out[key] !== undefined && typeof out[key] !== "string") delete out[key];
+    }
+    if (isPlainObject(out.avRowCreatePending)) {
+        const pending = out.avRowCreatePending;
+        const fingerprint = isPlainObject(pending.fingerprint) ? pending.fingerprint : undefined;
+        const validFingerprint = fingerprint
+            && typeof fingerprint.name === "string"
+            && typeof fingerprint.role === "string"
+            && MEMBER_ROLES.has(fingerprint.role as MemberRole)
+            && (fingerprint.birthday === undefined || typeof fingerprint.birthday === "string")
+            && typeof fingerprint.lunarBirthday === "boolean";
+        if (typeof pending.avId === "string" && pending.avId.trim()
+            && Array.isArray(pending.baselineItemIds) && validFingerprint) {
+            const normalizeIds = (value: unknown, limit: number) => Array.isArray(value)
+                ? [...new Set(value.filter((id): id is string => typeof id === "string" && !!id.trim()))].slice(0, limit)
+                : [];
+            out.avRowCreatePending = {
+                avId: pending.avId,
+                baselineItemIds: normalizeIds(pending.baselineItemIds, 20_000),
+                candidateItemIds: normalizeIds(pending.candidateItemIds, 200),
+                fingerprint: {
+                    name: fingerprint.name,
+                    role: fingerprint.role as MemberRole,
+                    ...(typeof fingerprint.birthday === "string" ? { birthday: fingerprint.birthday } : {}),
+                    lunarBirthday: fingerprint.lunarBirthday,
+                },
+                startedAt: typeof pending.startedAt === "string" ? pending.startedAt : new Date().toISOString(),
+            };
+        } else {
+            delete out.avRowCreatePending;
+        }
+    } else {
+        delete out.avRowCreatePending;
     }
     if (out.lunarBirthday !== undefined && typeof out.lunarBirthday !== "boolean") delete out.lunarBirthday;
     // D23：仅 male/female 合法；复制后清洗，避免改写 loadData 返回的对象。
@@ -173,21 +210,31 @@ export async function loadSettings(plugin: Plugin): Promise<HomeSettings> {
         webhookUrl: typeof data.webhookUrl === "string" ? data.webhookUrl : defaults.webhookUrl,
         webhookMode: data.webhookMode === "ntfy" ? "ntfy" : "bark",
         checkinBindings: normalizeCheckinBindings(data.checkinBindings),
+        avatar: normalizeAvatarText(data.avatar),
+        avatarImage: normalizeAvatarImage(data.avatarImage),
     };
 }
 
 export async function saveSettings(plugin: Plugin, settings: HomeSettings): Promise<void> {
-    // §15：写入失败重试一次（瞬时内核忙/工作区切换等）；仍失败抛带原始信息的错误，由调用方上报
-    try {
-        await plugin.saveData(SETTINGS_NAME, settings);
-    } catch (e1) {
-        await new Promise((r) => setTimeout(r, 300));
+    // Capture before queueing: callers often mutate the live settings object
+    // immediately after awaiting a panel action.
+    const snapshot = JSON.parse(JSON.stringify(settings)) as HomeSettings;
+    const previous = settingsSaveChains.get(plugin) ?? Promise.resolve();
+    const run = previous.then(async () => {
+        // §15：写入失败重试一次（瞬时内核忙/工作区切换等）；仍失败抛带原始信息的错误，由调用方上报
         try {
-            await plugin.saveData(SETTINGS_NAME, settings);
-        } catch {
-            throw new Error(`settings save failed after retry: ${e1 instanceof Error ? e1.message : String(e1)}`);
+            await plugin.saveData(SETTINGS_NAME, snapshot);
+        } catch (e1) {
+            await new Promise((r) => setTimeout(r, 300));
+            try {
+                await plugin.saveData(SETTINGS_NAME, snapshot);
+            } catch {
+                throw new Error(`settings save failed after retry: ${e1 instanceof Error ? e1.message : String(e1)}`);
+            }
         }
-    }
+    });
+    settingsSaveChains.set(plugin, run.catch(() => undefined));
+    await run;
 }
 
 export interface NormalizedImport {
@@ -229,6 +276,8 @@ export function normalizeImportedSettings(input: unknown): NormalizedImport {
         leadOverrides: isPlainObject(data.leadOverrides) ? Object.fromEntries(Object.entries(data.leadOverrides).filter((entry): entry is [string, number] => typeof entry[1] === "number" && Number.isFinite(entry[1]) && entry[1] >= 0)) : defaults.leadOverrides,
         dbRefs: normalizeDbRefs(data.dbRefs, defaults.dbRefs),
         checkinBindings: normalizeCheckinBindings(data.checkinBindings),
+        avatar: normalizeAvatarText(data.avatar),
+        avatarImage: normalizeAvatarImage(data.avatarImage),
         // 229 波恢复 e2e：导入路径钳制时刻（敌意/手改文件曾可把摘要时刻设为 99 → 摘要永不触发）
         notifyHour: clampHour(data.notifyHour, defaults.notifyHour),
         silentFrom: clampHour(data.silentFrom, defaults.silentFrom),

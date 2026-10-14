@@ -7,6 +7,8 @@
     import { saveRuntime } from "@/core/hub/runtime";
     import { memberHue } from "@/core/format";
     import { openContactPicker, getContactsBridge } from "@/libs/contact-picker";
+    import UiIcon from "@/ui/icon.svelte";
+    import ActivityFeed from "../activity-feed.svelte";
 
     let { plugin, t, version }: { plugin: HomePluginLike; t: (k: string) => string; version?: number } = $props();
 
@@ -69,6 +71,7 @@
     });
     let avatarInput: HTMLInputElement | undefined = $state();
     let avatarTarget: FamilyMember | null = null;
+    let avatarBusy = $state<Set<string>>(new Set());
     function pickAvatar(m: FamilyMember) {
         if (!m.avItemId) { showMessage(t("members.avatarNoRow"), 4000, "info"); return; }
         avatarTarget = m;
@@ -79,16 +82,29 @@
         (e.target as HTMLInputElement).value = "";
         const m = avatarTarget;
         if (!file || !m?.avItemId) return;
+        if (avatarBusy.has(m.id)) return;
         const ref = plugin.settings.dbRefs?.members;
         const avatarKey = ref?.columns?.avatar;
         if (!ref?.avId || !avatarKey) return;
+        avatarBusy = new Set([...avatarBusy, m.id]);
+        const operationKey = (() => {
+            try { return `member-avatar:${crypto.randomUUID()}`; }
+            catch { return `member-avatar:${Date.now().toString(36)}:${Math.random().toString(36).slice(2)}`; }
+        })();
         try {
-            const { name, path } = await uploadAsset(file);
-            await setCell(ref.avId, avatarKey, m.avItemId, { type: "mAsset", mAsset: [{ content: path, name }] });
+            const { name, path } = await uploadAsset(file, "/assets/siyuan-home/", { idempotencyKey: `${operationKey}:upload`, retries: 1 });
+            await setCell(ref.avId, avatarKey, m.avItemId, { type: "mAsset", mAsset: [{ content: path, name }] }, {
+                idempotencyKey: `${operationKey}:cell`,
+                retries: 1,
+            });
             avatars = { ...avatars, [m.id]: path };
             showMessage(t("members.avatarUploaded").replace("${name}", m.name), 2500, "info");
         } catch (e) {
             showMessage(t("members.avatarFailed").replace("${msg}", e instanceof Error ? e.message : String(e)), 5000, "error");
+        } finally {
+            const next = new Set(avatarBusy);
+            next.delete(m.id);
+            avatarBusy = next;
         }
     }
     // C5a 统计 chips + 17 组/219 波生日倒计时：单遍预计算（原 statChips/birthdaySoon
@@ -126,9 +142,17 @@
         return map;
     });
     const statsOf = (id: string): MemberStat => memberStats.get(id) ?? { chips: [], birthday: null };
-    async function runMemberAction(action: () => Promise<void>) {
+    let memberActionBusy = $state<Set<string>>(new Set());
+    async function runMemberAction(key: string, action: () => Promise<void>) {
+        if (memberActionBusy.has(key)) return;
+        memberActionBusy = new Set([...memberActionBusy, key]);
         try { await action(); }
         catch (e) { showMessage(t("hub.actionFailed").replace("${msg}", e instanceof Error ? e.message : String(e)), 5000, "error"); }
+        finally {
+            const next = new Set(memberActionBusy);
+            next.delete(key);
+            memberActionBusy = next;
+        }
     }
     let contactOverrides = $state<Record<string, string | null>>({});
     let contactBusy = $state<Record<string, boolean>>({});
@@ -157,13 +181,16 @@
             });
             // 17 组/197 波：上移/下移（拖拽排序的键盘可达替代）
             const idx = members.findIndex((x) => x.id === m.id);
-            menu.addItem({ label: t("members.moveUp"), disabled: idx <= 0, click: () => move(m, -1) });
-            menu.addItem({ label: t("members.moveDown"), disabled: idx === members.length - 1, click: () => move(m, 1) });
+            menu.addItem({ label: t("members.moveUp"), disabled: reorderBusy || idx <= 0, click: () => move(m, -1) });
+            menu.addItem({ label: t("members.moveDown"), disabled: reorderBusy || idx === members.length - 1, click: () => move(m, 1) });
             menu.addItem({ label: t("delete"), click: () => confirmRemove(m) });
             menu.open({ x, y });
         }, 0);
     }
+    let reorderBusy = $state(false);
     async function persistMemberOrder(ids: string[]) {
+        if (reorderBusy) return;
+        reorderBusy = true;
         const previous = [...plugin.settings.members];
         try {
             const { reorderMembers } = await import("@/core/members");
@@ -173,6 +200,8 @@
             plugin.settings.members = previous;
             orderVersion += 1;
             showMessage(t("members.reorderFailed").replace("${msg}", e instanceof Error ? e.message : String(e)), 5000, "error");
+        } finally {
+            reorderBusy = false;
         }
     }
     async function move(m: FamilyMember, delta: number) {
@@ -187,11 +216,13 @@
     let dragId = $state<string | null>(null);
     let dragOverId = $state<string | null>(null);
     function onDragStart(m: FamilyMember, e: DragEvent) {
+        if (reorderBusy) { e.preventDefault(); return; }
         dragId = m.id;
         e.dataTransfer?.setData("text/plain", m.id);
     }
     async function onDrop(m: FamilyMember, e: DragEvent) {
         e.preventDefault();
+        if (reorderBusy) return;
         const src = dragId ?? e.dataTransfer?.getData("text/plain") ?? null;
         dragId = null; dragOverId = null;
         if (!src || src === m.id) return;
@@ -237,18 +268,43 @@
     // D05 成员编辑：点"编辑"填入顶部表单，保存走 updateMember（av 行按 avItemId 精确写回）
     let name = $state("");
     let role = $state<import("@/types").MemberRole>("self");
+    let sex = $state<"male" | "female" | undefined>(undefined);
     let birthday = $state("");
     let lunar = $state(false);
+    let notes = $state("");
     let editId = $state<string | null>(null);
+    // Retain the new-member ID after a failed save so a user retry is the same
+    // operation and cannot create a second settings row or AV row.
+    let pendingNewMemberId = $state<string | undefined>();
+    // 初始无成员时展开首条录入；之后的展开状态由用户操作控制。
+    // svelte-ignore state_referenced_locally
+    let editorOpen = $state((plugin.settings.members?.length ?? 0) === 0);
+    let editorEl: HTMLDivElement | undefined = $state();
     const roles = ["self", "spouse", "partner", "child", "elder", "kin", "other"];
 
     function startEdit(m: FamilyMember) {
         editId = m.id;
+        editorOpen = true;
         name = m.name;
         role = m.role;
+        sex = m.sex;
         birthday = m.birthday ?? "";
         lunar = !!m.lunarBirthday;
+        notes = m.notes ?? "";
         expandedId = null;
+        requestAnimationFrame(() => {
+            editorEl?.scrollIntoView({ behavior: "smooth", block: "nearest" });
+            nameInput?.focus();
+        });
+    }
+
+    function startNewMember() {
+        cancelEdit();
+        editorOpen = true;
+        requestAnimationFrame(() => {
+            editorEl?.scrollIntoView({ behavior: "smooth", block: "nearest" });
+            nameInput?.focus();
+        });
     }
 
     // EC14：成员 ↔ 人脉联系人绑定（仅存快照 `名称 [docId]`，不改写人脉数据）
@@ -286,7 +342,8 @@
         await saveContactSnapshot(m, undefined);
     }
     function cancelEdit() {
-        editId = null; name = ""; role = "self"; birthday = ""; lunar = false;
+        editId = null; pendingNewMemberId = undefined; name = ""; role = "self"; sex = undefined; birthday = ""; lunar = false; notes = "";
+        editorOpen = false;
     }
 
     // UG11 v1（第九十波）：成员导出 vCard 4.0——姓名/生日/备注即个人信息，导出前一律确认
@@ -348,19 +405,21 @@
                     const target = (plugin.settings.members ?? []).find((m) => m.id === editId);
                     if (target) {
                         await updateMember(plugin, plugin.settings, {
-                            ...target, name: name.trim(), role, birthday: birthday || undefined, lunarBirthday: lunar,
+                            ...target, name: name.trim(), role, sex: sex || undefined, birthday: birthday || undefined, lunarBirthday: lunar, notes: notes.trim() || undefined,
                         });
                     }
                     cancelEdit();
                 } else {
                     const submittedName = name.trim();
+                    pendingNewMemberId ??= newSiYuanId();
                     await addMember(plugin, plugin.settings, {
-                        id: newSiYuanId(),
-                        name: submittedName, role, birthday: birthday || undefined,
-                        lunarBirthday: lunar, createdAt: new Date().toISOString(),
+                        id: pendingNewMemberId,
+                        name: submittedName, role, sex: sex || undefined, birthday: birthday || undefined,
+                        lunarBirthday: lunar, notes: notes.trim() || undefined, createdAt: new Date().toISOString(),
                     });
+                    pendingNewMemberId = undefined;
                     if (clearAfterCreate) {
-                        name = ""; role = "self"; birthday = ""; lunar = false;
+                        name = ""; role = "self"; sex = undefined; birthday = ""; lunar = false; notes = "";
                     }
                 }
             } catch (e) {
@@ -386,35 +445,47 @@
 <div class="lv-members-summary" role="status" aria-label={t("members.title")}>
     <div class="lv-members-summary-item"><span class="lv-members-summary-mark">人</span><div><b class="lv-num">{members.length}</b><span>{t("members.title")}</span></div></div>
     <div class="lv-members-summary-item"><span class="lv-members-summary-mark">事</span><div><b class="lv-num">{memberAlertCount}</b><span>{t("dash.needAttention")}</span></div></div>
-    <p>{t("settings.membersHint")}</p>
 </div>
 
-<div class="lv-card lv-member-editor">
-    <div class="lv-member-editor-head"><div><h2>{editId ? t("members.editing") : t("add")}</h2><p>{editId ? t("members.editing") : t("settings.membersHint")}</p></div><button class="b3-button b3-button--outline" onclick={exportVcf} disabled={members.length === 0 || exportingVcf} aria-busy={exportingVcf}>{exportingVcf ? t("ledger.saving") : t("members.exportVcf")}</button></div>
+<div class="lv-member-tools">
+    <button class={editorOpen ? "b3-button b3-button--outline" : "lv-btn primary"}
+        aria-expanded={editorOpen} aria-controls="lv-member-editor"
+        disabled={memberSaving} onclick={editorOpen ? cancelEdit : startNewMember}>
+        {#if !editorOpen}<UiIcon name="add" size={15} />{/if}{editorOpen ? t("cancel") : t("add")}
+    </button>
+    <button class="b3-button b3-button--outline" onclick={exportVcf} disabled={members.length === 0 || exportingVcf} aria-busy={exportingVcf}>{exportingVcf ? t("ledger.saving") : t("members.exportVcf")}</button>
+</div>
+
+<div id="lv-member-editor" class="lv-card lv-member-editor" bind:this={editorEl} hidden={!editorOpen}>
+    <div class="lv-member-editor-head"><div><h2>{editId ? t("members.editing") : t("add")}</h2><p>{editId ? t("members.editing") : t("settings.membersHint")}</p></div></div>
     <div class="lv-member-editor-fields">
-        <label class="lv-member-field"><span>{t("members.name")}</span><input bind:this={nameInput} class="b3-text-field" placeholder={t("members.name")} aria-label={t("members.name")} bind:value={name}
+                        <label class="lv-member-field"><span>{t("members.name")}</span><input bind:this={nameInput} class="b3-text-field" placeholder={t("members.name")} aria-label={t("members.name")} bind:value={name} disabled={memberSaving}
             onkeydown={(e: KeyboardEvent) => { if (e.key === "Enter" && !e.isComposing) save(); }} /></label>
-        <label class="lv-member-field"><span>{t("members.role")}</span><select class="b3-select" bind:value={role} aria-label={t("members.role")}>
+                        <label class="lv-member-field"><span>{t("members.role")}</span><select class="b3-select" bind:value={role} aria-label={t("members.role")} disabled={memberSaving}>
             {#each roles as r (r)}<option value={r}>{t(`role.${r}`)}</option>{/each}
         </select></label>
-        <label class="lv-member-field"><span>{t("members.birthday")}</span><input class="b3-text-field" type="date" title={t("members.birthday")} aria-label={t("members.birthday")} bind:value={birthday} /></label>
-        <label class="lv-member-check"><input type="checkbox" bind:checked={lunar} />{t("members.lunar")}</label>
+                        <label class="lv-member-field"><span>{t("members.sex")}</span><select class="b3-select" bind:value={sex} aria-label={t("members.sex")} disabled={memberSaving}>
+            <option value="">{t("members.sex.unknown")}</option><option value="male">{t("members.sex.male")}</option><option value="female">{t("members.sex.female")}</option>
+        </select></label>
+                        <label class="lv-member-field"><span>{t("members.birthday")}</span><input class="b3-text-field" type="date" title={t("members.birthday")} aria-label={t("members.birthday")} bind:value={birthday} disabled={memberSaving} /></label>
+                        <label class="lv-member-check"><input type="checkbox" bind:checked={lunar} disabled={memberSaving} />{t("members.lunar")}</label>
+                        <label class="lv-member-field lv-member-field-wide"><span>{t("members.notes")}</span><textarea class="b3-text-field" rows="2" bind:value={notes} aria-label={t("members.notes")} disabled={memberSaving}></textarea></label>
         <div class="lv-member-editor-actions">
             <button class="lv-btn primary sm" onclick={save} disabled={memberSaving} aria-busy={memberSaving}>
                 {memberSaving ? t("ledger.saving") : editId ? t("save") : `＋ ${t("add")}`}
             </button>
-            {#if editId}<button class="b3-button b3-button--outline" onclick={cancelEdit}>{t("cancel")}</button>{/if}
+            {#if editId}<button class="b3-button b3-button--outline" onclick={cancelEdit} disabled={memberSaving}>{t("cancel")}</button>{/if}
         </div>
     </div>
 </div>
 
 {#if members.length === 0}
-    <div class="lv-card"><div class="lv-empty"><div class="eic">人</div><b>{t("members.empty")}</b><span>{t("members.emptyHint")}</span></div></div>
+    <div class="lv-card"><div class="lv-empty" role="status"><div class="eic" aria-hidden="true">人</div><b>{t("members.empty")}</b><span>{t("members.emptyHint")}</span></div></div>
 {:else}
     <div class="lv-people">
         {#each members as m (m.id)}
-            <div class="lv-card lv-card--hover lv-person" role="group" aria-label={m.name}
-            draggable="true"
+            <div class="lv-card lv-person" role="group" aria-label={m.name}
+            draggable={!reorderBusy}
             ondragstart={(e: DragEvent) => onDragStart(m, e)}
             ondragover={(e: DragEvent) => { e.preventDefault(); dragOverId = m.id; }}
             ondragleave={() => { if (dragOverId === m.id) dragOverId = null; }}
@@ -429,19 +500,20 @@
             {#if avatars[m.id]}
                 <!-- 17 组/192 波：头像图（资产相对路径 → 内核 origin） -->
                 <img class="lv-avatar lg lv-person-avatar-image" src={new URL(avatars[m.id], location.origin).href}
-                    alt={m.name} />
+                    alt={m.name} width="44" height="44" decoding="async" loading="lazy" />
             {:else}
                 <!-- 225 波：个性化色相（id 哈希 → 稳定渐变），与总览 chips 同源 -->
                 <span class="lv-avatar lg lv-person-avatar-fallback" style="background:linear-gradient(135deg, hsl({memberHue(m.id)} 62% 52%), hsl({(memberHue(m.id) + 42) % 360} 62% 40%))">{m.name.slice(0, 1)}</span>
             {/if}
             <div class="lv-person-name">
                 <b>{m.name}</b>
-                <div class="lv-caption">{t(`role.${m.role}`)}{m.lunarBirthday ? ` · ${t("members.lunar")}` : ""} {m.birthday ?? ""}</div>
+                <div class="lv-caption">{t(`role.${m.role}`)}{m.sex ? ` · ${t(`members.sex.${m.sex}`)}` : ""}{m.lunarBirthday ? ` · ${t("members.lunar")}` : ""} {m.birthday ?? ""}</div>
             </div>
             </button>
             <!-- 操作保持常显，鼠标、键盘和触屏均能直接发现。 -->
             <button class="lv-iconbtn" title={t("members.uploadAvatar")} aria-label={t("members.uploadAvatar")}
-                onclick={() => pickAvatar(m)}>头像</button>
+                disabled={avatarBusy.has(m.id)} aria-busy={avatarBusy.has(m.id)}
+                onclick={() => pickAvatar(m)}>{avatarBusy.has(m.id) ? "…" : "头像"}</button>
             <button class="b3-button b3-button--text lv-member-edit" onclick={() => startEdit(m)}>{t("members.edit")}</button>
             <button class="b3-button b3-button--text" title={t("members.moreActions")} aria-label={t("members.moreActions")}
                 onclick={(e) => openCardMenu(m, e)}>⋯</button>
@@ -468,9 +540,10 @@
         {#if expandedId === m.id}
             <!-- 260 波：展开区入场动画（对齐抽屉编排语言；lv-rise 180ms） -->
             <div id={`member-details-${m.id}`} class="lv-person-expanded" style="border-top:1px solid var(--lv-line);padding-top:10px;display:flex;flex-direction:column;gap:6px">
+                {#if m.notes}<p class="lv-member-notes">{m.notes}</p>{/if}
                 <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center">
-                    <button class="b3-button b3-button--text" disabled={members.findIndex((x) => x.id === m.id) <= 0} onclick={() => void move(m, -1)}>{t("members.moveUp")}</button>
-                    <button class="b3-button b3-button--text" disabled={members.findIndex((x) => x.id === m.id) >= members.length - 1} onclick={() => void move(m, 1)}>{t("members.moveDown")}</button>
+                    <button class="b3-button b3-button--text" disabled={reorderBusy || members.findIndex((x) => x.id === m.id) <= 0} aria-busy={reorderBusy} onclick={() => void move(m, -1)}>{reorderBusy ? t("ledger.saving") : t("members.moveUp")}</button>
+                    <button class="b3-button b3-button--text" disabled={reorderBusy || members.findIndex((x) => x.id === m.id) >= members.length - 1} aria-busy={reorderBusy} onclick={() => void move(m, 1)}>{reorderBusy ? t("ledger.saving") : t("members.moveDown")}</button>
                     {#if plugin.settings.dbRefs?.members?.docId}
                         <button class="b3-button b3-button--text" onclick={() => plugin.showTabDocs(plugin.settings.dbRefs.members.docId)}>{t("members.openLedger")}</button>
                     {/if}
@@ -497,10 +570,11 @@
                             <span class="lv-badge {r.level === 'overdue' ? 'red' : r.level === 'soon' ? 'orange' : 'yellow'}">{r.dueDate}</span>
                             <span>{r.title}</span>
                             <span style="flex:1"></span>
-                            <button class="b3-button b3-button--text" onclick={() => void runMemberAction(() => plugin.complete(r))}>{t("act.done")}</button>
+                            <button class="b3-button b3-button--text" disabled={memberActionBusy.has(r.id)} aria-busy={memberActionBusy.has(r.id)} onclick={() => void runMemberAction(r.id, () => plugin.complete(r))}>{memberActionBusy.has(r.id) ? t("ledger.saving") : t("act.done")}</button>
                         </div>
                     {/each}
                 {/if}
+                <ActivityFeed {plugin} {t} {version} memberId={m.id} compact />
             </div>
         {/if}
             </div>
@@ -537,13 +611,13 @@
 
     .lv-members-summary {
         display: grid;
-        grid-template-columns: repeat(2, minmax(120px, 170px)) minmax(0, 1fr);
+        grid-template-columns: repeat(2, minmax(120px, 170px));
         align-items: center;
         gap: 12px;
         padding: 13px 16px;
         border: 1px solid var(--lv-line);
         border-radius: var(--lv-r-3);
-        background: color-mix(in srgb, var(--lv-surface) 92%, var(--lv-accent-soft));
+        background: var(--lv-surface);
         box-shadow: inset 0 1px 0 var(--lv-inset);
     }
 
@@ -562,16 +636,20 @@
     .lv-members-summary-item div { display: flex; flex-direction: column; min-width: 0; gap: 1px; }
     .lv-members-summary-item b { font-size: 18px; line-height: 1.1; font-weight: 600; }
     .lv-members-summary-item span:last-child { color: var(--lv-tx-3); font-size: 11.5px; white-space: nowrap; }
-    .lv-members-summary p { margin: 0; color: var(--lv-tx-3); font-size: 12px; line-height: 1.5; text-align: right; }
 
+    .lv-member-tools { display: flex; align-items: center; justify-content: flex-end; gap: 8px; flex-wrap: wrap; margin: 0 2px 14px; }
+    .lv-member-tools > button { min-height: 40px; }
     .lv-member-editor { padding: 16px; }
-    .lv-member-editor-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; margin-bottom: 14px; }
+    .lv-member-editor[hidden] { display: none !important; }
+    .lv-member-editor-head { display: flex; align-items: flex-start; gap: 12px; margin-bottom: 14px; }
     .lv-member-editor-head h2 { margin: 0; font-size: 15px; font-weight: 600; }
     .lv-member-editor-head p { margin: 3px 0 0; color: var(--lv-tx-3); font-size: 11.5px; line-height: 1.45; }
     .lv-member-editor-fields { display: grid; grid-template-columns: minmax(150px, 1.2fr) minmax(120px, .9fr) minmax(135px, 1fr) auto auto; align-items: end; gap: 10px; }
     .lv-member-field { display: flex; flex-direction: column; gap: 5px; min-width: 0; }
     .lv-member-field > span { color: var(--lv-tx-3); font-size: 11.5px; }
     .lv-member-field .b3-text-field, .lv-member-field .b3-select { width: 100%; min-width: 0; box-sizing: border-box; }
+    .lv-member-field-wide { grid-column: 1 / -1; }
+    .lv-member-notes { margin: 0; color: var(--lv-tx-2); font-size: 12px; line-height: 1.5; white-space: pre-wrap; overflow-wrap: anywhere; }
     .lv-member-check { display: inline-flex; align-items: center; gap: 6px; min-height: 32px; padding-bottom: 1px; color: var(--lv-tx-2); font-size: 12px; white-space: nowrap; cursor: pointer; }
     .lv-member-editor-actions { display: flex; gap: 7px; align-items: center; min-height: 32px; }
 
@@ -597,7 +675,6 @@
 
     @container lv-home (max-width: 680px) {
         .lv-members-summary { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-        .lv-members-summary p { grid-column: 1 / -1; text-align: left; padding-top: 2px; border-top: 1px solid var(--lv-line); }
         .lv-member-editor-fields { grid-template-columns: repeat(2, minmax(0, 1fr)); }
         .lv-member-editor-actions { grid-column: 1 / -1; }
     }
@@ -605,8 +682,7 @@
     @container lv-home (max-width: 420px) {
         .lv-members-hero-count { display: none; }
         .lv-members-summary { padding: 11px 12px; gap: 8px; }
-        .lv-member-editor-head { flex-direction: column; }
-        .lv-member-editor-head > .b3-button { align-self: flex-start; }
+        .lv-member-tools > button { min-height: 44px; }
         .lv-member-editor-fields { grid-template-columns: 1fr; }
         .lv-member-editor-actions { grid-column: auto; }
         .lv-members-screen .lv-person-head { align-items: flex-start; flex-wrap: wrap; }

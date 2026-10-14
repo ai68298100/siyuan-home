@@ -6,7 +6,7 @@ import { APP, ensureKernel, login, openPanel, gotoTab, sleep } from "./lib.mjs";
 
 mkdirSync("tmp/ui-shots/ui3-mobile", { recursive: true });
 await ensureKernel();
-const browser = await chromium.launch({ channel: "msedge", headless: true });
+const browser = await chromium.launch({ channel: "chrome", headless: true });
 const ctx = await browser.newContext({ viewport: { width: 390, height: 844 }, locale: "zh-CN", isMobile: true, hasTouch: true });
 await login(ctx);
 const page = await ctx.newPage();

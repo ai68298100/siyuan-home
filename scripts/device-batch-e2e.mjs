@@ -1,5 +1,5 @@
 // 真机批 e2e（DEVICE-01/02/03/04/05 自动化替代）—— node scripts/device-batch-e2e.mjs
-// 前置：隔离靶场实例（见 CONTRIBUTING「内核靶场约定」）+ npx playwright install-channel msedge 或系统 Edge；
+// 前置：隔离靶场实例（见 CONTRIBUTING「内核靶场约定」）+ 本机 Chrome；
 // 依赖 playwright（npx i playwright@1.63）
 // 在独立靶场实例上驱动浏览器版思源，逐项产出 {stage,item,pass,detail} 证据。
 // 边界：无头浏览器 ≠ 真实 Android WebView/读屏/低端设备——报告中如实声明残余项。
@@ -97,7 +97,7 @@ const pToastPoll = async (page, timeoutMs = 90000) => {
     return await pToast(page);
 };
 
-const browser = await chromium.launch({ channel: "msedge", headless: true });
+const browser = await chromium.launch({ channel: "chrome", headless: true });
 
 // ============================================================ S1 首启与引导
 {

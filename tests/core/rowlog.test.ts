@@ -6,6 +6,7 @@ import {
     logKey, getValuations, appendValuation, removeValuation, removeRowLog,
     getEntries, appendEntry, removeEntry,
     getMeterReadings, appendMeterReading, removeMeterReading,
+    updateRowLogs,
     type RowLogs,
 } from "@/core/rowlog";
 
@@ -76,6 +77,46 @@ describe("rowlog（行级子记录模型）", () => {
         expect(logs[logKey("av1", "r1")]).toBeDefined(); // transfers 仍在，key 保留
         logs = removeEntry(logs, "av1", "r1", "transfers", { date: "2026-02-01", from: "甲", to: "乙", at: AT });
         expect(logs[logKey("av1", "r1")]).toBeUndefined(); // 全空清 key
+    });
+});
+
+describe("rowlog 持久化并发", () => {
+    it("两个弹层并发追加会从队列内最新快照合并，不互相覆盖", async () => {
+        const store: Record<string, unknown> = {};
+        const plugin = {
+            loadData: async (name: string) => store[name] ?? null,
+            saveData: async (name: string, value: unknown) => {
+                await new Promise((resolve) => setTimeout(resolve, 5));
+                store[name] = JSON.parse(JSON.stringify(value));
+            },
+        } as any;
+        await Promise.all([
+            updateRowLogs(plugin, (current) => appendEntry(current, "av", "vehicle", "fuelings", { date: "2026-10-14", quantity: 20, at: "one" })),
+            updateRowLogs(plugin, (current) => appendEntry(current, "av", "vehicle", "fuelings", { date: "2026-10-14", quantity: 30, at: "two" })),
+        ]);
+        const saved = store["rowlogs.json"] as RowLogs;
+        expect(getEntries<{ quantity: number }>(saved, "av", "vehicle", "fuelings").map((entry) => entry.quantity).sort()).toEqual([20, 30]);
+    });
+
+    it("落盘失败会回传错误且不污染已保存快照，后续更新仍可继续", async () => {
+        const store: Record<string, unknown> = {};
+        let failNext = true;
+        const plugin = {
+            loadData: async (name: string) => store[name] ?? null,
+            saveData: async (name: string, value: unknown) => {
+                if (failNext) {
+                    failNext = false;
+                    throw new Error("disk full");
+                }
+                store[name] = JSON.parse(JSON.stringify(value));
+            },
+        } as any;
+        await expect(updateRowLogs(plugin, (current) => appendEntry(current, "av", "vehicle", "fuelings", { date: "2026-10-14", quantity: 20, at: "failed" })))
+            .rejects.toThrow("disk full");
+        expect(store["rowlogs.json"]).toBeUndefined();
+        await expect(updateRowLogs(plugin, (current) => appendEntry(current, "av", "vehicle", "fuelings", { date: "2026-10-14", quantity: 30, at: "retry" })))
+            .resolves.toMatchObject({ ["av|vehicle"]: { fuelings: [{ quantity: 30 }] } });
+        expect(getEntries<{ quantity: number }>(store["rowlogs.json"] as RowLogs, "av", "vehicle", "fuelings").map((entry) => entry.quantity)).toEqual([30]);
     });
 });
 

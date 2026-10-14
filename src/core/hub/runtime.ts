@@ -291,13 +291,51 @@ export async function loadRuntime(plugin: Plugin): Promise<HubRuntime> {
 // A plugin instance owns a single storage namespace. Sharing this cache globally can
 // skip the first write by a newly created instance when its data happens to match.
 const lastSerializedByPlugin = new WeakMap<object, string>();
+/**
+ * serialize runtime writes per plugin instance.  Several panels can persist a
+ * preference at the same time (for example a filter change while a reminder
+ * action is completing).  Calling saveData directly from both handlers lets
+ * the slower write win and silently drops the other change.  Keep a small
+ * per-instance queue here; the snapshot is captured before queueing so a
+ * later mutation cannot alter an earlier write in flight.
+ */
+const runtimeSaveChains = new WeakMap<object, Promise<unknown>>();
+
+/** Shared per-plugin serialization boundary for all runtime read/modify/write
+ * actions and direct preference snapshots. */
+export function withRuntimeSaveLock<T>(plugin: Plugin, operation: () => Promise<T>): Promise<T> {
+    const previous = runtimeSaveChains.get(plugin) ?? Promise.resolve();
+    const run = previous.then(operation);
+    runtimeSaveChains.set(plugin, run.catch(() => undefined));
+    return run;
+}
+
+function cloneRuntime(rt: HubRuntime): HubRuntime {
+    // HubRuntime is deliberately JSON-shaped (it is persisted as JSON).  A
+    // JSON clone also works in older embedded WebViews where structuredClone
+    // is not available.
+    return JSON.parse(JSON.stringify(rt)) as HubRuntime;
+}
 
 export async function saveRuntime(plugin: Plugin, rt: HubRuntime): Promise<void> {
     // PF09：序列化比对，无变化不落盘（筛选/动作频繁触发的场景减少全量写入）
-    const json = JSON.stringify(rt);
-    if (lastSerializedByPlugin.get(plugin) === json) return;
-    await plugin.saveData(RUNTIME_NAME, rt);
-    lastSerializedByPlugin.set(plugin, json);
+    const snapshot = cloneRuntime(rt);
+    const json = JSON.stringify(snapshot);
+    return withRuntimeSaveLock(plugin, async () => persistRuntimeSnapshot(plugin, snapshot, json));
+}
+
+/** Persist while the caller already holds withRuntimeSaveLock. */
+export async function persistRuntimeUnderLock(plugin: Plugin, rt: HubRuntime): Promise<void> {
+    const snapshot = cloneRuntime(rt);
+    await persistRuntimeSnapshot(plugin, snapshot, JSON.stringify(snapshot));
+}
+
+async function persistRuntimeSnapshot(plugin: Plugin, snapshot: HubRuntime, json: string): Promise<void> {
+        // Re-check after an earlier queued write: it may already have stored
+        // this exact snapshot while this call was waiting.
+        if (lastSerializedByPlugin.get(plugin) === json) return;
+        await plugin.saveData(RUNTIME_NAME, snapshot);
+        lastSerializedByPlugin.set(plugin, json);
 }
 
 /** 已完成运行态记录的保留期（天）：过期后才可被 purgeHandled 清除 */

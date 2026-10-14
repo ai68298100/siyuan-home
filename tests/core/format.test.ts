@@ -29,6 +29,12 @@ describe("formatAmount", () => {
         expect(formatAmount(-1234567.89)).toBe("-1,234,567.89");
     });
 
+    it("非有限值和极大数不会渲染 Infinity 或撑破卡片", () => {
+        expect(formatAmount(Number.NaN)).toBe("—");
+        expect(formatAmount(Number.POSITIVE_INFINITY)).toBe("—");
+        expect(formatAmount(Number.MAX_VALUE)).toMatch(/^1\.7977e\+308$/);
+    });
+
     it("白名单含五个金额语义 key；非金额 key 不在册", () => {
         for (const k of ["amount", "price", "refund_amount", "deposit", "target_amount"]) {
             expect(AMOUNT_KEYS.has(k)).toBe(true);

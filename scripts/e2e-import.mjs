@@ -29,7 +29,7 @@ writeFileSync("tmp/imp-hostile.json", JSON.stringify({
     notifyHour: 99,
 }));
 
-const browser = await chromium.launch({ channel: "msedge", headless: true });
+const browser = await chromium.launch({ channel: "chrome", headless: true });
 const openImport = async () => {
     const p = await (await browser.newContext({ viewport: { width: 1440, height: 900 }, locale: "zh-CN" })).newPage();
     await p.goto(`${BASE}/`, { waitUntil: "domcontentloaded" });

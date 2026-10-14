@@ -8,6 +8,40 @@
 
 import { calculateEnergyStats, normalizeEnergyRecords, type EnergyRecord, type EnergyStats } from "@/core/fuel";
 
+export type VehicleQuickAction = "fuel" | "charging" | "maintenance";
+
+/** Queue a detail action until its asynchronously rendered section is ready. */
+export function createVehicleActionQueue() {
+    const handlers = new Map<VehicleQuickAction, () => void>();
+    const pending = new Set<VehicleQuickAction>();
+    const failures = new Map<VehicleQuickAction, string>();
+
+    return {
+        request(action: VehicleQuickAction): { status: "ready" | "queued" | "failed"; error?: string } {
+            const handler = handlers.get(action);
+            if (handler) {
+                handler();
+                return { status: "ready" };
+            }
+            if (failures.has(action)) return { status: "failed", error: failures.get(action) ?? "" };
+            pending.add(action);
+            return { status: "queued" };
+        },
+        register(action: VehicleQuickAction, handler: () => void): boolean {
+            failures.delete(action);
+            handlers.set(action, handler);
+            if (!pending.delete(action)) return false;
+            handler();
+            return true;
+        },
+        fail(action: VehicleQuickAction, error: string): boolean {
+            handlers.delete(action);
+            failures.set(action, error);
+            return pending.delete(action);
+        },
+    };
+}
+
 export type MaintenanceCategory =
     | "routine"
     | "repair"

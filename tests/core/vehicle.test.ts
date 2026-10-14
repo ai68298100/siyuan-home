@@ -1,5 +1,5 @@
-import { describe, expect, it } from "vitest";
-import { calculateMaintenanceStats, calculateVehicleCostSummary, normalizeMaintenanceRecords, type MaintenanceRecord } from "@/core/vehicle";
+import { describe, expect, it, vi } from "vitest";
+import { calculateMaintenanceStats, calculateVehicleCostSummary, createVehicleActionQueue, normalizeMaintenanceRecords, type MaintenanceRecord } from "@/core/vehicle";
 import type { EnergyRecord } from "@/core/fuel";
 
 const service = (date: string, odometer: number, category = "routine", cost?: number): MaintenanceRecord => ({
@@ -63,5 +63,32 @@ describe("vehicle maintenance statistics", () => {
         expect(summary.eventCount).toBe(4);
         expect(summary.latestDate).toBe("2026-02-12");
         expect(summary.costComplete).toBe(false);
+    });
+});
+
+describe("vehicle detail quick actions", () => {
+    it("keeps a requested action queued until a delayed section registers", async () => {
+        vi.useFakeTimers();
+        try {
+            const queue = createVehicleActionQueue();
+            let triggered = 0;
+            expect(queue.request("fuel")).toEqual({ status: "queued" });
+
+            await vi.advanceTimersByTimeAsync(2_500);
+            expect(triggered).toBe(0);
+            expect(queue.register("fuel", () => { triggered += 1; })).toBe(true);
+            expect(triggered).toBe(1);
+            expect(queue.request("fuel")).toEqual({ status: "ready" });
+            expect(triggered).toBe(2);
+        } finally {
+            vi.useRealTimers();
+        }
+    });
+
+    it("reports and clears a queued action when its section fails to load", () => {
+        const queue = createVehicleActionQueue();
+        expect(queue.request("maintenance")).toEqual({ status: "queued" });
+        expect(queue.fail("maintenance", "storage unavailable")).toBe(true);
+        expect(queue.request("maintenance")).toEqual({ status: "failed", error: "storage unavailable" });
     });
 });

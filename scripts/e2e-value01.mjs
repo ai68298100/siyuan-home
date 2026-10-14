@@ -15,7 +15,7 @@ for (const f of ["settings.json", "hub-runtime.json", "settings.json.corrupted.j
     await api("/api/file/removeFile", { path: `/data/storage/petal/siyuan-home/${f}` }).catch(() => {});
 }
 
-const browser = await chromium.launch({ channel: "msedge", headless: true });
+const browser = await chromium.launch({ channel: "chrome", headless: true });
 const p = await (await browser.newContext({ viewport: { width: 1440, height: 900 }, locale: "zh-CN" })).newPage();
 p.on("pageerror", (e) => results.push({ item: "PAGEERROR", pass: false, detail: String(e).slice(0, 150) }));
 await p.goto(`${BASE}/`, { waitUntil: "domcontentloaded" });

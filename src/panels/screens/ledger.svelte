@@ -13,13 +13,22 @@
     import { showMessage, Dialog, confirm } from "siyuan";
     import type { HomePluginLike } from "@/types/plugin";
     import { saveRuntime } from "@/core/hub/runtime";
+    import { saveSettings } from "@/core/settings";
     import { ensurePinyin, pinyinReady, searchMatch } from "@/core/pinyin";
     import { openContactPicker } from "@/libs/contact-picker";
     import { getCertificateProfile, getCertificateReminderField } from "@/core/schema";
+    import type { ColumnDef } from "@/core/schema";
+    import { getCaptureFields, getFormFields, validateCaptureInput, type CaptureInputError } from "@/core/capture";
     import { assetHref, downloadAsset, isImageAsset, isEncryptedNotebookAsset } from "@/core/assets";
     import { calculateEnergyStats, type EnergyKind, type EnergyRecord } from "@/core/fuel";
-    import { calculateMaintenanceStats, calculateVehicleCostSummary, type MaintenanceRecord } from "@/core/vehicle";
-    import { loadRowLogs, saveRowLogs, getEntries, appendEntry, removeEntry } from "@/core/rowlog";
+    import { calculateMaintenanceStats, calculateVehicleCostSummary, createVehicleActionQueue, type MaintenanceRecord, type VehicleQuickAction } from "@/core/vehicle";
+    import { loadRowLogs, updateRowLogs, getEntries, appendEntry, removeEntry } from "@/core/rowlog";
+    import type { LogKind } from "@/core/rowlog";
+    import { rowLogActivityId, type ActivityTarget } from "@/core/activity";
+    import { onDestroy } from "svelte";
+    import UiIcon from "@/ui/icon.svelte";
+    import { uiIcon } from "@/ui/icons";
+    import { panelSession } from "../panel-session";
 
     let { plugin, t, version }: { plugin: HomePluginLike; t: (k: string) => string; version?: number } = $props();
 
@@ -41,11 +50,21 @@
     let loading = $state(false);
     let loadError = $state("");
     let loadRequest = 0;
+    let loadController: AbortController | undefined;
     let rebuilding = $state(false);
     let exporting = $state(false);
     let printing = $state(false);
+    // The panel session belongs to the stable plugin instance mounted here.
+    // svelte-ignore state_referenced_locally
+    const panelMemory = panelSession(plugin);
     // Search matches title/note and pinyin; it is independent from member filtering.
-    let searchText = $state("");
+    let searchText = $state(panelMemory.ledgerSearch);
+    onDestroy(() => {
+        loadRequest++;
+        loadController?.abort();
+        loadController = undefined;
+        if (plugin.pendingActivityTarget?.moduleId === active) plugin.pendingActivityTarget = undefined;
+    });
 
     // Settings can disable the currently open module while this screen stays
     // mounted. Keep the selector and form aligned with the enabled set instead
@@ -56,11 +75,25 @@
             active = available[0].id;
             plugin.activeLedger = active;
             searchText = "";
+            if (plugin.pendingActivityTarget) {
+                plugin.pendingActivityTarget = undefined;
+                showMessage(t("activity.navigationUnavailable"), 4000, "error");
+            }
         }
     });
     // Progressive rendering keeps the initial table responsive.
     const RENDER_PAGE = 200;
     let renderLimit = $state(RENDER_PAGE);
+    // 台账窗口化：数据仍完整保留在内存中，DOM 只保留视口附近的行。
+    // 通过固定的估算行高保留滚动轨道，避免 500+ 行一次性创建节点。
+    const VIRTUAL_ROW_HEIGHT = 48;
+    const VIRTUAL_OVERSCAN = 8;
+    let ledgerScrollTop = $state(0);
+    let ledgerViewportHeight = $state(640);
+    let ledgerTableEl = $state<HTMLTableElement | undefined>(undefined);
+    // The scroll owner is an imperative DOM handle; keeping it non-reactive
+    // prevents the ResizeObserver setup effect from re-running itself.
+    let virtualRoot: HTMLElement | undefined;
     // Load the pinyin dictionary lazily and recompute once it is ready.
     let pyTick = $state(0);
     $effect(() => {
@@ -104,28 +137,72 @@
             list = list.filter((r) => rowMatchesSearch(r, q, ref?.columns));
         }
         const keyID = sortKey ? ref?.columns?.[sortKey] : undefined;
-        return sortRows(list, keyID, sortAsc);
+        const keyType = sortKey ? plugin.schemaCatalog?.[active]?.columns?.find((column: any) => column.key === sortKey)?.type : undefined;
+        return sortRows(list, keyID, sortAsc, keyType);
     });
-    function sortRows(list: any[], keyID?: string, ascending = true) {
+    function sortRows(list: any[], keyID?: string, ascending = true, keyType?: string) {
         if (!keyID) return list;
         return [...list].sort((a, b) => {
             const av = cellText(a.cells[keyID]);
             const bv = cellText(b.cells[keyID]);
-            const an = parseFloat(av);
-            const bn = parseFloat(bv);
-            const cmp = !isNaN(an) && !isNaN(bn) && av !== "—" && bv !== "—" ? an - bn : av.localeCompare(bv);
+            const an = Number(av);
+            const bn = Number(bv);
+            // Only numeric schema columns use numeric comparison. Date strings
+            // such as 2026-10-11 must compare as dates, not as the year 2026.
+            const cmp = keyType === "number" && Number.isFinite(an) && Number.isFinite(bn) && av !== "—" && bv !== "—"
+                ? an - bn
+                : av.localeCompare(bv, undefined, { numeric: true });
             return ascending ? cmp : -cmp;
         });
     }
-    // Sorting and filtering apply to all rows; only the visible window is sliced.
-    const visibleRows = $derived(filteredRows.slice(0, renderLimit));
+    // 普通台账表格使用完整结果集配合窗口化渲染；车辆卡片保留渐进加载，
+    // 以便图片卡片按批次进入 DOM，避免首次进入触发大量资源解码。
+    const visibleRows = $derived(active === "vehicles" ? filteredRows.slice(0, renderLimit) : filteredRows);
+    const virtualRange = $derived.by(() => {
+        void ledgerScrollTop;
+        void ledgerViewportHeight;
+        const total = visibleRows.length;
+        if (total <= 80) return { start: 0, end: total };
+        const tableTop = ledgerTableEl && virtualRoot
+            ? ledgerTableEl.getBoundingClientRect().top - virtualRoot.getBoundingClientRect().top + virtualRoot.scrollTop
+            : 0;
+        const first = Math.max(0, Math.floor((ledgerScrollTop - tableTop) / VIRTUAL_ROW_HEIGHT) - VIRTUAL_OVERSCAN);
+        const count = Math.ceil(ledgerViewportHeight / VIRTUAL_ROW_HEIGHT) + VIRTUAL_OVERSCAN * 2;
+        return { start: Math.min(first, Math.max(0, total - count)), end: Math.min(total, first + count) };
+    });
+    const virtualRows = $derived(visibleRows.slice(virtualRange.start, virtualRange.end));
+
+    function measureLedgerViewport() {
+        if (!virtualRoot) return;
+        ledgerViewportHeight = virtualRoot.clientHeight || 640;
+        ledgerScrollTop = virtualRoot.scrollTop;
+    }
+
+    $effect(() => {
+        const table = ledgerTableEl;
+        if (!table) return;
+        const root = table.closest<HTMLElement>(".lv-home");
+        if (!root) return;
+        virtualRoot = root;
+        const onScroll = () => { ledgerScrollTop = root.scrollTop; };
+        root.addEventListener("scroll", onScroll, { passive: true });
+        const resize = new ResizeObserver(measureLedgerViewport);
+        resize.observe(root);
+        measureLedgerViewport();
+        return () => {
+            root.removeEventListener("scroll", onScroll);
+            resize.disconnect();
+            if (virtualRoot === root) virtualRoot = undefined;
+        };
+    });
 
     function rowMatchesSearch(row: any, q: string, columns?: Record<string, string>) {
-        const nameKey = columns?.name;
-        const noteKey = columns?.note;
-        const name = nameKey ? (row.cells[nameKey]?.text?.content ?? row.cells[nameKey]?.block?.content ?? "") : "";
-        const note = noteKey ? (row.cells[noteKey]?.text?.content ?? "") : "";
-        return searchMatch(name, q) || searchMatch(note, q);
+        // Search every scalar column so plate numbers, categories, dates and
+        // certificate numbers are discoverable without opening each row.
+        const searchable = Object.values(columns ?? {})
+            .map((columnId) => cellText(row.cells?.[columnId as string]))
+            .join(" ");
+        return searchMatch(searchable, q);
     }
 
     // Resolve only enabled modules. A disabled module may still have an old
@@ -133,6 +210,18 @@
     // settings change and make the empty-state actions misleading.
     const ref = $derived(ledgers.find((entry) => entry.id === active)?.ref);
     const schemaKeys = $derived<string[]>(ref?.columns ? Object.keys(ref.columns) : []);
+    // Keep the list useful across all modules. A fixed expiry/status list made
+    // travel, shopping and other ledgers render only an empty severity column.
+    const tableKeys = $derived.by(() => {
+        const preferred = ["name", "category", "status", "date", "expiry", "due", "amount", "brand_model", "plate", "energy_type", "mileage", "note"];
+        const keys = preferred.filter((key) => schemaKeys.includes(key));
+        const columns = plugin.schemaCatalog?.[active]?.columns ?? [];
+        for (const column of columns) {
+            if (keys.length >= 5) break;
+            if (schemaKeys.includes(column.key) && !keys.includes(column.key) && !["asset", "mAsset", "mSelect", "relation"].includes(column.type)) keys.push(column.key);
+        }
+        return keys.length > 0 ? keys : schemaKeys.slice(0, 5);
+    });
     function switchLedger(event: Event) {
         const next = (event.currentTarget as HTMLSelectElement).value;
         const hasDraft = hasAnyInput
@@ -145,7 +234,10 @@
             showMessage(t("ledger.draftModuleSwitchBlocked"), 5000, "info");
             return;
         }
+        if (next !== active && plugin.pendingActivityTarget?.moduleId !== next) plugin.pendingActivityTarget = undefined;
         active = next;
+        validationAttempted = false;
+        saveError = "";
         plugin.activeLedger = active;
         searchText = "";
     }
@@ -193,7 +285,7 @@
 @media print{.noprint{display:none}body{padding:0}}</style></head><body>
 <div class="head"><b>${t("ledger.printTitle")}</b><span class="sub">${t("ledger.printScanTip")} · ${new Date().toLocaleString()}</span></div>
 <div class="noprint" style="text-align:center;margin-bottom:14px"><button class="printbtn" onclick="window.print()">${t("ledger.printButton")}</button></div>
-<div class="grid">${labels.map((l) => `<div class="label"><img src="${l.qr}" alt="QR">${l.name ? `<div class="nm">${esc(l.name)}</div>` : ""}<div class="tip">${t("ledger.printScanTip")}</div></div>`).join("")}</div>
+<div class="grid">${labels.map((l) => `<div class="label"><img src="${l.qr}" alt="QR" width="132" height="132" decoding="async">${l.name ? `<div class="nm">${esc(l.name)}</div>` : ""}<div class="tip">${t("ledger.printScanTip")}</div></div>`).join("")}</div>
 <script>window.print()<\/script></body></html>`;
             const w = window.open("", "_blank");
             if (!w) { showMessage(t("ledger.printBlocked"), 4000, "error"); return; }
@@ -227,7 +319,8 @@
                 if (!all.complete) { showMessage(t("ledger.loadIncomplete"), 5000, "error"); return; }
                 let list = all.rows;
                 if (query) list = list.filter((r) => rowMatchesSearch(r, query, sourceRef.columns));
-                list = sortRows(list, sortField, ascending);
+                const sortType = sortKey ? plugin.schemaCatalog?.[moduleId]?.columns?.find((column: any) => column.key === sortKey)?.type : undefined;
+                list = sortRows(list, sortField, ascending, sortType);
                 const cols = (plugin.schemaCatalog?.[moduleId]?.columns ?? []).filter((c: any) => sourceRef.columns![c.key]);
                 const label = (c: any) => (t(`field.${c.key}`) !== `field.${c.key}` ? t(`field.${c.key}`) : c.key);
                 const csv = buildCsv(cols.map(label), list.map((r) => cols.map((c: any) => cellText(r.cells[sourceRef.columns![c.key]], c.key, true))));
@@ -278,7 +371,7 @@
             if (vehicles.length === 0) {
                 const empty = document.createElement("div");
                 empty.className = "lv-empty";
-                const icon = document.createElement("div"); icon.className = "eic"; icon.textContent = "🚗";
+                const icon = document.createElement("div"); icon.className = "eic"; icon.innerHTML = uiIcon("car");
                 const title = document.createElement("b"); title.textContent = t("fuel.noVehicles");
                 const hint = document.createElement("span"); hint.textContent = t("fuel.noVehiclesHint");
                 const add = document.createElement("button"); add.className = "b3-button"; add.textContent = `+ ${t("fuel.addVehicle")}`;
@@ -645,6 +738,7 @@
                     async () => {
                         try {
                             let ok = 0;
+                            const importOperationKey = `ledger-import:${active}:${file.name}:${file.size}:${file.lastModified}`;
                             const failed: number[] = [];
                             const partial: number[] = [];
                             const pending: number[] = [];
@@ -652,10 +746,13 @@
                                 const row = plan.rows[i];
                                 let created = false;
                                 try {
-                                    const itemID = await addDetachedRow(ref!.avId!, row.name);
+                                    const rowOperationKey = `${importOperationKey}:row:${i}`;
+                                    const itemID = await addDetachedRow(ref!.avId!, row.name, { idempotencyKey: rowOperationKey });
                                     created = true;
                                     for (const c of row.cells) {
-                                        if (ref!.columns![c.key]) await setCell(ref!.avId!, ref!.columns![c.key], itemID, cellValue(c.type, c.value));
+                                        if (ref!.columns![c.key]) await setCell(ref!.avId!, ref!.columns![c.key], itemID, cellValue(c.type, c.value), {
+                                            idempotencyKey: `${rowOperationKey}:cell:${c.key}`,
+                                        });
                                     }
                                     ok++;
                                 } catch (e) {
@@ -694,53 +791,96 @@
     async function load() {
         const avID = ref?.avId;
         const request = ++loadRequest;
+        loadController?.abort();
+        const controller = new AbortController();
+        loadController = controller;
         loadError = "";
         rows = [];
         avCols = [];
-        if (!avID) { loading = false; return; }
+        if (!avID) {
+            if (plugin.pendingActivityTarget?.moduleId === active) {
+                plugin.pendingActivityTarget = undefined;
+                showMessage(t("activity.navigationUnavailable"), 4000, "error");
+            }
+            loading = false;
+            if (loadController === controller) loadController = undefined;
+            return;
+        }
         loading = true;
         try {
             // Bound each render request to the kernel page size.
             // 表格永远只显示前 50 行——改用分页聚合的 renderLedgerAll
-            const res = await renderLedgerAll(avID);
+            const res = await renderLedgerAll(avID, 200, {
+                signal: controller.signal,
+                latestKey: `ledger:${active}`,
+            });
             if (request !== loadRequest || avID !== ref?.avId) return;
             if (!res.complete) {
                 loadError = t("ledger.loadIncomplete");
+                if (plugin.pendingActivityTarget?.moduleId === active) {
+                    plugin.pendingActivityTarget = undefined;
+                    showMessage(t("activity.recordNotFound"), 4500, "error");
+                }
                 return;
             }
             rows = res.rows;
             avCols = res.columns ?? [];
+            const pendingTarget = plugin.pendingActivityTarget;
+            if (pendingTarget && pendingTarget.moduleId === active) {
+                const targetRow = rows.find((row) => row.itemID === pendingTarget.rowId);
+                requestAnimationFrame(() => {
+                    if (plugin.pendingActivityTarget?.requestId !== pendingTarget.requestId) return;
+                    plugin.pendingActivityTarget = undefined;
+                    if (!targetRow) {
+                        showMessage(t("activity.recordNotFound"), 4500, "error");
+                        return;
+                    }
+                    if (active !== pendingTarget.moduleId) return;
+                    openDetail(targetRow, undefined, pendingTarget);
+                });
+            }
         } catch (e) {
+            if (controller.signal.aborted || (e instanceof Error && (e.name === "RequestSupersededError" || e.name === "RequestAbortedError"))) return;
             if (request === loadRequest && avID === ref?.avId) {
                 loadError = t("ledger.readFailed").replace("${msg}", e instanceof Error ? e.message : String(e));
+                if (plugin.pendingActivityTarget?.moduleId === active) {
+                    plugin.pendingActivityTarget = undefined;
+                    showMessage(t("ledger.readFailed").replace("${msg}", e instanceof Error ? e.message : String(e)), 6000, "error");
+                }
             }
         } finally {
-            if (request === loadRequest) loading = false;
+            if (request === loadRequest) {
+                loadController = undefined;
+                loading = false;
+            }
         }
     }
     $effect(() => { void version; void active; void plugin.scan?.scannedAt; load(); });
 
-    // Capture form fields and enum options come from the schema.
-    // Asset and multi-value fields remain explicitly unsupported in this form.
+    // Keep the fast path small, while exposing every supported schema field in
+    // the expandable section below. Writes still follow the declared cell type.
     const captureCols = $derived.by(() => {
-        const schema = plugin.schemaCatalog?.[active];
-        if (!schema?.capture) return [] as { key: string; type: string; options?: string[]; labelKey?: string }[];
-        const cols: any[] = schema.columns ?? [];
-        const out: { key: string; type: string; options?: string[]; labelKey?: string }[] = [];
-        for (const key of schema.capture as string[]) {
-            const col = cols.find((c: any) => c.key === key);
-            if (col) out.push({ key: col.key, type: col.type, options: col.options, labelKey: col.labelKey });
-        }
-        return out;
+        return getCaptureFields(plugin.schemaCatalog?.[active]);
     });
-    const UNSUPPORTED_TYPES = ["asset", "mAsset", "mSelect"];
-    const supportableCols = $derived(captureCols.filter((e) => !UNSUPPORTED_TYPES.includes(e.type)));
-    const unsupportedCount = $derived(captureCols.filter((e) => UNSUPPORTED_TYPES.includes(e.type) && e.type !== "mAsset").length);
+    const schemaCols = $derived(plugin.schemaCatalog?.[active]?.columns ?? []);
+    const supportableCols = $derived(getFormFields(plugin.schemaCatalog?.[active]).filter((field) =>
+        !(active === "certs" && field.key.startsWith("x_cert_"))
+        && !(field.type === "relation" && field.key !== "member")));
+    const captureKeys = $derived(new Set(captureCols.map((field) => field.key)));
+    const additionalCols = $derived(supportableCols.filter((field) =>
+        !captureKeys.has(field.key)
+        && !(active === "certs" && (field.key.startsWith("x_cert_")
+            || ["holder_no", "issue_date", "issuance_rule", "store_place", "location", "copy_location", "note", "due"].includes(field.key)))));
+    const unsupportedCols = $derived(schemaCols.filter((field) =>
+        ["asset", "mSelect"].includes(field.type)
+        || (field.type === "relation" && field.key !== "member")));
+    const unsupportedCount = $derived(unsupportedCols.length);
     // Form values are keyed by schema key.
     let form: Record<string, any> = $state({});
     let nameInput: HTMLInputElement | undefined = $state();
     let newRecordOpen = $state(false);
     let closeAfterSave = $state(true);
+    let newRecordTrigger: HTMLElement | null = null;
     let savedDocId = $state("");
     let savedRecordName = $state("");
     const certificateProfile = $derived(active === "certs" && form.category ? getCertificateProfile(String(form.category)) : null);
@@ -764,14 +904,15 @@
     });
     const certificateAssetCols = $derived.by(() => active === "certs"
         ? [
-            ...(captureCols.find((col) => col.key === "attachments") ? [{ key: "attachments", type: "mAsset", labelKey: "field.attachments" }] : []),
+            ...schemaCols.filter((col) => col.key === "attachments" && col.type === "mAsset"),
             ...(certificateProfile?.columns.filter((col) => col.type === "mAsset") ?? []),
         ]
         : []);
     const quickAssetCols = $derived.by(() => {
         const seen = new Set<string>();
         const out: { key: string; type: string; labelKey?: string }[] = [];
-        for (const col of [...captureCols.filter((entry) => entry.type === "mAsset"), ...certificateAssetCols]) {
+        const genericAssetCols = schemaCols.filter((entry) => entry.type === "mAsset" && !entry.key.startsWith("x_cert_"));
+        for (const col of [...genericAssetCols, ...certificateAssetCols]) {
             if (seen.has(col.key)) continue;
             seen.add(col.key);
             out.push({ key: col.key, type: "mAsset", labelKey: col.labelKey });
@@ -781,11 +922,30 @@
     // Keep local files across partial failures; successful uploads are cached by asset path.
     let certificateFiles: Record<string, File[]> = $state({});
     let uploadedCertificateFiles: Record<string, { name: string; content: string }[]> = $state({});
+    const attachmentWriteKeys = new Map<string, { signature: string; key: string }>();
     let lastCertificateCategory = $state("");
     function fileFingerprint(file: File): string {
         return `${file.name}:${file.size}:${file.lastModified}`;
     }
+    /** Generate one stable operation id for a user action and its retries. */
+    function newOperationKey(prefix: string): string {
+        try { return `${prefix}:${crypto.randomUUID()}`; }
+        catch { return `${prefix}:${Date.now().toString(36)}:${Math.random().toString(36).slice(2)}`; }
+    }
+    const ledgerWriteChains = new WeakMap<object, Promise<unknown>>();
+    function enqueueLedgerWrite<T>(run: () => Promise<T>): Promise<T> {
+        const previous = ledgerWriteChains.get(plugin) ?? Promise.resolve();
+        const current = previous.then(run);
+        ledgerWriteChains.set(plugin, current.catch(() => undefined));
+        return current;
+    }
     function setCertificateFiles(key: string, files: File[]) {
+        const vehiclePhoto = active === "vehicles" && key === "attachments";
+        if (vehiclePhoto) {
+            const invalid = files.filter((file) => !file.type.startsWith("image/") || file.size > 5 * 1024 * 1024);
+            if (invalid.length) showMessage(t("vehicle.photoInvalid"), 4500, "error");
+            files = files.filter((file) => file.type.startsWith("image/") && file.size <= 5 * 1024 * 1024).slice(0, 1);
+        }
         const previous = certificateFiles[key] ?? [];
         const seen = new Set(previous.map(fileFingerprint));
         const unique = files.filter((file) => {
@@ -796,17 +956,33 @@
         });
         certificateFiles = { ...certificateFiles, [key]: [...previous, ...unique] };
     }
-    async function removeCertificateFile(key: string, source: "local" | "uploaded", index: number) {
+    async function removeCertificateFile(key: string, source: "local" | "uploaded", index: number, confirmed = false) {
+        // Removing an already-uploaded asset writes immediately to the kernel;
+        // require an explicit confirmation so a misclick cannot lose it.
+        if (source === "uploaded" && !confirmed) {
+            confirm(t("ledger.removeAttachment"), t("ledger.removeAttachmentConfirm"), () => {
+                void removeCertificateFile(key, source, index, true);
+            });
+            return;
+        }
         if (source === "local") {
             certificateFiles = { ...certificateFiles, [key]: (certificateFiles[key] ?? []).filter((_, i) => i !== index) };
         } else {
             const next = (uploadedCertificateFiles[key] ?? []).filter((_, i) => i !== index);
             if (pendingItemID && ref?.avId && ref.columns?.[key]) {
                 try {
+                    const signature = JSON.stringify(next.map(({ name, content }) => ({ name, content })));
+                    const slot = `${pendingItemID}:${key}`;
+                    let operation = attachmentWriteKeys.get(slot);
+                    if (!operation || operation.signature !== signature) {
+                        operation = { signature, key: newOperationKey(`ledger:${pendingItemID}:attachment:${key}`) };
+                        attachmentWriteKeys.set(slot, operation);
+                    }
                     await setCell(ref.avId, ref.columns[key], pendingItemID, {
                         type: "mAsset",
                         mAsset: next.map(({ name, content }) => ({ name, content })),
-                    });
+                    }, { idempotencyKey: operation.key, retries: 1 });
+                    attachmentWriteKeys.delete(slot);
                 } catch (e) {
                     showMessage(t("ledger.attachmentRemoveFailed").replace("${msg}", e instanceof Error ? e.message : String(e)), 5000, "error");
                     return;
@@ -840,12 +1016,32 @@
             // Saving prevents double submits; retries preserve the item ID and form values.
     let saving = $state(false);
     let saveError = $state("");
+    let validationAttempted = $state(false);
     let identityPending = $state(false); // 行已提交但身份未确认（D02）：禁止自动重试，防重复建行
+    let identityChecked = $state(false);
     let savedModule = $state(""); // Brief save confirmation state.
     let pendingItemID = $state<string | null>(null);
+    /** Stable key for one new-row submission. Retries after a timeout reuse it
+     * so addAttributeViewBlocks cannot create a second detached row. */
+    let recordOperationKey = $state<string | null>(null);
+    // Keep the duplicate-name confirmation single-flight.  The host confirm
+    // dialog is asynchronous while the form remains mounted, so without this
+    // guard a rapid double click could open multiple dialogs and create rows
+    // more than once after each confirmation.
+    let duplicateConfirmPending = $state(false);
 
     function onNewRecordKeydown(event: KeyboardEvent) {
-        if (!newRecordOpen || saving) return;
+        if (!newRecordOpen) return;
+        // The host duplicate-confirm dialog owns keyboard focus while it is open.
+        if (duplicateConfirmPending) return;
+        if (event.key === "Tab" && saving) {
+            // The form controls are disabled while saving. Keep keyboard focus
+            // inside the modal instead of allowing Tab to escape to the page.
+            event.preventDefault();
+            document.querySelector<HTMLElement>(".lv-record-modal.open[role='dialog']")?.focus();
+            return;
+        }
+        if (saving) return;
         if (event.key === "Escape") {
             event.preventDefault();
             closeNewRecord();
@@ -866,19 +1062,71 @@
     function fieldLabel(key: string): string {
         return t(`field.${key}`) !== `field.${key}` ? t(`field.${key}`) : key;
     }
+    function fieldMetaText(key: string | undefined): string {
+        if (!key) return "";
+        const value = t(key);
+        return value === key ? "" : value;
+    }
+    function captureValidationMessage(field: ColumnDef, issue: CaptureInputError): string {
+        return t(`capture.validation.${issue}`)
+            .replace("${field}", fieldLabel(field.key))
+            .replace("${min}", String(field.min ?? ""))
+            .replace("${max}", String(field.max ?? ""));
+    }
+    function formFieldError(field: ColumnDef): string {
+        if (!validationAttempted) return "";
+        const issue = validateCaptureInput(field, form[field.key]);
+        if (issue) return captureValidationMessage(field, issue);
+        if (field.type === "relation") {
+            const relationID = String(form[field.key] ?? "").trim();
+            if (relationID && !(plugin.settings.members ?? []).some((member) => member.avItemId === relationID)) return t("members.notLinked");
+        }
+        return "";
+    }
+    function focusCaptureField(key: string) {
+        const control = document.getElementById(`lv-new-${key}`);
+        const collapsed = control?.closest("details");
+        if (collapsed instanceof HTMLDetailsElement) collapsed.open = true;
+        requestAnimationFrame(() => control?.focus());
+    }
 
     function openNewRecord() {
         if (!ref?.avId) {
             showMessage(t("ledger.notProvisionedHint"), 4500, "info");
             return;
         }
+        newRecordTrigger = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+        validationAttempted = false;
+        saveError = "";
         newRecordOpen = true;
         requestAnimationFrame(() => nameInput?.focus());
+    }
+
+    function restoreNewRecordFocus() {
+        const trigger = newRecordTrigger;
+        newRecordTrigger = null;
+        requestAnimationFrame(() => {
+            if (trigger?.isConnected && !trigger.closest("[inert]")) trigger.focus();
+        });
     }
 
     function closeNewRecord() {
         if (saving) return;
         newRecordOpen = false;
+        restoreNewRecordFocus();
+    }
+
+    function openPendingLedger() {
+        if (!ref?.docId) return;
+        identityChecked = true;
+        closeNewRecord();
+        plugin.showTabDocs(ref.docId);
+    }
+
+    function discardUncertainDraft() {
+        resetForm();
+        identityChecked = false;
+        showMessage(t("ledger.uncertainDraftDiscarded"), 6000, "error");
     }
 
     function clearNewRecord() {
@@ -899,7 +1147,7 @@
             saving = true;
             try {
                 const { removeLedgerRows } = await import("@/core/siyuan");
-                await removeLedgerRows(ref!.avId!, [pendingItemID!]);
+                await removeLedgerRows(ref!.avId!, [pendingItemID!], { idempotencyKey: `ledger:discard:${pendingItemID}` });
                 resetForm();
                 await load();
                 try { await plugin.refreshHub([active]); } catch { /* cleanup succeeded; refresh is best effort */ }
@@ -947,7 +1195,7 @@
         lastCertificateCategory = "";
         certificateFiles = {};
         uploadedCertificateFiles = {};
-        saveError = ""; identityPending = false; pendingItemID = null;
+        saveError = ""; validationAttempted = false; identityPending = false; identityChecked = false; pendingItemID = null; recordOperationKey = null;
     }
 
     /** Format a cell for both the table and the detail drawer. */
@@ -1038,17 +1286,50 @@
     }
 
     // Row click opens a detail drawer; user content is assigned through DOM APIs.
-    function openDetail(row: any) {
+    function openDetail(row: any, vehicleAction?: "fuel" | "charging" | "maintenance" | "edit", activityTarget?: ActivityTarget) {
         if (!ref?.columns) return;
         // Show the row name in the drawer header, with a generic fallback.
         const detailTitle = (ref.columns.name && cellText(row.cells[ref.columns.name], "name")) || t("ledger.detail");
         const dlg = new Dialog({
             title: detailTitle,
             content: `<div class="b3-dialog__content b3-dialog__content--wrap" id="lv-detail-body" style="max-height:60vh;overflow:auto"></div>
-<div class="b3-dialog__action"><button class="b3-button b3-button--cancel" id="lv-detail-del">${t("delete")}</button><span style="flex:1"></span><button class="b3-button b3-button--cancel" id="lv-detail-card-copy">${t("ledger.copyAsImage")}</button><button class="b3-button b3-button--cancel" id="lv-detail-card-png">${t("ledger.downloadPng")}</button><button class="b3-button b3-button--cancel" id="lv-detail-card-text">${t("ledger.copyAsText")}</button><button class="b3-button b3-button--cancel" id="lv-detail-close">${t("cancel")}</button><button class="b3-button b3-button--text" id="lv-detail-edit">${t("members.edit")}</button><button class="b3-button" id="lv-detail-open">${t("ledger.openDoc")} →</button></div>`,
+<div class="b3-dialog__action lv-detail-actions"><button class="b3-button" id="lv-detail-edit">${t("ledger.detailEditAll")}</button><button class="b3-button b3-button--cancel" id="lv-detail-close">${t("close")}</button><details class="lv-detail-more"><summary class="b3-button b3-button--text">${t("ledger.detailMore")}</summary><div class="lv-detail-more-menu"><button class="b3-button b3-button--cancel" id="lv-detail-del">${t("delete")}</button><button class="b3-button b3-button--cancel" id="lv-detail-card-copy">${t("ledger.copyAsImage")}</button><button class="b3-button b3-button--cancel" id="lv-detail-card-png">${t("ledger.downloadPng")}</button><button class="b3-button b3-button--cancel" id="lv-detail-card-text">${t("ledger.copyAsText")}</button><button class="b3-button b3-button--cancel" id="lv-detail-open">${t("ledger.openDoc")} →</button></div></details></div>`,
             width: "520px",
         });
         const body = dlg.element.querySelector("#lv-detail-body") as HTMLElement;
+        const vehicleActionQueue = createVehicleActionQueue();
+        const showVehicleActionError = (error: string) =>
+            showMessage(t("ledger.logReadFailed") + " (" + error + ")", 6000, "error");
+        const markActivityLine = (line: HTMLElement) => {
+            if (!activityTarget?.activityId) return;
+            line.classList.add("lv-activity-target");
+            line.setAttribute("aria-current", "location");
+            line.tabIndex = -1;
+            line.style.cssText += ";border-radius:6px;background:var(--lv-accent-soft, var(--b3-theme-background-light));outline:2px solid var(--lv-accent, var(--b3-theme-primary));outline-offset:2px;padding:7px";
+            requestAnimationFrame(() => {
+                if (!dlg.element.isConnected || !line.isConnected) return;
+                line.scrollIntoView({ block: "center", behavior: matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth" });
+                line.focus({ preventScroll: true });
+            });
+        };
+        const registerVehicleAction = (action: VehicleQuickAction, target: HTMLButtonElement) => {
+            vehicleActionQueue.register(action, () => {
+                if (!body.contains(target)) return;
+                target.click();
+                target.scrollIntoView({ block: "nearest" });
+            });
+        };
+        const requestVehicleAction = (action: VehicleQuickAction, notifyQueued = true) => {
+            const result = vehicleActionQueue.request(action);
+            if (result.status === "queued" && notifyQueued) showMessage(t("vehicle.quickLoading"), 2500, "info");
+            else if (result.status === "failed") showVehicleActionError(result.error ?? "");
+        };
+        const failVehicleActions = (actions: readonly VehicleQuickAction[], error: unknown) => {
+            const detail = error instanceof Error ? error.message : String(error);
+            for (const action of actions) vehicleActionQueue.fail(action, detail);
+            showVehicleActionError(detail);
+        };
+        body.classList.toggle("lv-detail-body-vehicle", active === "vehicles");
         const rowCategory = active === "certs" ? selectCellContent(row.cells[ref.columns.category ?? ""]) : undefined;
         const activeCertFields = active === "certs" ? new Set(getCertificateProfile(rowCategory).fieldKeys) : null;
         const schemaCols: any[] = (plugin.schemaCatalog?.[active]?.columns ?? []).filter((col: any) =>
@@ -1063,6 +1344,138 @@
             k.textContent = colLabel(col);
             return k;
         }
+        /**
+         * Inline field editing keeps the detail view useful for quick corrections.
+         * Scalar cells are edited in place; relations, assets and blocks keep their
+         * dedicated actions so a click never opens an incomplete picker.
+         */
+        function inlineEditHint(): string {
+            const translated = t("ledger.inlineEditHint");
+            return translated === "ledger.inlineEditHint" ? "点击字段值即可编辑" : translated;
+        }
+        function inlineValue(value: HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement): any {
+            if (value instanceof HTMLInputElement && value.type === "checkbox") return value.checked;
+            return value.value;
+        }
+        function beginInlineEdit(col: any, keyID: string, line: HTMLElement, valueEl: HTMLElement) {
+            if (!EDITABLE.has(col.type) || line.dataset.lvEditing === "true") return;
+            valueEl.setAttribute("aria-hidden", "true");
+            line.dataset.lvEditing = "true";
+            const originalChildren = Array.from(line.children);
+            const current = rawFromValue(col.type, row.cells[keyID]);
+            const editor = document.createElement("div");
+            editor.className = "lv-inline-editor";
+            editor.style.cssText = "display:flex;align-items:center;gap:6px;flex:1;min-width:0;flex-wrap:wrap";
+            let control: HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement;
+            const longText = col.type === "text" && /(^|_)(note|memo|description|remark|address)($|_)/i.test(String(col.key));
+            if (col.type === "select") {
+                const select = document.createElement("select");
+                select.className = "b3-select";
+                select.style.cssText = "flex:1;min-width:140px";
+                select.add(new Option("", ""));
+                for (const opt of col.options ?? []) select.add(new Option(optLabel(t, col.key, opt), String(opt)));
+                select.value = String(current ?? "");
+                control = select;
+            } else if (longText) {
+                const area = document.createElement("textarea");
+                area.className = "b3-text-field";
+                area.rows = 2;
+                area.style.cssText = "flex:1;min-width:160px;resize:vertical";
+                area.value = String(current ?? "");
+                control = area;
+            } else {
+                const input = document.createElement("input");
+                input.className = col.type === "checkbox" ? "b3-switch" : "b3-text-field";
+                input.type = col.type === "checkbox" ? "checkbox" : col.type === "number" ? "number" : col.type === "date" ? "date" : col.type === "url" ? "url" : "text";
+                if (col.type === "checkbox") input.checked = !!current;
+                else input.value = String(current ?? "");
+                if (col.type === "number") input.step = "any";
+                input.style.cssText = col.type === "checkbox" ? "flex:0 0 auto" : "flex:1;min-width:140px";
+                control = input;
+            }
+            const actions = document.createElement("span");
+            actions.style.cssText = "display:inline-flex;gap:3px;flex:0 0 auto";
+            const save = document.createElement("button");
+            save.type = "button";
+            save.className = "b3-button b3-button--text";
+            save.style.cssText = "padding:3px 6px;font-size:12px";
+            save.textContent = t("save");
+            const cancel = document.createElement("button");
+            cancel.type = "button";
+            cancel.className = "b3-button b3-button--text";
+            cancel.style.cssText = "padding:3px 6px;font-size:12px";
+            cancel.textContent = t("cancel");
+            actions.append(save, cancel);
+            editor.append(control);
+            if (col.key === "contact" && control instanceof HTMLInputElement) {
+                const pick = document.createElement("button");
+                pick.type = "button";
+                pick.className = "b3-button b3-button--outline";
+                pick.style.cssText = "padding:3px 6px;font-size:12px";
+                pick.textContent = t("ledger.pickContact");
+                pick.onclick = () => pickFromContacts((picked) => { control.value = picked; });
+                editor.append(pick);
+            }
+            editor.append(actions);
+            control.setAttribute("aria-label", colLabel(col));
+            line.replaceChildren(...[originalChildren[0], editor]);
+            const restore = () => {
+                line.replaceChildren(...originalChildren);
+                delete line.dataset.lvEditing;
+                valueEl.removeAttribute("aria-hidden");
+            };
+            let writeOperation: { signature: string; key: string } | null = null;
+            cancel.onclick = restore;
+            const saveInline = async () => {
+                if (save.disabled) return;
+                const value = inlineValue(control);
+                if (col.type === "number" && value !== "" && !Number.isFinite(Number(value))) {
+                    showMessage(t("ledger.logInvalid"), 3000, "error");
+                    control.focus();
+                    return;
+                }
+                const original = rawFromValue(col.type, row.cells[keyID]);
+                const same = col.type === "checkbox" ? value === original : String(value) === String(original);
+                if (same) { restore(); return; }
+                save.disabled = true;
+                cancel.disabled = true;
+                control.disabled = true;
+                try {
+                    const nextCell = cellValue(col.type, value);
+                    const signature = JSON.stringify(nextCell);
+                    if (!writeOperation || writeOperation.signature !== signature) {
+                        writeOperation = { signature, key: newOperationKey(`ledger:inline:${row.itemID}:${keyID}`) };
+                    }
+                    await setCell(ref!.avId!, keyID, row.itemID, nextCell, {
+                        idempotencyKey: writeOperation.key,
+                        retries: 1,
+                    });
+                    writeOperation = null;
+                    row.cells[keyID] = nextCell;
+                    // Reload the table and reopen the same detail card so derived
+                    // sections (history, QR and vehicle summaries) stay in sync.
+                    await load();
+                    try { await plugin.refreshHub([active]); }
+                    catch (refreshError) { showMessage(t("ledger.refreshFailed").replace("${msg}", refreshError instanceof Error ? refreshError.message : String(refreshError)), 5000, "error"); }
+                    dlg.destroy();
+                    const fresh = rows.find((entry) => entry.itemID === row.itemID);
+                    if (fresh) openDetail(fresh);
+                    showMessage(t("ledger.editSaved"), 2500, "info");
+                } catch (error) {
+                    save.disabled = false;
+                    cancel.disabled = false;
+                    control.disabled = false;
+                    showMessage(t("ledger.saveFailed").replace("${msg}", error instanceof Error ? error.message : String(error)), 6000, "error");
+                }
+            };
+            save.onclick = () => { void saveInline(); };
+            control.addEventListener("keydown", (event) => {
+                const keyEvent = event as KeyboardEvent;
+                if (keyEvent.key === "Escape") { keyEvent.preventDefault(); restore(); }
+                else if (keyEvent.key === "Enter" && (!(control instanceof HTMLTextAreaElement) || keyEvent.ctrlKey || keyEvent.metaKey)) { keyEvent.preventDefault(); void saveInline(); }
+            });
+            requestAnimationFrame(() => control.focus());
+        }
         function addHistorySection() {
             const history = (plugin.runtime?.renewHistory?.[row.itemID] ?? []) as { from: string; to: string; at: string }[];
             if (history.length === 0) return;
@@ -1073,6 +1486,7 @@
             body.appendChild(head);
             for (const h of history) {
                 const line = document.createElement("div");
+                if (active === "vehicles") line.className = "lv-detail-wide";
                 line.style.cssText = "padding:2px 0;font-size:12.5px";
                 line.textContent = `${h.from} → ${h.to} · ${h.at.slice(0, 10)}`;
                 body.appendChild(line);
@@ -1195,13 +1609,14 @@
             for (const attCol of assetCols) {
                 const attKeyID = ref!.columns[attCol.key];
                 const attHead = document.createElement("div");
-                attHead.className = "ft__on-surface";
+                attHead.className = active === "vehicles" ? "ft__on-surface lv-detail-wide" : "ft__on-surface";
                 attHead.style.cssText = "margin-top:10px;padding-top:8px;border-top:1px solid var(--b3-border-color);font-size:12px";
                 attHead.textContent = colLabel(attCol);
                 body.appendChild(attHead);
                 const existing = (row.cells[attKeyID]?.mAsset ?? []) as { name?: string; content?: string }[];
                 for (const f of existing) {
                     const line = document.createElement("div");
+                    line.className = active === "vehicles" ? "lv-detail-wide" : "";
                     line.style.cssText = "padding:4px 0;font-size:12.5px;display:flex;gap:8px;align-items:center;flex-wrap:wrap";
                     const name = document.createElement("span");
                     name.style.cssText = "word-break:break-all;flex:1;min-width:120px";
@@ -1267,24 +1682,30 @@
                 }
                 if (existing.length === 0) {
                     const none = document.createElement("div");
-                    none.className = "ft__on-surface";
+                    none.className = active === "vehicles" ? "ft__on-surface lv-detail-wide" : "ft__on-surface";
                     none.style.cssText = "font-size:12.5px";
                     none.textContent = t("ledger.noAttachments");
                     body.appendChild(none);
                 }
                 const uploadBtn = document.createElement("button");
-                uploadBtn.className = "b3-button b3-button--outline";
+                uploadBtn.className = `b3-button b3-button--outline${active === "vehicles" ? " lv-detail-wide" : ""}`;
                 uploadBtn.style.cssText = "margin-top:6px;font-size:12px";
                 uploadBtn.textContent = t("ledger.upload");
                 const fileInput = document.createElement("input");
                 fileInput.type = "file";
-                fileInput.accept = "image/*,.pdf";
+                fileInput.accept = active === "vehicles" && attCol.key === "attachments" ? "image/*" : "image/*,.pdf";
                 fileInput.multiple = attCol.key === "attachments";
                 if (active === "certs" && attCol.key !== "attachments") fileInput.setAttribute("capture", "environment");
                 fileInput.style.display = "none";
                 uploadBtn.onclick = () => fileInput.click();
                 fileInput.onchange = async () => {
-                    const files = Array.from(fileInput.files ?? []);
+                    let files = Array.from(fileInput.files ?? []);
+                    if (files.length === 0) return;
+                    if (active === "vehicles" && attCol.key === "attachments") {
+                        const valid = files.filter((file) => file.type.startsWith("image/") && file.size <= 5 * 1024 * 1024);
+                        if (valid.length !== files.length) showMessage(t("vehicle.photoInvalid"), 4500, "error");
+                        files = valid.slice(0, 1);
+                    }
                     if (files.length === 0) return;
                     uploadBtn.disabled = true;
                     const failed: string[] = [];
@@ -1294,7 +1715,10 @@
                         for (const f of files) {
                             try {
                                 const { uploadAsset } = await import("@/core/siyuan");
-                                const { name, path } = await uploadAsset(f);
+                                const { name, path } = await uploadAsset(f, "/assets/siyuan-home/", {
+                                    idempotencyKey: `ledger:detail-asset:${row.itemID}:${attCol.key}:${fileFingerprint(f)}`,
+                                    retries: 1,
+                                });
                                 appended.push({ name, content: path });
                             } catch (e) {
                                 failed.push(`${f.name}: ${e instanceof Error ? e.message : String(e)}`);
@@ -1302,7 +1726,10 @@
                         }
                         if (appended.length !== existing.length) {
                             try {
-                                await setCell(ref!.avId!, attKeyID, row.itemID, { type: "mAsset", mAsset: appended });
+                                await setCell(ref!.avId!, attKeyID, row.itemID, { type: "mAsset", mAsset: appended }, {
+                                    idempotencyKey: `ledger:detail-asset-cell:${row.itemID}:${attCol.key}:${appended.map((asset) => asset.content).join("|")}`,
+                                    retries: 1,
+                                });
                                 delete pendingDetailAssets[attCol.key];
                                 const msg = failed.length ? t("ledger.uploadFailed").replace("${msg}", failed.join("; ")) : t("ledger.uploadDone");
                                 showMessage(msg, 5000, failed.length ? "error" : "info");
@@ -1324,7 +1751,7 @@
             }
             if (assetCols.length > 0) {
                 const hint = document.createElement("div");
-                hint.className = "ft__on-surface";
+                hint.className = active === "vehicles" ? "ft__on-surface lv-detail-wide" : "ft__on-surface";
                 hint.style.cssText = "font-size:12px;line-height:1.6;margin-top:6px";
                 hint.textContent = t("ledger.ocrHint");
                 body.appendChild(hint);
@@ -1335,12 +1762,23 @@
         function buildView() {
             body.innerHTML = "";
             cardRows = [];
+            const editAction = dlg.element.querySelector("#lv-detail-edit") as HTMLButtonElement;
+            const closeAction = dlg.element.querySelector("#lv-detail-close") as HTMLButtonElement;
+            editAction.textContent = t("ledger.detailEditAll");
+            editAction.onclick = () => buildEdit();
+            closeAction.textContent = t("close");
+            closeAction.onclick = () => dlg.destroy();
+            (dlg.element.querySelector(".lv-detail-more") as HTMLDetailsElement).hidden = false;
+            const intro = document.createElement("p");
+            intro.className = "lv-detail-wide lv-detail-intro";
+            intro.textContent = inlineEditHint();
+            body.append(intro);
             for (const col of schemaCols) {
                 const keyID = ref!.columns[col.key];
                 if (!keyID) continue;
                 const line = document.createElement("div");
-                line.className = "fn__flex";
-                line.style.cssText = "gap:10px;padding:4px 0;font-size:13px";
+                line.className = active === "vehicles" ? "fn__flex lv-detail-kv" : "fn__flex";
+                line.style.cssText = "gap:10px;padding:7px 0;font-size:13px;min-width:0";
                 line.append(labelSpan(col));
                 const v = document.createElement("span");
                 v.style.cssText = "word-break:break-all";
@@ -1412,9 +1850,29 @@
                         }
                     }
                 }
+            if (EDITABLE.has(col.type)) {
+                if (!v.textContent?.trim() || v.textContent === "—") {
+                    v.textContent = t("ledger.detailEmpty");
+                    v.classList.add("is-empty");
+                }
+                v.addEventListener("click", () => beginInlineEdit(col, keyID, line, v));
+                v.addEventListener("keydown", (event) => {
+                    if (event.key === "Enter" || event.key === " ") {
+                        event.preventDefault();
+                        beginInlineEdit(col, keyID, line, v);
+                    }
+                });
+                v.tabIndex = 0;
+                v.role = "button";
+                v.title = inlineEditHint();
+                v.classList.add("lv-detail-value");
+                v.setAttribute("aria-label", `${colLabel(col)}：${v.textContent}`);
+                v.style.cssText += ";cursor:text;min-height:22px;display:inline-flex;align-items:center;flex:1;min-width:0;border-radius:4px;padding:1px 4px;margin:-1px -4px;transition:background .15s ease";
+                v.dataset.lvEditable = "true";
+            }
                 line.append(v);
                 body.appendChild(line);
-                cardRows.push({ label: colLabel(col), value: String(v.textContent) });
+                cardRows.push({ label: colLabel(col), value: v.classList.contains("is-empty") ? "—" : String(v.textContent) });
             }
             // Append user-created columns outside the schema as a read-only section.
             const schemaKeyIDs = new Set(Object.values<string>(ref!.columns));
@@ -1427,7 +1885,7 @@
                 body.appendChild(head);
                 for (const c of customCols) {
                     const line = document.createElement("div");
-                    line.className = "fn__flex";
+                    line.className = active === "vehicles" ? "fn__flex lv-detail-wide" : "fn__flex";
                     line.style.cssText = "gap:10px;padding:4px 0;font-size:13px";
                     const k = document.createElement("span");
                     k.className = "ft__on-surface";
@@ -1437,6 +1895,22 @@
                     const v = document.createElement("span");
                     v.style.cssText = "word-break:break-all";
                     v.textContent = cellText(row.cells[c.id]);
+                    if (EDITABLE.has(c.type)) {
+                        if (!v.textContent?.trim() || v.textContent === "—") { v.textContent = t("ledger.detailEmpty"); v.classList.add("is-empty"); }
+                        v.addEventListener("click", () => beginInlineEdit({ ...c, key: c.id }, c.id, line, v));
+                        v.addEventListener("keydown", (event) => {
+                            if (event.key === "Enter" || event.key === " ") {
+                                event.preventDefault();
+                                beginInlineEdit({ ...c, key: c.id }, c.id, line, v);
+                            }
+                        });
+                        v.tabIndex = 0;
+                        v.role = "button";
+                        v.title = inlineEditHint();
+                        v.classList.add("lv-detail-value");
+                        v.setAttribute("aria-label", `${c.name}：${v.textContent}`);
+                        v.style.cssText += ";cursor:text;min-height:22px;display:inline-flex;align-items:center;flex:1;min-width:0;border-radius:4px;padding:1px 4px;margin:-1px -4px;transition:background .15s ease";
+                    }
                     line.append(v);
                     body.appendChild(line);
                 }
@@ -1446,6 +1920,7 @@
             title: string;
             emptyText: string;
             addLabel: string;
+            kind?: LogKind;
             fields: { key: string; type: "date" | "number" | "text"; placeholder: string; width: number }[];
             load: () => Promise<Record<string, any>[]>;
             add: (vals: Record<string, string>) => Promise<boolean>;
@@ -1460,6 +1935,10 @@
                 for (const e of loaded) {
                     const line = document.createElement("div");
                     line.style.cssText = "padding:2px 0;font-size:12.5px;display:flex;gap:6px;align-items:center";
+                    if (opts.kind) {
+                        line.dataset.lvActivityId = rowLogActivityId(active, row.itemID, opts.kind, e);
+                        if (line.dataset.lvActivityId === activityTarget?.activityId) markActivityLine(line);
+                    }
                     const text = document.createElement("span");
                     text.textContent = opts.format(e);
                     const del = document.createElement("button");
@@ -1641,6 +2120,7 @@
         async function addVehicleEnergySection() {
             if (!ref?.avId) return;
             const energyWrap = document.createElement("section");
+            energyWrap.id = "lv-vehicle-energy";
             energyWrap.style.cssText = "margin-top:12px;padding-top:10px;border-top:1px solid var(--b3-border-color)";
             body.appendChild(energyWrap);
             const hint = document.createElement("p");
@@ -1668,6 +2148,25 @@
                 const grid = document.createElement("div");
                 grid.style.cssText = "display:grid;grid-template-columns:repeat(auto-fit,minmax(145px,1fr));gap:10px 8px";
                 const controls: Record<string, HTMLInputElement | HTMLSelectElement> = {};
+                const fieldErrors: Record<string, HTMLSpanElement> = {};
+                const clearFieldErrors = () => {
+                    for (const [key, control] of Object.entries(controls)) {
+                        control.removeAttribute("aria-invalid");
+                        control.removeAttribute("aria-describedby");
+                        fieldErrors[key]?.replaceChildren();
+                    }
+                };
+                const markFieldError = (key: string, message: string): boolean => {
+                    const control = controls[key];
+                    if (!control) return false;
+                    control.setAttribute("aria-invalid", "true");
+                    const error = fieldErrors[key];
+                    if (error) {
+                        error.textContent = message;
+                        control.setAttribute("aria-describedby", error.id);
+                    }
+                    return true;
+                };
                 const field = (key: string, type: "date" | "number" | "text" | "select", opts?: string[]) => {
                     const label = document.createElement("label");
                     label.style.cssText = "display:flex;flex-direction:column;gap:4px;min-width:0;font-size:12px";
@@ -1683,7 +2182,18 @@
                         for (const value of opts ?? []) input.append(new Option(t(`fuel.option.${value}`), value));
                     }
                     controls[key] = input;
-                    label.append(caption, input);
+                    const error = document.createElement("span");
+                    error.id = `lv-energy-${key}-error`;
+                    error.className = "lv-field-error";
+                    error.setAttribute("role", "alert");
+                    error.style.cssText = "min-height:16px;color:var(--lv-danger);font-size:11px;line-height:1.35";
+                    fieldErrors[key] = error;
+                    input.addEventListener("input", () => {
+                        input.removeAttribute("aria-invalid");
+                        input.removeAttribute("aria-describedby");
+                        error.replaceChildren();
+                    });
+                    label.append(caption, input, error);
                     grid.appendChild(label);
                 };
                 field("date", "date");
@@ -1725,6 +2235,7 @@
                 const save = dialog.element.querySelector("#lv-energy-save") as HTMLButtonElement;
                 cancel.onclick = () => dialog.destroy();
                 save.onclick = async () => {
+                    clearFieldErrors();
                     const date = (controls.date as HTMLInputElement).value;
                     const odometer = Number((controls.odometer as HTMLInputElement).value);
                     const quantity = Number((controls.quantity as HTMLInputElement).value);
@@ -1734,7 +2245,16 @@
                     const totalCost = costText ? Number(costText) : undefined;
                     // Cost is optional for both fuel and charging. Users can
                     // record odometer/quantity first and fill the amount later.
-                    if (!date || !Number.isFinite(odometer) || odometer <= 0 || !Number.isFinite(quantity) || quantity <= 0 || (unitPrice !== undefined && (!Number.isFinite(unitPrice) || unitPrice < 0)) || (totalCost !== undefined && (!Number.isFinite(totalCost) || totalCost < 0))) {
+                    const invalid: string[] = [];
+                    if (!date) invalid.push("date");
+                    if (!Number.isFinite(odometer) || odometer <= 0) invalid.push("odometer");
+                    if (!Number.isFinite(quantity) || quantity <= 0) invalid.push("quantity");
+                    if (unitPrice !== undefined && (!Number.isFinite(unitPrice) || unitPrice < 0)) invalid.push("unitPrice");
+                    if (totalCost !== undefined && (!Number.isFinite(totalCost) || totalCost < 0)) invalid.push("totalCost");
+                    if (invalid.length) {
+                        const first = invalid[0];
+                        for (const key of invalid) markFieldError(key, t("fuel.invalidField").replace("${field}", t(`fuel.field.${key}`)));
+                        (controls[first] as HTMLElement)?.focus();
                         showMessage(t("fuel.invalidRecord"), 4000, "error");
                         return;
                     }
@@ -1750,11 +2270,11 @@
                             ...((controls.station as HTMLInputElement).value.trim() ? { station: (controls.station as HTMLInputElement).value.trim() } : {}),
                             ...((controls.note as HTMLInputElement).value.trim() ? { note: (controls.note as HTMLInputElement).value.trim() } : {}),
                         };
-                        const latest = await loadRowLogs(plugin as any);
                         const logKind = kind === "fuel" ? "fuelings" : "chargings";
-                        const base = existing ? removeEntry(latest, ref!.avId!, row.itemID, logKind, existing as unknown as Record<string, unknown>) : latest;
-                        const next = appendEntry(base, ref!.avId!, row.itemID, logKind, { ...entry, at: new Date().toISOString() });
-                        await saveRowLogs(plugin as any, next);
+                        const next = await updateRowLogs(plugin as any, (latest) => {
+                            const base = existing ? removeEntry(latest, ref!.avId!, row.itemID, logKind, existing as unknown as Record<string, unknown>) : latest;
+                            return appendEntry(base, ref!.avId!, row.itemID, logKind, { ...entry, at: new Date().toISOString() });
+                        });
                         logs = next;
                         dialog.destroy();
                         renderEnergy();
@@ -1794,10 +2314,12 @@
                     const head = document.createElement("div");
                     head.style.cssText = "display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap;margin-bottom:8px";
                     const heading = document.createElement("b"); heading.textContent = t(isFuel ? "fuel.fuelTitle" : "fuel.chargingTitle");
-                    const add = document.createElement("button"); add.className = "b3-button b3-button--outline"; add.textContent = `+ ${t(isFuel ? "fuel.addFuel" : "fuel.addCharging")}`;
+                    const add = document.createElement("button"); add.className = "b3-button b3-button--outline"; add.dataset.lvVehicleAction = kind;
+                    add.textContent = `+ ${t(isFuel ? "fuel.addFuel" : "fuel.addCharging")}`;
                     add.onclick = () => openEnergyForm(kind);
                     head.append(heading, add);
                     section.appendChild(head);
+                    registerVehicleAction(kind, add);
 
                     const statsGrid = document.createElement("div");
                     statsGrid.style.cssText = "display:grid;grid-template-columns:repeat(auto-fit,minmax(112px,1fr));gap:6px";
@@ -1877,12 +2399,18 @@
                     const historyTitle = document.createElement("div"); historyTitle.className = "ft__on-surface"; historyTitle.style.cssText = "font-size:11px;margin:10px 0 4px"; historyTitle.textContent = `${t("fuel.historyTitle")} · ${records.length}`;
                     section.appendChild(historyTitle);
                     const recent = [...records].reverse().slice(0, 5);
+                    if (activityTarget?.activityId) {
+                        const targetEntry = records.find((entry) => rowLogActivityId(active, row.itemID, kind === "fuel" ? "fuelings" : "chargings", entry as unknown as Record<string, unknown>) === activityTarget.activityId);
+                        if (targetEntry && !recent.includes(targetEntry)) recent.push(targetEntry);
+                    }
                     if (!recent.length) {
                         const empty = document.createElement("div"); empty.className = "ft__on-surface"; empty.style.fontSize = "12px"; empty.textContent = t("fuel.noRecords"); section.appendChild(empty);
                     }
                     for (const entry of recent) {
                         const line = document.createElement("div");
                         line.style.cssText = "display:flex;align-items:flex-start;justify-content:space-between;gap:6px;padding:6px 0;border-top:1px solid var(--b3-border-color);font-size:12px;flex-wrap:wrap";
+                    line.dataset.lvActivityId = rowLogActivityId(active, row.itemID, kind === "fuel" ? "fuelings" : "chargings", entry as unknown as Record<string, unknown>);
+                    if (line.dataset.lvActivityId === activityTarget?.activityId) markActivityLine(line);
                         const desc = document.createElement("span"); desc.style.cssText = "flex:1;min-width:180px;overflow-wrap:anywhere";
                         const volume = `${compactNumber(entry.quantity)} ${unit}`;
                         const type = isFuel ? (entry.fuelGrade ? t(`fuel.option.${entry.fuelGrade}`) : "") : (entry.chargingMode ? t(`fuel.option.${entry.chargingMode}`) : "");
@@ -1894,9 +2422,8 @@
                         del.onclick = () => confirm(t("fuel.deleteEntry"), t("fuel.deleteEntryConfirm"), async () => {
                             del.disabled = true;
                             try {
-                                const latest = await loadRowLogs(plugin as any);
-                                const next = removeEntry(latest, ref!.avId!, row.itemID, kind === "fuel" ? "fuelings" : "chargings", entry as unknown as Record<string, unknown>);
-                                await saveRowLogs(plugin as any, next); logs = next; renderEnergy();
+                                const next = await updateRowLogs(plugin as any, (latest) => removeEntry(latest, ref!.avId!, row.itemID, kind === "fuel" ? "fuelings" : "chargings", entry as unknown as Record<string, unknown>));
+                                logs = next; renderEnergy();
                                 try {
                                     await plugin.refreshHub(["vehicles"], true);
                                 } catch (refreshError) {
@@ -1919,6 +2446,7 @@
         async function addVehicleMaintenanceSection() {
             if (!ref?.avId) return;
             const wrap = document.createElement("section");
+            wrap.id = "lv-vehicle-maintenance";
             wrap.style.cssText = "margin-top:12px;padding-top:10px;border-top:1px solid var(--b3-border-color)";
             body.appendChild(wrap);
             let records = getEntries<MaintenanceRecord>(await loadRowLogs(plugin as any), ref.avId, row.itemID, "maintenance");
@@ -1938,6 +2466,7 @@
                 dialog.element.classList.add("lv-energy-dialog");
                 const form = dialog.element.querySelector("#lv-maintenance-form") as HTMLElement;
                 const controls: Record<string, HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement> = {};
+                const fieldErrors: Record<string, HTMLSpanElement> = {};
                 const addField = (key: string, type: "text" | "date" | "number" | "select" | "textarea", label: string, value = "", options?: string[]) => {
                     const rowEl = document.createElement("label");
                     rowEl.style.cssText = "display:flex;flex-direction:column;gap:4px;margin:0 0 9px";
@@ -1955,7 +2484,17 @@
                     }
                     input.id = `lv-maintenance-${key}`;
                     if (type !== "select") (input as HTMLInputElement | HTMLTextAreaElement).placeholder = label;
-                    rowEl.htmlFor = input.id; rowEl.append(caption, input); form.appendChild(rowEl); controls[key] = input;
+                    const error = document.createElement("span");
+                    error.id = `lv-maintenance-${key}-error`;
+                    error.className = "lv-field-error";
+                    error.setAttribute("role", "alert");
+                    error.style.cssText = "min-height:16px;color:var(--lv-danger);font-size:11px;line-height:1.35";
+                    input.addEventListener("input", () => {
+                        input.removeAttribute("aria-invalid");
+                        input.removeAttribute("aria-describedby");
+                        error.replaceChildren();
+                    });
+                    rowEl.htmlFor = input.id; rowEl.append(caption, input, error); form.appendChild(rowEl); controls[key] = input; fieldErrors[key] = error;
                 };
                 addField("category", "select", t("vehicle.maintenance.field.category"), existing?.category, categories);
                 addField("date", "date", t("vehicle.maintenance.field.date"), existing?.date ?? new Date().toISOString().slice(0, 10));
@@ -1970,13 +2509,35 @@
                 cancel.onclick = () => dialog.destroy();
                 save.onclick = async () => {
                     const value = (key: string) => String((controls[key] as HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement).value ?? "").trim();
+                    for (const [key, control] of Object.entries(controls)) {
+                        control.removeAttribute("aria-invalid");
+                        control.removeAttribute("aria-describedby");
+                        fieldErrors[key]?.replaceChildren();
+                    }
                     const category = value("category");
                     const date = value("date");
                     const odometer = Number(value("odometer"));
                     const costText = value("cost");
                     const nextDate = value("nextDate");
                     const nextOdometerText = value("nextOdometer");
-                    if (!category || !date || !(odometer > 0) || (costText !== "" && !(Number(costText) >= 0)) || (nextOdometerText !== "" && !(Number(nextOdometerText) > 0))) {
+                    const invalid: string[] = [];
+                    if (!category) invalid.push("category");
+                    if (!date) invalid.push("date");
+                    if (!Number.isFinite(odometer) || !(odometer > 0)) invalid.push("odometer");
+                    if (costText !== "" && (!Number.isFinite(Number(costText)) || Number(costText) < 0)) invalid.push("cost");
+                    if (nextDate && !/^\d{4}-\d{2}-\d{2}$/.test(nextDate)) invalid.push("nextDate");
+                    if (nextOdometerText !== "" && (!Number.isFinite(Number(nextOdometerText)) || !(Number(nextOdometerText) > 0))) invalid.push("nextOdometer");
+                    if (invalid.length) {
+                        for (const key of invalid) {
+                            const control = controls[key];
+                            const error = fieldErrors[key];
+                            if (control && error) {
+                                control.setAttribute("aria-invalid", "true");
+                                control.setAttribute("aria-describedby", error.id);
+                                error.textContent = t("vehicle.maintenance.invalidField").replace("${field}", t(`vehicle.maintenance.field.${key}`));
+                            }
+                        }
+                        (controls[invalid[0]] as HTMLElement | undefined)?.focus();
                         showMessage(t("vehicle.maintenance.invalid"), 3500, "error");
                         return;
                     }
@@ -1990,10 +2551,10 @@
                         ...(value("note") ? { note: value("note") } : {}),
                     };
                     try {
-                        const latest = await loadRowLogs(plugin as any);
-                        const base = existing ? removeEntry(latest, ref!.avId!, row.itemID, "maintenance", existing as unknown as Record<string, unknown>) : latest;
-                        const next = appendEntry(base, ref!.avId!, row.itemID, "maintenance", { ...entry, at: new Date().toISOString() });
-                        await saveRowLogs(plugin as any, next);
+                        const next = await updateRowLogs(plugin as any, (latest) => {
+                            const base = existing ? removeEntry(latest, ref!.avId!, row.itemID, "maintenance", existing as unknown as Record<string, unknown>) : latest;
+                            return appendEntry(base, ref!.avId!, row.itemID, "maintenance", { ...entry, at: new Date().toISOString() });
+                        });
                         records = getEntries<MaintenanceRecord>(next, ref!.avId!, row.itemID, "maintenance");
                         dialog.destroy(); render();
                         try {
@@ -2012,8 +2573,9 @@
                 wrap.replaceChildren();
                 const head = document.createElement("div"); head.style.cssText = "display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap;margin-bottom:8px";
                 const title = document.createElement("h3"); title.style.cssText = "font-size:14px;margin:0"; title.textContent = t("vehicle.maintenance.title");
-                const add = document.createElement("button"); add.className = "b3-button b3-button--outline"; add.textContent = `+ ${t("vehicle.maintenance.add")}`; add.onclick = () => openForm();
+                const add = document.createElement("button"); add.className = "b3-button b3-button--outline"; add.dataset.lvVehicleAction = "maintenance"; add.textContent = `+ ${t("vehicle.maintenance.add")}`; add.onclick = () => openForm();
                 head.append(title, add); wrap.appendChild(head);
+                registerVehicleAction("maintenance", add);
                 const stats = calculateMaintenanceStats(records, new Date().toISOString().slice(0, 10), Number.isFinite(currentOdometer) ? currentOdometer : undefined);
                 const summary = document.createElement("div"); summary.style.cssText = "display:grid;grid-template-columns:repeat(auto-fit,minmax(112px,1fr));gap:6px;margin-bottom:8px";
                 const metric = (label: string, value: string) => { const box = document.createElement("div"); box.style.cssText = "min-width:0;padding:8px;border-radius:8px;background:var(--b3-theme-background-light)"; const cap = document.createElement("span"); cap.className = "ft__on-surface"; cap.style.cssText = "display:block;font-size:11px;margin-bottom:3px"; cap.textContent = label; const val = document.createElement("b"); val.style.cssText = "font-size:14px;overflow-wrap:anywhere"; val.textContent = value; box.append(cap, val); summary.appendChild(box); };
@@ -2027,11 +2589,18 @@
                 const byCategory = Object.entries(stats.byCategory);
                 if (byCategory.length) { const line = document.createElement("div"); line.className = "ft__on-surface"; line.style.cssText = "font-size:11px;line-height:1.6;margin:0 0 6px"; line.textContent = `${t("vehicle.maintenance.byCategory")}：${byCategory.map(([key, value]) => `${categoryLabel(key)} ${value.count}${value.cost ? ` · ${formatMoney(value.cost)}` : ""}`).join(" · ")}`; wrap.appendChild(line); }
                 if (!records.length) { const empty = document.createElement("div"); empty.className = "ft__on-surface"; empty.style.cssText = "font-size:12px;line-height:1.6"; empty.textContent = t("vehicle.maintenance.empty"); wrap.appendChild(empty); return; }
-                for (const entry of [...records].reverse().slice(0, 8)) {
+                const recentRecords = [...records].reverse().slice(0, 8);
+                if (activityTarget?.activityId) {
+                    const targetEntry = records.find((entry) => rowLogActivityId(active, row.itemID, "maintenance", entry as unknown as Record<string, unknown>) === activityTarget.activityId);
+                    if (targetEntry && !recentRecords.includes(targetEntry)) recentRecords.push(targetEntry);
+                }
+                for (const entry of recentRecords) {
                     const line = document.createElement("div"); line.style.cssText = "display:flex;align-items:flex-start;justify-content:space-between;gap:6px;padding:6px 0;border-top:1px solid var(--b3-border-color);font-size:12px;flex-wrap:wrap";
+                    line.dataset.lvActivityId = rowLogActivityId(active, row.itemID, "maintenance", entry as unknown as Record<string, unknown>);
+                    if (line.dataset.lvActivityId === activityTarget?.activityId) markActivityLine(line);
                     const desc = document.createElement("span"); desc.style.cssText = "flex:1;min-width:180px;overflow-wrap:anywhere"; desc.textContent = `${entry.date} · ${categoryLabel(entry.category)} · ${formatAmount(entry.odometer)} ${t("fuel.km")}${entry.cost !== undefined ? ` · ${formatMoney(entry.cost)}` : ""}${entry.shop ? ` · ${entry.shop}` : ""}${entry.nextDate ? ` · ${t("vehicle.maintenance.nextDateShort")} ${entry.nextDate}` : ""}${entry.nextOdometer !== undefined ? ` · ${t("vehicle.maintenance.nextOdometerShort")} ${formatAmount(entry.nextOdometer)}` : ""}`;
                     const edit = document.createElement("button"); edit.className = "b3-button b3-button--text"; edit.style.cssText = "padding:0 4px;font-size:11px"; edit.textContent = t("members.edit"); edit.onclick = () => openForm(entry);
-                    const del = document.createElement("button"); del.className = "b3-button b3-button--text"; del.style.cssText = "padding:0 4px;font-size:11px"; del.textContent = t("delete"); del.onclick = () => confirm(t("vehicle.maintenance.delete"), t("vehicle.maintenance.deleteConfirm"), async () => { del.disabled = true; try { const latest = await loadRowLogs(plugin as any); const next = removeEntry(latest, ref!.avId!, row.itemID, "maintenance", entry as unknown as Record<string, unknown>); await saveRowLogs(plugin as any, next); records = getEntries<MaintenanceRecord>(next, ref!.avId!, row.itemID, "maintenance"); render(); try { await plugin.refreshHub(["vehicles"], true); } catch (refreshError) { showMessage(t("ledger.logSavedRefreshFailed").replace("${msg}", refreshError instanceof Error ? refreshError.message : String(refreshError)), 5000, "error"); } } catch (error) { del.disabled = false; showMessage(t("ledger.logDeleteFailed").replace("${msg}", error instanceof Error ? error.message : String(error)), 5000, "error"); } });
+                    const del = document.createElement("button"); del.className = "b3-button b3-button--text"; del.style.cssText = "padding:0 4px;font-size:11px"; del.textContent = t("delete"); del.onclick = () => confirm(t("vehicle.maintenance.delete"), t("vehicle.maintenance.deleteConfirm"), async () => { del.disabled = true; try { const next = await updateRowLogs(plugin as any, (latest) => removeEntry(latest, ref!.avId!, row.itemID, "maintenance", entry as unknown as Record<string, unknown>)); records = getEntries<MaintenanceRecord>(next, ref!.avId!, row.itemID, "maintenance"); render(); try { await plugin.refreshHub(["vehicles"], true); } catch (refreshError) { showMessage(t("ledger.logSavedRefreshFailed").replace("${msg}", refreshError instanceof Error ? refreshError.message : String(refreshError)), 5000, "error"); } } catch (error) { del.disabled = false; showMessage(t("ledger.logDeleteFailed").replace("${msg}", error instanceof Error ? error.message : String(error)), 5000, "error"); } });
                     line.append(desc, edit, del); wrap.appendChild(line);
                 }
             };
@@ -2049,6 +2618,7 @@
             const blockId = nameVal?.type === "block" ? nameVal.block?.id : undefined;
             const link = blockDeepLink(blockId || ref?.docId || "");
             const wrap = document.createElement("div");
+            if (active === "vehicles") wrap.className = "lv-detail-wide";
             wrap.style.cssText = "border-top:1px solid var(--b3-border-color);margin-top:10px;padding-top:10px";
             const head = document.createElement("p");
             head.style.cssText = "font-size:12px;margin:0 0 6px;color:var(--b3-theme-on-surface)";
@@ -2072,14 +2642,26 @@
             const at = () => new Date().toISOString();
             const fresh = () => rl.loadRowLogs(plugin as any);
             if (active === "vehicles") {
-                await addVehicleCostSummarySection();
-                await addVehicleEnergySection();
-                await addVehicleMaintenanceSection();
+                try {
+                    await addVehicleCostSummarySection();
+                } catch (error) {
+                    showVehicleActionError(error instanceof Error ? error.message : String(error));
+                }
+                try {
+                    await addVehicleEnergySection();
+                } catch (error) {
+                    failVehicleActions(["fuel", "charging"], error);
+                }
+                try {
+                    await addVehicleMaintenanceSection();
+                } catch (error) {
+                    failVehicleActions(["maintenance"], error);
+                }
             }
             // Keep the assets-real module ID aligned with the CSV import entry point.
             if (active === "assets-real") {
                 await addRowLogSection({
-                    title: t("ledger.valuations"), emptyText: t("ledger.noValuations"), addLabel: t("ledger.valAdd"),
+                    title: t("ledger.valuations"), emptyText: t("ledger.noValuations"), addLabel: t("ledger.valAdd"), kind: "valuations",
                     fields: [
                         { key: "date", type: "date", placeholder: "", width: 130 },
                         { key: "value", type: "number", placeholder: t("ledger.valValue"), width: 100 },
@@ -2087,14 +2669,14 @@
                     load: () => fresh().then((l) => rl.getValuations(l, ref!.avId!, row.itemID)),
                     add: async (v) => {
                         if (!Number.isFinite(Number(v.value))) { showMessage(t("ledger.logInvalid"), 3000, "error"); return false; }
-                        await rl.saveRowLogs(plugin as any, rl.appendValuation(await fresh(), ref!.avId!, row.itemID, v.date, Number(v.value), at()));
+                        await rl.updateRowLogs(plugin as any, (current) => rl.appendValuation(current, ref!.avId!, row.itemID, v.date, Number(v.value), at()));
                         return true;
                     },
-                    remove: async (e) => { await rl.saveRowLogs(plugin as any, rl.removeValuation(await fresh(), ref!.avId!, row.itemID, e.date)); },
+                    remove: async (e) => { await rl.updateRowLogs(plugin as any, (current) => rl.removeValuation(current, ref!.avId!, row.itemID, e.date)); },
                     format: (e) => `${e.date} · ${e.value}`,
                 });
                 await addRowLogSection({
-                    title: t("ledger.moves"), emptyText: t("ledger.noMoves"), addLabel: t("ledger.valAdd"),
+                    title: t("ledger.moves"), emptyText: t("ledger.noMoves"), addLabel: t("ledger.valAdd"), kind: "moves",
                     fields: [
                         { key: "date", type: "date", placeholder: "", width: 130 },
                         { key: "from", type: "text", placeholder: t("ledger.moveFrom"), width: 90 },
@@ -2103,10 +2685,10 @@
                     load: () => fresh().then((l) => rl.getEntries<any>(l, ref!.avId!, row.itemID, "moves")),
                     add: async (v) => {
                         if (!v.from || !v.to) { showMessage(t("ledger.logInvalid"), 3000, "error"); return false; }
-                        await rl.saveRowLogs(plugin as any, rl.appendEntry(await fresh(), ref!.avId!, row.itemID, "moves", { date: v.date, from: v.from, to: v.to, at: at() }));
+                        await rl.updateRowLogs(plugin as any, (current) => rl.appendEntry(current, ref!.avId!, row.itemID, "moves", { date: v.date, from: v.from, to: v.to, at: at() }));
                         return true;
                     },
-                    remove: async (e) => { await rl.saveRowLogs(plugin as any, rl.removeEntry(await fresh(), ref!.avId!, row.itemID, "moves", e)); },
+                    remove: async (e) => { await rl.updateRowLogs(plugin as any, (current) => rl.removeEntry(current, ref!.avId!, row.itemID, "moves", e)); },
                     format: (e) => `${e.date} · ${e.from} → ${e.to}`,
                 });
             } else if (active === "shopping") {
@@ -2139,7 +2721,7 @@
                     showMessage(t("ledger.logReadFailed").replace("${msg}", e instanceof Error ? e.message : String(e)), 5000, "error");
                 });
                 await addRowLogSection({
-                    title: t("ledger.deposits"), emptyText: t("ledger.noDeposits"), addLabel: t("ledger.valAdd"),
+                    title: t("ledger.deposits"), emptyText: t("ledger.noDeposits"), addLabel: t("ledger.valAdd"), kind: "deposits",
                     fields: [
                         { key: "date", type: "date", placeholder: "", width: 130 },
                         { key: "amount", type: "number", placeholder: t("ledger.depositAmt"), width: 100 },
@@ -2147,14 +2729,14 @@
                     load: () => fresh().then((l) => rl.getEntries<any>(l, ref!.avId!, row.itemID, "deposits")),
                     add: async (v) => {
                         if (!v.date || !Number.isFinite(Number(v.amount))) { showMessage(t("ledger.logInvalid"), 3000, "error"); return false; }
-                        await rl.saveRowLogs(plugin as any, rl.appendEntry(await fresh(), ref!.avId!, row.itemID, "deposits", { date: v.date, amount: Number(v.amount), at: at() }));
+                        await rl.updateRowLogs(plugin as any, (current) => rl.appendEntry(current, ref!.avId!, row.itemID, "deposits", { date: v.date, amount: Number(v.amount), at: at() }));
                         return true;
                     },
-                    remove: async (e) => { await rl.saveRowLogs(plugin as any, rl.removeEntry(await fresh(), ref!.avId!, row.itemID, "deposits", e)); },
+                    remove: async (e) => { await rl.updateRowLogs(plugin as any, (current) => rl.removeEntry(current, ref!.avId!, row.itemID, "deposits", e)); },
                     format: (e) => `${e.date} · +${e.amount}`,
                 });
                 await addRowLogSection({
-                    title: t("ledger.prices"), emptyText: t("ledger.noPrices"), addLabel: t("ledger.valAdd"),
+                    title: t("ledger.prices"), emptyText: t("ledger.noPrices"), addLabel: t("ledger.valAdd"), kind: "prices",
                     fields: [
                         { key: "date", type: "date", placeholder: "", width: 130 },
                         { key: "price", type: "number", placeholder: t("ledger.priceValue"), width: 90 },
@@ -2163,15 +2745,15 @@
                     load: () => fresh().then((l) => rl.getEntries<any>(l, ref!.avId!, row.itemID, "prices")),
                     add: async (v) => {
                         if (!Number.isFinite(Number(v.price))) { showMessage(t("ledger.logInvalid"), 3000, "error"); return false; }
-                        await rl.saveRowLogs(plugin as any, rl.appendEntry(await fresh(), ref!.avId!, row.itemID, "prices", { date: v.date, price: Number(v.price), channel: v.channel, at: at() }));
+                        await rl.updateRowLogs(plugin as any, (current) => rl.appendEntry(current, ref!.avId!, row.itemID, "prices", { date: v.date, price: Number(v.price), channel: v.channel, at: at() }));
                         return true;
                     },
-                    remove: async (e) => { await rl.saveRowLogs(plugin as any, rl.removeEntry(await fresh(), ref!.avId!, row.itemID, "prices", e)); },
+                    remove: async (e) => { await rl.updateRowLogs(plugin as any, (current) => rl.removeEntry(current, ref!.avId!, row.itemID, "prices", e)); },
                     format: (e) => `${e.date} · ${formatAmount(Number(e.price))}${e.channel ? ` · ${e.channel}` : ""}`,
                 });
             } else if (active === "schooling") {
                 await addRowLogSection({
-                    title: t("ledger.transfers"), emptyText: t("ledger.noTransfers"), addLabel: t("ledger.valAdd"),
+                    title: t("ledger.transfers"), emptyText: t("ledger.noTransfers"), addLabel: t("ledger.valAdd"), kind: "transfers",
                     fields: [
                         { key: "date", type: "date", placeholder: "", width: 130 },
                         { key: "from", type: "text", placeholder: t("ledger.transferFrom"), width: 90 },
@@ -2180,16 +2762,16 @@
                     load: () => fresh().then((l) => rl.getEntries<any>(l, ref!.avId!, row.itemID, "transfers")),
                     add: async (v) => {
                         if (!v.from || !v.to) { showMessage(t("ledger.logInvalid"), 3000, "error"); return false; }
-                        await rl.saveRowLogs(plugin as any, rl.appendEntry(await fresh(), ref!.avId!, row.itemID, "transfers", { date: v.date, from: v.from, to: v.to, at: at() }));
+                        await rl.updateRowLogs(plugin as any, (current) => rl.appendEntry(current, ref!.avId!, row.itemID, "transfers", { date: v.date, from: v.from, to: v.to, at: at() }));
                         return true;
                     },
-                    remove: async (e) => { await rl.saveRowLogs(plugin as any, rl.removeEntry(await fresh(), ref!.avId!, row.itemID, "transfers", e)); },
+                    remove: async (e) => { await rl.updateRowLogs(plugin as any, (current) => rl.removeEntry(current, ref!.avId!, row.itemID, "transfers", e)); },
                     format: (e) => `${e.date} · ${e.from} → ${e.to}`,
                 });
             } else if (active === "house") {
                 // Utility meter logs record usage as the positive delta from the previous reading.
                 await addRowLogSection({
-                    title: t("ledger.meters"), emptyText: t("ledger.noMeters"), addLabel: t("ledger.valAdd"),
+                    title: t("ledger.meters"), emptyText: t("ledger.noMeters"), addLabel: t("ledger.valAdd"), kind: "meters",
                     fields: [
                         { key: "date", type: "date", placeholder: "", width: 130 },
                         { key: "reading", type: "number", placeholder: t("ledger.meterReading"), width: 110 },
@@ -2197,16 +2779,16 @@
                     load: () => fresh().then((l) => rl.getMeterReadings(l, ref!.avId!, row.itemID)),
                     add: async (v) => {
                         if (!v.date || !Number.isFinite(Number(v.reading))) { showMessage(t("ledger.logInvalid"), 3000, "error"); return false; }
-                        await rl.saveRowLogs(plugin as any, rl.appendMeterReading(await fresh(), ref!.avId!, row.itemID, v.date, Number(v.reading), at()));
+                        await rl.updateRowLogs(plugin as any, (current) => rl.appendMeterReading(current, ref!.avId!, row.itemID, v.date, Number(v.reading), at()));
                         return true;
                     },
-                    remove: async (e) => { await rl.saveRowLogs(plugin as any, rl.removeMeterReading(await fresh(), ref!.avId!, row.itemID, e.date)); },
+                    remove: async (e) => { await rl.updateRowLogs(plugin as any, (current) => rl.removeMeterReading(current, ref!.avId!, row.itemID, e.date)); },
                     format: (e: any) => `${e.date} · ${e.reading}${typeof e.usage === "number" ? ` (${e.usage})` : ""}`,
                 });
             } else if (active === "travel-plan") {
                 // Certificate checks are appended and deduplicated by the row-log helper.
                 await addRowLogSection({
-                    title: t("ledger.checks"), emptyText: t("ledger.noChecks"), addLabel: t("ledger.valAdd"),
+                    title: t("ledger.checks"), emptyText: t("ledger.noChecks"), addLabel: t("ledger.valAdd"), kind: "checks",
                     fields: [
                         { key: "date", type: "date", placeholder: "", width: 130 },
                         { key: "result", type: "text", placeholder: t("ledger.checkResult"), width: 200 },
@@ -2214,16 +2796,16 @@
                     load: () => fresh().then((l) => rl.getEntries<any>(l, ref!.avId!, row.itemID, "checks")),
                     add: async (v) => {
                         if (!v.date || !v.result) { showMessage(t("ledger.logInvalid"), 3000, "error"); return false; }
-                        await rl.saveRowLogs(plugin as any, rl.appendEntry(await fresh(), ref!.avId!, row.itemID, "checks", { date: v.date, result: v.result, at: at() }));
+                        await rl.updateRowLogs(plugin as any, (current) => rl.appendEntry(current, ref!.avId!, row.itemID, "checks", { date: v.date, result: v.result, at: at() }));
                         return true;
                     },
-                    remove: async (e) => { await rl.saveRowLogs(plugin as any, rl.removeEntry(await fresh(), ref!.avId!, row.itemID, "checks", e)); },
+                    remove: async (e) => { await rl.updateRowLogs(plugin as any, (current) => rl.removeEntry(current, ref!.avId!, row.itemID, "checks", e)); },
                     format: (e) => `${e.date} · ${e.result}`,
                 });
             } else if (active === "media") {
                 // Book loans leave the return date empty while still borrowed.
                 await addRowLogSection({
-                    title: t("ledger.loans"), emptyText: t("ledger.noLoans"), addLabel: t("ledger.valAdd"),
+                    title: t("ledger.loans"), emptyText: t("ledger.noLoans"), addLabel: t("ledger.valAdd"), kind: "loans",
                     fields: [
                         { key: "date", type: "date", placeholder: "", width: 130 },
                         { key: "to", type: "text", placeholder: t("ledger.loanTo"), width: 100 },
@@ -2232,14 +2814,20 @@
                     load: () => fresh().then((l) => rl.getEntries<any>(l, ref!.avId!, row.itemID, "loans")),
                     add: async (v) => {
                         if (!v.date || !v.to) { showMessage(t("ledger.logInvalid"), 3000, "error"); return false; }
-                        await rl.saveRowLogs(plugin as any, rl.appendEntry(await fresh(), ref!.avId!, row.itemID, "loans", { date: v.date, to: v.to, back: v.back || "", at: at() }));
+                        await rl.updateRowLogs(plugin as any, (current) => rl.appendEntry(current, ref!.avId!, row.itemID, "loans", { date: v.date, to: v.to, back: v.back || "", at: at() }));
                         return true;
                     },
-                    remove: async (e) => { await rl.saveRowLogs(plugin as any, rl.removeEntry(await fresh(), ref!.avId!, row.itemID, "loans", e)); },
+                    remove: async (e) => { await rl.updateRowLogs(plugin as any, (current) => rl.removeEntry(current, ref!.avId!, row.itemID, "loans", e)); },
                     format: (e) => `${e.date} · ${t("ledger.loanTo")} ${e.to}${e.back ? ` · ${e.back} ${t("ledger.loanReturned")}` : ` · ${t("ledger.loanOut")}`}`,
                 });
             }
-        })();
+        })().catch((error) => {
+            if (active === "vehicles") {
+                failVehicleActions(["fuel", "charging", "maintenance"], error);
+            } else {
+                showMessage(t("ledger.logReadFailed") + " (" + (error instanceof Error ? error.message : String(error)) + ")", 6000, "error");
+            }
+        });
 
         // Modules with templates expose a document generation action.
         (async () => {
@@ -2293,21 +2881,33 @@
             btn.style.cssText = "margin-top:8px;font-size:12px";
             btn.textContent = t("ledger.rxToMedicine");
             let pendingMedicineID: string | null = null;
+            let medicineOperationKey: string | null = null;
             btn.onclick = () => {
                 if (btn.disabled) return;
                 confirm(t("ledger.rxToMedicine"), t("ledger.rxToMedicineBody").replace("${name}", name), async () => {
                     btn.disabled = true;
                     try {
                         const { addDetachedRow, setCell } = await import("@/core/siyuan");
-                        const itemID = pendingMedicineID ?? await addDetachedRow(medRef.avId!, name);
+                        if (!medicineOperationKey) medicineOperationKey = newOperationKey(`ledger:rx-to-medicine:${row.itemID}`);
+                        const itemID = pendingMedicineID ?? await addDetachedRow(medRef.avId!, name, {
+                            idempotencyKey: `${medicineOperationKey}:row`,
+                            retries: 1,
+                        });
                         pendingMedicineID = itemID;
                         const catKey = medRef.columns?.category;
-                        if (catKey) await setCell(medRef.avId!, catKey, itemID, selectCellValue("rx"));
+                        if (catKey) await setCell(medRef.avId!, catKey, itemID, selectCellValue("rx"), {
+                            idempotencyKey: `${medicineOperationKey}:category`,
+                            retries: 1,
+                        });
                         const memKey = medRef.columns?.member;
                         const relBlock = row.cells[ref!.columns.member]?.relation?.blockIDs?.[0];
-                        if (memKey && relBlock) await setCell(medRef.avId!, memKey, itemID, { type: "relation", relation: { blockIDs: [relBlock], contents: null } });
+                        if (memKey && relBlock) await setCell(medRef.avId!, memKey, itemID, { type: "relation", relation: { blockIDs: [relBlock], contents: null } }, {
+                            idempotencyKey: `${medicineOperationKey}:member`,
+                            retries: 1,
+                        });
                         showMessage(t("ledger.rxToMedicineDone").replace("${name}", name), 3000, "info");
                         pendingMedicineID = null;
+                        medicineOperationKey = null;
                     } catch (e) {
                         showMessage(t("ledger.rxToMedicineFailed").replace("${msg}", e instanceof Error ? e.message : String(e)), 6000, "error");
                         btn.disabled = false;
@@ -2332,6 +2932,8 @@
             btn.style.cssText = "margin-top:8px;font-size:12px";
             btn.textContent = t("ledger.stockIn");
             let pendingStockItemID: string | null = null;
+            let stockOperationKey: string | null = null;
+            let stockWrite: { itemID: string; value: number; idempotencyKey: string } | null = null;
             let stockInBusy = false;
             btn.onclick = async () => {
                 if (stockInBusy) return;
@@ -2369,17 +2971,44 @@
                         ok.disabled = true;
                         cancel.disabled = true;
                         try {
-                            if (matches[0]) {
-                                const cur = matches[0].cells[stockKey]?.number;
-                                const curVal = cur?.isNotEmpty && typeof cur.content === "number" ? cur.content : 0;
-                                await setCell(medRef.avId!, stockKey, matches[0].itemID, { type: "number", number: { content: curVal + qty, isNotEmpty: true } });
-                            } else {
-                                const itemID = pendingStockItemID ?? await addDetachedRow(medRef.avId!, name);
-                                pendingStockItemID = itemID;
-                                await setCell(medRef.avId!, stockKey, itemID, { type: "number", number: { content: qty, isNotEmpty: true } });
-                                pendingStockItemID = null;
-                            }
+                            await enqueueLedgerWrite(async () => {
+                                // Re-read at commit time so a dialog left open cannot
+                                // overwrite a newer stock quantity. The queue also
+                                // serializes two stock-in dialogs in this plugin.
+                                const latest = await renderLedgerAll(medRef.avId!);
+                                if (!latest.complete) throw new Error(t("ledger.loadIncomplete"));
+                                const latestMatches = nameKey
+                                    ? latest.rows.filter((r) => String(r.cells[nameKey]?.text?.content ?? "").trim() === name)
+                                    : [];
+                                const target = stockWrite ? { itemID: stockWrite.itemID, cells: {} } : latestMatches[0];
+                                if (!stockOperationKey) stockOperationKey = newOperationKey(`ledger:stock-in:${row.itemID}`);
+                                if (target) {
+                                    if (!stockWrite) {
+                                        const cur = target.cells[stockKey]?.number;
+                                        const curVal = cur?.isNotEmpty && typeof cur.content === "number" ? cur.content : 0;
+                                        stockWrite = { itemID: target.itemID, value: curVal + qty, idempotencyKey: `${stockOperationKey}:cell:${target.itemID}` };
+                                    }
+                                    await setCell(medRef.avId!, stockKey, stockWrite.itemID, { type: "number", number: { content: stockWrite.value, isNotEmpty: true } }, {
+                                        idempotencyKey: stockWrite.idempotencyKey,
+                                        retries: 1,
+                                    });
+                                } else {
+                                    const itemID = pendingStockItemID ?? await addDetachedRow(medRef.avId!, name, {
+                                        idempotencyKey: `${stockOperationKey}:row`,
+                                        retries: 1,
+                                    });
+                                    pendingStockItemID = itemID;
+                                    if (!stockWrite) stockWrite = { itemID, value: qty, idempotencyKey: `${stockOperationKey}:cell:${itemID}` };
+                                    await setCell(medRef.avId!, stockKey, stockWrite.itemID, { type: "number", number: { content: stockWrite.value, isNotEmpty: true } }, {
+                                        idempotencyKey: stockWrite.idempotencyKey,
+                                        retries: 1,
+                                    });
+                                    pendingStockItemID = null;
+                                }
+                            });
                             stockCommitted = true;
+                            stockOperationKey = null;
+                            stockWrite = null;
                             dialog.destroy();
                             btn.textContent = t("ledger.stockIn");
                             try {
@@ -2447,7 +3076,10 @@
                             b.disabled = true;
                             try {
                                 const { setCell } = await import("@/core/siyuan");
-                                await setCell(ref!.avId!, relKey, row.itemID, { type: "relation", relation: { blockIDs: [r.itemID], contents: null } });
+                                await setCell(ref!.avId!, relKey, row.itemID, { type: "relation", relation: { blockIDs: [r.itemID], contents: null } }, {
+                                    idempotencyKey: `ledger:renew-link:${row.itemID}:${r.itemID}`,
+                                    retries: 1,
+                                });
                                 picker.destroy();
                                 dlg.destroy();
                                 showMessage(t("ledger.linked").replace("${name}", String(cellText(r.cells[ref!.columns.name]))), 2500, "info");
@@ -2557,6 +3189,10 @@
         // Edit mode writes supported fields independently and reports partial failures.
         function buildEdit() {
             body.innerHTML = "";
+            body.scrollTop = 0;
+            const more = dlg.element.querySelector(".lv-detail-more") as HTMLDetailsElement;
+            more.open = false;
+            more.hidden = true;
             const inputs: { keyID: string; type: string; label: string; get: () => any }[] = [];
             for (const col of schemaCols) {
                 const keyID = ref!.columns[col.key];
@@ -2582,6 +3218,7 @@
                     if (col.type === "checkbox") { input.type = "checkbox"; input.checked = !!cur; input.className = "b3-switch"; }
                     control = input;
                 }
+                control.setAttribute("aria-label", colLabel(col));
                 wrap.append(control);
                 // Contact fields can use the shared contacts picker when available.
                 if (col.key === "contact" && control instanceof HTMLInputElement) {
@@ -2595,19 +3232,21 @@
                 body.appendChild(wrap);
                 inputs.push({ keyID, type: col.type, label: colLabel(col), get: () => (control instanceof HTMLInputElement && control.type === "checkbox" ? control.checked : control.value) });
             }
-            const saveBar = document.createElement("div");
-            saveBar.style.cssText = "display:flex;gap:8px;margin-top:10px";
-            const save = document.createElement("button");
-            save.className = "b3-button b3-button--text";
+            const errorBox = document.createElement("div");
+            errorBox.className = "lv-record-error";
+            errorBox.setAttribute("role", "alert");
+            errorBox.style.display = "none";
+            body.appendChild(errorBox);
+            const save = dlg.element.querySelector("#lv-detail-edit") as HTMLButtonElement;
             save.textContent = t("save");
-            const cancel = document.createElement("button");
-            cancel.className = "b3-button b3-button--outline";
+            const cancel = dlg.element.querySelector("#lv-detail-close") as HTMLButtonElement;
             cancel.textContent = t("cancel");
             cancel.onclick = () => buildView();
             save.onclick = async () => {
                 if (save.disabled) return;
                 save.disabled = true;
                 cancel.disabled = true;
+                errorBox.style.display = "none";
                 const failed: string[] = [];
                 let changed = 0;
                 let personChanged = false;
@@ -2620,7 +3259,12 @@
                         const same = e.type === "checkbox" ? v === orig : String(v) === String(orig);
                         if (same) continue;
                         try {
-                            await setCell(ref!.avId!, e.keyID, row.itemID, cellValue(e.type, v));
+                            const nextCell = cellValue(e.type, v);
+                            await setCell(ref!.avId!, e.keyID, row.itemID, nextCell, {
+                                idempotencyKey: `ledger:detail-edit:${row.itemID}:${e.keyID}:${JSON.stringify(nextCell)}`,
+                                retries: 1,
+                            });
+                            row.cells[e.keyID] = nextCell;
                             changed++;
                             if (personKeyID && e.keyID === personKeyID) personChanged = true;
                         } catch {
@@ -2634,9 +3278,20 @@
                             await saveRuntime(plugin, plugin.runtime);
                         } catch (err) {
                             plugin.runtime.favorSyncs = { ...(plugin.runtime.favorSyncs ?? {}), [row.itemID]: previousFavorSync };
-                            failed.push(t("ledger.runtimeSync"));
                             showMessage(t("ledger.saveFailed").replace("${msg}", err instanceof Error ? err.message : String(err)), 6000, "error");
                         }
+                    }
+                    if (failed.length > 0) {
+                        if (changed > 0) {
+                            await load();
+                            try { await plugin.refreshHub([active]); }
+                            catch (err) { showMessage(t("ledger.refreshFailed").replace("${msg}", err instanceof Error ? err.message : String(err)), 5000, "error"); }
+                        }
+                        errorBox.textContent = t("ledger.editSavePartial").replace("${fields}", failed.join(", "));
+                        errorBox.style.display = "block";
+                        save.disabled = false;
+                        cancel.disabled = false;
+                        return;
                     }
                     dlg.destroy();
                     if (changed > 0) {
@@ -2648,18 +3303,35 @@
                             showMessage(t("ledger.refreshFailed").replace("${msg}", err instanceof Error ? err.message : String(err)), 5000, "error");
                         }
                     }
-                    if (failed.length > 0) showMessage(t("ledger.savePartial").replace("${fields}", failed.join(", ")), 6000, "error");
-                    else if (changed > 0) showMessage(t("ledger.editSaved"), 2500, "info");
+                    if (changed > 0) showMessage(t("ledger.editSaved"), 2500, "info");
                 } catch (err) {
                     showMessage(t("ledger.saveFailed").replace("${msg}", err instanceof Error ? err.message : String(err)), 6000, "error");
                     save.disabled = false;
                     cancel.disabled = false;
                 }
             };
-            saveBar.append(save, cancel);
-            body.appendChild(saveBar);
         }
         buildView();
+        if (active === "vehicles") {
+            const quick = document.createElement("section");
+            quick.className = "lv-vehicle-quick-actions";
+            quick.style.cssText = "display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin:0 0 14px;padding:10px 12px;border:1px solid var(--b3-border-color);border-radius:8px;background:var(--b3-theme-background-light)";
+            const label = document.createElement("b"); label.textContent = t("vehicle.quickActions"); label.style.cssText = "font-size:12px;margin-right:2px";
+            quick.appendChild(label);
+            for (const action of ["fuel", "charging", "maintenance"] as const) {
+                const button = document.createElement("button");
+                button.className = "b3-button b3-button--outline";
+                button.textContent = t(`vehicle.quick.${action}`);
+                button.onclick = () => requestVehicleAction(action);
+                quick.appendChild(button);
+            }
+            body.prepend(quick);
+            if (vehicleAction === "edit") {
+                requestAnimationFrame(() => (dlg.element.querySelector("#lv-detail-edit") as HTMLButtonElement | null)?.click());
+            } else if (vehicleAction) {
+                requestAnimationFrame(() => requestVehicleAction(vehicleAction));
+            }
+        }
         (dlg.element.querySelector("#lv-detail-close") as HTMLButtonElement).onclick = () => dlg.destroy();
         (dlg.element.querySelector("#lv-detail-edit") as HTMLButtonElement).onclick = () => buildEdit();
         (dlg.element.querySelector("#lv-detail-open") as HTMLButtonElement).onclick = () => { dlg.destroy(); plugin.showTabDocs(ref?.docId); };
@@ -2709,7 +3381,10 @@
             confirm(t("ledger.delTitle"), t("ledger.delBody").replace("${name}", cellText(row.cells[ref.columns.name])), async () => {
                 try {
                     const { removeLedgerRows, } = await import("@/core/siyuan");
-                    await removeLedgerRows(ref!.avId!, [row.itemID]);
+                    await removeLedgerRows(ref!.avId!, [row.itemID], {
+                        idempotencyKey: `ledger:delete:${ref!.avId!}:${row.itemID}`,
+                        retries: 1,
+                    });
                 } catch (e) {
                     showMessage(t("ledger.delFailed").replace("${msg}", e instanceof Error ? e.message : String(e)), 6000, "error");
                     return;
@@ -2717,6 +3392,22 @@
                 showMessage(t("ledger.delDone"), 2500, "info");
                 dlg.destroy();
                 const followupErrors: string[] = [];
+                try {
+                    const memberRef = plugin.settings.dbRefs.members;
+                    if (memberRef?.avId === ref!.avId) {
+                        const linkedMembers = (plugin.settings.members ?? []).filter((member) => member.avItemId === row.itemID);
+                        if (linkedMembers.length) {
+                            for (const member of linkedMembers) {
+                                member.avItemId = undefined;
+                                member.syncError = "ledger row deleted";
+                                member.avRowCreatePending = undefined;
+                            }
+                            await saveSettings(plugin, plugin.settings);
+                        }
+                    }
+                } catch (e) {
+                    followupErrors.push(`${t("ledger.memberLinkCleanupFailed")} (${e instanceof Error ? e.message : String(e)})`);
+                }
                 try {
                     // Clean orphaned runtime state after deleting the row.
                     const { cleanupRowRuntimeData } = await import("@/core/hub/runtime");
@@ -2729,9 +3420,8 @@
                 }
                 try {
                     // Remove child row-log records as well.
-                    const { loadRowLogs, saveRowLogs, removeRowLog } = await import("@/core/rowlog");
-                    const logs = removeRowLog(await loadRowLogs(plugin as any), ref!.avId!, row.itemID);
-                    await saveRowLogs(plugin as any, logs);
+                    const { updateRowLogs, removeRowLog } = await import("@/core/rowlog");
+                    await updateRowLogs(plugin as any, (current) => removeRowLog(current, ref!.avId!, row.itemID));
                 } catch (e) {
                     followupErrors.push(e instanceof Error ? e.message : String(e));
                 }
@@ -2748,7 +3438,8 @@
     }
 
     async function createRow() {
-        if (!ref?.avId || saving || identityPending) return;
+        if (!ref?.avId || saving || identityPending || duplicateConfirmPending) return;
+        validationAttempted = true;
         if (!hasAnyInput) {
             nameInput?.focus();
             showMessage(t("ledger.nameRequired"), 4000, "info");
@@ -2765,16 +3456,32 @@
             showMessage(saveError, 4000, "info");
             return;
         }
+        if (active === "certs" && form.x_cert_id_number && idcardCheck && !idcardCheck.ok) {
+            saveError = t("ledger.idcardBad").replace("${reason}", t(`ledger.idcardReason.${idcardCheck.reason ?? "format"}`));
+            focusCaptureField("x_cert_id_number");
+            showMessage(saveError, 4500, "error");
+            return;
+        }
+        for (const field of supportableCols) {
+            const error = formFieldError(field);
+            if (!error) continue;
+            saveError = error;
+            focusCaptureField(field.key);
+            showMessage(saveError, 4500, "error");
+            return;
+        }
         // D24（UG04 数据质量）：同名行确认——对照已加载行（render 窗口）提示同名数，确认可继续；D06 成员同名确认同款交互
         const dupName = String(form.name ?? "").trim();
         const nameKey = ref.columns?.name;
         if (dupName && !pendingItemID && nameKey) {
             const dupCount = rows.filter((r) => cellText(r.cells[nameKey]) === dupName).length;
             if (dupCount > 0) {
+                duplicateConfirmPending = true;
                 confirm(
                     t("ledger.dupTitle"),
                     t("ledger.dupBody").replace("${name}", dupName).replace("${n}", String(dupCount)),
-                    () => { void doCreateRow(); },
+                    () => { duplicateConfirmPending = false; void doCreateRow(); },
+                    () => { duplicateConfirmPending = false; },
                 );
                 return;
             }
@@ -2786,9 +3493,15 @@
         if (!ref?.avId || saving || identityPending) return;
         saving = true;
         saveError = "";
+        if (!recordOperationKey) {
+            try { recordOperationKey = `ledger:${crypto.randomUUID()}`; }
+            catch { recordOperationKey = `ledger:${Date.now().toString(36)}:${Math.random().toString(36).slice(2)}`; }
+        }
         try {
             // 重试路径：部分字段失败时复用已建行（补写同一行，不重复建行）
-            const itemID = pendingItemID ?? await addDetachedRow(ref.avId, String(form.name ?? "").trim() || t("ledger.unnamed"));
+            const itemID = pendingItemID ?? await addDetachedRow(ref.avId, String(form.name ?? "").trim() || t("ledger.unnamed"), {
+                idempotencyKey: `${recordOperationKey}:row`,
+            });
             pendingItemID = itemID;
             const cols = ref.columns ?? {};
             const failed: string[] = [];
@@ -2803,7 +3516,9 @@
                     return;
                 }
                 try {
-                    await setCell(ref.avId!, key, itemID, value);
+                    await setCell(ref.avId!, key, itemID, value, {
+                        idempotencyKey: `${recordOperationKey}:cell:${key}`,
+                    });
                 } catch {
                     failed.push(label); // Preserve the field value for retry.
                 }
@@ -2821,9 +3536,9 @@
                 if (e.type === "number" && isNaN(Number(v))) continue;
                 await tryCell(t(`field.${e.key}`), cols[e.key], cellValue(e.type, v));
             }
-            // Certificate attachments are uploaded before mAsset references are written.
+            // Image attachments are uploaded before mAsset references are written.
             // Successful uploads remain cached so retries do not duplicate them.
-            if (active === "certs") {
+            if (quickAssetCols.length > 0) {
                 for (const target of quickAssetCols) {
                     const previous = uploadedCertificateFiles[target.key] ?? [];
                     const uploaded = [...previous];
@@ -2835,7 +3550,9 @@
                     for (const file of certificateFiles[target.key] ?? []) {
                         try {
                             const { uploadAsset } = await import("@/core/siyuan");
-                            const { name, path } = await uploadAsset(file);
+                            const { name, path } = await uploadAsset(file, "/assets/siyuan-home/", {
+                                idempotencyKey: `${recordOperationKey}:asset:${target.key}:${fileFingerprint(file)}`,
+                            });
                             uploaded.push({ name, content: path });
                         } catch (e) {
                             failed.push(`${t(`field.${target.key}`)}: ${file.name} (${e instanceof Error ? e.message : String(e)})`);
@@ -2853,7 +3570,9 @@
             }
             // Fill the schema default status, falling back to the first enum option.
             const statusCol = (plugin.schemaCatalog?.[active]?.columns ?? []).find((c: any) => c.key === "status");
-            if (statusCol?.options?.length) await tryCell(t("field.status"), cols.status, selectCellValue(statusCol.default ?? statusCol.options[0]));
+            if (statusCol?.options?.length && (form.status === undefined || form.status === "")) {
+                await tryCell(t("field.status"), cols.status, selectCellValue(statusCol.default ?? statusCol.options[0]));
+            }
             if (failed.length > 0) {
                 // Preserve input and item ID so a retry updates the same row.
                 saveError = t("ledger.savePartial").replace("${fields}", failed.join(", "));
@@ -2866,7 +3585,10 @@
                 // Brief save confirmation keeps the user in the recording flow.
                 savedModule = active;
                 setTimeout(() => { savedModule = ""; }, 8000);
-                if (closeAfterSave) newRecordOpen = false;
+                if (closeAfterSave) {
+                    newRecordOpen = false;
+                    restoreNewRecordFocus();
+                }
             }
             await load();
             try {
@@ -2887,11 +3609,24 @@
             saving = false;
         }
     }
+
+    function vehicleImageHref(row: any): string {
+        if (active !== "vehicles" || !ref?.columns?.attachments) return "";
+        const cell = row.cells?.[ref.columns.attachments];
+        const asset = Array.isArray(cell?.mAsset) ? cell.mAsset.find((item: any) => isImageAsset(String(item?.content ?? ""))) : undefined;
+        if (!asset?.content) return "";
+        try { return assetHref(String(asset.content)); } catch { return ""; }
+    }
+
+    function vehicleText(row: any, key: string): string {
+        const id = ref?.columns?.[key];
+        return id ? cellText(row.cells?.[id], key) : "—";
+    }
 </script>
 
 <div class="lv-hero"><h1>{t("ledger.title")}</h1><p>{t("ledger.subtitle")}</p></div>
 
-<div class="lv-toolbar" style="margin:14px 0">
+<div class="lv-toolbar lv-ledger-toolbar" style="margin:14px 0">
     {#if ledgers.length > 0}
         <!-- Switching modules clears the previous search query. -->
         <select class="b3-select" value={active} onchange={switchLedger}>
@@ -2914,28 +3649,22 @@
         <button class="b3-button" onclick={rebuildLedger}>{t("ledger.rebuild")}</button>
     {:else}
         <input class="b3-text-field" style="width:150px" type="search" placeholder={t("ledger.search")}
-            bind:value={searchText} title={t("ledger.search")} />
-        <button class="b3-button b3-button--outline" title={t("ledger.exportCsvTip")}
-            disabled={filteredRows.length === 0 || exporting || printing} aria-busy={exporting} onclick={exportCsv}>{exporting ? t("ledger.saving") : t("ledger.exportCsv")}</button>
-        <!-- 246 波：QR 标签打印页（扫码直达对应行） -->
-        <button class="b3-button b3-button--outline" title={t("ledger.printLabels")}
-            disabled={filteredRows.length === 0 || printing || exporting} aria-busy={printing} onclick={printLabels}>{printing ? t("ledger.saving") : t("ledger.printLabels")}</button>
-        {#if active === "vehicles"}
-            <button class="b3-button b3-button--outline" onclick={openEnergyDashboard}>{t("fuel.dashboardButton")}</button>
-        {/if}
-        {#if active === "parenting"}
-            <button class="b3-button b3-button--outline" onclick={openGrowthChart}>{t("ledger.growthChart")}</button>
-        {/if}
-        {#if active === "stock"}
-            <!-- Low-stock purchasing suggestions. -->
-            <button class="b3-button b3-button--outline" onclick={openShoppingList}>{t("ledger.shoppingList")}</button>
-        {/if}
-        {#if active !== "members" && active !== "adhoc"}
-            <!-- Schema-driven CSV import is available for supported ledgers. -->
-            <button class="b3-button b3-button--outline" disabled={printing || exporting} onclick={openCsvImport}>{t("ledger.importCsv")}</button>
-        {/if}
-        <button class="b3-button b3-button--outline" onclick={() => plugin.showTabDocs(ref?.docId)}>{t("ledger.openDoc")} →</button>
+            bind:value={searchText} oninput={(event) => { panelMemory.ledgerSearch = event.currentTarget.value; }} title={t("ledger.search")} />
         <button class="lv-btn primary" onclick={openNewRecord} disabled={rebuilding}>＋ {t("ledger.newRecord")}</button>
+        <details class="lv-ledger-more">
+            <summary class="b3-button b3-button--outline">{t("ledger.moreActions")}</summary>
+            <div class="lv-ledger-more__menu">
+                <button class="b3-button b3-button--outline" title={t("ledger.exportCsvTip")}
+                    disabled={filteredRows.length === 0 || exporting || printing} aria-busy={exporting} onclick={exportCsv}>{exporting ? t("ledger.saving") : t("ledger.exportCsv")}</button>
+                <button class="b3-button b3-button--outline" title={t("ledger.printLabels")}
+                    disabled={filteredRows.length === 0 || printing || exporting} aria-busy={printing} onclick={printLabels}>{printing ? t("ledger.saving") : t("ledger.printLabels")}</button>
+                {#if active === "vehicles"}<button class="b3-button b3-button--outline" onclick={openEnergyDashboard}>{t("fuel.dashboardButton")}</button>{/if}
+                {#if active === "parenting"}<button class="b3-button b3-button--outline" onclick={openGrowthChart}>{t("ledger.growthChart")}</button>{/if}
+                {#if active === "stock"}<button class="b3-button b3-button--outline" onclick={openShoppingList}>{t("ledger.shoppingList")}</button>{/if}
+                {#if active !== "members" && active !== "adhoc"}<button class="b3-button b3-button--outline" disabled={printing || exporting} onclick={openCsvImport}>{t("ledger.importCsv")}</button>{/if}
+                <button class="b3-button b3-button--outline" onclick={() => plugin.showTabDocs(ref?.docId)}>{t("ledger.openDoc")} →</button>
+            </div>
+        </details>
     {/if}
 </div>
 
@@ -2948,53 +3677,101 @@
 
 <div class="lv-mask" class:open={newRecordOpen} aria-hidden="true" onclick={closeNewRecord}></div>
 <svelte:window onkeydown={onNewRecordKeydown} />
-<div class="lv-modal lv-record-modal" class:open={newRecordOpen} role="dialog" aria-modal="true" aria-label={t("ledger.newRecord")} inert={!newRecordOpen}>
+<div class="lv-modal lv-record-modal" class:open={newRecordOpen} role="dialog" aria-modal="true" aria-labelledby="lv-new-record-title" aria-busy={saving || duplicateConfirmPending} tabindex="-1" inert={!newRecordOpen || duplicateConfirmPending}>
     <div class="lv-sheet lv-record-sheet">
         <div class="lv-sheet-head">
             <div class="lv-record-title">
-                <b>{t("ledger.newRecordTitle").replace("${module}", t(`module.${active}`) !== `module.${active}` ? t(`module.${active}`) : active)}</b>
+                <b id="lv-new-record-title">{t("ledger.newRecordTitle").replace("${module}", t(`module.${active}`) !== `module.${active}` ? t(`module.${active}`) : active)}</b>
                 <span>{t("ledger.newRecordIntro")}</span>
             </div>
-            <button class="lv-iconbtn" aria-label={t("cancel")} title={t("cancel")} onclick={closeNewRecord} disabled={saving}>×</button>
+            <button class="lv-iconbtn" aria-label={t("ledger.closeKeepDraft")} title={t("ledger.closeKeepDraft")} onclick={closeNewRecord} disabled={saving}><UiIcon name="close" size={16} /></button>
         </div>
         <div class="lv-sheet-body lv-record-body">
             <section class="lv-record-section">
                 <h3>{t("ledger.newRecordBasic")}</h3>
                 <div class="lv-record-grid">
-                    {#each supportableCols as e (e.key)}
+                    {#each captureCols as e (e.key)}
                         <div class="lv-record-field" class:lv-record-field-wide={e.key === "name" || e.type === "url"}>
-                            <label for="lv-new-{e.key}">{fieldLabel(e.key)}{e.key === "name" || (active === "certs" && e.key === "category") ? " *" : ""}</label>
+                            {#if e.type !== "checkbox"}<label for="lv-new-{e.key}">{fieldLabel(e.key)}{e.required || (active === "certs" && e.key === "category") ? " *" : ""}</label>{/if}
                             {#if e.type === "select"}
-                                <select id="lv-new-{e.key}" class="b3-select" bind:value={form[e.key]} onfocus={active === "certs" && e.key === "category" ? () => { lastCertificateCategory = String(form.category ?? ""); } : undefined} onchange={active === "certs" && e.key === "category" ? (event) => handleCertificateCategoryChange((event.currentTarget as HTMLSelectElement).value) : undefined} disabled={saving || identityPending}>
+                                <select id="lv-new-{e.key}" class="b3-select" bind:value={form[e.key]} onfocus={active === "certs" && e.key === "category" ? () => { lastCertificateCategory = String(form.category ?? ""); } : undefined} onchange={active === "certs" && e.key === "category" ? (event) => handleCertificateCategoryChange((event.currentTarget as HTMLSelectElement).value) : undefined} disabled={saving || identityPending} aria-invalid={!!formFieldError(e)} aria-describedby={formFieldError(e) ? `lv-new-${e.key}-error` : undefined}>
                                     <option value="">{fieldLabel(e.key)}</option>
                                     {#each e.options ?? [] as opt (opt)}
                                         <option value={opt}>{t(`field.${e.key}.opt.${opt}`) !== `field.${e.key}.opt.${opt}` ? t(`field.${e.key}.opt.${opt}`) : opt}</option>
                                     {/each}
                                 </select>
                             {:else if e.type === "relation"}
-                                <select id="lv-new-{e.key}" class="b3-select" bind:value={form[e.key]} disabled={saving || identityPending}>
+                                <select id="lv-new-{e.key}" class="b3-select" bind:value={form[e.key]} disabled={saving || identityPending} aria-invalid={!!formFieldError(e)} aria-describedby={formFieldError(e) ? `lv-new-${e.key}-error` : undefined}>
                                     <option value="">{fieldLabel(e.key)}: {t("members.all")}</option>
                                     {#each plugin.settings.members ?? [] as m (m.avItemId ?? m.id)}
                                         <option value={m.avItemId ?? ""} disabled={!m.avItemId}>{m.name}{m.avItemId ? "" : ` · ${t("members.notLinked")}`}</option>
                                     {/each}
                                 </select>
                             {:else if e.type === "date"}
-                                <input id="lv-new-{e.key}" class="b3-text-field" type="date" bind:value={form[e.key]} disabled={saving || identityPending} />
+                                <input id="lv-new-{e.key}" class="b3-text-field" type="date" bind:value={form[e.key]} disabled={saving || identityPending} aria-invalid={!!formFieldError(e)} aria-describedby={formFieldError(e) ? `lv-new-${e.key}-error` : undefined} />
                             {:else if e.type === "number"}
-                                <input id="lv-new-{e.key}" class="b3-text-field" type="number" step="any" placeholder={fieldLabel(e.key)} bind:value={form[e.key]} disabled={saving || identityPending} />
+                                <input id="lv-new-{e.key}" class="b3-text-field" type="number" min={e.min} max={e.max} step={e.step ?? "any"} placeholder={fieldMetaText(e.placeholderKey) || fieldLabel(e.key)} bind:value={form[e.key]} disabled={saving || identityPending} aria-invalid={!!formFieldError(e)} aria-describedby={formFieldError(e) ? `lv-new-${e.key}-error` : undefined} />
                             {:else if e.type === "url"}
-                                <input id="lv-new-{e.key}" class="b3-text-field" type="url" placeholder={fieldLabel(e.key)} bind:value={form[e.key]} disabled={saving || identityPending} />
+                                <input id="lv-new-{e.key}" class="b3-text-field" type="url" placeholder={fieldMetaText(e.placeholderKey) || fieldLabel(e.key)} bind:value={form[e.key]} disabled={saving || identityPending} aria-invalid={!!formFieldError(e)} aria-describedby={formFieldError(e) ? `lv-new-${e.key}-error` : undefined} />
                             {:else if e.type === "checkbox"}
-                                <label class="lv-record-check"><input id="lv-new-{e.key}" type="checkbox" class="b3-switch" bind:checked={form[e.key]} disabled={saving || identityPending} />{t(`field.${e.key}`)}</label>
+                                <label class="lv-record-check"><input id="lv-new-{e.key}" type="checkbox" class="b3-switch" bind:checked={form[e.key]} disabled={saving || identityPending} aria-invalid={!!formFieldError(e)} aria-describedby={formFieldError(e) ? `lv-new-${e.key}-error` : undefined} />{fieldLabel(e.key)}{e.required ? " *" : ""}</label>
                             {:else if e.key === "name"}
-                                <input bind:this={nameInput} id="lv-new-{e.key}" class="b3-text-field" type="text" placeholder={t("ledger.newName")} bind:value={form[e.key]} disabled={saving || identityPending} onkeydown={(event: KeyboardEvent) => { if (event.key === "Enter" && !event.isComposing) saveNewRecord(false); }} />
+                                <input bind:this={nameInput} id="lv-new-{e.key}" class="b3-text-field" type="text" placeholder={fieldMetaText(e.placeholderKey) || t("ledger.newName")} bind:value={form[e.key]} disabled={saving || identityPending} aria-invalid={!!formFieldError(e)} aria-describedby={formFieldError(e) ? `lv-new-${e.key}-error` : undefined} onkeydown={(event: KeyboardEvent) => { if (event.key === "Enter" && !event.isComposing) saveNewRecord(false); }} />
+                            {:else if ["note", "violations", "diagnosis"].includes(e.key)}
+                                <textarea id="lv-new-{e.key}" class="b3-text-field lv-record-textarea" rows="3" placeholder={fieldMetaText(e.placeholderKey) || fieldLabel(e.key)} bind:value={form[e.key]} disabled={saving || identityPending} aria-invalid={!!formFieldError(e)} aria-describedby={formFieldError(e) ? `lv-new-${e.key}-error` : undefined}></textarea>
                             {:else}
-                                <input id="lv-new-{e.key}" class="b3-text-field" type="text" placeholder={fieldLabel(e.key)} bind:value={form[e.key]} disabled={saving || identityPending} />
+                                <input id="lv-new-{e.key}" class="b3-text-field" type="text" placeholder={fieldMetaText(e.placeholderKey) || fieldLabel(e.key)} bind:value={form[e.key]} disabled={saving || identityPending} aria-invalid={!!formFieldError(e)} aria-describedby={formFieldError(e) ? `lv-new-${e.key}-error` : undefined} />
                             {/if}
+                            {#if fieldMetaText(e.helpKey) || fieldMetaText(e.unitKey)}
+                                <small class="lv-capture-field-hint">
+                                    {fieldMetaText(e.helpKey)}{#if fieldMetaText(e.helpKey) && fieldMetaText(e.unitKey)} · {/if}{#if fieldMetaText(e.unitKey)}{t("capture.unitLabel")}：{fieldMetaText(e.unitKey)}{/if}
+                                </small>
+                            {/if}
+                            {#if formFieldError(e)}<small class="lv-record-field-error" id="lv-new-{e.key}-error" role="alert">{formFieldError(e)}</small>{/if}
                         </div>
                     {/each}
                 </div>
             </section>
+
+            {#if additionalCols.length > 0}
+                <details class="lv-record-more">
+                    <summary>{t("ledger.additionalFields")} <span>{additionalCols.length}</span></summary>
+                    <section class="lv-record-section lv-record-section--nested">
+                        <div class="lv-record-grid">
+                            {#each additionalCols as e (e.key)}
+                                <div class="lv-record-field" class:lv-record-field-wide={e.key === "name" || e.type === "url" || ["note", "violations", "diagnosis"].includes(e.key)}>
+                                    {#if e.type !== "checkbox"}<label for="lv-new-{e.key}">{fieldLabel(e.key)}{e.required ? " *" : ""}</label>{/if}
+                                    {#if e.type === "select"}
+                                        <select id="lv-new-{e.key}" class="b3-select" bind:value={form[e.key]} disabled={saving || identityPending} aria-invalid={!!formFieldError(e)} aria-describedby={formFieldError(e) ? `lv-new-${e.key}-error` : undefined}>
+                                            <option value="">{fieldLabel(e.key)}</option>
+                                            {#each e.options ?? [] as opt (opt)}<option value={opt}>{t(`field.${e.key}.opt.${opt}`) !== `field.${e.key}.opt.${opt}` ? t(`field.${e.key}.opt.${opt}`) : opt}</option>{/each}
+                                        </select>
+                                    {:else if e.type === "relation"}
+                                        <select id="lv-new-{e.key}" class="b3-select" bind:value={form[e.key]} disabled={saving || identityPending} aria-invalid={!!formFieldError(e)} aria-describedby={formFieldError(e) ? `lv-new-${e.key}-error` : undefined}>
+                                            <option value="">{fieldLabel(e.key)}: {t("members.all")}</option>
+                                            {#each plugin.settings.members ?? [] as m (m.avItemId ?? m.id)}<option value={m.avItemId ?? ""} disabled={!m.avItemId}>{m.name}{m.avItemId ? "" : ` · ${t("members.notLinked")}`}</option>{/each}
+                                        </select>
+                                    {:else if e.type === "date"}
+                                        <input id="lv-new-{e.key}" class="b3-text-field" type="date" bind:value={form[e.key]} disabled={saving || identityPending} aria-invalid={!!formFieldError(e)} aria-describedby={formFieldError(e) ? `lv-new-${e.key}-error` : undefined} />
+                                    {:else if e.type === "number"}
+                                        <input id="lv-new-{e.key}" class="b3-text-field" type="number" min={e.min} max={e.max} step={e.step ?? "any"} placeholder={fieldMetaText(e.placeholderKey) || fieldLabel(e.key)} bind:value={form[e.key]} disabled={saving || identityPending} aria-invalid={!!formFieldError(e)} aria-describedby={formFieldError(e) ? `lv-new-${e.key}-error` : undefined} />
+                                    {:else if e.type === "url"}
+                                        <input id="lv-new-{e.key}" class="b3-text-field" type="url" placeholder={fieldMetaText(e.placeholderKey) || fieldLabel(e.key)} bind:value={form[e.key]} disabled={saving || identityPending} aria-invalid={!!formFieldError(e)} aria-describedby={formFieldError(e) ? `lv-new-${e.key}-error` : undefined} />
+                                    {:else if e.type === "checkbox"}
+                                        <label class="lv-record-check"><input id="lv-new-{e.key}" type="checkbox" class="b3-switch" bind:checked={form[e.key]} disabled={saving || identityPending} aria-invalid={!!formFieldError(e)} aria-describedby={formFieldError(e) ? `lv-new-${e.key}-error` : undefined} />{fieldLabel(e.key)}{e.required ? " *" : ""}</label>
+                                    {:else if ["note", "violations", "diagnosis"].includes(e.key)}
+                                        <textarea id="lv-new-{e.key}" class="b3-text-field lv-record-textarea" rows="3" placeholder={fieldMetaText(e.placeholderKey) || fieldLabel(e.key)} bind:value={form[e.key]} disabled={saving || identityPending} aria-invalid={!!formFieldError(e)} aria-describedby={formFieldError(e) ? `lv-new-${e.key}-error` : undefined}></textarea>
+                                    {:else}
+                                        <input id="lv-new-{e.key}" class="b3-text-field" type="text" placeholder={fieldMetaText(e.placeholderKey) || fieldLabel(e.key)} bind:value={form[e.key]} disabled={saving || identityPending} aria-invalid={!!formFieldError(e)} aria-describedby={formFieldError(e) ? `lv-new-${e.key}-error` : undefined} />
+                                    {/if}
+                                    {#if fieldMetaText(e.helpKey) || fieldMetaText(e.unitKey)}<small class="lv-capture-field-hint">{fieldMetaText(e.helpKey)}{#if fieldMetaText(e.helpKey) && fieldMetaText(e.unitKey)} · {/if}{#if fieldMetaText(e.unitKey)}{t("capture.unitLabel")}：{fieldMetaText(e.unitKey)}{/if}</small>{/if}
+                                    {#if formFieldError(e)}<small class="lv-record-field-error" id="lv-new-{e.key}-error" role="alert">{formFieldError(e)}</small>{/if}
+                                </div>
+                            {/each}
+                        </div>
+                    </section>
+                </details>
+            {/if}
 
             {#if active === "certs"}
                 {#if !form.category}
@@ -3050,13 +3827,58 @@
                     {/if}
                 {/if}
             {/if}
-            {#if unsupportedCount > 0}<span class="lv-caption">{t("ledger.unsupportedInForm")}</span>{/if}
+            {#if active === "vehicles" && quickAssetCols.length > 0}
+                <section class="lv-record-section">
+                    <h3>{t("vehicle.photoTitle")}</h3>
+                    <div class="lv-record-assets">
+                        {#each quickAssetCols as e (e.key)}
+                            <label class="b3-button b3-button--outline lv-record-upload">
+                                <input type="file" accept="image/*" multiple={false} aria-label={t("vehicle.photoTitle")} onchange={(event) => { const input = event.currentTarget as HTMLInputElement; setCertificateFiles(e.key, Array.from(input.files ?? [])); input.value = ""; }} disabled={saving || identityPending} />
+                                {t("vehicle.photoChoose")} · {selectedFileText(e.key)}
+                            </label>
+                            {#each certificateFiles[e.key] ?? [] as file, index (`vehicle-photo-local-${index}`)}
+                                <span class="lv-record-file">{file.name}<button class="b3-button b3-button--text" aria-label={t("ledger.removeAttachment")} title={t("ledger.removeAttachment")} onclick={() => removeCertificateFile(e.key, "local", index)} disabled={saving}>×</button></span>
+                            {/each}
+                        {/each}
+                        <span class="lv-caption">{t("vehicle.photoHint")}</span>
+                    </div>
+                </section>
+            {/if}
+            {#if active !== "certs" && active !== "vehicles" && quickAssetCols.length > 0}
+                <section class="lv-record-section">
+                    <h3>{t("ledger.newRecordAttachments")}</h3>
+                    <div class="lv-record-assets">
+                        {#each quickAssetCols as e (e.key)}
+                            <label class="b3-button b3-button--outline lv-record-upload">
+                                <input type="file" accept="image/*,.pdf" multiple aria-label={fieldLabel(e.key)} onchange={(event) => { const input = event.currentTarget as HTMLInputElement; setCertificateFiles(e.key, Array.from(input.files ?? [])); input.value = ""; }} disabled={saving || identityPending} />
+                                {fieldLabel(e.key)} · {selectedFileText(e.key)}
+                            </label>
+                            {#each certificateFiles[e.key] ?? [] as file, index (`generic-asset-local-${e.key}-${index}`)}
+                                <span class="lv-record-file">{file.name}<button class="b3-button b3-button--text" aria-label={t("ledger.removeAttachment")} title={t("ledger.removeAttachment")} onclick={() => removeCertificateFile(e.key, "local", index)} disabled={saving}>×</button></span>
+                            {/each}
+                            {#each uploadedCertificateFiles[e.key] ?? [] as file, index (`generic-asset-uploaded-${e.key}-${index}`)}
+                                <span class="lv-record-file">{file.name}<button class="b3-button b3-button--text" aria-label={t("ledger.removeAttachment")} title={t("ledger.removeAttachment")} onclick={() => removeCertificateFile(e.key, "uploaded", index)} disabled={saving}>×</button></span>
+                            {/each}
+                        {/each}
+                        <span class="lv-caption">{t("ledger.photoUploadTip")}</span>
+                    </div>
+                </section>
+            {/if}
+            {#if unsupportedCount > 0}
+                <div class="lv-record-next" role="note">
+                    <span>{t("ledger.unsupportedInForm").replace("${fields}", unsupportedCols.map((field) => fieldLabel(field.key)).join("、"))}</span>
+                    <button class="b3-button b3-button--outline" onclick={() => plugin.showTabDocs(ref?.docId)} disabled={!ref?.docId}>{t("ledger.openDoc")} →</button>
+                </div>
+            {/if}
             {#if saveError}<div class="lv-record-error" role="alert">{saveError}</div>{:else if nameMissing}<div class="lv-record-error lv-record-warning" role="status">{t("ledger.nameRequired")}</div>{:else if active === "certs" && !form.category}<div class="lv-record-error lv-record-warning" role="status">{t("ledger.categoryRequired")}</div>{/if}
         </div>
         <div class="lv-sheet-foot lv-record-foot">
+            {#if identityPending}
+                <button class="lv-btn ghost" onclick={openPendingLedger}>{t("ledger.checkPending")}</button>
+                {#if identityChecked}<button class="lv-btn ghost" onclick={discardUncertainDraft}>{t("ledger.discardUncertain")}</button>{/if}
+            {/if}
             <button class="b3-button b3-button--text" onclick={clearNewRecord} disabled={saving || identityPending}>{pendingItemID ? t("ledger.discardPartial") : t("ledger.clearDraft")}</button>
             <span class="fn__flex-1"></span>
-            <button class="lv-btn ghost" onclick={closeNewRecord} disabled={saving}>{t("ledger.closeKeepDraft")}</button>
             <button class="lv-btn" onclick={() => saveNewRecord(true)} disabled={saving || identityPending || nameMissing || (active === "certs" && !form.category)}>{t("ledger.saveContinue")}</button>
             <button class="lv-btn primary" onclick={() => saveNewRecord(false)} disabled={saving || identityPending || nameMissing || (active === "certs" && !form.category)}>{saving ? t("ledger.saving") : t("save")}</button>
         </div>
@@ -3066,49 +3888,90 @@
 {#if loading}
     <div class="lv-card" style="padding:20px"><div class="lv-skel" style="height:16px;width:60%"></div></div>
 {:else if loadError}
-    <div class="lv-card"><div class="lv-empty" role="alert"><div class="eic">!</div><b>{loadError}</b>
+    <div class="lv-card"><div class="lv-empty" role="alert"><div class="eic"><UiIcon name="alert" size={22} /></div><b>{loadError}</b>
         <button class="b3-button b3-button--outline" onclick={() => void load()}>{t("ledger.retryRead")}</button>
     </div></div>
 {:else if filteredRows.length === 0}
     {#if ledgers.length === 0}
-        <div class="lv-card"><div class="lv-empty" role="status"><div class="eic">⚙</div><b>{t("ledger.noEnabledModules")}</b><span>{t("ledger.noEnabledModulesHint")}</span>
+        <div class="lv-card"><div class="lv-empty" role="status"><div class="eic"><UiIcon name="settings" size={22} /></div><b>{t("ledger.noEnabledModules")}</b><span>{t("ledger.noEnabledModulesHint")}</span>
             <button class="lv-btn primary" style="margin-top:4px" onclick={() => plugin.openSetting()}>{t("startGuide.openSettings")}</button>
         </div></div>
     {:else if !ref?.avId}
-        <div class="lv-card"><div class="lv-empty" role="status"><div class="eic">🚧</div><b>{t("ledger.notProvisioned")}</b><span>{t("ledger.notProvisionedHint")}</span></div></div>
+        <div class="lv-card"><div class="lv-empty" role="status"><div class="eic"><UiIcon name="archive" size={22} /></div><b>{t("ledger.notProvisioned")}</b><span>{t("ledger.notProvisionedHint")}</span></div></div>
     {:else if rows.length > 0}
         <!-- Empty state for a search with no matches. -->
-        <div class="lv-card"><div class="lv-empty" role="status"><div class="eic">🔍</div><b>{t("ledger.searchEmpty")}</b><span>{t("ledger.searchEmptyHint").replace("${q}", searchText.trim())}</span></div></div>
+        <div class="lv-card"><div class="lv-empty" role="status"><div class="eic"><UiIcon name="search" size={22} /></div><b>{t("ledger.searchEmpty")}</b><span>{t("ledger.searchEmptyHint").replace("${q}", searchText.trim())}</span></div></div>
     {:else}
-        <div class="lv-card"><div class="lv-empty" role="status"><div class="eic">🗂</div><b>{t("ledger.empty")}</b><span>{t("ledger.emptyHint")}</span>
+        <div class="lv-card"><div class="lv-empty" role="status"><div class="eic"><UiIcon name="folder" size={22} /></div><b>{t("ledger.empty")}</b><span>{t("ledger.emptyHint")}</span>
             <button class="lv-btn primary" style="margin-top:4px" onclick={openNewRecord} disabled={rebuilding}>+ {t("ledger.newRecord")}</button>
         </div></div>
     {/if}
+{:else if active === "vehicles"}
+    <div class="lv-vehicle-grid" aria-label={t("module.vehicles")}>
+        {#each visibleRows as r (r.itemID)}
+            {@const tone = ledgerTone(r)}
+            {@const photo = vehicleImageHref(r)}
+            <article class="lv-vehicle-card lv-card" role="group">
+                <div class="lv-vehicle-photo">
+                    {#if photo}<img src={photo} alt={vehicleText(r, "name")} width="96" height="72" decoding="async" loading="lazy" />{:else}<UiIcon name="car" size={28} />{/if}
+                </div>
+                <div class="lv-vehicle-main">
+                    <div class="lv-vehicle-head">
+                        <button type="button" class="lv-vehicle-title" onclick={() => openDetail(r)} aria-label={`${t("ledger.detail")}：${vehicleText(r, "name")}`}>
+                            {vehicleText(r, "name")}
+                        </button>
+                        <span class="lv-sev {toneCls(tone)}" title={tone === "danger" ? t("level.overdue") : tone === "warn" ? t("level.soon") : ""}></span>
+                    </div>
+                    <div class="lv-vehicle-sub">{vehicleText(r, "brand_model")} · {vehicleText(r, "plate")}</div>
+                    <div class="lv-vehicle-meta">
+                        <span>{vehicleText(r, "energy_type")}</span>
+                        <span>{vehicleText(r, "mileage")} {t("fuel.km")}</span>
+                        <span>{t("field.inspection_due")} · {vehicleText(r, "inspection_due")}</span>
+                        <span>{t("field.insurance_due")} · {vehicleText(r, "insurance_due")}</span>
+                    </div>
+                    <div class="lv-vehicle-actions">
+                        <button class="b3-button b3-button--outline" onclick={(e) => { e.stopPropagation(); openDetail(r, "fuel"); }}>{t("vehicle.quick.fuel")}</button>
+                        <button class="b3-button b3-button--outline" onclick={(e) => { e.stopPropagation(); openDetail(r, "charging"); }}>{t("vehicle.quick.charging")}</button>
+                        <button class="b3-button b3-button--outline" onclick={(e) => { e.stopPropagation(); openDetail(r, "maintenance"); }}>{t("vehicle.quick.maintenance")}</button>
+                        <button class="b3-button b3-button--text" onclick={(e) => { e.stopPropagation(); openDetail(r, "edit"); }}>{t("members.edit")}</button>
+                    </div>
+                </div>
+            </article>
+        {/each}
+        {#if filteredRows.length > visibleRows.length}
+            <button class="b3-button b3-button--outline lv-vehicle-more" onclick={() => (renderLimit += RENDER_PAGE)}>{t("ledger.loadMore").replace("${n}", String(filteredRows.length - visibleRows.length))}</button>
+        {/if}
+    </div>
 {:else}
     <div class="lv-card lv-table-wrap lv-table" style="margin-top:12px">
-        <table>
+        <table bind:this={ledgerTableEl}>
             <thead><tr>
                 <!-- Severity indicator column. -->
                 <th class="lv-sev-col"></th>
-                {#each schemaKeys.filter((k) => ["name", "status", "expiry", "due"].includes(k)) as k (k)}
+                {#each tableKeys as k (k)}
                     <th>
                         <button class="b3-button b3-button--text" style="padding:0 2px;font-weight:600" title={t("ledger.sortTip")}
                             onclick={() => toggleSort(k)}>
-                            {t(`field.${k}`)}{sortKey === k ? (sortAsc ? " ↑" : " ↓") : ""}
+                            {fieldLabel(k)}{sortKey === k ? (sortAsc ? " ↑" : " ↓") : ""}
                         </button>
                     </th>
                 {/each}
             </tr></thead>
             <tbody>
-                {#each visibleRows as r (r.itemID)}
+                {#if virtualRange.start > 0}
+                    <tr class="lv-virtual-spacer" aria-hidden="true"><td colspan={tableKeys.length + 1} style={`height:${virtualRange.start * VIRTUAL_ROW_HEIGHT}px`}></td></tr>
+                {/if}
+                {#each virtualRows as r (r.itemID)}
                     {@const tone = ledgerTone(r)}
-                    <tr class="lv-row-link" role="button" tabindex="0"
-                        onkeydown={(e: KeyboardEvent) => {
-                            if (e.key === "Enter" || e.key === " ") { e.preventDefault(); openDetail(r); }
-                        }}
-                        onclick={() => openDetail(r)} title={t("ledger.detail")}>
-                        <td class="lv-sev-cell"><span class="lv-sev {toneCls(tone)}" title={tone === "danger" ? t("level.overdue") : tone === "warn" ? t("level.soon") : tone === "ok" ? t("level.lead") : ""}></span></td>
-                        {#each schemaKeys.filter((k) => ["name", "status", "expiry", "due"].includes(k)) as k (k)}
+                    {@const rowName = cellText(r.cells[ref.columns.name], "name") || cellText(r.cells[ref.columns.title], "title") || t("ledger.detail")}
+                    <tr class="lv-row-link" onclick={() => openDetail(r)} title={t("ledger.detail")}>
+                        <td class="lv-sev-cell">
+                            <button type="button" class="lv-table-open" aria-label={`${t("ledger.detail")}：${rowName}`} title={t("ledger.detail")}
+                                onclick={(e) => { e.stopPropagation(); openDetail(r); }}>
+                                <span class="lv-sev {toneCls(tone)}" aria-hidden="true"></span><UiIcon name="forward" size={14} />
+                            </button>
+                        </td>
+                        {#each tableKeys as k (k)}
                             {@const v = r.cells[ref.columns[k]]}
                             <td class="lv-num" style={k === "expiry" || k === "due" ? `color:${toneColor(tone)}` : ""}>
                                 {cellText(v, k)}
@@ -3116,10 +3979,13 @@
                         {/each}
                     </tr>
                 {/each}
+                {#if virtualRange.end < visibleRows.length}
+                    <tr class="lv-virtual-spacer" aria-hidden="true"><td colspan={tableKeys.length + 1} style={`height:${(visibleRows.length - virtualRange.end) * VIRTUAL_ROW_HEIGHT}px`}></td></tr>
+                {/if}
                 {#if filteredRows.length > visibleRows.length}
                     <!-- Progressive rendering load-more row. -->
                     <tr class="lv-more">
-                        <td colspan={schemaKeys.filter((k) => ["name", "status", "expiry", "due"].includes(k)).length + 1}>
+                        <td colspan={tableKeys.length + 1}>
                             <button class="b3-button b3-button--outline" style="margin:0 auto;display:block"
                                 onclick={() => (renderLimit += RENDER_PAGE)}>
                                 {t("ledger.loadMore").replace("${n}", String(filteredRows.length - visibleRows.length))}

@@ -11,7 +11,13 @@ export const TOKEN = process.env.SIYUAN_TOKEN || "";
 export const APP = `${BASE}/stage/build/desktop/`;
 export const COOKIE_FILE = path.resolve(ROOT, "tmp/ui3-cookies.json");
 export const WS_DIR = process.env.TEST_WS_DIR || path.resolve(ROOT, "tmp/sy-ui3");
-const KERNEL = process.env.SIYUAN_KERNEL || "D:\\biji\\SiYuan\\resources\\kernel\\SiYuan-Kernel.exe";
+const KERNEL_CANDIDATES = [
+    process.env.SIYUAN_KERNEL,
+    "D:\\RJ\\SiYuan\\resources\\kernel\\SiYuan-Kernel.exe",
+    "D:\\biji\\SiYuan\\resources\\kernel\\SiYuan-Kernel.exe",
+    "C:\\Program Files\\SiYuan\\resources\\kernel\\SiYuan-Kernel.exe",
+].filter(Boolean);
+const KERNEL = KERNEL_CANDIDATES.find((candidate) => existsSync(candidate)) ?? KERNEL_CANDIDATES[0];
 
 export const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
@@ -19,6 +25,9 @@ export const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 export async function ensureKernel() {
     const alive = await fetch(`${BASE}/check-auth`, { signal: AbortSignal.timeout(1500) }).then((r) => r.ok).catch(() => false);
     if (alive) return;
+    if (!KERNEL || !existsSync(KERNEL)) {
+        throw new Error(`SiYuan-Kernel.exe not found; set SIYUAN_KERNEL to its full path (checked: ${KERNEL_CANDIDATES.join(", ")})`);
+    }
     execSync(`powershell.exe -NoProfile -Command "Start-Process -FilePath '${KERNEL}' -ArgumentList 'serve','--workspace','${WS_DIR.replace(/\\/g, "\\\\")}','--port','${PORT}','--lang','zh-CN' -WindowStyle Hidden"`, { stdio: "ignore" });
     for (let i = 0; i < 30; i++) {
         await sleep(1000);
@@ -91,7 +100,7 @@ export async function armFullRender(page) {
         }
         // width 必须显式给定：.lv-home 带 container-type:inline-size（尺寸包含），
         // 固定定位下不设宽度会把 inline-size 解析为 0，整面板塌缩成竖条
-        el.style.cssText = "position:fixed;inset:auto;top:0;left:0;width:calc(100vw - 32px);z-index:9999;background:var(--b3-theme-background);overflow:visible;height:auto;padding:16px";
+        el.style.cssText = "position:fixed;inset:auto;top:0;left:0;width:calc(100vw - 32px);z-index:9999;overflow:visible;height:auto;padding:16px";
     });
     await sleep(600);
 }

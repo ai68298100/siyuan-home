@@ -125,6 +125,9 @@ export interface DownloadAssetOptions {
     origin?: string;
     fetchImpl?: typeof fetch;
     documentRef?: Document;
+    /** 外部取消信号；下载超时默认 15 秒，避免附件请求永久占用界面状态。 */
+    signal?: AbortSignal;
+    timeoutMs?: number;
 }
 
 /** Fetch an asset and trigger a browser download using its original name. */
@@ -133,7 +136,22 @@ export async function downloadAsset(asset: AssetRef, options: DownloadAssetOptio
     const fetchImpl = options.fetchImpl ?? globalThis.fetch;
     if (typeof fetchImpl !== "function") throw new Error("asset download requires fetch");
 
-    const response = await fetchImpl(href, { credentials: "same-origin" });
+    const controller = new AbortController();
+    let abortListener: (() => void) | undefined;
+    if (options.signal) {
+        abortListener = () => controller.abort();
+        if (options.signal.aborted) controller.abort();
+        else options.signal.addEventListener("abort", abortListener, { once: true });
+    }
+    const timer = setTimeout(() => controller.abort(), Math.max(1, options.timeoutMs ?? 15_000));
+    let response: Response;
+    try {
+        response = await fetchImpl(href, { credentials: "same-origin", signal: controller.signal });
+    } finally {
+        clearTimeout(timer);
+        if (options.signal && abortListener) options.signal.removeEventListener("abort", abortListener);
+    }
+    if (response.status === 401 || response.status === 403) throw new Error("登录状态已失效，请重新登录后重试");
     if (!response.ok) throw new Error(`asset download failed: HTTP ${response.status}`);
     const blob = await response.blob();
     const documentRef = options.documentRef ?? (globalThis as { document?: Document }).document;

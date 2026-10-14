@@ -4,6 +4,8 @@
     import { newMember, saveSettings, normalizeCheckinBindings } from "@/core/settings";
     import type { ProvisioningReport } from "@/core/provisioner";
     import type { HomeSettings, MemberRole, FamilyMember, CheckinBinding, ModuleGroupId } from "@/types";
+    import { formatLocalDateTime } from "@/core/date-display";
+    import UiIcon from "@/ui/icon.svelte";
 
     interface IHomePluginLike {
         i18n: Record<string, unknown>;
@@ -115,8 +117,10 @@
     const METRICS: CheckinBinding["metric"][] = ["count", "quantity", "duration"];
     let checkinItems: { id: string; name: string; kind: string }[] = $state([]);
     let checkinPresent = $state<boolean | null>(null); // null=探测中
+    let checkinProbe = $state(0);
 
     $effect(() => {
+        void checkinProbe;
         let alive = true;
         (async () => {
             try {
@@ -138,16 +142,33 @@
         return "count";
     }
     function addBinding() {
-        if (!checkinItems.length) return;
-        const it = checkinItems[0];
+        const pair = availableBindingPair;
+        if (!pair) {
+            showMessage(t(draftMembers.length ? "settings.checkinAllBound" : "settings.checkinNeedMember"), 3500, "info");
+            return;
+        }
+        const { item: it, member } = pair;
         draftBindings = [...draftBindings, {
             itemId: it.id, itemName: it.name,
-            memberId: draftMembers[0]?.id ?? "",
+            memberId: member.id,
             metric: defaultMetric(it.kind),
         }];
     }
+    const availableBindingPair = $derived.by(() => {
+        for (const item of checkinItems) {
+            const member = draftMembers.find((m) => !draftBindings.some((b) => b.itemId === item.id && b.memberId === m.id));
+            if (member) return { item, member };
+        }
+        return undefined;
+    });
     function removeBinding(i: number) {
-        draftBindings = draftBindings.filter((_, idx) => idx !== i);
+        const binding = draftBindings[i];
+        if (!binding) return;
+        confirm(
+            t("settings.bindingRemoveTitle"),
+            t("settings.bindingRemoveBody").replace("${item}", binding.itemName).replace("${member}", draftMembers.find((m) => m.id === binding.memberId)?.name?.trim() || t("members.name")),
+            () => { draftBindings = draftBindings.filter((_, idx) => idx !== i); },
+        );
     }
     function syncBindingItem(b: CheckinBinding) {
         const it = checkinItems.find((x) => x.id === b.itemId);
@@ -198,6 +219,7 @@
         }
         syncDraftFromSettings(next);
         savedTick += 1;
+        window.dispatchEvent(new CustomEvent("siyuan-home:settings-replaced", { detail: { plugin, settings: next } }));
     }
 
     /** 草稿是否偏离已保存设置（footer 徽章；四种生效参数全部覆盖） */
@@ -249,7 +271,9 @@
     }
 
     function removeMember(id: string) {
-        confirm(t("delete"), t("delete") + "?", () => {
+        const member = draftMembers.find((item) => item.id === id);
+        if (!member) return;
+        confirm(t("members.deleteTitle"), t("members.deleteBody").replace("${name}", member.name.trim() || t("members.name")), () => {
             draftMembers = draftMembers.filter((m) => m.id !== id);
         });
     }
@@ -317,6 +341,7 @@
             width: "520px",
         });
         const body = dlg.element.querySelector("#lv-ambig-body") as HTMLElement;
+        let applyingAmbiguity = false;
         ambiguous.forEach((a, ai) => {
             const head = document.createElement("div");
             head.className = "ft__on-surface";
@@ -338,7 +363,11 @@
             }
         });
         (dlg.element.querySelector("#lv-ambig-cancel") as HTMLButtonElement).onclick = () => dlg.destroy();
-        (dlg.element.querySelector("#lv-ambig-ok") as HTMLButtonElement).onclick = async () => {
+        const ambiguityOk = dlg.element.querySelector("#lv-ambig-ok") as HTMLButtonElement;
+        ambiguityOk.onclick = async () => {
+            if (applyingAmbiguity) return;
+            applyingAmbiguity = true;
+            ambiguityOk.disabled = true;
             const previous = cloneSettings(plugin.settings);
             let applied = 0;
             try {
@@ -346,7 +375,12 @@
                     const pick = picks[ai];
                     if (!pick) return;
                     const m = plugin.settings.members.find((x) => x.id === a.memberId);
-                    if (m) { m.avItemId = pick; m.syncError = undefined; applied++; }
+                    if (m) {
+                        m.avItemId = pick;
+                        m.avRowCreatePending = undefined;
+                        m.syncError = undefined;
+                        applied++;
+                    }
                 });
                 dlg.destroy();
                 if (applied > 0) {
@@ -363,6 +397,8 @@
                 plugin.settings = previous;
                 showMessage(`${t("settings.saveFailed")}${error instanceof Error ? ` (${error.message})` : ""}`, 6000, "error");
                 dlg.destroy();
+            } finally {
+                applyingAmbiguity = false;
             }
         };
     }
@@ -441,16 +477,20 @@
         const previous = cloneSettings(plugin.settings);
         try {
             const next = { ...previous, onboarded: false };
-            plugin.settings = next;
-            await import("@/core/settings").then((m) => m.saveSettings(plugin as any, next));
+            await persistReplacement(next);
             try {
                 await plugin.refreshHub?.(undefined, true);
             } catch (error) {
-                showMessage(`${t("wiz.rerunHint")} (${settingHint("刷新失败", "refresh failed")}: ${error instanceof Error ? error.message : String(error)})`, 6000, "error");
+                // The setting is already persisted and broadcast; keep it rather
+                // than reverting disk and memory to two different states.
+                showMessage(`${settingHint("引导已重置，但提醒刷新失败", "Onboarding reset, but reminder refresh failed")} (${error instanceof Error ? error.message : String(error)})`, 6000, "error");
                 return;
             }
             showMessage(t("wiz.rerunHint"), 3000, "info");
         } catch (error) {
+            // persistReplacement restores the in-memory snapshot when the write
+            // itself fails; retain the explicit assignment for non-standard test
+            // doubles that reject before entering its helper.
             plugin.settings = previous;
             showMessage(`${settingHint("重置引导失败", "Unable to reset onboarding")}${error instanceof Error ? ` (${error.message})` : ""}`, 6000, "error");
         } finally {
@@ -581,11 +621,13 @@
             const previous = cloneSettings(plugin.settings);
             const prevMembers = previous.members;
             const prevModules = new Set(previous.enabledModules);
+            const normalizedBindings = normalizeCheckinBindings(draftBindings);
+            const droppedBindingCount = Math.max(0, draftBindings.length - normalizedBindings.length);
             const modulesChanged = draftEnabled.length !== prevModules.size || draftEnabled.some((id) => !prevModules.has(id));
             const next: HomeSettings = {
                 ...previous,
                 enabledModules: [...draftEnabled],
-                members: draftMembers.map((m) => ({ ...m, name: m.name.trim() || "?" })),
+                members: draftMembers.map((m) => ({ ...m, name: m.name.trim() || "?", sex: m.sex || undefined })),
                 // C8c：提醒设置落盘（无效时段值忽略，保持 0-23 界内）；263 波起与脏检查共用 clampHour
                 notifyHour: clampHour(draftNotifyHour, 8),
                 silentFrom: clampHour(draftSilentFrom, 22),
@@ -597,7 +639,7 @@
                 // 263 波：与脏检查共用 normLeads
                 leadOverrides: normLeads(draftLeads),
                 // EC09：打卡绑定落盘（清洗在 normalize——缺 id/metric 非法剔除、去重）
-                checkinBindings: normalizeCheckinBindings(draftBindings),
+                checkinBindings: normalizedBindings,
             };
             plugin.settings = next;
             try {
@@ -628,6 +670,7 @@
             const warnings: string[] = [];
             if (rep.failed.length > 0) warnings.push(t("members.syncPartial").replace("${n}", String(rep.failed.length)));
             if (provisioningWarning) warnings.push(provisioningWarning);
+            if (droppedBindingCount > 0) warnings.push(t("settings.checkinCleaned").replace("${n}", String(droppedBindingCount)));
             if (warnings.length > 0) {
                 showMessage(warnings.join("；"), 7000, "error");
             } else {
@@ -731,6 +774,7 @@
                         <input
                             type="checkbox"
                             class="b3-switch"
+                            aria-label={t(`module.${mod.id}`)}
                             checked={enabledIds.has(mod.id)}
                             disabled={mod.alwaysOn}
                             onchange={() => toggleModule(mod.id, mod.alwaysOn)}
@@ -764,28 +808,52 @@
                 <div class="lv-setcard__hint ft__on-surface">{t("members.empty")}</div>
             {/if}
             {#each draftMembers as m, i (m.id)}
-                <div class="fn__flex lv-settings__row lv-settings__member">
-                    <input class="b3-text-field fn__size200" placeholder={t("members.name")} bind:value={draftMembers[i].name} />
-                    <select class="b3-select" bind:value={draftMembers[i].role}>
-                        {#each ROLES as r (r)}
-                            <option value={r}>{t(`role.${r}`)}</option>
-                        {/each}
-                    </select>
-                    <select class="b3-select" bind:value={draftMembers[i].sex} title={t("members.sex")}>
-                        <option value={undefined}>{t("members.sex.unknown")}</option>
-                        <option value="male">{t("members.sex.male")}</option>
-                        <option value="female">{t("members.sex.female")}</option>
-                    </select>
-                    <input class="b3-text-field" type="date" bind:value={draftMembers[i].birthday} title={t("members.birthday")} />
-                    <label class="fn__flex">
-                        <input type="checkbox" class="b3-switch" bind:checked={draftMembers[i].lunarBirthday} />
-                        <span>{t("members.lunar")}</span>
-                    </label>
-                    <span class="fn__flex-1"></span>
-                    <button class="b3-button b3-button--outline" onclick={() => removeMember(m.id)}>{t("delete")}</button>
-                </div>
+                <section class="lv-settings-member" aria-labelledby={`lv-settings-member-${m.id}`}>
+                    <div class="lv-settings-member__head">
+                        <h3 id={`lv-settings-member-${m.id}`}>
+                            <span class="lv-settings-member__number" aria-hidden="true">{i + 1}</span>
+                            <span>{m.name.trim() || t("members.name")}</span>
+                        </h3>
+                        <button class="b3-button b3-button--text lv-settings-member__delete" type="button"
+                            aria-label={`${t("delete")} ${m.name.trim() || t("members.name")}`} onclick={() => removeMember(m.id)}>
+                            {t("delete")}
+                        </button>
+                    </div>
+                    <div class="lv-settings-member__fields">
+                        <label class="lv-settings-member__field">
+                            <span>{t("members.name")}</span>
+                            <input class="b3-text-field" placeholder={t("members.name")} bind:value={draftMembers[i].name} />
+                        </label>
+                        <label class="lv-settings-member__field">
+                            <span>{t("members.role")}</span>
+                            <select class="b3-select" bind:value={draftMembers[i].role}>
+                                {#each ROLES as r (r)}
+                                    <option value={r}>{t(`role.${r}`)}</option>
+                                {/each}
+                            </select>
+                        </label>
+                        <label class="lv-settings-member__field">
+                            <span>{t("members.sex")}</span>
+                            <select class="b3-select" bind:value={draftMembers[i].sex}>
+                                <option value="">{t("members.sex.unknown")}</option>
+                                <option value="male">{t("members.sex.male")}</option>
+                                <option value="female">{t("members.sex.female")}</option>
+                            </select>
+                        </label>
+                        <label class="lv-settings-member__field">
+                            <span>{t("members.birthday")}</span>
+                            <input class="b3-text-field" type="date" bind:value={draftMembers[i].birthday} />
+                        </label>
+                        <label class="lv-settings-member__calendar">
+                            <span>{t("members.lunar")}</span>
+                            <input type="checkbox" class="b3-switch" bind:checked={draftMembers[i].lunarBirthday} />
+                        </label>
+                    </div>
+                </section>
             {/each}
-            <button class="b3-button b3-button--outline lv-setcard__action" onclick={addMember}>＋ {t("add")}</button>
+            <button class="b3-button b3-button--outline lv-setcard__action lv-settings-member__add" type="button" onclick={addMember}>
+                <UiIcon name="add" size={15} /> {t("add")}
+            </button>
         </div>
         </div>
     {:else if area === "reminders"}
@@ -803,14 +871,14 @@
             <div class="lv-setcard__hint">{t("settings.remindersHint")}</div>
             <div class="fn__flex lv-settings__row">
                 <span style="min-width:180px">{t("settings.notifyHour")}</span>
-                <input class="b3-text-field" style="width:90px" type="number" min="0" max="23" bind:value={draftNotifyHour} />
+                <input class="b3-text-field" style="width:90px" type="number" min="0" max="23" aria-label={t("settings.notifyHour")} bind:value={draftNotifyHour} />
                 <span class="lv-caption fn__flex-1">{t("settings.notifyHourHint")}</span>
             </div>
             <div class="fn__flex lv-settings__row">
                 <span style="min-width:180px">{t("settings.silentHours")}</span>
-                <input class="b3-text-field" style="width:70px" type="number" min="0" max="23" bind:value={draftSilentFrom} />
+                <input class="b3-text-field" style="width:70px" type="number" min="0" max="23" aria-label={t("settings.silentFromLabel")} bind:value={draftSilentFrom} />
                 <span class="lv-caption" style="margin:0 6px">→</span>
-                <input class="b3-text-field" style="width:70px" type="number" min="0" max="23" bind:value={draftSilentTo} />
+                <input class="b3-text-field" style="width:70px" type="number" min="0" max="23" aria-label={t("settings.silentToLabel")} bind:value={draftSilentTo} />
                 <span class="lv-caption fn__flex-1">{t("settings.silentHoursHint")}</span>
             </div>
         </div>
@@ -820,12 +888,12 @@
             <div class="lv-setcard__hint">{t("settings.webhookHint")}</div>
             <div class="fn__flex lv-settings__row">
                 <span style="min-width:180px">{t("settings.webhookEnable")}</span>
-                <input type="checkbox" class="b3-switch" bind:checked={draftWebhookEnabled} />
+                <input type="checkbox" class="b3-switch" aria-label={t("settings.webhookEnable")} bind:checked={draftWebhookEnabled} />
                 <span class="lv-caption fn__flex-1"></span>
             </div>
             <div class="fn__flex lv-settings__row">
                 <span style="min-width:180px">{t("settings.webhookMode")}</span>
-                <select class="b3-select" bind:value={draftWebhookMode}>
+                <select class="b3-select" aria-label={t("settings.webhookMode")} bind:value={draftWebhookMode}>
                     <option value="bark">Bark</option>
                     <option value="ntfy">ntfy</option>
                 </select>
@@ -833,7 +901,7 @@
             </div>
             <div class="fn__flex lv-settings__row">
                 <span style="min-width:180px">{t("settings.webhookUrl")}</span>
-                <input class="b3-text-field fn__flex-1" style="min-width:0" bind:value={draftWebhookUrl}
+                <input class="b3-text-field fn__flex-1" style="min-width:0" aria-label={t("settings.webhookUrl")} bind:value={draftWebhookUrl}
                     placeholder="https://api.day.app/yourkey" />
             </div>
             <button class="b3-button b3-button--outline lv-setcard__action" disabled={testingWebhook || !draftWebhookUrl.trim()}
@@ -852,6 +920,7 @@
                 <div class="fn__flex lv-settings__row" style={enabledIds.has(lr.moduleId) ? "" : "opacity:.55"}>
                     <span style="min-width:220px">{t(`module.${lr.moduleId}`)} · {t(`rule.${lr.ruleKey}`) !== `rule.${lr.ruleKey}` ? t(`rule.${lr.ruleKey}`) : lr.ruleKey}</span>
                     <input class="b3-text-field" style="width:90px" type="number" min="0" max="3650"
+                        aria-label={`${t(`module.${lr.moduleId}`)} · ${t(`rule.${lr.ruleKey}`) !== `rule.${lr.ruleKey}` ? t(`rule.${lr.ruleKey}`) : lr.ruleKey}`}
                         placeholder={String(lr.def)}
                         bind:value={draftLeads[lr.key]} />
                     <span class="lv-caption fn__flex-1">{t("settings.leadDefault").replace("${n}", String(lr.def))}{#if !enabledIds.has(lr.moduleId)} · {t("settings.leadDisabled")}{/if}</span>
@@ -865,7 +934,14 @@
             <div class="lv-setcard__hint">{t("settings.checkinBindingsHint")}</div>
             {#if checkinPresent === false}
                 <p class="lv-setcard__hint" style="color:var(--lv-warn)">{t("settings.checkinAbsent")}</p>
+            {:else if checkinPresent === null}
+                <p class="lv-setcard__hint" role="status">{t("settings.checkinLoading")}</p>
+                <button class="b3-button b3-button--outline lv-setcard__action" onclick={() => { checkinItems = []; checkinPresent = null; checkinProbe += 1; }}>{t("settings.checkinRetry")}</button>
             {:else if checkinPresent === true}
+                {#if draftMembers.length === 0}
+                    <p class="lv-setcard__hint" role="status">{t("settings.checkinNeedMember")}</p>
+                    <button class="b3-button b3-button--outline lv-setcard__action" onclick={() => (area = "members")}>{t("tabMembers")}</button>
+                {/if}
                 {#each draftBindings as b, i}
                     <div class="fn__flex lv-settings__row" style="gap:6px">
                         <select class="b3-select" style="width:auto" bind:value={b.memberId} aria-label={t("settings.metricMember")}>
@@ -878,7 +954,7 @@
                         <select class="b3-select" style="width:auto" bind:value={b.metric} aria-label={t("settings.metricKind")}>
                             {#each METRICS as mt (mt)}<option value={mt}>{t(`settings.metric.${mt}`)}</option>{/each}
                         </select>
-                        <button class="b3-button b3-button--text" title={t("delete")} onclick={() => removeBinding(i)}>✕</button>
+                        <button class="b3-button b3-button--text" title={t("delete")} aria-label={`${t("delete")} · ${b.itemName}`} onclick={() => removeBinding(i)}>✕</button>
                     </div>
                 {/each}
                 {#if draftBindings.length === 0}
@@ -887,7 +963,10 @@
                 {#if checkinItems.length === 0}
                     <p class="lv-setcard__hint" role="status">{t("settings.checkinNoItems")}</p>
                 {/if}
-                <button class="b3-button b3-button--outline lv-setcard__action" disabled={!checkinItems.length} onclick={addBinding}>＋ {t("settings.checkinAdd")}</button>
+                {#if checkinItems.length > 0 && draftMembers.length > 0 && !availableBindingPair}
+                    <p class="lv-setcard__hint" role="status">{t("settings.checkinAllBound")}</p>
+                {/if}
+                <button class="b3-button b3-button--outline lv-setcard__action" disabled={!availableBindingPair} onclick={addBinding}>＋ {t("settings.checkinAdd")}</button>
             {/if}
         </div>
         {/if}
@@ -967,7 +1046,7 @@
             {#if diag}
                 <div class="lv-card lv-setcard">
                     <div class="lv-setcard__title">{t("diag.title")} · v{diag.version}</div>
-                    <p class="lv-caption" style="margin:2px 0 8px">{t("hub.scannedAt")} {diag.scannedAt ? new Date(diag.scannedAt).toLocaleString() : "—"}</p>
+                    <p class="lv-caption" style="margin:2px 0 8px">{t("hub.scannedAt")} {formatLocalDateTime(diag.scannedAt) ?? "—"}</p>
                     {#each diag.ledgers as l (l.id)}
                         <p class="lv-caption">
                             {t(`module.${l.id}`)}：
@@ -1025,3 +1104,125 @@
         <button class="lv-btn primary" disabled={saving || migrationBusy || demoBusy} onclick={save}>{saving || demoBusy ? t("ledger.saving") : t("save")}</button>
     </div>
 </div>
+
+<style>
+    .lv-settings-member {
+        padding: 16px;
+        margin-top: 12px;
+        border: 1px solid var(--lv-line);
+        border-radius: 14px;
+        background: var(--lv-surface);
+        min-width: 0;
+    }
+
+    .lv-settings-member__head {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+        margin-bottom: 14px;
+    }
+
+    .lv-settings-member__head h3 {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        min-width: 0;
+        margin: 0;
+        color: var(--lv-tx);
+        font-size: 13px;
+        font-weight: 600;
+    }
+
+    .lv-settings-member__head h3 > span:last-child {
+        overflow-wrap: anywhere;
+    }
+
+    .lv-settings-member__number {
+        display: grid;
+        place-items: center;
+        flex: none;
+        width: 24px;
+        height: 24px;
+        border-radius: 8px;
+        background: var(--lv-surface-2);
+        color: var(--lv-tx-3);
+        font-size: 11px;
+        font-variant-numeric: tabular-nums;
+    }
+
+    .lv-settings-member__delete {
+        flex: none;
+        display: inline-flex;
+        align-items: center;
+        gap: 5px;
+        min-height: 36px;
+        color: var(--lv-tx-3);
+    }
+
+    .lv-settings-member__delete:hover {
+        color: var(--lv-danger);
+        background: color-mix(in srgb, var(--lv-danger) 8%, var(--lv-surface));
+    }
+
+    .lv-settings-member__fields {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 14px 16px;
+    }
+
+    .lv-settings-member__field {
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+        min-width: 0;
+        color: var(--lv-tx-2);
+        font-size: 12px;
+    }
+
+    .lv-settings-member__field :is(input, select) {
+        width: 100%;
+        min-width: 0;
+        min-height: 40px;
+        box-sizing: border-box;
+    }
+
+    .lv-settings-member__calendar {
+        grid-column: 1 / -1;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+        min-height: 40px;
+        padding-top: 10px;
+        border-top: 1px solid var(--lv-line);
+        color: var(--lv-tx-2);
+        font-size: 12px;
+        cursor: pointer;
+    }
+
+    .lv-settings-member__calendar input { flex: none; }
+
+    .lv-settings-member__add {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        min-height: 40px;
+    }
+
+    @container lv-home (max-width: 480px) {
+        .lv-settings-member { padding: 12px; }
+        .lv-settings-member__fields { grid-template-columns: minmax(0, 1fr); gap: 12px; }
+        .lv-settings-member__field :is(input, select),
+        .lv-settings-member__delete,
+        .lv-settings-member__add { min-height: 44px; }
+    }
+
+    @media (max-width: 480px) {
+        .lv-settings-member { padding: 12px; }
+        .lv-settings-member__fields { grid-template-columns: minmax(0, 1fr); gap: 12px; }
+        .lv-settings-member__field :is(input, select),
+        .lv-settings-member__delete,
+        .lv-settings-member__add { min-height: 44px; }
+    }
+</style>

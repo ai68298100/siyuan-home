@@ -1,6 +1,11 @@
 <script lang="ts">
     import type { HomePluginLike } from "@/types/plugin";
-    let { plugin, t, onGoto }: { plugin: HomePluginLike; t: (k: string) => string; onGoto?: (s: string) => void } = $props();
+    let { plugin, t, onGoto, onCapture }: {
+        plugin: HomePluginLike;
+        t: (k: string) => string;
+        onGoto?: (s: string) => void;
+        onCapture?: (moduleId?: string) => void;
+    } = $props();
 
     let step = $state(1);
     let provisioning = $state(false);
@@ -18,8 +23,9 @@
     );
 
     function toggle(role: string) {
-        picked = picked.includes(role) ? picked.filter((r) => r !== role) : [...picked, role];
-        if (!picked.includes("child")) children = 0;
+        const nextPicked = picked.includes(role) ? picked.filter((r) => r !== role) : [...picked, role];
+        picked = nextPicked;
+        if (!nextPicked.includes("child")) children = 0;
     }
 
     async function runOnboarding(roles: string[], moduleIds: string[], goToCapture: boolean) {
@@ -33,17 +39,18 @@
         try {
             await plugin.finishOnboarding({ roles, children }, moduleIds);
             if (goToCapture) {
-                // The certificates ledger is only a recommendation. It can be
-                // disabled by an existing user, or fail to provision while the
-                // onboarding flow is finishing. Never route into a blank or
-                // disabled ledger: choose the first enabled, provisioned ledger
-                // and otherwise leave the user on the overview with guidance.
-                const target = (plugin.settings.enabledModules ?? [])
+                // Prefer newly recommended ledgers, then fall back to any
+                // enabled ledger that was successfully provisioned.
+                const enabled = plugin.settings.enabledModules ?? [];
+                const target = [...recommended.filter((id) => enabled.includes(id)), ...enabled]
                     .filter((id) => id !== "members" && id !== "adhoc")
-                    .find((id) => !!plugin.settings.dbRefs?.[id]?.avId);
+                    .find((id) => !!plugin.schemaCatalog?.[id]?.capture?.length && !!plugin.settings.dbRefs?.[id]?.avId);
                 if (target) {
-                    plugin.setActiveLedger(target);
-                    onGoto?.("ledger");
+                    if (onCapture) onCapture(target);
+                    else {
+                        plugin.setActiveLedger(target);
+                        onGoto?.("ledger");
+                    }
                 } else {
                     onGoto?.("overview");
                 }
@@ -56,12 +63,16 @@
             provisioning = false;
         }
     }
-    // C7 向导 CTA：完成后直达证件快速录入（预选 certs）。超时只提示仍在处理中，
+    // C7 向导 CTA：完成后直达快速记录（优先预选刚推荐并已建库的台账）。超时只提示仍在处理中，
     // 保持 busy 锁直到建库流程实际结束，避免超时后再次点击并发建库。
     async function finishAndCapture() {
         await runOnboarding(["self", ...picked], recommended, true);
     }
-    // 完成=建库+直达证件快速录入（C7 CTA）；skip 路径同样经 finishOnboarding（需容错）
+    function goToStep(next: number) {
+        step = next;
+        requestAnimationFrame(() => document.getElementById("lv-wiz-title")?.focus());
+    }
+    // 完成=建库+直达快速记录（C7 CTA）；skip 路径同样经 finishOnboarding（需容错）
     async function skip() {
         children = 0;
         await runOnboarding(["self"], [], false);
@@ -124,7 +135,7 @@
         </details>
         {#if step === 1}
             <div class="lv-wiz__current">
-                <h3 id="lv-wiz-title" class="lv-wiz__title">{t("wiz.s1Title")}</h3>
+                <h3 id="lv-wiz-title" class="lv-wiz__title" tabindex="-1">{t("wiz.s1Title")}</h3>
                 <p class="lv-sub lv-wiz__hint">{t("wiz.s1Hint")}</p>
             </div>
             <div class="lv-roles">
@@ -142,12 +153,12 @@
             {/if}
             <div class="lv-wiz__actions">
                 <button class="lv-btn ghost" disabled={provisioning} onclick={skip}>{provisioning ? t("wiz.provisioningShort") : t("wiz.skip")}</button>
-                <button class="lv-btn primary" disabled={provisioning} onclick={() => (step = 2)}>{t("wiz.next")} →</button>
+                <button class="lv-btn primary" disabled={provisioning} onclick={() => goToStep(2)}>{t("wiz.next")} →</button>
             </div>
             {#if provisionError}<p class="lv-caption lv-wiz__error" role="alert">⚠ {skipFailed ? `${t("wiz.skipFailed")}: ${provisionError}` : provisionError}</p>{/if}
         {:else}
             <div class="lv-wiz__current">
-                <h3 id="lv-wiz-title" class="lv-wiz__title">{t("wiz.s2Title")}</h3>
+                <h3 id="lv-wiz-title" class="lv-wiz__title" tabindex="-1">{t("wiz.s2Title")}</h3>
                 <p class="lv-wiz__lead">{t("wiz.moduleIntro")}</p>
                 <p class="lv-sub lv-wiz__hint">{t("wiz.s2Hint")}</p>
             </div>
@@ -162,7 +173,7 @@
                 <p class="lv-caption lv-wiz__note" role="note">ⓘ {t("wiz.sexHint")}</p>
             {/if}
             <div class="lv-wiz__actions lv-wiz__actions--split">
-                <button class="lv-btn" disabled={provisioning} onclick={() => (step = 1)}>← {t("wiz.back")}</button>
+                <button class="lv-btn" disabled={provisioning} onclick={() => goToStep(1)}>← {t("wiz.back")}</button>
                 {#if provisionError}
                     <span class="lv-caption lv-wiz__error" role="alert">⚠ {skipFailed ? `${t("wiz.skipFailed")}: ${provisionError}` : provisionError}</span>
                 {/if}
@@ -234,7 +245,7 @@
         margin-bottom: 18px;
         border: 1px solid var(--lv-line);
         border-radius: var(--lv-r-2);
-        background: color-mix(in srgb, var(--lv-surface) 72%, transparent);
+        background: var(--lv-surface);
     }
 
     .lv-onboarding .lv-wiz__overview summary {
@@ -286,7 +297,7 @@
     .lv-onboarding .lv-wiz__actions--split .lv-wiz__error { flex: 1; margin: 0; }
     .lv-onboarding .lv-wiz__note { margin: 0 0 12px; color: var(--lv-accent); line-height: 1.5; }
 
-    @media (max-width: 480px) {
+    @container lv-home (max-width: 480px) {
         .lv-onboarding .lv-wiz__intro {
             grid-template-columns: 34px minmax(0, 1fr);
             align-items: start;

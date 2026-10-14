@@ -8,7 +8,10 @@ export const AMOUNT_KEYS: ReadonlySet<string> = new Set([
 ]);
 
 export function formatAmount(n: number): string {
-    if (!Number.isFinite(n)) return String(n);
+    if (!Number.isFinite(n)) return "—";
+    // Avoid multiplying very large values into Infinity and keep diagnostic
+    // cards usable when imported data contains an accidental huge amount.
+    if (Math.abs(n) >= 1e15) return n.toExponential(4).replace(/\.?(0+)e/, "e");
     const rounded = Math.round(n * 100) / 100;
     const [int, dec] = String(rounded).split(".");
     const intFmt = int.replace(/\B(?=(\d{3})+(?!\d))/g, ",");

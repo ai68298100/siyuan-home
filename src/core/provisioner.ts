@@ -18,7 +18,7 @@ import type { HomeSettings, DbRef } from "@/types";
 import type { ModuleSchema } from "./schema";
 import {
     listNotebooks, createNotebook, openNotebook, createDocWithMd, getHPathByID, sql, newSiYuanId,
-    createAttributeView, addAttributeViewColumn, KernelError,
+    createAttributeView, addAttributeViewColumn, renderLedger, KernelError, isWriteResultUnknown,
 } from "./siyuan";
 
 export interface DuplicateFinding {
@@ -55,6 +55,21 @@ export function isSiYuanId(v: string | undefined): boolean {
     return !!v && SIYUAN_ID_RE.test(v);
 }
 
+async function createNotebookWithRecovery(name: string): Promise<string> {
+    try {
+        return await createNotebook(name, { idempotencyKey: `provision:notebook:create:${name}`, retries: 0 });
+    } catch (error) {
+        if (!isWriteResultUnknown(error)) throw error;
+        // The create request may have committed before its response was lost.
+        // Re-read by exact name before reporting an unresolved result; never
+        // blindly submit a second create request.
+        const matches = (await listNotebooks()).filter((notebook) => notebook.name === name);
+        if (matches.length === 1) return matches[0].id;
+        throw new KernelError("/api/notebook/createNotebook", -408,
+            matches.length > 1 ? `notebook creation is ambiguous for "${name}"` : `notebook creation result is unknown for "${name}"`);
+    }
+}
+
 /**
  * 确保专用笔记本可用，返回笔记本 ID（D07）：
  * - 登记值为 ID → 按 ID 匹配；查不到（笔记本被删除）→ 落回默认名，绝不把 ID 当名称新建；
@@ -68,7 +83,7 @@ export async function ensureNotebook(preferred?: string): Promise<string> {
     if (preferred) {
         const hit = isSiYuanId(preferred) ? byId(preferred) : byName(preferred);
         if (hit) {
-            if (hit.closed) await openNotebook(hit.id);
+            if (hit.closed) await openNotebook(hit.id, { idempotencyKey: `provision:notebook:open:${hit.id}`, retries: 1 });
             return hit.id;
         }
     }
@@ -76,10 +91,10 @@ export async function ensureNotebook(preferred?: string): Promise<string> {
     const name = isSiYuanId(preferred) || !preferred ? DEFAULT_NOTEBOOK_NAME : preferred;
     const hit = byName(name);
     if (hit) {
-        if (hit.closed) await openNotebook(hit.id);
+        if (hit.closed) await openNotebook(hit.id, { idempotencyKey: `provision:notebook:open:${hit.id}`, retries: 1 });
         return hit.id;
     }
-    return createNotebook(name);
+    return createNotebookWithRecovery(name);
 }
 
 /** 台账文档 hpath（笔记本内一级文档） */
@@ -87,10 +102,21 @@ export function ledgerHPath(titleI18n: string): string {
     return `/${DOC_TITLE_PREFIX}${titleI18n}`;
 }
 
+function stableAvSeed(moduleId: string, docId: string): string {
+    let hash = 2166136261;
+    for (const char of `${moduleId}:${docId}`) {
+        hash ^= char.charCodeAt(0);
+        hash = Math.imul(hash, 16777619);
+    }
+    const timestamp = docId.match(/^(\d{14})-/)?.[1] ?? "20000101000000";
+    return `${timestamp}-${(hash >>> 0).toString(36).padStart(7, "0")}`;
+}
+
 async function findLedgerDoc(notebookId: string, hpath: string): Promise<string | null> {
     const rows = await sql<{ id: string }>(
-        `SELECT id FROM blocks WHERE type='d' AND box='${notebookId}' AND hpath='${hpath.replace(/'/g, "''")}' LIMIT 1`,
+        `SELECT id FROM blocks WHERE type='d' AND box='${notebookId.replace(/'/g, "''")}' AND hpath='${hpath.replace(/'/g, "''")}' LIMIT 2`,
     );
+    if (rows.length > 1) throw new KernelError("provision.findLedgerDoc", -409, `multiple ledger documents match "${hpath}"`);
     return rows[0]?.id ?? null;
 }
 
@@ -153,18 +179,63 @@ async function ensureColumns(
     const columns: Record<string, string> = { ...(existing ?? {}) };
     let error: string | undefined;
     if (!avId) return { columns, error: error ?? "av unavailable" };
+    let knownColumns: any[];
+    try {
+        knownColumns = (await renderLedger(avId)).columns ?? [];
+    } catch (e) {
+        return { columns, error: `column preflight: ${errText(e)}` };
+    }
     for (const col of schema.columns) {
         if (columns[col.key]) continue; // 已登记 → 不删不改（ensureColumns 约束，15/33.2）
         const keyID = newSiYuanId();
+        const columnName = opts.resolveName?.(col.key) ?? col.key;
+        // Settings can be lost while the AV still contains the column. Reuse
+        // the one preflight snapshot so existing columns are restored without
+        // issuing another read for every field.
+        const currentMatches = knownColumns.filter((candidate: any) =>
+            candidate?.id === keyID || candidate?.name === columnName || candidate?.keyName === columnName,
+        );
+        if (currentMatches.length === 1 && currentMatches[0]?.id) {
+            columns[col.key] = String(currentMatches[0].id);
+            continue;
+        }
+        if (currentMatches.length > 1) {
+            error = `column "${col.key}" has multiple matching keys`;
+            continue;
+        }
         try {
             await addAttributeViewColumn(avId, {
                 keyID,
-                name: opts.resolveName?.(col.key) ?? col.key,
+                name: columnName,
                 type: col.type,
                 relationTargetAvID: col.type === "relation" ? memberAvId : undefined,
-            });
+            }, { idempotencyKey: `provision:column:${moduleId}:${col.key}`, retries: 0 });
             columns[col.key] = keyID;
+            knownColumns.push({ id: keyID, name: columnName });
         } catch (e) {
+            // The add may have committed while its response was lost. A
+            // fresh view can safely recover the key; otherwise leave the
+            // mapping missing so the next run can reconcile before creating.
+            let recovered: any;
+            for (let attempt = 0; attempt < (isWriteResultUnknown(e) ? 4 : 1); attempt++) {
+                if (attempt > 0) await new Promise((resolve) => setTimeout(resolve, 300));
+                try {
+                    const recoveredView = await renderLedger(avId);
+                    const matches = (recoveredView.columns ?? []).filter((candidate: any) =>
+                        candidate?.id === keyID || candidate?.name === columnName || candidate?.keyName === columnName,
+                    );
+                    if (matches.length === 1) {
+                        recovered = matches[0];
+                        knownColumns = recoveredView.columns ?? [];
+                    }
+                    if (matches.length > 1) error = `column "${col.key}" recovery is ambiguous`;
+                    if (matches.length > 0) break;
+                } catch { /* keep trying briefly only when the write result is unknown */ }
+            }
+            if (recovered?.id) {
+                columns[col.key] = String(recovered.id);
+                continue;
+            }
             // 补列失败不阻断建库（可重跑续补，33.2）
             error = `column "${col.key}": ${errText(e)}`;
             console.warn(`[siyuan-home] column "${col.key}" on "${moduleId}" deferred:`, error);
@@ -217,7 +288,7 @@ export async function provisionModule(
             let avId = await findAvBlockInDoc(found);
             if (!avId) {
                 try {
-                    avId = await createAttributeView(found, newSiYuanId());
+                    avId = await createAttributeView(found, stableAvSeed(moduleId, found), { idempotencyKey: `provision:av:${moduleId}:${found}` });
                 } catch {
                     avId = null; // av 创建失败 → provisional 落库，诊断可见
                 }
@@ -228,13 +299,28 @@ export async function provisionModule(
             settings.dbRefs[moduleId] = dbRef;
             return { dbRef, created: false };
         }
-        const docId = await createDocWithMd(notebookId, hpath, `${titleI18n}\n\n{: placeholder-ledger }\n`);
-        const avIdSeed = newSiYuanId();
+        let docId: string;
+        try {
+            docId = await createDocWithMd(notebookId, hpath, `${titleI18n}\n\n{: placeholder-ledger }\n`, {
+                idempotencyKey: `provision:doc:${moduleId}:${notebookId}:${hpath}`,
+                retries: 0,
+            });
+        } catch (error) {
+            if (!isWriteResultUnknown(error)) throw error;
+            let recovered: string | null = null;
+            for (let attempt = 0; attempt < 5 && !recovered; attempt++) {
+                if (attempt > 0) await new Promise((resolve) => setTimeout(resolve, 250));
+                recovered = await findLedgerDoc(notebookId, hpath);
+            }
+            if (!recovered) throw new KernelError("/api/filetree/createDocWithMd", -408, `document creation result is unknown for "${hpath}"`);
+            docId = recovered;
+        }
+        const avIdSeed = stableAvSeed(moduleId, docId);
         let avId: string | undefined;
         let provisional = false;
         let provisionError: string | undefined;
         try {
-            avId = await createAttributeView(docId, avIdSeed);
+            avId = await createAttributeView(docId, avIdSeed, { idempotencyKey: `provision:av:${moduleId}:${docId}` });
         } catch (e) {
             provisional = true;
             provisionError = errText(e);

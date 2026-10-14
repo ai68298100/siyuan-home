@@ -16,12 +16,27 @@ function fakeAv() {
     let seq = 0;
     let failAdd = false;
     let failCellKey: string | null = null;
+    let uncertainAdd: "unique-fingerprint" | "none" | null = null;
     setTransport(async (endpoint: string, payload: any) => {
         switch (endpoint) {
             case "/api/av/getAttributeViewPrimaryKeyValues":
                 return { code: 0, msg: "", data: { rows: { values: [...rows.keys()].map((id) => ({ id })) } } };
             case "/api/av/addAttributeViewBlocks": {
                 if (failAdd) return { code: 5, msg: "av busy" };
+                if (uncertainAdd) {
+                    const mode = uncertainAdd;
+                    uncertainAdd = null;
+                    const matchingId = `row-${++seq}`;
+                    const matchingCells = mode === "unique-fingerprint" ? {
+                        [COLS.name]: { type: "text", text: { content: "待确认成员" } },
+                        [COLS.role]: { type: "select", select: { content: "self" } },
+                        [COLS.lunar]: { type: "checkbox", checkbox: { checked: false } },
+                    } : { [COLS.name]: { type: "text", text: { content: "无关记录甲" } } };
+                    rows.set(matchingId, matchingCells);
+                    rows.set(`row-${++seq}`, { [COLS.name]: { type: "text", text: { content: "无关记录乙" } } });
+                    // Simulate a request whose writes committed but whose response was lost.
+                    throw new TypeError("network response lost");
+                }
                 const id = `row-${++seq}`;
                 rows.set(id, {});
                 // D02：响应直接携带新行 ID
@@ -55,6 +70,7 @@ function fakeAv() {
         rows,
         setFailAdd: (v: boolean) => { failAdd = v; },
         setFailCell: (k: string | null) => { failCellKey = k; },
+        setUncertainAdd: (v: "unique-fingerprint" | "none") => { uncertainAdd = v; },
     };
 }
 
@@ -106,6 +122,16 @@ describe("addMember / updateMember（D05）", () => {
         expect(av.rows.get(m.avItemId!)![COLS.lunar]?.checkbox?.checked).toBe(true);
     });
 
+    it("相同成员 ID 重放 addMember → 不重复追加设置或建台账行", async () => {
+        const av = fakeAv();
+        const { plugin } = memoryPlugin();
+        const st = settings([]);
+        const m = member({ id: "stable-add-id", name: "幂等成员" });
+        await Promise.all([addMember(plugin, st, m), addMember(plugin, st, m)]);
+        expect(st.members.filter((entry) => entry.id === m.id)).toHaveLength(1);
+        expect(av.rows.size).toBe(1);
+    });
+
     it("建行失败（内核报错）→ syncError 记录，设置侧仍生效", async () => {
         const av = fakeAv();
         const { plugin } = memoryPlugin();
@@ -115,6 +141,85 @@ describe("addMember / updateMember（D05）", () => {
         await addMember(plugin, st, m);
         expect(m.avItemId).toBeUndefined();
         expect(m.syncError).toBeTruthy();
+    });
+
+    it("身份待确认重试先回读既有候选，不重复创建台账行", async () => {
+        const av = fakeAv();
+        const { plugin } = memoryPlugin();
+        const m = member({ id: "pending-member", name: "待确认" });
+        av.rows.set("row-existing", {
+            [COLS.name]: { type: "text", text: { content: m.name } },
+            [COLS.role]: { type: "select", select: { content: m.role } },
+            [COLS.lunar]: { type: "checkbox", checkbox: { checked: false } },
+        });
+        m.avRowCreatePending = {
+            avId: REF.avId!,
+            baselineItemIds: [],
+            candidateItemIds: ["row-existing"],
+            fingerprint: { name: m.name, role: m.role, lunarBirthday: false },
+            startedAt: new Date().toISOString(),
+        };
+        const st = settings([m]);
+        await addMember(plugin, st, m);
+        expect(av.rows.size).toBe(1);
+        expect(m.avItemId).toBe("row-existing");
+        expect(m.avRowCreatePending).toBeUndefined();
+    });
+
+    it("未知建行结果持久记录候选；唯一成员指纹可恢复，不能再次建行", async () => {
+        const av = fakeAv();
+        const { plugin, store } = memoryPlugin();
+        const st = settings([]);
+        const m = member({ id: "pending-recovery", name: "待确认成员" });
+        av.setUncertainAdd("unique-fingerprint");
+        await addMember(plugin, st, m);
+        expect(m.avItemId).toBeUndefined();
+        expect(m.avRowCreatePending?.baselineItemIds).toEqual([]);
+        expect(m.avRowCreatePending?.candidateItemIds).toHaveLength(2);
+        expect(JSON.parse(store["settings.json"]).members[0].avRowCreatePending.candidateItemIds).toHaveLength(2);
+        const before = av.rows.size;
+
+        // Both the normal retry path and settings sync must reconcile the prior create.
+        await updateMember(plugin, st, { ...m, notes: "编辑后重试" });
+        expect(st.members[0].avItemId).toBe("row-1");
+        expect(av.rows.size).toBe(before);
+        expect(st.members[0].avRowCreatePending).toBeUndefined();
+        expect(text(av, "row-1", "name")).toBe("待确认成员");
+    });
+
+    it("待确认建行没有匹配候选时，保存重试/差异同步/回填均不得再创建", async () => {
+        const av = fakeAv();
+        const { plugin, store } = memoryPlugin();
+        const st = settings([]);
+        const m = member({ id: "pending-no-match", name: "待确认成员" });
+        av.setUncertainAdd("none");
+        await addMember(plugin, st, m);
+        const before = av.rows.size;
+        expect(m.avRowCreatePending).toBeTruthy();
+
+        await updateMember(plugin, st, { ...m, notes: "再试一次" });
+        const sync = await syncMembersToAv(plugin, st, []);
+        expect(sync.failed).toContain("待确认成员");
+        const backfill = await backfillMemberLinks(plugin, st);
+        expect(backfill.ambiguous.map((entry) => entry.member)).toContain("待确认成员");
+        expect(av.rows.size).toBe(before);
+        expect(st.members[0].avItemId).toBeUndefined();
+        expect(st.members[0].avRowCreatePending).toBeTruthy();
+        expect(JSON.parse(store["settings.json"]).members[0].avRowCreatePending).toBeTruthy();
+    });
+
+    it("待确认候选在回填时唯一匹配指纹后完成关联", async () => {
+        const av = fakeAv();
+        const { plugin } = memoryPlugin();
+        const st = settings([]);
+        const m = member({ id: "pending-backfill", name: "待确认成员" });
+        av.setUncertainAdd("unique-fingerprint");
+        await addMember(plugin, st, m);
+        const result = await backfillMemberLinks(plugin, st);
+        expect(result.linked).toEqual(["待确认成员"]);
+        expect(m.avItemId).toBe("row-1");
+        expect(m.avRowCreatePending).toBeUndefined();
+        expect(av.rows.size).toBe(2);
     });
 
     it("编辑成员（改名+清空生日）→ 按 avItemId 精确写回，含空生日 isNotEmpty:false", async () => {

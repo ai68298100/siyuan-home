@@ -6,18 +6,39 @@
     import { fade } from "svelte/transition";
     import { localDateKey } from "@/core/hub/rule";
     import { parseNaturalDate } from "@/core/dateparse";
+    import { formatLocalDate, formatLocalTime } from "@/core/date-display";
     import { memberHue } from "@/core/format";
     import { showMessage } from "siyuan";
-    import { moduleIcon as icons, moduleTone } from "@/core/modules";
+    import { MODULE_GROUPS, getModule, moduleTone } from "@/core/modules";
+    import UiIcon from "@/ui/icon.svelte";
+    import ActivityFeed from "../activity-feed.svelte";
+    import { moduleUiIcon } from "@/ui/icons";
+    import type { ModuleGroupId } from "@/types";
 
-    let { plugin, t, onGoto, version, initialScanError = "", onRetryScan }: {
+    let { plugin, t, onGoto, onCapture, version, initialScanError = "", onRetryScan }: {
         plugin: HomePluginLike;
         t: (k: string) => string;
         onGoto: (s: string) => void;
+        onCapture?: (moduleId?: string) => void;
         version?: number;
         initialScanError?: string;
         onRetryScan?: () => Promise<void>;
     } = $props();
+
+    function openQuickCapture(moduleId: string) {
+        plugin.setActiveLedger(moduleId);
+        // The capture sheet is mounted once at tab-panel level. Set the target
+        // before opening it so the shortcut always opens the module the user
+        // just chose, even when a previous capture used another module.
+        if (plugin.runtime) plugin.runtime.hubQuickModule = moduleId;
+        if (onCapture) onCapture(moduleId);
+        else onGoto("ledger");
+    }
+
+    const onboarded = $derived.by(() => {
+        void version;
+        return !!plugin.settings.onboarded;
+    });
 
     // version（H02）：hubListeners 触发时递增，驱动以下 $derived 重算（plugin.* 为普通对象引用，本身不追踪）
     const allReminders = $derived.by(() => {
@@ -81,14 +102,60 @@
         return plugin.settings.enabledModules.filter((id: string) => id !== "members");
     });
 
+    // 269 波：模块较多时按功能分组，并提供本地搜索，避免首页变成难以扫读的长卡片墙。
+    // 筛选只影响当前页面展示，不改变设置中的启用状态。
+    let moduleGroupFilter = $state<ModuleGroupId | "all">("all");
+    let moduleQuery = $state("");
+    // 模块较多时默认只展开首个分组和有待办的分组；用户展开状态独立保存，
+    // 筛选结果自动展开匹配组，避免在长页面中反复寻找命中的模块。
+    let moduleGroupOpen = $state<Partial<Record<ModuleGroupId, boolean>>>({});
+    const moduleGroupStats = $derived.by(() => {
+        void version;
+        return MODULE_GROUPS
+            .map((id) => ({ id, count: moduleCards.filter((mid) => getModule(mid)?.group === id).length }))
+            .filter((group) => group.count > 0);
+    });
+    const moduleSections = $derived.by(() => {
+        void version;
+        const query = moduleQuery.trim().toLocaleLowerCase();
+        return moduleGroupStats
+            .filter((group) => moduleGroupFilter === "all" || group.id === moduleGroupFilter)
+            .map((group) => ({
+                ...group,
+                ids: moduleCards.filter((mid) => {
+                    if (getModule(mid)?.group !== group.id) return false;
+                    if (!query) return true;
+                    return t(`module.${mid}`).toLocaleLowerCase().includes(query);
+                }),
+            }))
+            .filter((group) => group.ids.length > 0);
+    });
+
+    function isModuleGroupOpen(id: ModuleGroupId, index: number, ids: string[]): boolean {
+        const query = moduleQuery.trim();
+        if (query || moduleGroupFilter !== "all") return ids.length > 0;
+        const explicit = moduleGroupOpen[id];
+        if (explicit !== undefined) return explicit;
+        const hasPending = ids.some((mid) => (pendingByModule.get(mid) ?? 0) > 0);
+        return index === 0 || hasPending;
+    }
+
+    function toggleModuleGroup(id: ModuleGroupId, open: boolean) {
+        moduleGroupOpen = { ...moduleGroupOpen, [id]: open };
+    }
+
     // 快捷录入只展示当前已启用的模块。固定展示未启用模块会把用户带到
     // 不存在的台账页，随后点击“重建”也不会真正创建该模块。
-    const quickModuleIds = ["certs", "medicine", "memberships", "media", "favors", "members"];
+    const quickModuleIds = ["vehicles", "certs", "medicine", "memberships", "favors", "media", "health", "insurance", "stock", "parenting", "members"];
     const quickModules = $derived.by(() => {
         void version;
         const enabled = new Set(plugin.settings.enabledModules);
-        return quickModuleIds.filter((id) => enabled.has(id));
+        const prioritized = quickModuleIds.filter((id) => enabled.has(id));
+        const additional = plugin.settings.enabledModules.filter((id) => enabled.has(id) && !quickModuleIds.includes(id) && id !== "adhoc");
+        return [...prioritized, ...additional].filter((id) => id === "members" || !!plugin.schemaCatalog?.[id]?.capture?.length);
     });
+    let quickExpanded = $state(false);
+    const quickVisibleModules = $derived(quickExpanded ? quickModules : quickModules.slice(0, 6));
     // A user may have disabled every optional module. Keep the first-record
     // guide actionable in that state instead of routing to a non-existent
     // `certs` ledger. The CTA then opens module settings where one can be
@@ -126,18 +193,16 @@
         return days.map((v) => (max > 0 ? Math.max(15, Math.round((v / max) * 100)) : 15));
     }
 
-    // B2（94 波走查）：模块图标共享表移至 core/modules（95 波起与提醒行共用，覆盖测试钉住）
-    const moduleIcon = (mid: string) => icons(mid);
-
     // 170/171 波（对齐原型质感，不低于）：context-strip 状态条 + focus-row 三重点卡
     const overdueCount = $derived.by(() => { void version; return allReminders.filter((r: Reminder) => r.level === "overdue").length; });
     const soon7Count = $derived.by(() => { void version; return allReminders.filter((r: Reminder) => r.daysLeft >= 0 && r.daysLeft <= 7).length; });
     const syncErrCount = $derived.by(() => { void version; return members.filter((m) => m.syncError).length; });
     const scanErrors = $derived.by(() => { void version; return plugin.scan?.errors ?? []; });
+    const permissionDenied = $derived(scanErrors.some((error) => error.moduleId === "permission"));
     const scanStale = $derived.by(() => { void version; return plugin.scan?.stale === true; });
     const snapshotLabel = $derived.by(() => {
         const at = plugin.runtime?.scannedAt;
-        return at ? new Date(at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) : "—";
+        return formatLocalTime(at, { hour: "2-digit", minute: "2-digit" }) ?? "—";
     });
     const scopeLabel = $derived(memberFilter ? (members.find((m) => m.id === memberFilter)?.name ?? "?") : t("dash.scopeAll"));
 
@@ -156,7 +221,7 @@
     });
     const rowCountOf = (mid: string): number | undefined => statsByModule[mid]?.rowCount;
     const hasLedgerRows = $derived.by(() => Object.values(statsByModule).some((stats: any) => typeof stats?.rowCount === "number" && stats.rowCount > 0));
-    const showStartGuide = $derived(plugin.settings.onboarded && (members.length === 0 || !hasLedgerRows));
+    const showStartGuide = $derived(onboarded && (members.length === 0 || !hasLedgerRows));
 
     // 262 波（Todoist/Linear assignee avatar 语言）：行级成员微头像——"这是谁的事"一眼可辨
     const memberOf = (id: string | undefined) => (id ? members.find((m) => m.id === id) : undefined);
@@ -221,9 +286,18 @@
     let memoDue = $state("");
     let memoInput: HTMLInputElement | undefined = $state();
     let savingMemo = $state(false);
-    async function runOverviewAction(action: () => Promise<void>) {
+    // 每条提醒独立锁定写操作，避免双击把同一条完成/延后写入两次。
+    let overviewBusy = $state<Set<string>>(new Set());
+    async function runOverviewAction(key: string, action: () => Promise<void>) {
+        if (overviewBusy.has(key)) return;
+        overviewBusy = new Set([...overviewBusy, key]);
         try { await action(); }
         catch (e) { showMessage(t("hub.actionFailed").replace("${msg}", e instanceof Error ? e.message : String(e)), 5000, "error"); }
+        finally {
+            const next = new Set(overviewBusy);
+            next.delete(key);
+            overviewBusy = next;
+        }
     }
     async function addMemo() {
         if (savingMemo) return;
@@ -280,33 +354,52 @@
     }
 </script>
 
-{#if !plugin.settings.onboarded}
-    <Onboarding {plugin} {t} onGoto={onGoto} />
+{#if !onboarded}
+    <Onboarding {plugin} {t} onGoto={onGoto} {onCapture} />
 {/if}
 
-<div class="lv-strip" role="status" aria-label={t("dash.stripLabel")}>
-    <span><strong>{t("dash.stripScope")}</strong> {scopeLabel}</span>
-    <span><strong>{t("dash.stripSnapshot")}</strong> <span class="lv-num">{snapshotLabel}</span>{scanStale ? ` · ${t("dash.stale")}` : ""}</span>
-    <span><strong>{t("dash.stripErrors")}</strong> {scanErrors.length}</span>
-</div>
-
 <div class="lv-hero">
-    <div><h1>{greet}</h1><p>{dateLine}{#if monthlyDone > 0}&nbsp;&nbsp;<span class="lv-badge green">✓ {t("dash.monthlyDone").replace("${n}", monthlyDueTotal > 0 ? `${monthlyDone}/${monthlyDueTotal}` : String(monthlyDone))}</span>{/if}</p></div>
-    <div class="lv-hero-count" title={t("dash.statScope").replace("${t}", snapshotLabel)}>
-        <b class="lv-num" use:countUp={reminders.length}>{reminders.length}</b><span>{reminders.length === 1 ? t("dash.needAttentionOne") : t("dash.needAttention")}</span>
+    <div class="lv-hero-copy">
+        <div class="lv-hero-meta" role="status" aria-label={t("dash.stripLabel")}>
+            <span>{dateLine}{scanStale ? ` · ${t("dash.stale")}` : ""}</span>
+            <span><strong>{t("dash.stripScope")}</strong> {scopeLabel}</span>
+            <span><strong>{t("dash.stripErrors")}</strong> {scanErrors.length}</span>
+        </div>
+        <h1>{greet}，{t("dash.heroTitle")}</h1><p class="lv-hero-lead">{t("dash.heroLead")}</p>
+        <div class="lv-hero-actions">
+            <button class="b3-button lv-hero-open" onclick={() => onGoto("reminders")}><UiIcon name="clock" size={17} />{t("dash.heroOpen")}</button>
+            {#if onCapture}<button class="b3-button b3-button--outline lv-hero-capture" onclick={() => onCapture()}><UiIcon name="add" size={16} />{t("dash.quickRecord")}</button>{/if}
+        </div>
+        {#if monthlyDone > 0}<p><span class="lv-badge green">✓ {t("dash.monthlyDone").replace("${n}", monthlyDueTotal > 0 ? `${monthlyDone}/${monthlyDueTotal}` : String(monthlyDone))}</span></p>{/if}
+    </div>
+    <div class="lv-hero-tools">
+        <div class="lv-hero-count" title={t("dash.statScope").replace("${t}", snapshotLabel)}>
+            <b class="lv-num" use:countUp={reminders.length}>{reminders.length}</b><span>{reminders.length === 1 ? t("dash.needAttentionOne") : t("dash.needAttention")}</span>
+        </div>
+        <svg class="lv-hero-art" viewBox="0 0 184 130" aria-hidden="true"><rect x="9" y="12" width="166" height="106" rx="28" fill="currentColor" opacity=".08"/><rect x="24" y="25" width="76" height="88" rx="12" fill="var(--lv-surface)" stroke="currentColor" stroke-opacity=".25"/><path d="M40 48h43M40 61h32M40 76h20M40 91h29" stroke="currentColor" stroke-width="4" stroke-linecap="round" opacity=".25"/><rect x="94" y="42" width="64" height="65" rx="14" fill="var(--lv-surface)" stroke="currentColor" stroke-opacity=".25"/><path d="m107 67 19-16 19 16M113 63v24h26V63M122 87V74h8v13" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/><circle cx="153" cy="33" r="14" fill="var(--lv-amber-soft)"/><path d="m147 33 4 4 8-8" fill="none" stroke="var(--lv-amber)" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
     </div>
 </div>
 
+{#if permissionDenied}
+    <div class="lv-card" role="alert" style="display:flex;align-items:center;gap:12px;padding:12px 16px">
+        <UiIcon name="alert" size={18} />
+        <span style="flex:1;min-width:0;overflow-wrap:anywhere">{t("permission.body")}</span>
+        <button class="b3-button b3-button--outline" disabled={retryingScan} aria-busy={retryingScan} onclick={retryScan}>
+            {retryingScan ? t("ledger.saving") : t("hub.rescan")}
+        </button>
+    </div>
+{/if}
+
 {#if showStartGuide}
-    <section class="lv-start-guide" aria-labelledby="lv-start-guide-title">
-        <div class="lv-start-guide__head">
-            <div>
+    <details class="lv-start-guide" aria-labelledby="lv-start-guide-title">
+        <summary class="lv-start-guide__summary">
+            <span class="lv-start-guide__copy">
                 <span class="lv-kicker">{t("startGuide.kicker")}</span>
-                <h2 id="lv-start-guide-title">{t("startGuide.title")}</h2>
-                <p>{t("startGuide.intro")}</p>
-            </div>
-            <span class="lv-start-guide__mark" aria-hidden="true">✦</span>
-        </div>
+                <span id="lv-start-guide-title" class="lv-start-guide__title">{t("startGuide.title")}</span>
+                <span class="lv-start-guide__intro">{t("startGuide.intro")}</span>
+            </span>
+            <span class="lv-start-guide__mark" aria-hidden="true">⌄</span>
+        </summary>
         <div class="lv-start-guide__steps">
             <div class="lv-start-guide__step">
                 <span class="lv-start-guide__num">1</span>
@@ -329,22 +422,22 @@
                 <button class="b3-button b3-button--outline" onclick={() => onGoto("reminders")}>{t("startGuide.openReminders")}</button>
             </div>
         </div>
-    </section>
+    </details>
 {/if}
 
 <div class="lv-focus" aria-label={t("dash.focusLabel")}>
     <div class="lv-focus-card">
-        <span class="lv-focus-icon">◷</span>
+        <span class="lv-focus-icon"><UiIcon name="clock" size={17} /></span>
         <div><b>{t("dash.focusToday")}</b><span>{t("dash.focusTodayBody").replace("${od}", String(overdueCount)).replace("${s}", String(soon7Count))}</span></div>
         <button class="b3-button b3-button--text" onclick={() => onGoto("reminders")}>{t("dash.focusOpen")}</button>
     </div>
     <div class="lv-focus-card">
-        <span class="lv-focus-icon">⌁</span>
+        <span class="lv-focus-icon"><UiIcon name="users" size={17} /></span>
         <div><b>{t("dash.focusReview")}</b><span>{syncErrCount > 0 ? t("dash.focusReviewBody").replace("${n}", String(syncErrCount)) : t("dash.focusReviewOk")}</span></div>
         <button class="b3-button b3-button--text" onclick={() => onGoto("members")}>{t("dash.focusView")}</button>
     </div>
     <div class="lv-focus-card">
-        <span class="lv-focus-icon" style={scanStale || scanErrors.length ? "color:var(--lv-warn)" : "color:var(--lv-ok)"}>✓</span>
+        <span class="lv-focus-icon" style={scanStale || scanErrors.length ? "color:var(--lv-warn)" : "color:var(--lv-ok)"}><UiIcon name="check" size={17} /></span>
         <div><b>{t("dash.focusData")}</b><span>{scanStale ? t("dash.focusStale") : scanErrors.length > 0 ? t("dash.focusDataErr").replace("${t}", snapshotLabel).replace("${n}", String(scanErrors.length)) : t("dash.focusDataOk").replace("${t}", snapshotLabel)}</span></div>
         <button class="b3-button b3-button--text" onclick={() => plugin.openSetting()}>{t("dash.focusView")}</button>
     </div>
@@ -357,7 +450,7 @@
             <span class="lv-avatar" aria-hidden="true" style="background:linear-gradient(135deg, hsl({memberHue(m.id)} 62% 52%), hsl({(memberHue(m.id) + 42) % 360} 62% 40%))">{m.name.slice(0, 1)}</span>{m.name}
         </button>
     {/each}
-    <button class="lv-chip" aria-label={t("add")} title={t("add")} onclick={() => onGoto("members")}>＋</button>
+    <button class="lv-chip" aria-label={t("add")} title={t("add")} onclick={() => onGoto("members")}><UiIcon name="add" size={15} /></button>
 </div>
 
 <div class="lv-sec"><h2 class="lv-title-sec">{t("dash.upcoming")}</h2><span class="lv-sub">{t("dash.upcomingSub")}</span>
@@ -365,7 +458,7 @@
 </div>
 {#if reminders.length === 0 && (initialScanError || scanErrors.length > 0)}
     <div class="lv-card"><div class="lv-empty" role="alert">
-        <div class="eic">⚠</div><b>{t("dash.scanUnavailable")}</b>
+        <div class="eic"><UiIcon name="alert" size={22} /></div><b>{t("dash.scanUnavailable")}</b>
         <span>{initialScanError || t("dash.focusDataErr").replace("${t}", snapshotLabel).replace("${n}", String(scanErrors.length))}</span>
         <button class="b3-button b3-button--outline" style="margin-top:8px" disabled={retryingScan} aria-busy={retryingScan} onclick={retryScan}>
             {retryingScan ? t("ledger.saving") : t("hub.rescan")}
@@ -373,7 +466,7 @@
     </div></div>
 {:else if reminders.length === 0 && memberFilter}
     <!-- 174 波（对齐原型空态解释）：筛选导致的空 ≠ 无资料，说明并给清除出口 -->
-    <div class="lv-card"><div class="lv-empty" role="status"><div class="eic">🔍</div><b>{t("dash.filteredEmpty")}</b><span>{t("dash.filteredEmptyHint")}</span>
+    <div class="lv-card"><div class="lv-empty" role="status"><div class="eic"><UiIcon name="search" size={22} /></div><b>{t("dash.filteredEmpty")}</b><span>{t("dash.filteredEmptyHint")}</span>
         <button class="b3-button b3-button--outline" style="margin-top:8px" onclick={() => setMemberFilter(undefined)}>{t("dash.clearFilter")}</button>
     </div></div>
 {:else if reminders.length === 0}
@@ -392,7 +485,7 @@
         </div>
         <p class="lv-caption" style="margin:8px 2px">{t("hub.firstScan")}</p>
     {:else}
-        <div class="lv-card"><div class="lv-empty" role="status"><div class="eic">✓</div><b>{t("dash.allClear")}</b><span>{t("hub.emptyHint")}</span></div></div>
+        <div class="lv-card"><div class="lv-empty" role="status"><div class="eic"><UiIcon name="check" size={22} /></div><b>{t("dash.allClear")}</b><span>{t("hub.emptyHint")}</span></div></div>
     {/if}
 {:else}
     <div class="lv-card lv-rems">
@@ -401,27 +494,37 @@
             <div class="lv-rem {r.level}" out:fade={{ duration: 150 }}>
                 <!-- 259 波：图标砖收回中性（对齐原型 .rem .ic = surface-2）——级别语义由色轨+
                      右侧相对时间大字承载，彩色砖让整列提醒过度用色 -->
-                <div class="lv-rem-ic" aria-hidden="true">{r.moduleId === "adhoc" ? "📝" : moduleIcon(r.moduleId)}</div>
-                <div class="lv-rem-t"><b>{r.title}</b><span>{#if memberOf(r.memberId)}{@const member = memberOf(r.memberId)}<span class="lv-miniava" style="background:linear-gradient(135deg, hsl({memberHue(member.id)} 62% 52%), hsl({(memberHue(member.id) + 42) % 360} 62% 40%))" aria-hidden="true">{member.name.slice(0, 1)}</span>{/if}{t(`module.${r.moduleId}`) !== `module.${r.moduleId}` ? t(`module.${r.moduleId}`) : t("adhoc.name")}{r.lunar ? " 🌙" : ""}{r.autoRenew ? " 🔄" : ""}</span></div>
+                <div class="lv-rem-ic" aria-hidden="true"><UiIcon name={moduleUiIcon(r.moduleId)} size={18} /></div>
+                <div class="lv-rem-t"><b>{r.title}</b><span>{#if memberOf(r.memberId)}{@const member = memberOf(r.memberId)}<span class="lv-miniava" style="background:linear-gradient(135deg, hsl({memberHue(member.id)} 62% 52%), hsl({(memberHue(member.id) + 42) % 360} 62% 40%))" aria-hidden="true">{member.name.slice(0, 1)}</span>{/if}{t(`module.${r.moduleId}`) !== `module.${r.moduleId}` ? t(`module.${r.moduleId}`) : t("adhoc.name")}{#if !r.memberId} · {t("members.unassigned")}{/if}{r.lunar ? " 🌙" : ""}{r.autoRenew ? " 🔄" : ""}</span></div>
                 <div class="lv-rem-when"><b class="lv-num" style="color:var(--lv-{r.level === 'overdue' ? 'danger' : r.level === 'soon' ? 'warn' : 'amber'})">
                     {r.daysLeft < 0 ? t("days.overdue").replace("${n}", String(-r.daysLeft)) : r.daysLeft === 0 ? t("days.today") : t("days.after").replace("${n}", String(r.daysLeft))}
                 </b><span class="lv-num">{r.dueDate}</span></div>
                 <div class="lv-rem-ops">
-                    <button class="b3-button b3-button--text" onclick={() => void runOverviewAction(() => plugin.complete(r))}>{t("act.done")}</button>
-                    <button class="b3-button b3-button--text" onclick={() => void runOverviewAction(() => plugin.snooze(r.id, 7))}>{t("act.snooze7")}</button>
+                    <button class="b3-button b3-button--text" disabled={overviewBusy.has(r.id)} aria-busy={overviewBusy.has(r.id)} onclick={() => void runOverviewAction(r.id, () => plugin.complete(r))}>{overviewBusy.has(r.id) ? t("ledger.saving") : t("act.done")}</button>
+                    <button class="b3-button b3-button--text" disabled={overviewBusy.has(r.id)} aria-busy={overviewBusy.has(r.id)} onclick={() => void runOverviewAction(r.id, () => plugin.snooze(r.id, 7))}>{overviewBusy.has(r.id) ? t("ledger.saving") : t("act.snooze7")}</button>
                 </div>
             </div>
         {/each}
     </div>
 {/if}
 
-<div class="lv-sec"><h2 class="lv-title-sec">{t("dash.quickRecord")}</h2><span class="lv-sub">{t("dash.quickRecordSub")}</span></div>
-<div class="lv-quick" style="margin-bottom:4px">
-    {#each quickModules as mid (mid)}
-        <button class="lv-qbtn" onclick={() => { plugin.setActiveLedger(mid); onGoto(mid === "members" ? "members" : "ledger"); }}>
-            <span class="qi">{moduleIcon(mid)}</span>{mid === "members" ? t("tab.members") : t(`module.${mid}`)}
+<ActivityFeed {plugin} {t} {version} />
+
+<div class="lv-sec"><h2 class="lv-title-sec">{t("dash.quickRecord")}</h2><span class="lv-sub">{t("dash.quickRecordSub")}</span>
+    {#if onCapture}<button class="b3-button b3-button--text" onclick={() => onCapture()}>{t("capture.openFull")}</button>{/if}
+</div>
+<div id="lv-quick-modules" class="lv-quick" style="margin-bottom:4px">
+    {#each quickVisibleModules as mid (mid)}
+        <button class="lv-qbtn" onclick={() => mid === "members" ? onGoto("members") : openQuickCapture(mid)}>
+            <span class="qi"><UiIcon name={moduleUiIcon(mid)} size={15} /></span>{mid === "members" ? t("tab.members") : t(`module.${mid}`)}
         </button>
     {/each}
+    {#if quickModules.length > 6}
+        <button class="lv-qbtn lv-qbtn--toggle" aria-expanded={quickExpanded}
+            onclick={() => (quickExpanded = !quickExpanded)}>
+            {quickExpanded ? t("dash.quickModulesLess") : t("dash.quickModulesMore").replace("${n}", String(quickModules.length - 6))}
+        </button>
+    {/if}
 </div>
 <div class="lv-sec"><h2 class="lv-title-sec">{t("memo.quick")}</h2><span class="lv-sub">{t("memo.quickSub")}</span></div>
 <div class="lv-card lv-memo" style="margin-top:0">
@@ -430,7 +533,7 @@
         disabled={savingMemo} onkeydown={(e: KeyboardEvent) => { if (e.key === "Enter" && !e.isComposing) void addMemo(); }} />
     <!-- 262 波（Todoist 式即时预览）：解析命中即亮 chip，提交前就知道日期去哪了 -->
     {#if memoParsed}
-        <span class="lv-parsechip" role="status">📅 <span class="lv-num">{memoParsed.date}</span></span>
+        <span class="lv-parsechip" role="status"><UiIcon name="calendar" size={13} /> <span class="lv-num">{memoParsed.date}</span></span>
     {/if}
     <input class="b3-text-field" type="date" bind:value={memoDue} />
     <button class="b3-button b3-button--text" disabled={savingMemo} aria-busy={savingMemo} onclick={addMemo} title={t("memo.add")}>{savingMemo ? t("ledger.saving") : `＋ ${t("memo.add")}`}</button>
@@ -451,39 +554,70 @@
         {/each}
     </div>
 {:else}
-<div class="lv-mods">
-    {#each moduleCards as mid (mid)}
+    <div class="lv-module-tools" aria-label={t("dash.moduleFilterLabel")}>
+        <div class="lv-module-filters" role="group" aria-label={t("dash.moduleFilterLabel")}>
+            <button type="button" class="lv-module-filter" class:on={moduleGroupFilter === "all"} aria-pressed={moduleGroupFilter === "all"}
+                onclick={() => (moduleGroupFilter = "all")}>{t("dash.moduleAll")}</button>
+            {#each moduleGroupStats as group (group.id)}
+                <button type="button" class="lv-module-filter" class:on={moduleGroupFilter === group.id} aria-pressed={moduleGroupFilter === group.id}
+                    onclick={() => (moduleGroupFilter = group.id)}>{t(`group.${group.id}`)} <span>{group.count}</span></button>
+            {/each}
+        </div>
+        <label class="lv-module-search">
+            <UiIcon name="search" size={15} />
+            <input class="b3-text-field" type="search" bind:value={moduleQuery} placeholder={t("dash.moduleSearch")} aria-label={t("dash.moduleSearch")} />
+        </label>
+        <span class="lv-module-total"><b class="lv-num">{moduleCards.length}</b> {t("dash.moduleCount")}</span>
+    </div>
+    {#if moduleSections.length === 0}
+        <div class="lv-card lv-module-empty" role="status">
+            <UiIcon name="search" size={17} /><span>{t("dash.moduleEmpty")}</span>
+            <button class="b3-button b3-button--text" onclick={() => { moduleQuery = ""; moduleGroupFilter = "all"; }}>{t("dash.moduleClear")}</button>
+        </div>
+    {:else}
+    {#each moduleSections as section, sectionIndex (section.id)}
+    {@const expanded = isModuleGroupOpen(section.id, sectionIndex, section.ids)}
+    {@const sectionPending = section.ids.reduce((total, id) => total + (pendingByModule.get(id) ?? 0), 0)}
+    {@const sectionRows = section.ids.reduce((total, id) => total + (rowCountOf(id) ?? 0), 0)}
+    {@const sectionRowsKnown = section.ids.every((id) => rowCountOf(id) !== undefined)}
+    <section class="lv-module-section" aria-labelledby={`lv-module-group-${section.id}`}>
+        <h3 class="lv-module-section__heading">
+            <button class="lv-module-section__head" aria-expanded={expanded} aria-controls={expanded ? `lv-module-items-${section.id}` : undefined}
+                onclick={() => toggleModuleGroup(section.id, !expanded)}>
+                <span class="lv-module-section__chevron" aria-hidden="true">{expanded ? "⌄" : "›"}</span>
+                <span class="lv-module-section__title" id={`lv-module-group-${section.id}`}>{t(`group.${section.id}`)}</span>
+                <span class="lv-caption">{(sectionRowsKnown ? t("dash.moduleGroupSummary") : t("dash.moduleGroupSummaryUnknown")).replace("${m}", String(section.ids.length)).replace("${r}", String(sectionRows)).replace("${p}", String(sectionPending))}</span>
+                {#if sectionPending > 0}<span class="lv-badge red lv-num">{sectionPending} <UiIcon name="alert" size={12} /></span>{/if}
+            </button>
+        </h3>
+        {#if expanded}
+        <div id={`lv-module-items-${section.id}`} class="lv-module-section__body">
+        <div class="lv-mods">
+    {#each section.ids as mid (mid)}
         {@const pending = pendingByModule.get(mid) ?? 0}
-        <div
-            class="lv-card lv-card--hover lv-mod"
-            role="button"
-            tabindex="0"
-            aria-label={t(`module.${mid}`)}
-            onkeydown={(e: KeyboardEvent) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); plugin.setActiveLedger(mid); onGoto("ledger"); } }}
-            onclick={() => { plugin.setActiveLedger(mid); onGoto("ledger"); }}
-        >
-            <div class="lv-mi" class:tone-blue={moduleTone(mid) === "t-blue"} class:tone-green={moduleTone(mid) === "t-green"}
-                class:tone-rose={moduleTone(mid) === "t-rose"} class:tone-amber={moduleTone(mid) === "t-amber"}
-                aria-hidden="true">{moduleIcon(mid)}</div><b>{t(`module.${mid}`)}</b>
+        <article class="lv-card lv-mod" aria-label={t(`module.${mid}`)}>
+            <button type="button" class="lv-module-open" aria-label={t(`module.${mid}`)} onclick={() => { plugin.setActiveLedger(mid); onGoto("ledger"); }}>
+                <span class="lv-mi" class:tone-blue={moduleTone(mid) === "t-blue"} class:tone-green={moduleTone(mid) === "t-green"}
+                    class:tone-rose={moduleTone(mid) === "t-rose"} class:tone-amber={moduleTone(mid) === "t-amber"}
+                    aria-hidden="true"><UiIcon name={moduleUiIcon(mid)} size={20} /></span><b>{t(`module.${mid}`)}</b>
+            </button>
             <div class="lv-stat" title={t("dash.statScope").replace("${t}", snapshotLabel)}>
             {#if rowCountOf(mid) !== undefined}
                 <!-- 264 波：主数字=台账行数（原型 "12 条 · 1 待办" 层次）；265 波零值弱色降噪——
                      空台账的"0"是已知事实但不必与活跃数字同权重；待办徽章右置可下钻 -->
                 <b class="lv-num" class:zero={rowCountOf(mid) === 0}>{rowCountOf(mid)}</b><span>{t("mod.records")}</span>
                 {#if pending > 0}
-                    <span class="up" role="button" tabindex="0" style="cursor:pointer;display:inline-flex"
+                    <button type="button" class="lv-module-pending up"
                         title={t("mod.pendingDrill")}
-                        onkeydown={(e: KeyboardEvent) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); e.stopPropagation(); drillReminders(mid); } }}
                         onclick={(e: MouseEvent) => { e.stopPropagation(); drillReminders(mid); }}
-                    ><span class="lv-badge red lv-num">{pending} ⚠</span></span>
+                    ><span class="lv-badge red lv-num">{pending} <UiIcon name="alert" size={12} /></span></button>
                 {/if}
             {:else if pending > 0}
                 <!-- 17 组/196 波：徽章=独立下钻目标（stopPropagation，卡片本体仍进台账） -->
-                <span class="lv-num" role="button" tabindex="0" style="cursor:pointer"
+                <button type="button" class="lv-num lv-module-pending"
                     title={t("mod.pendingDrill")}
-                    onkeydown={(e: KeyboardEvent) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); e.stopPropagation(); drillReminders(mid); } }}
                     onclick={(e: MouseEvent) => { e.stopPropagation(); drillReminders(mid); }}
-                ><b>{pending}</b><span style="color:var(--lv-warn)">{t("mod.pending")}</span></span>
+                ><b>{pending}</b><span style="color:var(--lv-warn)">{t("mod.pending")}</span></button>
             {:else if plugin.settings.dbRefs?.[mid] && !plugin.settings.dbRefs[mid].docId}
                     <span style="color:var(--lv-warn)">{t("diag.missing")}</span>
             {:else if plugin.settings.dbRefs?.[mid]?.provisional}
@@ -503,8 +637,8 @@
             </div>
             {#if mid === "exams" && plugin.runtime?.lastExamStats?.generatedAt}
                 <!-- EC21：lv-exam:stats 聚合展示（只读子集，标注更新日期；不读题目内容） -->
-                <div class="lv-caption" title={t("mod.examStatsTip").replace("${d}", new Date(plugin.runtime.lastExamStats.generatedAt).toLocaleDateString())}>
-                    📝 {t("mod.examStreak").replace("${n}", String(plugin.runtime.lastExamStats.streak)).replace("${p}", String(plugin.runtime.lastExamStats.accuracy))}
+                <div class="lv-caption" title={t("mod.examStatsTip").replace("${d}", formatLocalDate(plugin.runtime.lastExamStats.generatedAt) ?? "—")}>
+                    <UiIcon name="note" size={13} /> {t("mod.examStreak").replace("${n}", String(plugin.runtime.lastExamStats.streak)).replace("${p}", String(plugin.runtime.lastExamStats.accuracy))}
                 </div>
             {/if}
             {#if mid === "health" && healthBound.length > 0}
@@ -513,7 +647,12 @@
                     ⏱ {t("mod.checkinBound").replace("${n}", String(healthBound.length))}
                 </div>
             {/if}
-        </div>
+        </article>
     {/each}
-</div>
+        </div>
+        </div>
+        {/if}
+    </section>
+    {/each}
+    {/if}
 {/if}

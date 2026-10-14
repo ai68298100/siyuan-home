@@ -37,7 +37,8 @@ async function demoRow(
     const ref = settings.dbRefs[moduleId];
     const cols = ref?.columns;
     if (!ref?.avId || !cols) return false;
-    const itemID = await addDetachedRow(ref.avId, `${DEMO_PREFIX}${fields.name}`);
+    const operationKey = `demo:${moduleId}:${String(fields.name)}`;
+    const itemID = await addDetachedRow(ref.avId, `${DEMO_PREFIX}${fields.name}`, { idempotencyKey: `${operationKey}:row` });
     settings.demoRows = {
         ...(settings.demoRows ?? {}),
         [moduleId]: [...(settings.demoRows?.[moduleId] ?? []), itemID],
@@ -45,7 +46,7 @@ async function demoRow(
     await saveSettings(plugin, settings);
     const write = async (key: string, value: unknown) => {
         if (!cols[key]) return;
-        await setCell(ref.avId!, cols[key], itemID, value);
+        await setCell(ref.avId!, cols[key], itemID, value, { idempotencyKey: `${operationKey}:cell:${key}` });
     };
     for (const [key, v] of Object.entries(fields)) {
         // 269 波：名称列必须显式写——addDetachedRow 的标题不落到 av 名称列
@@ -135,7 +136,7 @@ export async function clearDemoData(plugin: Plugin, settings: HomeSettings): Pro
         const failedIds: string[] = [];
         for (const itemID of itemIds) {
             try {
-                await removeLedgerRows(ref.avId, [itemID]);
+                await removeLedgerRows(ref.avId, [itemID], { idempotencyKey: `demo:clear:${moduleId}:${itemID}`, retries: 1 });
                 result.cleared++;
             } catch (e) {
                 result.errors.push(`${moduleId}/${itemID}: ${e instanceof Error ? e.message : String(e)}`);
