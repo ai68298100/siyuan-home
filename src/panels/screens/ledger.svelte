@@ -31,6 +31,7 @@
     import { openEnergyDashboardModal } from "../ledger/vehicle-dashboard-modal";
     import { calculateMembershipSpending } from "@/core/memberships";
     import { calculateMedicineSummary, formatMedicineRestockText } from "@/core/medicine";
+    import { calculateRetirement, type RetirementWorkerType } from "@/core/retirement";
 
     let { plugin, t, version }: { plugin: HomePluginLike; t: (k: string) => string; version?: number } = $props();
 
@@ -221,6 +222,25 @@
     const medicineSummary = $derived.by(() => {
         if (active !== "medicine" || !ref?.columns) return undefined;
         return calculateMedicineSummary(rows, ref.columns);
+    });
+
+    let selectedRetireMemberId = $state<string | undefined>();
+    let retireWorkerTypeOverride = $state<RetirementWorkerType | undefined>();
+
+    const targetRetireMember = $derived.by(() => {
+        const mems = plugin.settings.members ?? [];
+        if (mems.length === 0) return undefined;
+        return mems.find((m) => m.id === selectedRetireMemberId) ?? mems[0];
+    });
+
+    const currentRetireWorkerType = $derived.by<RetirementWorkerType>(() => {
+        if (retireWorkerTypeOverride) return retireWorkerTypeOverride;
+        return targetRetireMember?.sex === "male" ? "male" : "female_55";
+    });
+
+    const retireCalc = $derived.by(() => {
+        if (active !== "social" || !targetRetireMember?.birthday) return null;
+        return calculateRetirement(targetRetireMember.birthday, currentRetireWorkerType);
     });
 
     async function copyMedicineRestock() {
@@ -3382,6 +3402,76 @@
                 </button>
             {/if}
         </div>
+    </section>
+{/if}
+
+{#if active === "social" && (plugin.settings.members ?? []).length > 0}
+    {@const membersList = plugin.settings.members ?? []}
+    <section class="lv-retirement-banner lv-card" aria-label={t("social.banner.title")}>
+        <div class="lv-retirement-top">
+            <div class="lv-retirement-header">
+                <UiIcon name="users" size={16} />
+                <span class="lv-retirement-title">{t("social.banner.title")}</span>
+            </div>
+            {#if membersList.length > 1}
+                <div class="lv-retirement-members" role="tablist" aria-label={t("members.title")}>
+                    {#each membersList as m (m.id)}
+                        <button type="button" class="lv-retirement-member-chip" class:active={(targetRetireMember?.id ?? membersList[0]?.id) === m.id}
+                            onclick={() => { selectedRetireMemberId = m.id; retireWorkerTypeOverride = undefined; }}>
+                            {m.name}
+                        </button>
+                    {/each}
+                </div>
+            {/if}
+        </div>
+
+        {#if targetRetireMember}
+            {#if retireCalc}
+                <div class="lv-retirement-body">
+                    <div class="lv-retirement-metric">
+                        <span class="lv-retirement-label">
+                            {targetRetireMember.name} · {t("social.banner.countdown")}
+                        </span>
+                        {#if retireCalc.isRetired}
+                            <b class="lv-retirement-countdown retired">{t("social.banner.alreadyRetired")}</b>
+                            <span class="lv-retirement-sub">
+                                {t("social.banner.retireDate")}：{retireCalc.retireDateStr}（{retireCalc.targetAgeYears}{t("social.banner.years")}{#if retireCalc.targetAgeMonths > 0}{retireCalc.targetAgeMonths}{t("social.banner.months")}{/if}）
+                            </span>
+                        {:else}
+                            <b class="lv-retirement-countdown lv-num">
+                                {#if retireCalc.yearsLeft > 0}
+                                    {retireCalc.yearsLeft} <span class="unit">{t("social.banner.years")}</span>
+                                {/if}
+                                {retireCalc.monthsLeft} <span class="unit">{t("social.banner.months")}</span>
+                            </b>
+                            <span class="lv-retirement-sub">
+                                {t("social.banner.retireDate")}：<b>{retireCalc.retireDateStr}</b> · {t("social.banner.targetAge")}：{retireCalc.targetAgeYears}{t("social.banner.years")}{#if retireCalc.targetAgeMonths > 0}{retireCalc.targetAgeMonths}{t("social.banner.months")}{/if}
+                                {#if retireCalc.delayMonths > 0}
+                                    · {t("social.banner.delayed")} {retireCalc.delayMonths}{t("social.banner.months")}
+                                {/if}
+                            </span>
+                        {/if}
+                    </div>
+
+                    <div class="lv-retirement-controls">
+                        <select class="b3-select lv-retirement-select" value={currentRetireWorkerType}
+                            onchange={(e) => { retireWorkerTypeOverride = (e.currentTarget as HTMLSelectElement).value as RetirementWorkerType; }}>
+                            <option value="male">{t("social.banner.workerType.male")}</option>
+                            <option value="female_55">{t("social.banner.workerType.female_55")}</option>
+                            <option value="female_50">{t("social.banner.workerType.female_50")}</option>
+                        </select>
+                    </div>
+                </div>
+            {:else}
+                <div class="lv-retirement-empty">
+                    <UiIcon name="calendar" size={16} />
+                    <span>{targetRetireMember.name}：{t("social.banner.needBirthday")}</span>
+                    <button class="b3-button b3-button--text" onclick={() => plugin.panelScreenSwitch?.("members")}>
+                        {t("startGuide.openMembers")} →
+                    </button>
+                </div>
+            {/if}
+        {/if}
     </section>
 {/if}
 

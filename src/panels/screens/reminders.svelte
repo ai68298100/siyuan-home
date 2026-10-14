@@ -184,6 +184,18 @@
         }
     }
 
+    async function completeItem(r: Reminder) {
+        await runReminderAction(async () => {
+            await plugin.complete(r);
+            plugin.showUndo?.({
+                message: t("act.completed").replace("${title}", r.title),
+                action: async () => {
+                    await plugin.restore(r.id);
+                },
+            });
+        }, r.id);
+    }
+
     // H03：未处理备忘的显式删除（确认后物理删除；这是备忘唯一的物理删除路径）
     function confirmDeleteMemo(r: Reminder) {
         confirm(t("delete"), t("hub.memoDeleteBody").replace("${title}", r.title), async () => {
@@ -693,7 +705,7 @@
             <b class="lv-num" style="color:var(--lv-{r.level === 'overdue' ? 'danger' : r.level === 'soon' ? 'warn' : 'amber'})">{relDue(r.daysLeft, r.dueDate)}</b>
         </div>
         <div class="lv-rem-ops">
-            <button class="b3-button b3-button--text" disabled={batchBusy || reminderBusy.has(r.id)} aria-busy={reminderBusy.has(r.id)} onclick={() => void runReminderAction(() => plugin.complete(r), r.id)}>{reminderBusy.has(r.id) ? t("ledger.saving") : t("act.done")}</button>
+            <button class="b3-button b3-button--text" disabled={batchBusy || reminderBusy.has(r.id)} aria-busy={reminderBusy.has(r.id)} onclick={() => void completeItem(r)}>{reminderBusy.has(r.id) ? t("ledger.saving") : t("act.done")}</button>
             <div class="lv-rem-more">
                 <button class="b3-button b3-button--text lv-rem-more-toggle" type="button" aria-expanded="false" aria-controls={`lv-rem-more-${r.id}`}
                     onclick={toggleMoreMenu}>{t("ledger.detailMore")} <span aria-hidden="true">⌄</span></button>
@@ -852,7 +864,7 @@
     <!-- 日历在空筛选结果时仍提供日期浏览与新增备忘入口。 -->
     <Calendar items={filtered} {t} {version} initialMode={plugin.runtime.hubCalMode}
         onModeChange={(m: "month" | "week") => { plugin.runtime.hubCalMode = m; saveRuntime(plugin, plugin.runtime).catch((e) => showMessage(t("hub.preferenceSaveFailed").replace("${msg}", e instanceof Error ? e.message : String(e)), 5000, "error")); }}
-        onComplete={(r: Reminder) => runReminderAction(() => plugin.complete(r), `calendar:${r.id}`)}
+        onComplete={(r: Reminder) => completeItem(r)}
         onAddMemo={(title: string, due: string) => plugin.addMemo(title, due)}
         onConvert={(r: Reminder) => toLedgerDialog(r)} />
 {:else if filtered.length === 0}

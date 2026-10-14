@@ -51,4 +51,10 @@ export interface HomePluginLike extends Plugin {
     /** 时间线点击后的仅内存一次性详情目标，由台账页在真实数据加载后消费。 */
     pendingActivityTarget?: ActivityTarget;
     openActivityTarget?: (target: Omit<ActivityTarget, "requestId">) => void;
+    /** 5秒底栏撤销条触发器（UIX-03） */
+    showUndo?: (options: {
+        message: string;
+        action: () => Promise<void> | void;
+        onDone?: () => void;
+    }) => void;
 }

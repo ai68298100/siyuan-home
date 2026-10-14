@@ -4,6 +4,7 @@
     import { showMessage } from "siyuan";
     import AvatarSettings from "./avatar-settings.svelte";
     import ErrorBoundary from "./error-boundary.svelte";
+    import UndoSnackbar from "./undo-snackbar.svelte";
     import UiIcon from "@/ui/icon.svelte";
     import type { HomePluginLike } from "@/types/plugin";
     import type { ActivityTarget } from "@/core/activity";
@@ -151,6 +152,14 @@
         plugin.setActiveLedger(target.moduleId);
         gotoScreen("ledger");
     }
+    let snackbar = $state<any>(null);
+    $effect(() => {
+        plugin.showUndo = (options) => snackbar?.show(options);
+        return () => {
+            if (plugin.showUndo) plugin.showUndo = undefined;
+        };
+    });
+
     // R6（2026-10-09）：对外入口（状态栏角标/服务桥 openReminders/命令面板）在面板已挂载时
     // 直切页签——pendingScreen 只在挂载时消费，SiYuan 恢复的旧页签路径永远走不到挂载消费
     $effect(() => {
@@ -347,4 +356,6 @@
     {#if CaptureView}
         <CaptureView {plugin} {t} {version} bind:open={captureOpen} />
     {/if}
+
+    <UndoSnackbar bind:this={snackbar} {t} />
 </div>

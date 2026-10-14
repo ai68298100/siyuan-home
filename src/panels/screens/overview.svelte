@@ -299,6 +299,28 @@
             overviewBusy = next;
         }
     }
+    async function completeItem(r: Reminder) {
+        await runOverviewAction(r.id, async () => {
+            await plugin.complete(r);
+            plugin.showUndo?.({
+                message: t("act.completed").replace("${title}", r.title),
+                action: async () => {
+                    await plugin.restore(r.id);
+                },
+            });
+        });
+    }
+    async function snoozeItem(r: Reminder) {
+        await runOverviewAction(r.id, async () => {
+            await plugin.snooze(r.id, 7);
+            plugin.showUndo?.({
+                message: t("act.snoozed").replace("${title}", r.title),
+                action: async () => {
+                    await plugin.restore(r.id);
+                },
+            });
+        });
+    }
     async function addMemo() {
         if (savingMemo) return;
         if (!memoTitle.trim()) {
@@ -531,8 +553,8 @@
                     {r.daysLeft < 0 ? t("days.overdue").replace("${n}", String(-r.daysLeft)) : r.daysLeft === 0 ? t("days.today") : t("days.after").replace("${n}", String(r.daysLeft))}
                 </b><span class="lv-num">{r.dueDate}</span></div>
                 <div class="lv-rem-ops">
-                    <button class="b3-button b3-button--text" disabled={overviewBusy.has(r.id)} aria-busy={overviewBusy.has(r.id)} onclick={() => void runOverviewAction(r.id, () => plugin.complete(r))}>{overviewBusy.has(r.id) ? t("ledger.saving") : t("act.done")}</button>
-                    <button class="b3-button b3-button--text" disabled={overviewBusy.has(r.id)} aria-busy={overviewBusy.has(r.id)} onclick={() => void runOverviewAction(r.id, () => plugin.snooze(r.id, 7))}>{overviewBusy.has(r.id) ? t("ledger.saving") : t("act.snooze7")}</button>
+                    <button class="b3-button b3-button--text" disabled={overviewBusy.has(r.id)} aria-busy={overviewBusy.has(r.id)} onclick={() => void completeItem(r)}>{overviewBusy.has(r.id) ? t("ledger.saving") : t("act.done")}</button>
+                    <button class="b3-button b3-button--text" disabled={overviewBusy.has(r.id)} aria-busy={overviewBusy.has(r.id)} onclick={() => void snoozeItem(r)}>{overviewBusy.has(r.id) ? t("ledger.saving") : t("act.snooze7")}</button>
                 </div>
             </div>
         {/each}
