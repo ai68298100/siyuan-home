@@ -17,16 +17,20 @@
   --lv-leading-tight: 1.25; --lv-leading-body: 1.6; --lv-leading-relaxed: 1.75;
   --lv-weight-regular: 400; --lv-weight-medium: 500; --lv-weight-semibold: 600;
   --lv-control-sm: 32px; --lv-control-md: 36px; --lv-control-lg: 40px;
-  --lv-canvas: #f7f8fc;
+  --lv-canvas: #f8fafc;
   --lv-surface: #fff;
-  --lv-surface-2: #f3f5fa;
+  --lv-surface-2: #f1f5f9;
   --lv-r-2: 10px;
   --lv-r-3: 18px;
   --lv-r-4: 22px;
-  --lv-line: #e6eaf1;
-  --lv-line-strong: #d5dde8;
+  --lv-line: rgba(148, 163, 184, .22);
+  --lv-line-strong: rgba(148, 163, 184, .38);
   --lv-inset: rgba(255, 255, 255, .85);
-  --lv-shadow-1: 0 1px 3px rgba(41, 59, 83, .05);
+  --lv-card-inset: inset 0 1px 0 rgba(255, 255, 255, .95);
+  --lv-shadow-card: 0 1px 3px rgba(15, 23, 42, .03), 0 6px 18px -4px rgba(15, 23, 42, .05);
+  --lv-shadow-card-hover: 0 4px 12px -2px rgba(15, 23, 42, .06), 0 14px 28px -6px rgba(15, 23, 42, .08);
+  --lv-shadow-floating: inset 0 1px 0 rgba(255, 255, 255, .7), 0 10px 30px -4px rgba(15, 23, 42, .08);
+  --lv-shadow-1: var(--lv-shadow-card);
   --lv-shadow-2: 0 12px 32px rgba(41, 59, 83, .12);
   --lv-shadow-3: 0 8px 20px rgba(28, 42, 62, .09), 0 24px 56px rgba(28, 42, 62, .13);
   --lv-accent: #355a7b;
@@ -34,9 +38,9 @@
   --lv-accent-soft: #eaf1f9;
   --lv-accent-glow: rgba(53, 90, 123, .14);
   --lv-accent-line: rgba(53, 90, 123, .28);
-  --lv-tx: #263548;
-  --lv-tx-2: #536379;
-  --lv-tx-3: #667489;
+  --lv-tx: #1e293b;
+  --lv-tx-2: #475569;
+  --lv-tx-3: #64748b;
   --lv-warn: #9d4f35;
   --lv-warn-soft: #fbf0eb;
   --lv-amber: #b46643;
@@ -95,9 +99,13 @@
   --lv-ok: var(--b3-theme-success);
   --lv-ok-soft: var(--b3-card-success-background);
   --lv-inset: color-mix(in srgb, var(--b3-theme-on-background) 5%, transparent);
-  --lv-aura: color-mix(in srgb, var(--b3-theme-primary) 4%, transparent);
+  --lv-card-inset: inset 0 1px 0 rgba(255, 255, 255, .08);
+  --lv-shadow-card: 0 2px 8px -2px rgba(0, 0, 0, .45), 0 8px 24px -6px rgba(0, 0, 0, .35);
+  --lv-shadow-card-hover: 0 4px 14px -2px rgba(0, 0, 0, .55), 0 16px 36px -6px rgba(0, 0, 0, .45);
+  --lv-shadow-floating: inset 0 1px 0 rgba(255, 255, 255, .09), 0 12px 36px rgba(0, 0, 0, .55);
+  --lv-aura: color-mix(in srgb, var(--b3-theme-primary) 9%, transparent);
   // 阴影使用透明黑，而非反白光晕；暗色主题由表面色差和描边承担分层。
-  --lv-shadow-1: 0 1px 2px rgba(0, 0, 0, .07), 0 4px 14px rgba(0, 0, 0, .05);
+  --lv-shadow-1: var(--lv-shadow-card);
   --lv-shadow-2: 0 3px 10px rgba(0, 0, 0, .10), 0 10px 24px rgba(0, 0, 0, .10);
   --lv-shadow-3: 0 10px 28px rgba(0, 0, 0, .14), 0 24px 56px rgba(0, 0, 0, .18);
   --lv-z-topbar: 50; --lv-z-mask: 90; --lv-z-drawer: 100; --lv-z-modal: 110;
@@ -164,55 +172,57 @@
   .tone-amber { --tile-bg: var(--lv-amber-soft); --tile-border: color-mix(in srgb, var(--lv-amber) 24%, transparent); }
 
   // ── 2. 排版 ─────────────────────────────────────────────
-  .lv-title-page { font-size: var(--lv-font-display); font-weight: var(--lv-weight-semibold); line-height: var(--lv-leading-tight); letter-spacing: 0; }
+  .lv-title-page { font-size: var(--lv-font-display); font-weight: 700; line-height: var(--lv-leading-tight); letter-spacing: -0.02em; }
   // 259 波：思源辅助文字类在默认暗色主题下发蓝（--b3-theme-on-surface 带蓝色相），
   // 面板内统一归入三级文字层次（07 §2：不允许第四种文字颜色）
   .ft__on-surface, .ft__smaller.ft__on-surface { color: var(--lv-tx-3); }
   // 249 波：section 标题深色化（对齐原型：深色加粗小标题，非浅色大写风）
-  .lv-title-sec { font-size: var(--lv-font-title); font-weight: var(--lv-weight-semibold); line-height: var(--lv-leading-tight); letter-spacing: 0; color: var(--lv-tx); }
-  .lv-sub { font-size: var(--lv-font-sm); color: var(--lv-tx-3); }
-  .lv-caption { font-size: var(--lv-font-xs); color: var(--lv-tx-3); }
-  .lv-num { font-variant-numeric: tabular-nums; font-feature-settings: "tnum"; }
+  .lv-title-sec { font-size: 16px; font-weight: 650; line-height: var(--lv-leading-tight); letter-spacing: -0.01em; color: var(--lv-tx); }
+  .lv-sub { font-size: 12px; color: var(--lv-tx-3); line-height: 1.5; }
+  .lv-caption { font-size: 11px; color: var(--lv-tx-3); line-height: 1.45; }
+  .lv-num { font-variant-numeric: tabular-nums; font-feature-settings: "tnum"; letter-spacing: -0.01em; }
   .lv-mono { font-family: var(--b3-font-family-code); font-size: .86em; letter-spacing: 0; }
 
   // ── 3. 页头与节奏 ───────────────────────────────────────
-  // 主导航使用白面与细描边，普通工作面不依赖浮起阴影。
-  .lv-tabbar { display: flex; align-items: center; gap: var(--lv-space-3); padding: var(--lv-space-3) var(--lv-space-4); margin-bottom: var(--lv-space-5);
-    // 长台账/提醒列表滚动时保留主导航和快速记录入口；窄屏在下方容器断点
-    // 复用同一 sticky 语义，避免侧栏场景导航消失。
+  // 悬浮磨砂顶栏：双层内嵌微高光 + 漫反射微弥散阴影 + 高保真毛玻璃
+  .lv-tabbar { display: flex; align-items: center; gap: var(--lv-space-3); padding: 10px 18px; margin-bottom: var(--lv-space-5);
     position: sticky; top: 0; z-index: var(--lv-z-topbar);
-    background: var(--lv-surface);
-    border: 1px solid var(--lv-line); border-radius: var(--lv-r-3);
-    box-shadow: none; }
+    background: color-mix(in srgb, var(--lv-surface) 86%, transparent);
+    backdrop-filter: blur(20px) saturate(180%);
+    -webkit-backdrop-filter: blur(20px) saturate(180%);
+    border: 1px solid var(--lv-line); border-radius: var(--lv-r-4);
+    box-shadow: var(--lv-shadow-floating); }
   .lv-appbrand { display: flex; align-items: center; gap: var(--lv-space-2); flex: none; }
-  // R54：品牌标记保留单一实体色，把渐变和阴影留给真正的浮层，顶栏因此更安静。
-  .lv-logo { width: 34px; height: 34px; border-radius: 10px; display: grid; place-items: center; font-size: 17px;
-    background: var(--lv-accent); color: #fff;
-    box-shadow: inset 0 1px 0 rgba(255, 255, 255, .28); }
+  // 品牌标记：渐变双色阶 + 内嵌高光 + 软投影
+  .lv-logo { width: 34px; height: 34px; border-radius: 11px; display: grid; place-items: center; font-size: 17px;
+    background: linear-gradient(135deg, var(--lv-accent) 0%, color-mix(in srgb, var(--lv-accent) 80%, #000) 100%);
+    color: #fff;
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, .38), 0 3px 8px -2px color-mix(in srgb, var(--lv-accent) 45%, transparent); }
   .lv-logo-mark { display: block; transform: translateY(-1px); font-size: 20px; line-height: 1; font-weight: 500; }
   .lv-appbrand-t { display: flex; flex-direction: column; min-width: 0; line-height: 1.18;
     // 品牌名来自插件标题/内测标记，窄面板下允许它收缩，避免挤压页签和右侧动作。
     b { display: block; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
-      font-size: 14px; font-weight: 600; letter-spacing: 0; }
+      font-size: 14px; font-weight: 650; letter-spacing: -0.01em; }
     span { font-size: 9.5px; font-weight: 600; letter-spacing: .16em; color: var(--lv-tx-3); } }
   .lv-tabbar__title { font-size: 15px; font-weight: 600; }
   .lv-tabbar__meta { display: flex; gap: 6px; align-items: center; }
   .lv-tabbar-actions { display: flex; align-items: center; gap: var(--lv-space-1); flex: none; }
   // ⚙ 等顶栏图标按钮：幽灵风（对齐原型 iconbtn——无描边、hover 才浮出底色），命中区 ≥34px（26.7 回归项）
   .lv-tabbar > .b3-button { min-height: 34px; min-width: 34px; display: inline-flex; align-items: center; justify-content: center;
-    border: none; background: none; box-shadow: none; color: var(--lv-tx-2); font-size: 15px;
+    border: none; background: none; box-shadow: none; color: var(--lv-tx-2); font-size: 15px; border-radius: 9px;
     transition: background var(--lv-t-med) var(--lv-ease), color var(--lv-t-med) var(--lv-ease);
     &:hover { background: var(--lv-surface-2); color: var(--lv-tx); } }
-  .lv-tabs { display: flex; gap: 2px; background: var(--lv-surface-2); border: 1px solid var(--lv-line);
-    border-radius: 999px; padding: 4px; }
-  .lv-nav-pill { position: absolute; top: 4px; left: 0; height: calc(100% - 8px); border-radius: 999px;
-    background: var(--lv-surface); box-shadow: 0 1px 3px rgba(0, 0, 0, .04);
+  .lv-tabs { display: flex; gap: 2px; background: color-mix(in srgb, var(--lv-surface-2) 75%, transparent);
+    backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);
+    border: 1px solid var(--lv-line); border-radius: 999px; padding: 3px; }
+  .lv-nav-pill { position: absolute; top: 3px; left: 0; height: calc(100% - 6px); border-radius: 999px;
+    background: var(--lv-surface); box-shadow: 0 1px 4px rgba(15, 23, 42, .06), 0 3px 10px -2px rgba(15, 23, 42, .05);
     transition: transform var(--lv-t-sheet) var(--lv-spring), width var(--lv-t-sheet) var(--lv-spring); z-index: 0;
     &.init { transition: none; } }
   .lv-tabs__item { position: relative; z-index: 1; padding: var(--lv-space-2) 16px; border-radius: 999px; font-size: 13px;
     display: inline-flex; align-items: center; justify-content: center; min-height: 34px;
     color: var(--lv-tx-2); background: none; border: none; cursor: pointer; transition: color var(--lv-t-med) var(--lv-ease);
-    &:hover { color: var(--lv-tx); } &.on { color: var(--lv-tx); font-weight: 500; }
+    &:hover { color: var(--lv-tx); } &.on { color: var(--lv-tx); font-weight: 600; }
     // 待办红点（提醒页签，扫描计数 > 0 时出现）
     .lv-dot { position: absolute; top: 6px; right: 8px; width: 6px; height: 6px; border-radius: 50%;
       background: var(--lv-danger); box-shadow: 0 0 0 3px var(--lv-danger-soft); } }
@@ -225,26 +235,26 @@
     box-shadow: none;
     strong { color: var(--lv-tx-2); font-weight: 500; margin-right: 4px; } }
   .lv-focus { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--lv-space-4); margin: var(--lv-space-5) 2px 2px; }
-  .lv-focus-card { display: flex; align-items: center; justify-content: space-between; gap: var(--lv-space-3); min-width: 0; padding: 16px 20px;
+  .lv-focus-card { display: flex; align-items: center; justify-content: space-between; gap: var(--lv-space-3); min-width: 0; padding: 18px 22px;
     border: 1px solid var(--lv-line); border-radius: var(--lv-r-3); background: var(--lv-surface);
-    box-shadow: none; cursor: pointer; text-align: left;
+    box-shadow: var(--lv-card-inset), var(--lv-shadow-card); cursor: pointer; text-align: left;
     transition: all var(--lv-t-med) var(--lv-ease);
-    &:hover { border-color: var(--lv-line-strong); transform: translateY(-1px); box-shadow: var(--lv-shadow-1); }
+    &:hover { border-color: var(--lv-line-strong); transform: translateY(-2px); box-shadow: var(--lv-card-inset), var(--lv-shadow-card-hover); }
     .lv-focus-copy { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 3px;
       .lv-focus-label { font-size: 11.5px; color: var(--lv-tx-3); font-weight: 500; }
-      .lv-focus-num { font-size: 24px; font-weight: 700; line-height: 1.25; color: var(--lv-tx); }
+      .lv-focus-num { font-size: 24px; font-weight: 700; line-height: 1.25; color: var(--lv-tx); letter-spacing: -0.01em; }
       .lv-focus-sub { font-size: 11px; color: var(--lv-tx-3); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; } }
     .lv-focus-icon { width: 38px; height: 38px; border-radius: 12px; display: grid; place-items: center;
       flex: none; font-size: 16px; color: var(--lv-accent); background: var(--lv-surface-2); border: 1px solid var(--lv-line); } }
   @media (max-width: 640px) {
     .lv-focus { grid-template-columns: 1fr; }
   }
-  .lv-hero { display: flex; align-items: center; gap: 20px; margin: 24px 2px 12px; padding: 24px;
-    border: 1px solid var(--lv-line); border-radius: var(--lv-r-3); background: var(--lv-surface); flex-wrap: wrap;
-    // 250 波：对齐原型字号层级（26/600 标题 + 32/600 计数）——46px/700 的计数在中文面板里
-    // 喧宾夺主，且与 26px 页标题断层过大
-    h1 { margin: 4px 0 0; font-size: clamp(23px, 2.6cqi, 28px); font-weight: 650; line-height: 1.4; letter-spacing: 0; }
-    p { color: var(--lv-tx-2); font-size: 13px; margin-top: 5px; }
+  .lv-hero { display: flex; align-items: center; gap: 24px; margin: 20px 2px 14px; padding: 26px 28px;
+    border: 1px solid var(--lv-line); border-radius: var(--lv-r-4);
+    background: linear-gradient(135deg, var(--lv-surface) 0%, color-mix(in srgb, var(--lv-accent-soft) 22%, var(--lv-surface)) 100%);
+    box-shadow: var(--lv-card-inset), var(--lv-shadow-card); flex-wrap: wrap; position: relative; overflow: hidden;
+    h1 { margin: 4px 0 0; font-size: clamp(23px, 2.6cqi, 28px); font-weight: 700; line-height: 1.35; letter-spacing: -0.015em; }
+    p { color: var(--lv-tx-2); font-size: 13.5px; margin-top: 6px; }
   }
   .lv-hero-copy { flex: 1; min-width: 0; }
   .lv-hero-meta { display: flex; align-items: center; flex-wrap: wrap; gap: 3px 14px; margin-bottom: 4px;
@@ -280,11 +290,13 @@
     backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); }
 
   // ── 4. 卡片与容器 ───────────────────────────────────────
-  // R54：普通卡由白面、细描边与留白分层；阴影仅留给弹层。
+  // 双层微高光 + 漫反射微弥散阴影，赋予卡片微磨砂陶瓷般的现代高级质感
   .lv-card { background: var(--lv-surface);
-    border: 1px solid var(--lv-line); border-radius: var(--lv-r-3); box-shadow: none; }
-  .lv-card--hover { transition: border-color var(--lv-t-med) var(--lv-ease);
-    &:hover { border-color: var(--lv-line-strong); } }
+    border: 1px solid var(--lv-line); border-radius: var(--lv-r-3);
+    box-shadow: var(--lv-card-inset), var(--lv-shadow-card);
+    transition: transform var(--lv-t-med) var(--lv-ease), box-shadow var(--lv-t-med) var(--lv-ease), border-color var(--lv-t-med) var(--lv-ease); }
+  .lv-card--hover {
+    &:hover { border-color: var(--lv-line-strong); box-shadow: var(--lv-card-inset), var(--lv-shadow-card-hover); transform: translateY(-2px); } }
 
   // ── 5. 按钮 ─────────────────────────────────────────────
   .lv-btn { display: inline-flex; align-items: center; justify-content: center; gap: var(--lv-space-2); min-height: var(--lv-control-lg); padding: var(--lv-space-2) 15px;
@@ -339,13 +351,13 @@
     &:hover { border-color: var(--lv-line-strong); color: var(--lv-tx); }
     &.on { background: var(--lv-accent-soft); border-color: var(--lv-accent-line);
       color: var(--lv-accent); font-weight: 500; } }
-  .lv-badge { display: inline-flex; align-items: center; gap: 5px; font-size: 11.5px; padding: 2px 9px;
-    border-radius: 999px; font-weight: 500;
-    &.red { background: var(--lv-danger-soft); color: var(--lv-danger); }
-    &.orange { background: var(--lv-warn-soft); color: var(--lv-warn); }
-    &.yellow { background: var(--lv-amber-soft); color: var(--lv-amber); }
-    &.green { background: var(--lv-ok-soft); color: var(--lv-ok); }
-    &.gray { background: var(--lv-surface-2); color: var(--lv-tx-3); } }
+  .lv-badge { display: inline-flex; align-items: center; gap: 5px; font-size: 11px; padding: 2.5px 8px;
+    border-radius: 7px; font-weight: 600; line-height: 1.4; white-space: nowrap; letter-spacing: .02em;
+    &.red { background: var(--lv-danger-soft); color: var(--lv-danger); border: 1px solid color-mix(in srgb, var(--lv-danger) 18%, transparent); }
+    &.orange { background: var(--lv-warn-soft); color: var(--lv-warn); border: 1px solid color-mix(in srgb, var(--lv-warn) 18%, transparent); }
+    &.yellow { background: var(--lv-amber-soft); color: var(--lv-amber); border: 1px solid color-mix(in srgb, var(--lv-amber) 18%, transparent); }
+    &.green { background: var(--lv-ok-soft); color: var(--lv-ok); border: 1px solid color-mix(in srgb, var(--lv-ok) 18%, transparent); }
+    &.gray { background: var(--lv-surface-2); color: var(--lv-tx-3); border: 1px solid var(--lv-line); } }
   .lv-sev { width: 8px; height: 8px; border-radius: 50%; display: inline-block;
     &.red { background: var(--lv-danger); box-shadow: 0 0 0 3px var(--lv-danger-soft); }
     &.orange { background: var(--lv-warn); box-shadow: 0 0 0 3px var(--lv-warn-soft); }
