@@ -350,6 +350,32 @@
     .lv-membership-chip { flex: 1; justify-content: center; }
   }
 
+  // ── 4c. 家庭药箱效期与补货看板（MOD-01）────────────────────
+  .lv-medicine-banner {
+    padding: 16px 20px; margin-bottom: 14px;
+    background: linear-gradient(135deg, var(--lv-surface) 0%, color-mix(in srgb, var(--lv-danger-soft) 18%, var(--lv-surface)) 100%);
+    border: 1px solid var(--lv-line); border-radius: var(--lv-r-3);
+    box-shadow: var(--lv-card-inset), var(--lv-shadow-card);
+  }
+  .lv-medicine-hero {
+    display: flex; align-items: center; justify-content: space-between; gap: 14px; flex-wrap: wrap;
+  }
+  .lv-medicine-metric {
+    display: flex; flex-direction: column; gap: 6px; min-width: 0;
+    .lv-medicine-label { font-size: 13px; font-weight: 650; color: var(--lv-tx); }
+    .lv-medicine-tags { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+  }
+  .lv-medicine-btn {
+    font-size: 12px; min-height: 32px; padding: 4px 12px; gap: 6px;
+    border-color: var(--lv-line-strong); background: var(--lv-surface);
+    &:hover { border-color: var(--lv-accent-line); color: var(--lv-accent); background: var(--lv-surface-2); }
+  }
+  @media (max-width: 600px) {
+    .lv-medicine-banner { padding: 12px 14px; }
+    .lv-medicine-hero { flex-direction: column; align-items: stretch; gap: 10px; }
+    .lv-medicine-btn { width: 100%; justify-content: center; min-height: 40px; }
+  }
+
   // ── 5. 按钮 ─────────────────────────────────────────────
   .lv-btn { display: inline-flex; align-items: center; justify-content: center; gap: var(--lv-space-2); min-height: var(--lv-control-lg); padding: var(--lv-space-2) 15px;
     border-radius: var(--lv-r-2); border: 1px solid var(--lv-line);

@@ -30,6 +30,7 @@
     import { openCsvModal } from "../ledger/csv-modal";
     import { openEnergyDashboardModal } from "../ledger/vehicle-dashboard-modal";
     import { calculateMembershipSpending } from "@/core/memberships";
+    import { calculateMedicineSummary, formatMedicineRestockText } from "@/core/medicine";
 
     let { plugin, t, version }: { plugin: HomePluginLike; t: (k: string) => string; version?: number } = $props();
 
@@ -216,6 +217,22 @@
         if (active !== "memberships" || !ref?.columns) return undefined;
         return calculateMembershipSpending(rows, ref.columns);
     });
+
+    const medicineSummary = $derived.by(() => {
+        if (active !== "medicine" || !ref?.columns) return undefined;
+        return calculateMedicineSummary(rows, ref.columns);
+    });
+
+    async function copyMedicineRestock() {
+        if (!medicineSummary) return;
+        const text = formatMedicineRestockText(medicineSummary, t);
+        try {
+            await navigator.clipboard.writeText(text);
+            showMessage(t("medicine.banner.copyRestockDone"), 2500, "info");
+        } catch {
+            showMessage(t("ledger.shopCopyFailed"), 4000, "error");
+        }
+    }
     // Keep the list useful across all modules. A fixed expiry/status list made
     // travel, shopping and other ledgers render only an empty severity column.
     const tableKeys = $derived.by(() => {
@@ -3328,6 +3345,43 @@
                 {/each}
             </div>
         {/if}
+    </section>
+{/if}
+
+{#if active === "medicine" && medicineSummary && rows.length > 0}
+    <section class="lv-medicine-banner lv-card" aria-label={t("medicine.banner.title")}>
+        <div class="lv-medicine-hero">
+            <div class="lv-medicine-metric">
+                <span class="lv-medicine-label">{t("medicine.banner.title")}</span>
+                <div class="lv-medicine-tags">
+                    {#if medicineSummary.expiredCount > 0}
+                        <span class="lv-badge red lv-num">
+                            <UiIcon name="alert" size={12} /> {medicineSummary.expiredCount} {t("medicine.banner.expired")}
+                        </span>
+                    {/if}
+                    {#if medicineSummary.lowStockCount > 0}
+                        <span class="lv-badge orange lv-num">
+                            <UiIcon name="box" size={12} /> {medicineSummary.lowStockCount} {t("medicine.banner.lowStock")}
+                        </span>
+                    {/if}
+                    {#if medicineSummary.expiringSoonCount > 0}
+                        <span class="lv-badge yellow lv-num">
+                            <UiIcon name="clock" size={12} /> {medicineSummary.expiringSoonCount} {t("medicine.banner.expiring")}
+                        </span>
+                    {/if}
+                    {#if medicineSummary.itemsNeedingAttention.length === 0}
+                        <span class="lv-badge green">
+                            <UiIcon name="check" size={12} /> {t("medicine.banner.allHealthy")}
+                        </span>
+                    {/if}
+                </div>
+            </div>
+            {#if medicineSummary.itemsNeedingAttention.length > 0}
+                <button type="button" class="b3-button b3-button--outline lv-medicine-btn" onclick={copyMedicineRestock}>
+                    <UiIcon name="note" size={14} /> {t("medicine.banner.copyRestock")}
+                </button>
+            {/if}
+        </div>
     </section>
 {/if}
 

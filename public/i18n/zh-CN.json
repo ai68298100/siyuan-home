@@ -1529,5 +1529,15 @@
     "membership.banner.active": "项有效服务",
     "membership.banner.autoRenew": "项自动续费",
     "membership.banner.top": "主要支出项",
-    "membership.banner.unitCnyPerMonth": "元/月"
+    "membership.banner.unitCnyPerMonth": "元/月",
+    "medicine.banner.title": "药箱效期与补货看板",
+    "medicine.banner.expired": "项已过期",
+    "medicine.banner.expiring": "项30天内临期",
+    "medicine.banner.lowStock": "项库存不足",
+    "medicine.banner.copyRestock": "复制补货清单",
+    "medicine.banner.copyRestockDone": "已复制药箱补货与清理清单",
+    "medicine.banner.allHealthy": "药箱状态良好，暂无过期或缺货药品。",
+    "medicine.banner.expiredGroup": "已过期药品（需清理）",
+    "medicine.banner.lowStockGroup": "库存告急药品（需补货）",
+    "medicine.banner.expiringGroup": "即将到期药品（请留意）"
 }

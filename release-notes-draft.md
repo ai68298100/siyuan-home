@@ -1,17 +1,20 @@
-# v0.5.4 · 小驴管家（内测版）紧急修复
+# v0.5.5 · 小驴管家（内测版）架构解耦与核心业务深化
 
 ## 变更
 
-- **彻底根治 `tree not found` 报错与路由死锁**：
-  - 彻底拔除 `TabPanel` 中对宿主全局 `window.history`（`history.pushState`、`history.replaceState`、`window.addEventListener("popstate")`）的侵入性调用。
-  - 根因定位：思源笔记作为单窗口桌面应用，全局路由器会捕获插件在自定义 Tab 中写入的非文档 ID 路由状态并尝试加载文档树，导致思源内核抛出 `tree not found` 弹窗；随后思源试图纠正路由触发 `popstate`，与插件形成相互触发的死循环，造成页面在能渲染与骨架屏之间快速来回闪烁。
-  - 插件内部页签状态切换完全改由安全的 `sessionStorage` 与组件局部状态接管，彻底隔离宿主全局历史。
-- **解耦首屏扫描与刷新事件监听**：
-  - `refreshInitialScan` 从频繁受依赖重触发的 `$effect` 移至 `onMount` 启动，切断 `hubListeners`（`version++`）引发的递归自激更新。
+- **台账弹窗解耦与架构瘦身（ENG-01）**：
+  - 将 `ledger.svelte` 中的四大重型独立功能弹窗解耦抽离至 `src/panels/ledger/`（`growth-modal` 生长曲线、`shopping-modal` 采购建议、`csv-modal` CSV 批量导入向导、`vehicle-dashboard-modal` 车辆能源维保工作台），大幅降低台账主文件的认知与维护负荷。
+- **会员与订阅支出看板（MOD-02）**：
+  - 新增日/周/月/季/年五类周期的等效月均支出与年度支出折算纯函数，自动统计活跃订阅与开启自动续费的项目数，并提取 Top 大额订阅。
+  - 在台账会员与订阅模块顶部渲染专属的 `.lv-membership-banner` 仪表盘，支持双层内嵌微高光与现代弥散光影。
+- **家庭药箱效期与补货看板（MOD-01）**：
+  - 新增过期药品（需丢弃清理）、30 天内临期药品（请留意）与库存告急（需补货）三级统计。
+  - 增加“一键生成药箱补货与清理清单”功能，自动计算建议补齐量，一键格式化复制到剪贴板，方便在购物软件中采购。
 
 ## 验证
 
-- 409 项单测全部通过；TypeScript、Svelte（0 错误 0 警告）、i18n（1522 键全量对齐）、元数据、loader 语义、生产构建和发布包 smoke 检查全部通过。
+- 新增 `memberships.test.ts` 与 `medicine.test.ts` 单元测试，全套单测数量扩充至 48 个文件共 **416 项全绿**。
+- 多语言词条扩充至 1539 键中英文全量对齐；TypeScript 与 Svelte 0 错误 0 警告，单文件打包与加载器语义通过。
 - `pnpm audit --prod --audit-level moderate` 通过，未发现中等级别及以上生产依赖漏洞。
 
 完整变更见 [CHANGELOG.md](./CHANGELOG.md)。

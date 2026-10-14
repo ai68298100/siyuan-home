@@ -1529,5 +1529,15 @@
     "membership.banner.active": "Active Services",
     "membership.banner.autoRenew": "Auto-Renewing",
     "membership.banner.top": "Top Subscriptions",
-    "membership.banner.unitCnyPerMonth": "/mo"
+    "membership.banner.unitCnyPerMonth": "/mo",
+    "medicine.banner.title": "Medicine Expiry & Restock Dashboard",
+    "medicine.banner.expired": "expired",
+    "medicine.banner.expiring": "expiring soon",
+    "medicine.banner.lowStock": "low stock",
+    "medicine.banner.copyRestock": "Copy Restock List",
+    "medicine.banner.copyRestockDone": "Medicine restock list copied to clipboard",
+    "medicine.banner.allHealthy": "Medicine cabinet is in good order, no expired or low-stock medicines.",
+    "medicine.banner.expiredGroup": "Expired medicines (need discard)",
+    "medicine.banner.lowStockGroup": "Low stock medicines (need restock)",
+    "medicine.banner.expiringGroup": "Expiring soon medicines (heads up)"
 }
