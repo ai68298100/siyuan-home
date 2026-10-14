@@ -42,29 +42,11 @@
     let screenLoadRequest = 0;
     let CaptureView = $state<Component<CaptureProps> | null>(null);
     let captureLoadRequest = 0;
-    const HISTORY_KEY = "__siyuanHomeScreen";
     function isScreen(value: unknown): value is ScreenId {
         return value === "overview" || value === "reminders" || value === "ledger" || value === "members";
     }
-    function historyScreen(state: unknown): ScreenId | undefined {
-        if (!state || typeof state !== "object") return undefined;
-        const value = (state as Record<string, unknown>)[HISTORY_KEY];
-        return isScreen(value) ? value : undefined;
-    }
-    function writeScreenHistory(target: ScreenId, mode: "push" | "replace") {
-        try {
-            const current = history.state && typeof history.state === "object" && !Array.isArray(history.state)
-                ? history.state as Record<string, unknown> : {};
-            const next = { ...current, [HISTORY_KEY]: target };
-            if (mode === "push") history.pushState(next, "", window.location.href);
-            else history.replaceState(next, "", window.location.href);
-            try { sessionStorage.setItem("siyuan-home:last-screen", target); } catch { /* Storage can be disabled by the host. */ }
-        } catch (error) {
-            // A host may keep a non-cloneable state object. Session restore still
-            // works in that case, while plugin navigation itself remains usable.
-            try { sessionStorage.setItem("siyuan-home:last-screen", target); } catch { /* Storage can be disabled by the host. */ }
-            console.warn("[siyuan-home] Could not add plugin tab to browser history:", error);
-        }
+    function saveScreenSession(target: ScreenId) {
+        try { sessionStorage.setItem("siyuan-home:last-screen", target); } catch { /* Storage can be disabled by the host. */ }
     }
     function saveCurrentScroll() {
         if (homeEl && isScreen(screen)) session.scrollTop[screen] = homeEl.scrollTop;
@@ -96,14 +78,14 @@
             pointerPreparedScreen = target;
         } else pointerPreparedScreen = null;
     }
-    function gotoScreen(s: ScreenId, historyMode: "push" | "replace" | "none" = "push") {
+    function gotoScreen(s: ScreenId) {
         if (screen === s) { pointerPreparedScreen = null; return; }
         if (pointerPreparedScreen !== s) saveCurrentScroll();
         pointerPreparedScreen = null;
         if (s !== "ledger") plugin.pendingActivityTarget = undefined;
         screen = s;
         void loadScreen(s);
-        if (historyMode !== "none") writeScreenHistory(s, historyMode);
+        saveScreenSession(s);
         restoreScroll(s);
     }
     async function loadScreen(target: ScreenId): Promise<void> {
@@ -138,18 +120,10 @@
     }
     onMount(() => {
         void loadScreen(screen);
-        if (!historyScreen(history.state)) writeScreenHistory(screen, "replace");
-        const onPopState = (event: PopStateEvent) => {
-            const next = historyScreen(event.state);
-            if (!next || next === screen) return;
-            saveCurrentScroll();
-            if (next !== "ledger") plugin.pendingActivityTarget = undefined;
-            screen = next;
-            restoreScroll(next);
-        };
-        window.addEventListener("popstate", onPopState);
+        saveScreenSession(screen);
+        const timer = window.setTimeout(() => { void refreshInitialScan(); }, 50);
         return () => {
-            window.removeEventListener("popstate", onPopState);
+            window.clearTimeout(timer);
             restoreTimers.forEach((timer) => window.clearTimeout(timer));
             restoreTimers = [];
         };
@@ -165,7 +139,7 @@
             // Recreate Ledger so its local selected module follows activeLedger
             // and its successful load can consume the new one-shot target.
             screen = "overview";
-            writeScreenHistory("overview", "replace");
+            saveScreenSession("overview");
             requestAnimationFrame(() => {
                 plugin.pendingActivityTarget = { ...target, requestId };
                 plugin.setActiveLedger(target.moduleId);
@@ -243,7 +217,7 @@
             return isScreen(value) ? value : undefined;
         } catch { return undefined; }
     }
-    let screen: ScreenId = $state(pendingScreen ?? historyScreen(history.state) ?? readLastScreen() ?? "overview");
+    let screen: ScreenId = $state(pendingScreen ?? readLastScreen() ?? "overview");
     // 提醒页签待办红点（version 驱动重算，随扫描更新）
     const pendingTotal = $derived.by(() => {
         void version;
@@ -298,9 +272,6 @@
             version += 1;
             if (plugin.runtime?.scannedAt && !plugin.scan?.errors?.length) initialScanError = "";
         };
-        // Settings pages may be hosted outside this keyed screen tree. Refresh
-        // ordinary plugin-object reads immediately after a saved replacement,
-        // including first-run completion and resetting the onboarding wizard.
         const onSettingsReplaced = (event: Event) => {
             const detail = (event as CustomEvent<{ plugin?: HomePluginLike }>).detail;
             if (detail?.plugin && detail.plugin !== plugin) return;
@@ -308,12 +279,7 @@
         };
         (plugin.hubListeners as Set<() => void>).add(listener);
         window.addEventListener("siyuan-home:settings-replaced", onSettingsReplaced);
-        // 225 波修复：refreshHub 必须延后到 effect 同步作用域之外——其缓存路径会在本次 flush 内
-        // 同步触发 hubListeners（version++），在 effect 依赖跟踪未定型时形成
-        // effect_update_depth_exceeded 无限循环（真机首启即崩、页签全冻结）
-        const timer = window.setTimeout(() => { void refreshInitialScan(); }, 0);
         return () => {
-            window.clearTimeout(timer);
             (plugin.hubListeners as Set<() => void>).delete(listener);
             window.removeEventListener("siyuan-home:settings-replaced", onSettingsReplaced);
         };
