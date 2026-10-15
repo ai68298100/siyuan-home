@@ -30,6 +30,7 @@
     import { openCsvModal } from "../ledger/csv-modal";
     import { openEnergyDashboardModal } from "../ledger/vehicle-dashboard-modal";
     import { calculateMembershipSpending } from "@/core/memberships";
+    import { buildPaymentSummary } from "@/core/payment-summary";
     import { calculateMedicineSummary, formatMedicineRestockText } from "@/core/medicine";
     import { calculateRetirement, type RetirementWorkerType } from "@/core/retirement";
     import { formatDesensitizedRecord } from "@/core/desensitize";
@@ -239,6 +240,17 @@
         if (active !== "memberships" || !ref?.columns) return undefined;
         return calculateMembershipSpending(rows, ref.columns);
     });
+
+    const paymentSummary = $derived.by(() => {
+        if ((active !== "memberships" && active !== "insurance") || !ref?.columns) return undefined;
+        return buildPaymentSummary([{ moduleId: active, columns: ref.columns, rows }], new Date());
+    });
+
+    /** 付款摘要来源定位：复用台账行详情抽屉，避免摘要复制一套编辑逻辑。 */
+    function openPaymentSource(item: { rowId: string }) {
+        const row = rows.find((candidate) => candidate.itemID === item.rowId);
+        if (row) openDetail(row);
+    }
 
     const medicineSummary = $derived.by(() => {
         if (active !== "medicine" || !ref?.columns) return undefined;
@@ -4636,6 +4648,35 @@
         </details>
     {/if}
 </div>
+
+{#if paymentSummary && paymentSummary.sourceCount > 0}
+    <section class="lv-payment-banner lv-card" aria-label={t("payment.summaryTitle")}>
+        <div class="lv-payment-hero">
+            <div class="lv-payment-metric">
+                <span class="lv-payment-label">{t("payment.monthlyEquivalent")}</span>
+                <b class="lv-payment-amount lv-num">¥ {formatAmount(paymentSummary.monthlyTotal, plugin.settings.hideAmounts)}</b>
+                <span class="lv-payment-sub">{t("payment.annualEquivalent")}：¥ {formatAmount(paymentSummary.annualTotal, plugin.settings.hideAmounts)}</span>
+            </div>
+            <div class="lv-payment-stats">
+                <div class="lv-payment-chip"><span><b>{paymentSummary.next7Total > 0 ? `¥ ${formatAmount(paymentSummary.next7Total, plugin.settings.hideAmounts)}` : "—"}</b> {t("payment.next7")}</span></div>
+                <div class="lv-payment-chip highlight"><span><b>{paymentSummary.next30Total > 0 ? `¥ ${formatAmount(paymentSummary.next30Total, plugin.settings.hideAmounts)}` : "—"}</b> {t("payment.next30")}</span></div>
+            </div>
+        </div>
+        {#if paymentSummary.upcoming.length > 0}
+            <div class="lv-payment-top">
+                <span class="lv-payment-top__title">{t("payment.upcoming")}：</span>
+                {#each paymentSummary.upcoming.slice(0, 3) as item (item.moduleId + item.rowId)}
+                    <button type="button" class="lv-payment-top__tag" title={item.title} aria-label={item.title}
+                        onclick={() => openPaymentSource(item)}>
+                        {item.title} · {item.dueDate} · ¥{formatAmount(item.amount, plugin.settings.hideAmounts)}
+                    </button>
+                {/each}
+            </div>
+        {:else}
+            <div class="lv-payment-empty">{t("payment.noUpcoming")}</div>
+        {/if}
+    </section>
+{/if}
 
 {#if active === "memberships" && membershipSummary && membershipSummary.activeCount > 0}
     <section class="lv-membership-banner lv-card" aria-label={t("membership.banner.title")}>
