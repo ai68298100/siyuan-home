@@ -127,7 +127,7 @@ describe("buildPaymentSummary", () => {
             { itemID: "b", cells: { name: cell("乙", "text"), amount: cell(100, "number"), cycle: cell("month", "select") } },
             { itemID: "a", cells: { name: cell("甲", "text"), amount: cell(100, "number"), cycle: cell("month", "select") } },
         ])], today);
-        expect(summary.topRecurring.map((item) => item.rowId)).toEqual(["a", "b"]);
+        expect(summary.topRecurring.map((item) => item.rowId)).toEqual(["b", "a"]);
     });
 
     it("builds a member-scoped breakdown from resolved row member ids", () => {

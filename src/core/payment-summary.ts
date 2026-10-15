@@ -148,6 +148,11 @@ function roundMoney(value: number): number {
     return Math.round(value * 100) / 100;
 }
 
+function compareStableText(left: string, right: string): number {
+    if (left === right) return 0;
+    return left < right ? -1 : 1;
+}
+
 function emptyBreakdown(): PaymentBreakdown {
     return { sourceCount: 0, monthlyTotal: 0, annualTotal: 0, next7Total: 0, next30Total: 0, overdueTotal: 0 };
 }
@@ -308,7 +313,7 @@ export function buildPaymentSummary(sources: PaymentSource[], today: Date): Paym
 
     upcoming.sort((a, b) => a.dueDate.localeCompare(b.dueDate) || a.title.localeCompare(b.title, undefined, { numeric: true }));
     overdue.sort((a, b) => a.dueDate.localeCompare(b.dueDate) || a.title.localeCompare(b.title, undefined, { numeric: true }));
-    commitments.sort((a, b) => b.monthlyCost - a.monthlyCost || a.title.localeCompare(b.title, undefined, { numeric: true }) || a.rowId.localeCompare(b.rowId));
+    commitments.sort((a, b) => b.monthlyCost - a.monthlyCost || compareStableText(a.title, b.title) || compareStableText(a.rowId, b.rowId));
     const byModule = Object.fromEntries([...moduleTotals.entries()].map(([moduleId, value]) => [moduleId, roundBreakdown(value)])) as Partial<Record<PaymentModuleId, PaymentBreakdown>>;
     const byMember = Object.fromEntries([...memberTotals.entries()].map(([memberId, value]) => [memberId, finalizeScope(value)]));
     return {
