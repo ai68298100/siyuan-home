@@ -79,8 +79,8 @@
 
 ## 验证
 
-- 新增 `plan-date.test.ts`、`escape.test.ts`、`asset-lifecycle.test.ts`、`annual-report.test.ts`、`travel-certs.test.ts`、`pets.test.ts`、`media.test.ts`、`schooling.test.ts`、`allergy-check.test.ts`、`assets-valuation.test.ts`、`favors.test.ts`、`shopping-asset.test.ts`、`warranty.test.ts`、`solids.test.ts`、`desensitize.test.ts`、`named-views.test.ts` 与 `members-reassign.test.ts` 纯逻辑单测，全量单元测试扩充至 66 个文件共 **511 项全绿**。
-- 多语言词条扩充至 1745 键中英文全量对齐；TypeScript 与 Svelte 0 错误 0 警告，单文件打包与加载器语义通过。
+- 新增 `plan-date.test.ts`、`escape.test.ts`、`asset-lifecycle.test.ts`、`annual-report.test.ts`、`travel-certs.test.ts`、`pets.test.ts`、`media.test.ts`、`schooling.test.ts`、`allergy-check.test.ts`、`assets-valuation.test.ts`、`favors.test.ts`、`shopping-asset.test.ts`、`warranty.test.ts`、`solids.test.ts`、`desensitize.test.ts`、`named-views.test.ts` 与 `members-reassign.test.ts` 纯逻辑单测，全量单元测试扩充至 66 个文件共 **512 项全绿**。
+- 多语言词条扩充至 1747 键中英文全量对齐；TypeScript 与 Svelte 0 错误 0 警告，单文件打包与加载器语义通过。
 - `pnpm audit --prod --audit-level moderate` 通过，未发现中等级别及以上生产依赖漏洞。
 
 完整变更见 [CHANGELOG.md](./CHANGELOG.md)。

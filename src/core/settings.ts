@@ -181,7 +181,11 @@ export async function loadSettings(plugin: Plugin): Promise<HomeSettings> {
         ? data.members.map(normalizeMember).filter((member): member is FamilyMember => !!member)
         : defaults.members;
     const overrides = isPlainObject(data.leadOverrides)
-        ? Object.fromEntries(Object.entries(data.leadOverrides).filter((entry): entry is [string, number] => typeof entry[1] === "number" && Number.isFinite(entry[1]) && entry[1] >= 0))
+        ? Object.fromEntries(
+            Object.entries(data.leadOverrides)
+                .filter((entry): entry is [string, number] => typeof entry[1] === "number" && Number.isFinite(entry[1]) && entry[1] >= 0)
+                .map(([k, v]) => [k, Math.min(3650, Math.round(v))]),
+        )
         : defaults.leadOverrides;
     const household = isPlainObject(data.household) ? data.household : undefined;
     const validRoles = Array.isArray(household?.roles)
@@ -274,7 +278,13 @@ export function normalizeImportedSettings(input: unknown): NormalizedImport {
         ...data,
         enabledModules: enabled,
         members,
-        leadOverrides: isPlainObject(data.leadOverrides) ? Object.fromEntries(Object.entries(data.leadOverrides).filter((entry): entry is [string, number] => typeof entry[1] === "number" && Number.isFinite(entry[1]) && entry[1] >= 0)) : defaults.leadOverrides,
+        leadOverrides: isPlainObject(data.leadOverrides)
+            ? Object.fromEntries(
+                Object.entries(data.leadOverrides)
+                    .filter((entry): entry is [string, number] => typeof entry[1] === "number" && Number.isFinite(entry[1]) && entry[1] >= 0)
+                    .map(([k, v]) => [k, Math.min(3650, Math.round(v))]),
+            )
+            : defaults.leadOverrides,
         dbRefs: normalizeDbRefs(data.dbRefs, defaults.dbRefs),
         checkinBindings: normalizeCheckinBindings(data.checkinBindings),
         avatar: normalizeAvatarText(data.avatar),

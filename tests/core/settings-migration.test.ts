@@ -227,6 +227,24 @@ describe("坏文件容错（15 组）", () => {
         expect(settings.webhookUrl).toBe("");
     });
 
+    it("leadOverrides 提前量覆盖配置归一化：非法键值过滤并限制在 0-3650 天", async () => {
+        const plugin = pluginWithSettings({
+            leadOverrides: {
+                "certs.expiry": 60,
+                "medicine.expiry": 45,
+                "bad.rule": -10,
+                "invalid": "text",
+                "overflow": 5000,
+            },
+        });
+        const settings = await loadSettings(plugin);
+        expect(settings.leadOverrides?.["certs.expiry"]).toBe(60);
+        expect(settings.leadOverrides?.["medicine.expiry"]).toBe(45);
+        expect(settings.leadOverrides?.["bad.rule"]).toBeUndefined();
+        expect(settings.leadOverrides?.["invalid"]).toBeUndefined();
+        expect(settings.leadOverrides?.["overflow"]).toBe(3650);
+    });
+
     it("运行态缓存逐项归一化：错误 map/list/cache 字段安全回退", async () => {
         const plugin = pluginWithSettings(null);
         plugin.loadData = async (name: string) => name === "hub-runtime.json" ? {

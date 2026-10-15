@@ -1222,6 +1222,8 @@
     "settings.leadsShowAll": "显示未启用模块规则（${n} 条，覆盖值已保留）",
     "settings.leadsEnabledOnly": "只看启用模块",
     "settings.leadDisabled": "模块未启用，覆盖值保留",
+    "settings.leadReset": "重置",
+    "settings.leadResetDefault": "恢复为默认提前量",
     "settings.disableTitle": "停用模块",
     "settings.disableBody": "停用「${name}」后仅隐藏入口并停止其提醒，台账数据保留，可随时重新启用。",
     "about.repo": "GitHub 仓库 ↗",

@@ -49,7 +49,7 @@ This release introduces smart dual dates (plan date vs deadline), performance ca
 - **Added**: Physical asset lifecycle state machine (MOD-21) with inuse/idle/lent/repairing/disposed transitions and loan log integration.
 - **Added**: Travel 6-month passport validity checker (MOD-18), packing list templates (MOD-19), media progress dashboard (MOD-14), pet health & deworming manager (MOD-15), schooling milestone countdown (MOD-13), asset valuation dashboard (MOD-10), favors gift balance report (MOD-08), house warranty checker (MOD-06), food allergy checker (MOD-12), and infant food 3-day tolerance check (MOD-07).
 - **Improved**: Avatar hue and module icon memory caching (PERF-01), unified XSS sanitization (SEC-01), privacy desensitized copying (MOD-04), compact/comfortable table density toggle (UIX-04), inline reminder summary expander (UIX-05), one-click missing ledger rebuilding (SYS-01), and bulk orphan member reassign (MOD-05).
-- **Validation**: 511 unit tests across 66 test suites, 1745 i18n keys aligned, 0 TypeScript/Svelte errors and warnings, production build and loader verification pass.
+- **Validation**: 512 unit tests across 66 test suites, 1747 i18n keys aligned, 0 TypeScript/Svelte errors and warnings, production build and loader verification pass.
 
 ## 📦 Install (v0.5.7)
 
@@ -59,7 +59,7 @@ This release introduces smart dual dates (plan date vs deadline), performance ca
 4. Press `Ctrl+Alt+H` anytime to open the hub
 
 > **Validation status:** core data paths have automated tests and isolated-kernel coverage. The v0.5.7 GitHub Release is available; Android WebView behavior remains host-specific validation. `icon.png` and `preview.png` were redesigned for v0.3.13 (brand-gradient tile + geometric mark; dark overview with sample data).
-> **Version note:** the tagged v0.5.7 package is the current GitHub release; local quality checks report 511 unit tests.
+> **Version note:** the tagged v0.5.7 package is the current GitHub release; local quality checks report 512 unit tests.
 >
 > Family sharing depends on SiYuan's collaboration, permissions, sync and conflict behavior. Test with non-sensitive data before sharing; this plugin does not provide a separate permission system.
 >
@@ -135,7 +135,7 @@ pnpm run dev      # dev (app + kernel watch)
 pnpm run build    # dist/ + package.zip
 pnpm run check    # 5-layer gate (types + svelte + i18n + meta + audit)
 pnpm run smoke    # release package and single-file loader smoke checks
-pnpm test         # unit tests (511)
+pnpm test         # unit tests (512)
 ```
 
 - Setup & conventions: [CONTRIBUTING.md](./CONTRIBUTING.md)

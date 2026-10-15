@@ -1,5 +1,5 @@
 # 小驴管家（Lv Home）· 项目待办总清单
-> **当前事实（2026-10-15 · v0.5.7）**：v0.5.7 就绪；智能双日期、渲染性能缓存、XSS安全加固、实物资产状态机、家庭生活年报、国家免疫规划疫苗排期与全景业务看板均已纳入主线。511 项单测通过（66 个套件），类型/Svelte/i18n(1745 键)/meta/audit/build/smoke/loader 全绿；依赖基线为 Vite 8.3.3、Svelte 5.57.1、SiYuan SDK 1.2.9、pnpm 12.9.1；Svelte 0 错误 0 警告；Vite/Rolldown 单文件输出无外部 chunk；package.zip 0.57 MB；真实 Android WebView/独立窗口/兄弟插件/双端冲突待设备；集市上架继续暂缓。
+> **当前事实（2026-10-15 · v0.5.7）**：v0.5.7 就绪；智能双日期、渲染性能缓存、XSS安全加固、实物资产状态机、家庭生活年报、国家免疫规划疫苗排期与全景业务看板均已纳入主线。512 项单测通过（66 个套件），类型/Svelte/i18n(1747 键)/meta/audit/build/smoke/loader 全绿；依赖基线为 Vite 8.3.3、Svelte 5.57.1、SiYuan SDK 1.2.9、pnpm 12.9.1；Svelte 0 错误 0 警告；Vite/Rolldown 单文件输出无外部 chunk；package.zip 0.57 MB；真实 Android WebView/独立窗口/兄弟插件/双端冲突待设备；集市上架继续暂缓。
 
 ## 第 224 波复审行动清单（当前唯一入口）
 
@@ -336,7 +336,7 @@ v0.3.0 已发 GitHub Release；**集市上架以此批通过为先决条件**。
 - [x] 🟡 medicine：schema/建库计划/效期 provider 已存在；低库存数值规则未实现，双规则闭环见 H15 ✅ 2026-10-02 第三轮（H15 落地：NumericRuleProvider 低库存规则与效期规则独立并存，单测覆盖）
 - [x] 🟡 memberships schema（计费周期/试用期/自动续费/储值余额） ✅ 2026-10-02（SchemaLedgerProvider 通用派生，schema 驱动建库+提醒；低库存双规则留 v0.3 后段）
 - [x] 🟡 insurance schema（缴费日+保障到期双提醒） ✅ 2026-10-02（SchemaLedgerProvider 通用派生，schema 驱动建库+提醒；低库存双规则留 v0.3 后段）
-- [ ] 🟡 提醒中枢规则清单 UI 完善（按模块列出 rules）
+- [x] 🟡 提醒中枢规则清单 UI 完善（按模块列出 rules） ✅ 2026-10-15（C8c / settings.svelte 提醒设置：按模块枚举所有提醒规则、显示规则中文名与默认提前量，并支持逐规则配置 leadOverrides 自定义覆盖）
 - [ ] 🟡 生态 RPC server 首批：home.capabilities / getSnippets / getBookmarks（2026-10-03 第二十八轮进度：**window 版先行落地**——`window.LvHome` 服务桥 v1（protocol 1，capabilities=[whenReady,openButler,openReminders,addMemo,summary]，summary 只含计数），模式对齐人脉 window.LvContacts；契约文档 docs/BRIDGE.md；5 项单测。getSnippets/getBookmarks 数据读取待 snippets/bookmarks 面板成型；kernel 私有路由版随实例验证）
 - [ ] 🟡 生态开关接线（设置·生态 → rpc 权限）
 - [x] 🟡 多端同步信号：台账变更 broadcast → 他端"刷新"角标 ✅ 2026-10-03 第二十一轮（ws-main websocket 消息 → 60 秒节流补扫——变更直接进提醒与计数，未做角标形态；事件名/频度 [待实测]；两设备冲突实测仍属 S7）
@@ -354,7 +354,7 @@ v0.3.0 已发 GitHub Release；**集市上架以此批通过为先决条件**。
 
 ## 8. v0.5 教育包（🟡）
 
-- [ ] 🔴 parenting：schema 与免疫程序种子已写入，但未核验、未接线；2026-10-02 发现月龄差错与政策过时，须按 2026 官方程序校核，见 V01–V05，暂不作为可用排期能力
+- [x] 🔴 parenting：schema 与免疫程序种子已写入，但未核验、未接线；2026-10-02 发现月龄差错与政策过时，须按 2026 官方程序校核，见 V01–V05，暂不作为可用排期能力 ✅ 2026-10-15（MOD-17 / V01-V05 结案：依据国家卫健委 2021 版现行《国家免疫规划疫苗儿童免疫程序表》建立 IMMUNIZATION_SCHEDULE 22 剂次权威程序表，支持按出生日期精确推算月龄与接种日，台账与成员卡全链路接线并配齐单测）
 - [x] 🟡 schooling schema（学段推算当前年级/升学节点/学费/课外班课时） ✅ 2026-10-15（MOD-13：升学教育台账顶部增加升学里程碑倒计时看板，自动依据学制与入学年份推算幼升小、小升初、中考、高考等关键节点倒计时）
 - [x] 🟡 exams schema（证书效期/复审周期/考试节点） ✅ 2026-10-02（schema+枚举 i18n+通用提醒派生；UI 细化随模块启用迭代）
 - [x] 🟡 allowance schema（压岁钱/零花钱多账户/发放周期） ✅ 2026-10-02（schema+枚举 i18n+通用提醒派生；UI 细化随模块启用迭代）
@@ -365,8 +365,8 @@ v0.3.0 已发 GitHub Release；**集市上架以此批通过为先决条件**。
 ## 9. v0.6 生活包（🟡）
 
 - [x] 🟡 favors schema（收送双向/事件类型/按人净额视图） ✅ 2026-10-02（schema+枚举 i18n+通用提醒派生；UI 细化随模块启用迭代）
-- [ ] 🟡 stock：schema/效期规则已存在；低库存阈值执行与解除已落地（2026-10-02 第三轮 H15：≤ 触发/0 算有值/缺值不评估/补货扫描自动解除，单测覆盖）；补货去重待 P03 采购清单
-- [ ] 🟡 food schema（菜谱/忌口联动/餐厅）
+- [x] 🟡 stock：schema/效期规则已存在；低库存阈值执行与解除已落地（2026-10-02 第三轮 H15：≤ 触发/0 算有值/缺值不评估/补货扫描自动解除，单测覆盖）；补货去重待 P03 采购清单 ✅ 2026-10-15（P03 采购清单 + 药箱/囤货补货建议弹窗已落地，MOD-11 应急物资储备建议清单模板 emergency-kit.tpl 与半年巡检闭环）
+- [x] 🟡 food schema（菜谱/忌口联动/餐厅） ✅ 2026-10-15（FOOD_SCHEMA 定义并入网格，MOD-12 菜谱食材过敏史冲突实时预警 + MOD-07 婴儿辅食 3 天观察期闭环）
 - [x] 🟡 address / bookmarks / snippets schema（轻台账三件） ✅ 2026-10-15（ADDRESS_SCHEMA、BOOKMARKS_SCHEMA、SNIPPETS_SCHEMA 全量定义并纳入 SCHEMA_CATALOG）
 - [x] 🟡 chores schema（周期任务 → 提醒中枢 recurring） ✅ 2026-10-02（schema+枚举 i18n+通用提醒派生；UI 细化随模块启用迭代）
 - [x] 🟡 house schema（维护周期/缴费日/农历纪念日/忌日） ✅ 2026-10-02（schema+枚举 i18n+通用提醒派生；UI 细化随模块启用迭代）

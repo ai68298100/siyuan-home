@@ -957,6 +957,11 @@
                         placeholder={String(lr.def)}
                         bind:value={draftLeads[lr.key]} />
                     <span class="lv-caption fn__flex-1">{t("settings.leadDefault").replace("${n}", String(lr.def))}{#if !enabledIds.has(lr.moduleId)} · {t("settings.leadDisabled")}{/if}</span>
+                    {#if (draftLeads[lr.key] ?? "").trim() !== ""}
+                        <button class="b3-button b3-button--text b3-button--small" style="padding:2px 8px;font-size:11.5px;color:var(--lv-tx-3)" title={t("settings.leadResetDefault")} onclick={() => (draftLeads[lr.key] = "")}>
+                            {t("settings.leadReset")}
+                        </button>
+                    {/if}
                 </div>
             {/each}
         </div>

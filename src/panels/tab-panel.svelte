@@ -37,6 +37,7 @@
     // In Svelte 5 runes mode a capitalized component reference is dynamic by
     // default. Keeping this reference capitalized avoids the deprecated
     // <svelte:component> wrapper while preserving lazy loading behavior.
+    const screenCache: Partial<Record<ScreenId, ScreenComponent>> = {};
     let ScreenView = $state<ScreenComponent | null>(null);
     let loadedScreen = $state<ScreenId | null>(null);
     let screenLoadError = $state("");
@@ -85,11 +86,23 @@
         pointerPreparedScreen = null;
         if (s !== "ledger") plugin.pendingActivityTarget = undefined;
         screen = s;
-        void loadScreen(s);
+        if (screenCache[s]) {
+            ScreenView = screenCache[s]!;
+            loadedScreen = s;
+            screenLoadError = "";
+        } else {
+            void loadScreen(s);
+        }
         saveScreenSession(s);
         restoreScroll(s);
     }
     async function loadScreen(target: ScreenId): Promise<void> {
+        if (screenCache[target]) {
+            ScreenView = screenCache[target]!;
+            loadedScreen = target;
+            screenLoadError = "";
+            return;
+        }
         const request = ++screenLoadRequest;
         screenLoadError = "";
         try {
@@ -101,7 +114,9 @@
                         ? await import("./screens/ledger.svelte")
                         : await import("./screens/members.svelte");
             if (request !== screenLoadRequest) return;
-            ScreenView = module.default as unknown as ScreenComponent;
+            const comp = module.default as unknown as ScreenComponent;
+            screenCache[target] = comp;
+            ScreenView = comp;
             loadedScreen = target;
         } catch (error) {
             if (request !== screenLoadRequest) return;

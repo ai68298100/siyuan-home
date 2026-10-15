@@ -1222,6 +1222,8 @@
     "settings.leadsShowAll": "Show rules of disabled modules (${n}, overrides kept)",
     "settings.leadsEnabledOnly": "Enabled modules only",
     "settings.leadDisabled": "Module disabled — override kept",
+    "settings.leadReset": "Reset",
+    "settings.leadResetDefault": "Restore default lead days",
     "settings.disableTitle": "Disable module",
     "settings.disableBody": "Disabling \"${name}\" only hides its entry and stops its reminders; ledger data is kept and it can be re-enabled anytime.",
     "about.repo": "GitHub repo ↗",
