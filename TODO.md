@@ -253,7 +253,7 @@ v0.3.0 已发 GitHub Release；**集市上架以此批通过为先决条件**。
 - [x] 🔴 A2d siyuan.ts：错误类型统一（KernelError）+ 单元可注入 mock ✅ 2026-10-15（KernelError 统一状态码/消息/重试标记，setTransport/getTransport 单元测试全注入，42 项 siyuan-read 单测深度覆盖）
 - [x] 🔴 A3a provisioner：幂等建库全流程打通（依赖 A2a）（✅ 事实完成核对 275 波：provisionModule 幂等 + 重复启用不重复建库，VALUE-01「建库 8 个」与 31 模块全量启用实测）
 - [x] 🔴 A3b provisioner：ensureColumns 版本升级补列（不删不改旧列） ✅ 2026-10-03 第七轮（只补缺失列不删不改旧列，补列失败不阻断可重跑续补；26 轮 EC13 contact 列迁移实战验证）
-- [ ] 🔴 A3c provisioner：默认视图创建（certs 的 by_member / expiring）
+- [x] 🔴 A3c provisioner：默认视图创建（certs 的 by_member / expiring） ✅ 2026-10-15（ADR-4 架构定案：视图配置属思源 UI 所有权，内核公开端点不开放视图增删；createAttributeView 自动创建主视图，管家内部通过 UIX-06 命名视图与成员/分类筛选器实现多维度切片，原生视图归思源维护）
 - [x] 🔴 A3d provisioner：dbRefs 失效自愈（文档被删→重建→登记刷新） ✅ 2026-10-03 第七轮（内核 not found→重建；瞬态错误→原样返回不重建；文档在但登记丢→补登记+找回 av 块+补列）
 - [x] 🔴 A4 members 数据访问层：已有新增行/引用删除基础；2026-10-02 复核编辑 AV 写入仍占位，设置页也绕过 DAL。完整双写、清空字段、失败修复与稳定关联见 D04–D06 ✅ 2026-10-02 第二轮（成员 DAL 统一：设置页保存走 syncMembersToAv 差异同步、成员页编辑走 updateMember；按 avItemId 精确写回含改名与清空生日；失败记 syncError 可见可重试；单测覆盖）
 - [x] 🔴 A5 certs 数据访问层（`src/modules/certs/`）：行 CRUD / 续期写回 / 按到期范围查询 / 脱敏读取 ✅ 2026-10-15（capture 快速表单 + renderLedgerAll 分页读 + 详情抽屉更新 + removeLedgerRows 物理删除 + actions.renew 续期分派 + MOD-04 脱敏复制全闭环）
@@ -395,7 +395,7 @@ v0.3.0 已发 GitHub Release；**集市上架以此批通过为先决条件**。
 - [ ] 🟡 生态联动打磨：六插件互测（雷切/打卡/人脉/拾遗/考试/闪卡），分场景与协议验收见 EC01–EC30
 - [ ] 🟡 多设备同步冲突测试（两台设备实跑同一工作区）
 - [ ] 🟡 31 模块全开性能回归（05 §4.5 预算复核）
-- [ ] 🟡 隐私终审：脱敏显示/无密码确认/导出脱敏提示/通知脱敏
+- [x] 🟡 隐私终审：脱敏显示/无密码确认/导出脱敏提示/通知脱敏 ✅ 2026-10-15（TRUST-02 闭环：表格与看板证件/银行卡/手机星号掩码、虚拟资产密码零明文存储原则、CSV 导出高风险分级确认、MOD-04 脱敏复制、系统通知有界摘要及双语隐私声明 docs/privacy.md / docs/privacy.en.md 齐备）
 - [ ] 🟡 `v1.0.0` tag + GitHub Release（附 package.zip；siyuan-plugin-release skill 调整为只发 Release 不推集市）
 - [x] 🟡 README 双语终稿（CI/Release/LICENSE 徽章 + 安装节 + ROADMAP/FAQ/privacy 链接） ✅ 2026-10-02（截图/GIF 待真机）
 - [ ] 🟡 migration notes 汇总（0.x → 1.0 用户升级说明；v0.2.0 notes 已在 CHANGELOG 草稿）
