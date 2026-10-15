@@ -992,6 +992,8 @@
     "assets.topTitle": "Top assets",
     "assets.viewAssets": "View all assets",
     "assets.noValuation": "No asset valuations recorded",
+    "assets.snapshotSource": "${n} manual valuation snapshots · latest date ${date}",
+    "assets.purchaseSource": "No manual valuation snapshots; using ledger purchase amounts",
     "allergy.alertTitle": "Family allergen warning",
     "allergy.alertBanner": "Allergens detected for family member",
     "allergy.memberConflict": "${member} is allergic to ${allergen}",

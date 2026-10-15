@@ -547,6 +547,7 @@
     .lv-asset-label { font-size: 11.5px; color: var(--lv-tx-3); font-weight: 500; }
     .lv-asset-amount { font-size: 26px; font-weight: 700; color: var(--lv-tx); line-height: 1.25; letter-spacing: -0.015em; }
     .lv-asset-sub { font-size: 12px; color: var(--lv-tx-2); }
+    .lv-asset-source { font-size: 11px; color: var(--lv-tx-3); line-height: 1.35; }
   }
   .lv-asset-stats {
     display: flex; align-items: center; gap: 8px; flex-wrap: wrap;

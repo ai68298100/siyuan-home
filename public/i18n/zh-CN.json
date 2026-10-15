@@ -992,6 +992,8 @@
     "assets.topTitle": "高价值资产",
     "assets.viewAssets": "查看全部资产",
     "assets.noValuation": "暂无资产估值记录（可在实物资产中填入购入金额）",
+    "assets.snapshotSource": "${n} 项手动估值快照 · 最新口径日 ${date}",
+    "assets.purchaseSource": "未发现手动估值快照，当前按台账购入金额汇总",
     "allergy.alertTitle": "家庭过敏原安全预警",
     "allergy.alertBanner": "检测到本菜品/食材包含家庭成员过敏原",
     "allergy.memberConflict": "【${member}】对【${allergen}】过敏",

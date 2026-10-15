@@ -39,7 +39,7 @@
     import { calculateSolidsObservation, buildAllergyFromFeeding } from "@/core/solids";
     import { calculateFavorsSummary, formatFavorsReportText, type FavorRow } from "@/core/favors";
     import { buildAssetFromShopping } from "@/core/shopping-asset";
-    import { calculateAssetValuation, type AssetRowData } from "@/core/assets-valuation";
+    import { calculateAssetValuation, type AssetRowData, type ValuationLogEntry } from "@/core/assets-valuation";
     import { checkAllergyConflicts, type FamilyAllergy } from "@/core/allergy-check";
     import { calculateSchoolingMilestones, type SchoolingRowData } from "@/core/schooling";
     import { calculateMediaSummary, type MediaRowData } from "@/core/media";
@@ -311,6 +311,38 @@
         return calculateFavorsSummary(fRows);
     });
 
+    // Asset Steward reference: valuation snapshots should override purchase
+    // price in the read-only summary, while rowlogs remain the only secondary
+    // projection and the AV row stays the source of truth.
+    let assetValuationLogs = $state<Record<string, ValuationLogEntry[]>>({});
+    let assetValuationLogRequest = 0;
+    $effect(() => {
+        const moduleId = active;
+        const avId = ref?.avId;
+        const request = ++assetValuationLogRequest;
+        if (moduleId !== "assets-real" || !avId) {
+            assetValuationLogs = {};
+            return;
+        }
+        loadRowLogs(plugin as any).then((logs) => {
+            if (request !== assetValuationLogRequest) return;
+            const prefix = `${avId}|`;
+            const next: Record<string, ValuationLogEntry[]> = {};
+            for (const [key, log] of Object.entries(logs)) {
+                if (!key.startsWith(prefix) || !log.valuations?.length) continue;
+                const rowId = key.slice(prefix.length);
+                next[rowId] = log.valuations.map((entry) => ({
+                    value: entry.value,
+                    date: entry.date,
+                    at: entry.at,
+                })).sort((a, b) => String(a.date ?? a.at ?? "").localeCompare(String(b.date ?? b.at ?? "")));
+            }
+            assetValuationLogs = next;
+        }).catch(() => {
+            if (request === assetValuationLogRequest) assetValuationLogs = {};
+        });
+    });
+
     const realAssetSummary = $derived.by(() => {
         void version;
         if (active !== "assets-real" || !ref?.columns) return undefined;
@@ -325,8 +357,17 @@
             status: r.cells[statusCol]?.select?.content ?? r.cells[statusCol]?.mSelect?.[0]?.content ?? r.cells[statusCol]?.text?.content ?? "inuse",
             amount: r.cells[amtCol]?.number?.isNotEmpty && typeof r.cells[amtCol].number.content === "number" ? r.cells[amtCol].number.content : undefined,
         }));
-        return calculateAssetValuation(aRows);
+        return calculateAssetValuation(aRows, [], assetValuationLogs);
     });
+
+    const assetValuationSnapshotDate = $derived.by(() => {
+        void version;
+        const dates = Object.values(assetValuationLogs).flatMap((entries) => entries.map((entry) => entry.date ?? entry.at ?? ""))
+            .filter(Boolean)
+            .sort();
+        return dates.length > 0 ? dates[dates.length - 1] : "";
+    });
+    const assetSnapshotCount = $derived(Object.values(assetValuationLogs).filter((entries) => entries.length > 0).length);
 
     let selectedSchoolingIndex = $state(0);
     const schoolingMilestones = $derived.by(() => {
@@ -4828,6 +4869,11 @@
                 <span class="lv-asset-label">{t("assets.valuationTitle")}</span>
                 <b class="lv-asset-amount lv-num">¥ {formatAmount(realAssetSummary.totalRealValuation, plugin.settings.hideAmounts)}</b>
                 <span class="lv-asset-sub">{t("assets.activeCount")}：{realAssetSummary.activeItemCount} 件{#if realAssetSummary.disposedItemCount > 0} · {t("assets.disposedCount")}：{realAssetSummary.disposedItemCount} 件{/if}</span>
+                <span class="lv-asset-source" title={assetSnapshotCount > 0 ? t("assets.snapshotSource").replace("${n}", String(assetSnapshotCount)).replace("${date}", assetValuationSnapshotDate) : t("assets.purchaseSource")}>
+                    {assetSnapshotCount > 0
+                        ? t("assets.snapshotSource").replace("${n}", String(assetSnapshotCount)).replace("${date}", assetValuationSnapshotDate)
+                        : t("assets.purchaseSource")}
+                </span>
             </div>
             <div class="lv-asset-stats">
                 <div class="lv-asset-chip">

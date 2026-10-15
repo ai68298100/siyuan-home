@@ -39,6 +39,17 @@ describe("calculateAssetValuation (MOD-10 家庭资产估值汇总统计)", () =
         expect(res.topAssets[0].amount).toBe(11000);
     });
 
+    it("兼容 rowlog 的 value/date 估值快照形态", () => {
+        const res = calculateAssetValuation(realAssets, [], {
+            r2: [
+                { value: 2100, date: "2026-09-01", at: "2026-09-01T08:00:00.000Z" },
+                { value: 2800, date: "2026-06-01", at: "2026-06-01T08:00:00.000Z" },
+            ],
+        });
+        expect(res.totalRealValuation).toBe(15000 + 2100 + 6000);
+        expect(res.topAssets.find((item) => item.name === "戴森吸尘器")?.amount).toBe(2100);
+    });
+
     it("分类占比与高价值资产排行", () => {
         const res = calculateAssetValuation(realAssets, virtualAssets);
         expect(res.topAssets).toHaveLength(4);

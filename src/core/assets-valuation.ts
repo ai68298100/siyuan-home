@@ -17,8 +17,12 @@ export interface AssetRowData {
 }
 
 export interface ValuationLogEntry {
-    amount: number;
-    at: string;
+    /** Legacy callers used amount; rowlog valuations use value. */
+    amount?: number;
+    value?: number;
+    /** Snapshot date when available; at remains the write timestamp fallback. */
+    date?: string;
+    at?: string;
 }
 
 export interface CategoryValuation {
@@ -72,10 +76,13 @@ export function calculateAssetValuation(
         // 优先取 rowlog 最新手动估值，缺失回退到 item.amount
         let val = typeof item.amount === "number" && Number.isFinite(item.amount) && item.amount > 0 ? item.amount : 0;
         if (item.id && valuationLogs?.[item.id]?.length) {
-            const logs = valuationLogs[item.id];
+            const logs = [...valuationLogs[item.id]].sort((a, b) =>
+                String(a.date ?? a.at ?? "").localeCompare(String(b.date ?? b.at ?? "")),
+            );
             const latest = logs[logs.length - 1];
-            if (typeof latest.amount === "number" && Number.isFinite(latest.amount) && latest.amount > 0) {
-                val = latest.amount;
+            const snapshotValue = typeof latest.amount === "number" ? latest.amount : latest.value;
+            if (typeof snapshotValue === "number" && Number.isFinite(snapshotValue) && snapshotValue > 0) {
+                val = snapshotValue;
             }
         }
 
