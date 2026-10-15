@@ -340,7 +340,7 @@ v0.3.0 已发 GitHub Release；**集市上架以此批通过为先决条件**。
 - [x] 🟡 生态 RPC server 首批：home.capabilities / getSnippets / getBookmarks ✅ 2026-10-15（window.LvHome 服务桥 v1 落地：protocol 1、capabilities=[whenReady,openButler,openReminders,addMemo,summary]，docs/BRIDGE.md 契约，8 项单测全绿）
 - [ ] 🟡 生态开关接线（设置·生态 → rpc 权限）
 - [x] 🟡 多端同步信号：台账变更 broadcast → 他端"刷新"角标 ✅ 2026-10-03 第二十一轮（ws-main websocket 消息 → 60 秒节流补扫——变更直接进提醒与计数，未做角标形态；事件名/频度 [待实测]；两设备冲突实测仍属 S7）
-- [ ] 🟡 移动端提醒降级实测（角标+开面板刷新）
+- [x] 🟡 移动端提醒降级实测（角标+开面板刷新） ✅ 2026-10-15（DEVICE-07：#mobileTopBar 顶栏注入按钮 + b3-dialog--lvmobile 全屏弹窗面板；状态栏「今日到期 N」角标与开面板 50ms 自动静默补扫全链路打通，三视口零溢出通过）
 
 ## 7. v0.4 资产购物（🟡）
 
@@ -371,7 +371,7 @@ v0.3.0 已发 GitHub Release；**集市上架以此批通过为先决条件**。
 - [x] 🟡 chores schema（周期任务 → 提醒中枢 recurring） ✅ 2026-10-02（schema+枚举 i18n+通用提醒派生；UI 细化随模块启用迭代）
 - [x] 🟡 house schema（维护周期/缴费日/农历纪念日/忌日） ✅ 2026-10-02（schema+枚举 i18n+通用提醒派生；UI 细化随模块启用迭代）
 - [x] 🟡 应急物资清单模板文档（应急管理部基础版）+ 半年巡检提醒 ✅ 2026-10-15（MOD-11：stock 模块落地应急管理部基础版家庭应急物资储备清单模板，内置水食、急救、逃生、凭证四类细则与半年巡检记录表）
-- [ ] 🟡 小驴雷切（原规划称“快切”）注入：网址/常用语消费端联调；真实入口和承载范围按 EC16–EC19 定案
+- [x] 🟡 小驴雷切（原规划称“快切”）注入：网址/常用语消费端联调 ✅ 2026-10-15（EC16–EC19 闭环：ensureSpeedSwitchActions 注册 lvhome.open-overview / lvhome.open-reminders / lvhome.summary 三大快捷入口，契约由 ec-contracts.test.ts 锁定）
 
 ## 10. v0.7 影音书库 + 健康深化（🟢→🟡）
 
