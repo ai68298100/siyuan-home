@@ -4,7 +4,8 @@
     import { confirm, showMessage } from "siyuan";
     import { tick } from "svelte";
     import { addDetachedRow, RowIdentityPendingError, setCell } from "@/core/siyuan";
-    import { saveRuntime } from "@/core/hub/runtime";
+    import { removeCaptureDraft, saveRuntime, upsertCaptureDraft } from "@/core/hub/runtime";
+    import type { CaptureDraft } from "@/core/hub/runtime";
     import { captureCellValue, getCaptureFields, validateCaptureInput } from "@/core/capture";
     import type { ColumnDef, ModuleSchema } from "@/core/schema";
     import type { HomeSettings } from "@/types";
@@ -14,7 +15,8 @@
         i18n: Record<string, unknown>;
         settings: HomeSettings;
         schemaCatalog?: Record<string, ModuleSchema>;
-        runtime?: { hubQuickModule?: string };
+        runtime?: { hubQuickModule?: string; captureDrafts?: CaptureDraft[] };
+        hubListeners?: Set<() => void>;
         openSetting: () => void;
         refreshHub?: (only?: string | string[], force?: boolean) => Promise<unknown>;
         showTabDocs?: (docId?: string) => void;
@@ -90,22 +92,104 @@
     // during batch entry; silently clearing the previous form makes it easy
     // to lose a name or a date.
     let valuesByModule: Record<string, Record<string, string | number | boolean | undefined>> = $state({});
+    // A restored draft is applied once per module for the lifetime of this
+    // mounted sheet. Subsequent module switches keep the in-memory form and
+    // must not overwrite it from the persisted snapshot again.
+    const restoredDraftModules = new Set<string>();
+
+    function draftValues(source = values): Record<string, string | number | boolean> {
+        return Object.fromEntries(Object.entries(source).filter((entry): entry is [string, string | number | boolean] => {
+            const value = entry[1];
+            return typeof value === "string" || typeof value === "number" && Number.isFinite(value) || typeof value === "boolean";
+        }));
+    }
+
+    function runtimeDraft(module: string): CaptureDraft | undefined {
+        return plugin.runtime?.captureDrafts?.find((draft) => draft.moduleId === module);
+    }
+
+    function notifyRuntime() {
+        try { plugin.hubListeners?.forEach((listener) => listener()); }
+        catch (error) { console.warn("[siyuan-home] quick capture runtime listener failed:", error); }
+    }
+
+    /** Restore one persisted failed/pending form the first time its module is selected. */
+    function restoreCaptureDraft(module: string): boolean {
+        if (!module || restoredDraftModules.has(module)) return false;
+        restoredDraftModules.add(module);
+        const draft = runtimeDraft(module);
+        if (!draft) return false;
+        const restored = { ...draft.values };
+        valuesByModule = { ...valuesByModule, [module]: restored };
+        values = restored;
+        saveOperationKey = draft.operationKey;
+        pendingModuleId = draft.rowId ? module : undefined;
+        pendingRowId = draft.rowId;
+        identityPending = draft.status === "pending" && !draft.rowId;
+        saveError = draft.error ?? "";
+        fieldErrors = {};
+        return true;
+    }
+
+    async function persistCaptureDraft(module: string, status: CaptureDraft["status"], rowId: string | undefined, error: string | undefined) {
+        if (!plugin.runtime || !module) return;
+        if (!saveOperationKey) saveOperationKey = nextSaveOperationKey();
+        const previous = runtimeDraft(module);
+        const draft: CaptureDraft = {
+            id: previous?.id ?? `capture:${module}:${saveOperationKey}`,
+            moduleId: module,
+            values: draftValues(),
+            createdAt: previous?.createdAt ?? new Date().toISOString(),
+            operationKey: saveOperationKey,
+            status,
+            ...(rowId ? { rowId } : {}),
+            ...(error ? { error } : {}),
+        };
+        plugin.runtime.captureDrafts = upsertCaptureDraft(plugin.runtime.captureDrafts, draft);
+        notifyRuntime();
+        try {
+            await saveRuntime(plugin as any, plugin.runtime as any);
+        } catch (persistError) {
+            // The original capture error is the actionable one; persistence is
+            // best effort and must never replace it in the form.
+            console.warn("[siyuan-home] quick capture draft persistence failed:", persistError);
+        }
+    }
+
+    async function clearCaptureDraft(module: string) {
+        if (!plugin.runtime || !module) return;
+        if (!runtimeDraft(module)) return;
+        plugin.runtime.captureDrafts = removeCaptureDraft(plugin.runtime.captureDrafts, module);
+        notifyRuntime();
+        try {
+            await saveRuntime(plugin as any, plugin.runtime as any);
+        } catch (persistError) {
+            console.warn("[siyuan-home] quick capture draft cleanup failed:", persistError);
+        }
+    }
+
     let currentModuleId = "";
     $effect(() => {
         void moduleId;
         if (!moduleId) return;
         if (!currentModuleId) {
             currentModuleId = moduleId;
-            values = { ...(valuesByModule[moduleId] ?? {}) };
-            saveError = "";
+            const existing = valuesByModule[moduleId];
+            const restored = !existing || Object.keys(existing).length === 0 ? restoreCaptureDraft(moduleId) : false;
+            if (!restored) values = { ...(existing ?? {}) };
+            if (!restored) saveError = "";
             fieldErrors = {};
             return;
         }
         if (currentModuleId !== moduleId) {
             valuesByModule = { ...valuesByModule, [currentModuleId]: { ...values } };
             currentModuleId = moduleId;
-            values = { ...(valuesByModule[moduleId] ?? {}) };
-            saveError = "";
+            const existing = valuesByModule[moduleId];
+            const restored = !existing || Object.keys(existing).length === 0 ? restoreCaptureDraft(moduleId) : false;
+            if (!restored) {
+                values = { ...(existing ?? {}) };
+                saveError = "";
+            }
             fieldErrors = {};
         }
     });
@@ -249,6 +333,7 @@
                     if (e instanceof RowIdentityPendingError) {
                         identityPending = true;
                         saveError = t("capture.identityPending").replace("${module}", modLabel(moduleId));
+                        await persistCaptureDraft(moduleId, "pending", undefined, saveError);
                         return;
                     }
                     throw e;
@@ -274,6 +359,9 @@
                 const cell = captureCellValue(f, v);
                 if (cell !== undefined) await setCellSafe(f.key, cell);
             }
+            // All cells are committed. Remove the recovery draft before any
+            // refresh so a refresh failure cannot cause a duplicate retry row.
+            await clearCaptureDraft(moduleId);
             // A preference failure must not turn a committed row into a retryable save failure.
             const previousQuickModule = plugin.runtime?.hubQuickModule;
             try {
@@ -312,6 +400,7 @@
         } catch (e) {
             const messageKey = pendingRowId ? "capture.partialFailed" : "capture.failed";
             saveError = t(messageKey).replace("${msg}", e instanceof Error ? e.message : String(e));
+            await persistCaptureDraft(pendingModuleId ?? moduleId, pendingRowId ? "pending" : "failed", pendingRowId, saveError);
         } finally {
             saving = false;
         }
@@ -336,6 +425,8 @@
             t("capture.discardUncertain"),
             t("capture.discardUncertainConfirm").replace("${module}", modLabel(pendingModuleId ?? moduleId)),
             () => {
+                const targetModule = pendingModuleId ?? moduleId;
+                void clearCaptureDraft(targetModule);
                 values = {};
                 pendingRowId = undefined;
                 pendingModuleId = undefined;
