@@ -7,6 +7,7 @@
 import type { HomeSettings, Reminder } from "@/types";
 import type { DataProvider } from "./providers";
 import { applyRuntime, type HubRuntime } from "./runtime";
+import { buildPaymentSummary, type PaymentSource, type PaymentSummary } from "../payment-summary";
 
 export interface ScanResult {
     reminders: Reminder[];
@@ -19,6 +20,8 @@ export interface ScanResult {
     derived: Reminder[];
     /** 各模块本次生效的派生切片与数据时间（H04：失败模块为上次快照，行数口径随快照同策略） */
     byModule: Record<string, { reminders: Reminder[]; at: string; rowCount?: number; memberCounts?: Record<string, number> }>;
+    /** 全量扫描时由已读台账行派生的付款摘要；仅保存在当前进程的 scan 快照中。 */
+    paymentSummary?: PaymentSummary;
 }
 
 /** 264 波：行数口径（台账行数 + 成员行分布；providers 全量读表时顺手上报） */
@@ -33,6 +36,8 @@ export async function runScan(
     only?: Set<string>,
     /** 264 波：providers 经 deps.onStats 写入的行数口径，成功模块并入 byModule */
     statsSink?: Map<string, ModuleStats>,
+    /** 付款摘要收集器；只在成功读取 memberships/insurance 后写入。 */
+    paymentSink?: Map<string, PaymentSource>,
 ): Promise<ScanResult> {
     const enabled = new Set(settings.enabledModules);
     const derivedByModule = new Map<string, Reminder[]>();
@@ -96,6 +101,7 @@ export async function runScan(
         soon: visible.filter((r) => r.level === "soon").length,
         lead: visible.filter((r) => r.level === "lead").length,
     };
+    const paymentError = errors.some((error) => error.moduleId === "memberships" || error.moduleId === "insurance");
     return {
         reminders: visible,
         counts,
@@ -104,6 +110,7 @@ export async function runScan(
         stale: errors.length > 0,
         derived,
         byModule,
+        ...(!only && !paymentError ? { paymentSummary: buildPaymentSummary([...(paymentSink?.values() ?? [])], today) } : {}),
     };
 }
 

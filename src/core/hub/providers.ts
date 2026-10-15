@@ -9,6 +9,7 @@ import { CERTS_SCHEMA, MEMBERS_SCHEMA, type ModuleSchema, type NumericRuleSpec }
 import type { DbRef, HomeSettings } from "@/types";
 import { getEntries, type RowLogs } from "../rowlog";
 import { normalizeMaintenanceRecords, type MaintenanceRecord } from "../vehicle";
+import type { PaymentSource } from "../payment-summary";
 
 export interface DataProvider {
     readonly moduleId: string;
@@ -70,6 +71,8 @@ export interface ProviderDeps {
     /** 264 波：行数口径上报——providers 本就全量读表，顺手上报台账行数与成员行分布，
      * 供模块卡主数字 / 成员卡统计格（原型层次）；扫描成功才计入（失败沿用旧快照） */
     onStats?: (moduleId: string, stats: { rowCount: number; memberCounts: Record<string, number> }) => void;
+    /** 付款摘要快照：只在扫描成功后把已读行交给扫描器的内存投影。 */
+    onPaymentSource?: (source: PaymentSource) => void;
     /** 可选的行日志读取器；车辆 provider 用它派生维护/维修提醒。 */
     loadRowLogs?: () => Promise<RowLogs>;
     /** 可选的界面文案读取器；提醒标题需跟随当前语言。 */
@@ -208,6 +211,9 @@ export class SchemaLedgerProvider implements DataProvider {
         const members = this.deps.settings.members ?? [];
         // 264 波：行数口径（同 certs）
         this.deps.onStats?.(this.moduleId, { rowCount: loaded.rows.length, memberCounts: memberCountsFrom(loaded.rows, loaded.ref, members) });
+        if (this.moduleId === "memberships" || this.moduleId === "insurance") {
+            this.deps.onPaymentSource?.({ moduleId: this.moduleId, columns: loaded.ref.columns, rows: loaded.rows });
+        }
         return out;
     }
 }

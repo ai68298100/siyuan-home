@@ -10,6 +10,7 @@ import { FAVORS_SCHEMA, VEHICLES_SCHEMA } from "@/core/schema";
 import type { RowLogs } from "@/core/rowlog";
 import type { DataProvider } from "@/core/hub/providers";
 import type { HomeSettings, Reminder } from "@/types";
+import type { PaymentSource } from "@/core/payment-summary";
 
 const TODAY = new Date(2026, 9, 1);
 
@@ -90,6 +91,21 @@ describe("scanner.runScan", () => {
             settings(["members"]), defaultRuntime(), TODAY,
         );
         expect(res.reminders.map((r) => r.moduleId)).toEqual(["adhoc"]);
+    });
+    it("全量扫描把已读付款源投影到 scan，供总览复用", async () => {
+        const paymentSink = new Map<string, PaymentSource>();
+        paymentSink.set("memberships", {
+            moduleId: "memberships",
+            columns: { name: "name", status: "status", amount: "amount", cycle: "cycle", next_pay: "next_pay" },
+            rows: [{ itemID: "m1", cells: {
+                name: { text: { content: "云盘" } }, status: { select: { content: "active" } },
+                amount: { number: { content: 120 } }, cycle: { select: { content: "year" } },
+                next_pay: { date: { content: new Date(2026, 9, 5).getTime(), isNotEmpty: true } },
+            } }],
+        });
+        const res = await runScan([], settings(["memberships"]), defaultRuntime(), TODAY, undefined, undefined, paymentSink);
+        expect(res.paymentSummary).toMatchObject({ sourceCount: 1, monthlyTotal: 10, next7Total: 120 });
+        expect(res.paymentSummary?.upcoming[0]).toMatchObject({ moduleId: "memberships", rowId: "m1", dueDate: "2026-10-05" });
     });
 });
 

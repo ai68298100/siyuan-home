@@ -7,7 +7,7 @@
     import { localDateKey } from "@/core/hub/rule";
     import { parseNaturalDate } from "@/core/dateparse";
     import { formatLocalDate, formatLocalTime } from "@/core/date-display";
-    import { memberHue } from "@/core/format";
+    import { formatAmount, memberHue } from "@/core/format";
     import { showMessage } from "siyuan";
     import { MODULE_GROUPS, getModule, moduleTone } from "@/core/modules";
     import UiIcon from "@/ui/icon.svelte";
@@ -59,6 +59,10 @@
             : allReminders,
     );
     const top = $derived(reminders.slice(0, 4));
+    const paymentSummary = $derived.by(() => {
+        void version;
+        return plugin.scan?.paymentSummary;
+    });
     // 260 波：首扫 loading 态——runtime 无快照时间且无错误时，"最近没有要紧事"是撒谎
     // （未知 ≠ 0，13 §3.4）；骨架屏表达"正在读取"
     const firstScanPending = $derived.by(() => {
@@ -241,6 +245,14 @@
     function openLedgerFor(moduleId: string) {
         plugin.setActiveLedger(moduleId);
         onGoto("ledger");
+    }
+
+    function openPaymentSource(item: { moduleId: string; rowId: string }) {
+        if (plugin.openActivityTarget) {
+            plugin.openActivityTarget({ moduleId: item.moduleId, rowId: item.rowId, source: "ledger" });
+            return;
+        }
+        openLedgerFor(item.moduleId);
     }
 
     // 261 波：「查看全部」= 新意图——清掉上次会话遗留的筛选（逾期/某成员/某模块）再进入；
@@ -619,6 +631,35 @@
         </span>
     </button>
 </div>
+
+{#if !memberFilter && paymentSummary && paymentSummary.sourceCount > 0}
+    <section class="lv-payment-banner lv-card lv-payment-overview" aria-label={t("payment.summaryTitle")}>
+        <div class="lv-payment-hero">
+            <div class="lv-payment-metric">
+                <span class="lv-payment-label">{t("payment.summaryTitle")}</span>
+                <b class="lv-payment-amount lv-num">¥ {formatAmount(paymentSummary.next30Total, plugin.settings.hideAmounts)}</b>
+                <span class="lv-payment-sub">{t("payment.next30")}{#if paymentSummary.upcoming.length > 0} · {paymentSummary.upcoming.length} {t("payment.items")}{/if}</span>
+            </div>
+            <div class="lv-payment-stats">
+                <div class="lv-payment-chip"><span><b>¥ {formatAmount(paymentSummary.next7Total, plugin.settings.hideAmounts)}</b> {t("payment.next7")}</span></div>
+                <div class="lv-payment-chip highlight"><span><b>¥ {formatAmount(paymentSummary.monthlyTotal, plugin.settings.hideAmounts)}</b> {t("payment.monthlyEquivalent")}</span></div>
+            </div>
+        </div>
+        {#if paymentSummary.upcoming.length > 0}
+            <div class="lv-payment-top">
+                <span class="lv-payment-top__title">{t("payment.upcoming")}：</span>
+                {#each paymentSummary.upcoming.slice(0, 3) as item (item.moduleId + item.rowId)}
+                    <button type="button" class="lv-payment-top__tag" title={item.title} aria-label={item.title}
+                        onclick={() => openPaymentSource(item)}>
+                        {item.title} · {item.dueDate} · ¥{formatAmount(item.amount, plugin.settings.hideAmounts)}
+                    </button>
+                {/each}
+            </div>
+        {:else}
+            <div class="lv-payment-empty">{t("payment.noUpcoming")}</div>
+        {/if}
+    </section>
+{/if}
 
 <div class="lv-members" style="margin-bottom:4px">
     <button class="lv-chip {!memberFilter ? 'on' : ''}" aria-pressed={!memberFilter} onclick={() => setMemberFilter(undefined)}>{t("members.all")}</button>

@@ -8,6 +8,7 @@ import { svelteDialog } from "@/libs/dialog";
 import { loadSettings, saveSettings } from "@/core/settings";
 import { loadRuntime, saveRuntime, purgeHandled, listHandled, type HubRuntime } from "@/core/hub/runtime";
 import { runScan, deriveVisible, type ScanResult } from "@/core/hub/scanner";
+import type { PaymentSource } from "@/core/payment-summary";
 import { buildScanProviders } from "@/core/hub/registry";
 import { dailyDigest, markNotified, inSilentHours, weeklyPreview, markWeeklyNotified } from "@/core/hub/notify";
 import { complete, snooze, mute, unmute, renew, restore, addMemo, removeMemo, updateMemo } from "@/core/hub/actions";
@@ -513,7 +514,10 @@ export default class LvHomePlugin extends Plugin {
         // PF01/PF02：性能标记（PerformanceObserver / DevTools 可读取）
         const perfMark = `lvhome-scan-${seq}`;
         performance.mark(`${perfMark}-start`);
-        const onlySet = only ? new Set(Array.isArray(only) ? only : [only]) : undefined;
+        let onlySet = only ? new Set(Array.isArray(only) ? only : [only]) : undefined;
+        // 付款摘要来自 memberships/insurance 的完整行快照；写入这些模块后
+        // 走一次全量扫描，确保总览不会继续展示旧的金额投影。
+        if (onlySet?.has("memberships") || onlySet?.has("insurance")) onlySet = undefined;
         if (!onlySet && !force && this.lastScanAt && Date.now() - this.lastScanAt < LvHomePlugin.FULL_SCAN_MIN_MS) {
             const cached = this.scan;
             if (cached) {
@@ -523,20 +527,25 @@ export default class LvHomePlugin extends Plugin {
         }
         // 264 波：行数口径收集器——providers 经 deps.onStats 上报，runScan 并入 byModule 快照
         const moduleStats = new Map<string, { rowCount: number; memberCounts: Record<string, number> }>();
+        const paymentSources = new Map<string, PaymentSource>();
         const deps = {
             settings: this.settings,
             getDbRef: (id: string) => this.settings.dbRefs[id],
             loadRowLogs: () => loadRowLogs(this),
             t: (key: string) => this.i18nText(key),
             onStats: (id: string, stats: { rowCount: number; memberCounts: Record<string, number> }) => moduleStats.set(id, stats),
+            onPaymentSource: (source: PaymentSource) => paymentSources.set(source.moduleId, source),
         };
         // 12 轮修复：provider 由 schemaCatalog 程序化派生（手工清单曾漏掉 parenting/schooling，
         // 两模块提醒从未生效）；覆盖契约见 registry.providerCoverage
         const providers = buildScanProviders(this.schemaCatalog, deps);
-        const scan = await runScan(providers, this.settings, this.runtime, new Date(), onlySet, moduleStats);
+        const scan = await runScan(providers, this.settings, this.runtime, new Date(), onlySet, moduleStats, paymentSources);
         // H11：扫描期间已有更新的扫描启动（或手动动作已改运行态）→ 旧结果丢弃，不落盘不广播
         if (seq !== this.scanSeq) return scan;
-        this.scan = scan;
+        // 增量扫描其他模块时沿用当前进程中的付款摘要；付款模块本身会强制全量扫描。
+        this.scan = scan.paymentSummary || !this.scan?.paymentSummary
+            ? scan
+            : { ...scan, paymentSummary: this.scan.paymentSummary };
         this.runtime.cache = {
             reminders: scan.reminders,
             counts: scan.counts,
