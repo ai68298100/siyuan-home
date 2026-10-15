@@ -15,7 +15,17 @@
     import { moduleUiIcon } from "@/ui/icons";
     import { memberHue } from "@/core/format";
     import type { Reminder } from "@/types";
-    let { plugin, t, version }: { plugin: HomePluginLike; t: (k: string) => string; version?: number } = $props();
+    let { plugin, t, version, onCapture }: { plugin: HomePluginLike; t: (k: string) => string; version?: number; onCapture?: (moduleId?: string) => void } = $props();
+
+    const captureDrafts = $derived.by(() => {
+        void version;
+        return plugin.runtime.captureDrafts ?? [];
+    });
+
+    function captureDraftLabel(moduleId: string): string {
+        const key = `module.${moduleId}`;
+        return t(key) !== key ? t(key) : moduleId;
+    }
 
     // UIX-06 / §17 智能筛选命名视图（滴答清单智能清单印证）
     const namedViews = $derived.by(() => {
@@ -1039,6 +1049,27 @@
     </div>
 </section>
 
+{#if captureDrafts.length > 0}
+    <section class="lv-card lv-capture-recovery" aria-labelledby="lv-capture-recovery-title">
+        <div class="lv-capture-recovery__head">
+            <div>
+                <div class="lv-hub-panel-label" id="lv-capture-recovery-title">{t("capture.recoveryTitle")}</div>
+                <p class="lv-caption">{t("capture.recoveryDescription")}</p>
+            </div>
+            <UiIcon name="alert" size={17} />
+        </div>
+        {#each captureDrafts as draft (draft.id)}
+            <div class="lv-capture-recovery__row">
+                <div class="lv-capture-recovery__meta">
+                    <strong>{captureDraftLabel(draft.moduleId)}</strong>
+                    <span class="lv-caption">{draft.status === "pending" ? t("capture.recoveryPending") : t("capture.recoveryFailed")}{draft.error ? ` · ${draft.error}` : ""}</span>
+                </div>
+                <button class="b3-button b3-button--outline" onclick={() => onCapture?.(draft.moduleId)}>{t("capture.recoveryOpen")}</button>
+            </div>
+        {/each}
+    </section>
+{/if}
+
 {#if permissionDenied}
     <div class="lv-card" role="alert" style="display:flex;align-items:center;gap:12px;padding:12px 16px">
         <UiIcon name="alert" size={18} />
@@ -1225,6 +1256,13 @@
     .lv-hub-view-toggle { flex: 0 0 auto; padding: 2px; }
     .lv-hub-view-toggle .lv-tabs__item { min-height: 28px; padding: 4px 10px; font-size: 12px; }
     .lv-hub-filters .is-filtered, .lv-hub-actions .is-active { color: var(--lv-accent); border-color: var(--lv-accent-line); background: var(--lv-accent-soft); }
+    .lv-capture-recovery { margin-bottom: 12px; padding: 11px 13px; border-color: var(--lv-accent-line); }
+    .lv-capture-recovery__head, .lv-capture-recovery__row { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+    .lv-capture-recovery__head { margin-bottom: 8px; }
+    .lv-capture-recovery__head .lv-caption { margin: 3px 0 0; }
+    .lv-capture-recovery__row { padding: 7px 0; border-top: 1px solid var(--lv-line); }
+    .lv-capture-recovery__meta { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+    .lv-capture-recovery__meta strong, .lv-capture-recovery__meta span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
     .lv-hub-batchbar { padding: 8px 13px; margin-bottom: 12px; border-color: var(--lv-accent-line); background: var(--lv-surface); }
     .lv-hub-batchbar .lv-caption { color: var(--lv-tx-2); font-weight: 600; }
     .lv-named-views {

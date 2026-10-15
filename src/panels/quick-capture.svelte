@@ -131,6 +131,14 @@
         return true;
     }
 
+    function syncModuleOperationKey(module: string) {
+        // Operation keys are scoped to a module's retry chain. Switching to a
+        // module without a persisted recovery draft must never reuse another
+        // module's idempotency key.
+        const draft = runtimeDraft(module);
+        saveOperationKey = draft?.operationKey;
+    }
+
     async function persistCaptureDraft(module: string, status: CaptureDraft["status"], rowId: string | undefined, error: string | undefined) {
         if (!plugin.runtime || !module) return;
         if (!saveOperationKey) saveOperationKey = nextSaveOperationKey();
@@ -177,6 +185,7 @@
             const existing = valuesByModule[moduleId];
             const restored = !existing || Object.keys(existing).length === 0 ? restoreCaptureDraft(moduleId) : false;
             if (!restored) values = { ...(existing ?? {}) };
+            if (!restored) syncModuleOperationKey(moduleId);
             if (!restored) saveError = "";
             fieldErrors = {};
             return;
@@ -188,6 +197,7 @@
             const restored = !existing || Object.keys(existing).length === 0 ? restoreCaptureDraft(moduleId) : false;
             if (!restored) {
                 values = { ...(existing ?? {}) };
+                syncModuleOperationKey(moduleId);
                 saveError = "";
             }
             fieldErrors = {};
