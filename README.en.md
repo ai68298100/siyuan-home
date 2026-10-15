@@ -39,7 +39,14 @@ Certificates expire, medicine expires, insurance needs renewal, subscriptions au
 
 Image OCR uses the engine configured in SiYuan Settings → OCR. It runs only when requested and does not require automatic OCR to be enabled. AI OCR asks before each run because the image is sent to the selected AI service. Results are saved to SiYuan OCR text and included in search; re-running replaces the previous result. Encrypted notebook images and PDFs are not supported, and OCR text is never written into ledger fields automatically.
 
-## 🆕 What's new in v0.5.21
+## 🆕 What's new in v0.5.22
+
+This release adds read-only payment and asset summaries on top of the SiYuan 3.8.x flicker-loop fix.
+
+- **Highest recurring costs**: memberships and insurance are ranked by monthly-equivalent cost, with member filtering and source-row navigation.
+- **Asset category share**: physical-asset valuation now includes accessible category bars based on the existing ledger and valuation snapshots.
+- **Health recovery summary**: the overview surfaces scan errors, stale snapshots and capture drafts, with a direct link to Health & Recovery.
+- **Regression gates**: 534 unit tests, TypeScript/Svelte/i18n/meta/audit checks, production build, loader, smoke and Chrome isolated-kernel walkthroughs pass.
 
 This emergency release fixes the SiYuan 3.8.x loop where the top-bar icon and page content repeatedly appear and disappear after enabling the plugin. Plugin tab state is now isolated from the host route lifecycle.
 
@@ -49,15 +56,15 @@ This emergency release fixes the SiYuan 3.8.x loop where the top-bar icon and pa
 - **Regression guard**: Chrome isolated-kernel coverage checks repeated tab switches, refresh, history stability, single mounting, and `tree not found`/reactive-depth errors.
 - **Release gates**: TypeScript, Svelte, i18n, metadata, audit, unit tests, production build, loader semantics and package smoke are run before publishing.
 
-## 📦 Install (v0.5.21)
+## 📦 Install (v0.5.22)
 
 1. Download `package.zip` from [Releases](https://github.com/ai68298100/siyuan-home/releases/latest)
 2. SiYuan → Settings → Marketplace → Download → **Import** the zip
 3. Enable the plugin → complete the 2-step onboarding (household → module picks and provisioning)
 4. Press `Ctrl+Alt+H` anytime to open the hub
 
-> **Validation status:** core data paths have automated tests and isolated-kernel coverage. The v0.5.21 GitHub Release contains the flicker-loop fix; Android WebView behavior remains host-specific validation. `icon.png` and `preview.png` were redesigned for v0.3.13 (brand-gradient tile + geometric mark; dark overview with sample data).
-> **Version note:** the tagged v0.5.21 package is the current GitHub release; the exact unit-test count is recorded by the release workflow.
+> **Validation status:** core data paths have automated tests and isolated-kernel coverage. The v0.5.22 GitHub Release contains the recurring-payment ranking, asset-category summary and health-recovery entry; Android WebView behavior remains host-specific validation. `icon.png` and `preview.png` were redesigned for v0.3.13 (brand-gradient tile + geometric mark; dark overview with sample data).
+> **Version note:** the tagged v0.5.22 package is the current GitHub release; the exact unit-test count is recorded by the release workflow.
 >
 > Family sharing depends on SiYuan's collaboration, permissions, sync and conflict behavior. Test with non-sensitive data before sharing; this plugin does not provide a separate permission system.
 >
@@ -111,11 +118,11 @@ Full accounting · password vaults · official data integrations · real-time tr
 
 ## 🗺 Roadmap
 
-The v0.5.21 release is available on GitHub, with static isolated-kernel gates and Chrome tab-lifecycle coverage for the main UI. Recurring-payment summaries for memberships and insurance now show monthly equivalents, upcoming 7/30-day amounts, data-quality hints and links back to source rows. The next feature slice should optimize the five-minute path from a member to a first reminder and its source record, then prioritize the evidence center, inbox and health recovery before pinyin search, webhooks, QR labels, AI and family collaboration.
+The v0.5.22 release is available on GitHub, with static isolated-kernel gates and Chrome tab-lifecycle coverage for the main UI. Recurring-payment summaries for memberships and insurance now show monthly equivalents, upcoming 7/30-day amounts, data-quality hints, highest recurring costs and links back to source rows; physical assets also show category share. The next feature slice should optimize the five-minute path from a member to a first reminder and its source record, then prioritize the evidence center, inbox and valuation freshness before pinyin search, webhooks, QR labels, AI and family collaboration.
 
 | Phase | Content |
 |---|---|
-| ✅ v0.5.21 (current) | SiYuan 3.8.x flicker and `tree not found` route-loop fix, stable tab restore, membership/insurance recurring-payment summary, and regression gates; GitHub Release |
+| ✅ v0.5.22 (current) | Highest recurring costs, asset category share, health recovery summary, plus the SiYuan 3.8.x flicker and `tree not found` route-loop fix; GitHub Release |
 | 🔜 Next | Task workbench, evidence center, inbox, health recovery |
 | 🔭 Later | Family collaboration, template packs, yearly family report, AI capabilities |
 
