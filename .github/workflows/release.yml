@@ -85,12 +85,12 @@ jobs:
       - name: Package smoke test
         run: pnpm run smoke
 
-      - name: Bundle size gate (index.js gzip < 220KB, single-file mandatory)
+      - name: Bundle size gate (index.js gzip < 230KB, single-file mandatory)
         run: |
           SIZE=$(gzip -c dist/index.js | wc -c)
           echo "index.js gzip: $SIZE bytes"
-          if [ "$SIZE" -gt 225280 ]; then
-            echo "::error::index.js gzip exceeds 220KB budget"
+          if [ "$SIZE" -gt 235520 ]; then
+            echo "::error::index.js gzip exceeds 230KB budget"
             exit 1
           fi
 

@@ -4744,17 +4744,6 @@
         {:else if paymentSummary.overdue.length === 0}
             <div class="lv-payment-empty">{t("payment.noUpcoming")}</div>
         {/if}
-        {#if paymentSummary.topRecurring.length > 0}
-            <div class="lv-payment-top" aria-label={t("payment.topRecurring")}>
-                <span class="lv-payment-top__title">{t("payment.topRecurring")}：</span>
-                {#each paymentSummary.topRecurring.slice(0, 3) as item (item.moduleId + item.rowId)}
-                    <button type="button" class="lv-payment-top__tag" title={item.title} aria-label={item.title}
-                        onclick={() => openPaymentSource(item)}>
-                        {item.title} · {paymentCycleLabel(item)} · ¥{formatAmount(item.monthlyCost, plugin.settings.hideAmounts)}{t("payment.perMonth")}
-                    </button>
-                {/each}
-            </div>
-        {/if}
         {#if paymentQualityIssueCount > 0}
             <div class="lv-payment-quality" role="status">
                 {t("payment.dataQuality").replace("${count}", String(paymentQualityIssueCount))} ·
