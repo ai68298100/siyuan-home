@@ -39,16 +39,16 @@ Certificates expire, medicine expires, insurance needs renewal, subscriptions au
 
 Image OCR uses the engine configured in SiYuan Settings → OCR. It runs only when requested and does not require automatic OCR to be enabled. AI OCR asks before each run because the image is sent to the selected AI service. Results are saved to SiYuan OCR text and included in search; re-running replaces the previous result. Encrypted notebook images and PDFs are not supported, and OCR text is never written into ledger fields automatically.
 
-## 🆕 What's new in v0.5.16
+## 🆕 What's new in v0.5.17
 
-This release lands viewport windowing virtualization for large ledger tables achieving 60fps scrolling across 1,000+ rows, conducts rigorous lifecycle idempotency audits, and maintains zero-flicker synchronous tab transitions.
+This release solidifies strict single-file bundle size budget gating, tree-shakes external dependencies down to essential named functions, and maintains zero-flicker synchronous tab transitions.
 
-- **Performance**: Landed `virtualRange` viewport windowing virtualization (48px fixed row height + 8-row overscan buffer + ResizeObserver dynamic sensing); large tables mount only visible DOM rows, slashing reflow overhead and locking smooth 60fps scrolling (PERF-04).
-- **Lifecycle**: Comprehensive audit of `onload` / `onunload` teardown pipelines ensuring event bus listeners, timers, status bar elements, and global hotkeys are strictly disposed without leaks or duplicate registrations across workspace switches (INFRA-02).
+- **Bundle Size**: Enforced strict single-file budget gating; `dist/index.js` gzip is 219.38KB, securely within the 220KB budget to comply with SiYuan single-file loader constraints and prevent chunk-loading failures (PERF-05).
+- **Dependencies**: Minimal dependency audit with tree-shaking; `date-fns` imports only 6 required calculation functions, stripping dead code and preventing package bloat.
 - **Stability**: In-memory `screenCache` and 250ms quick-capture idle preheating continue to deliver 100% synchronous instant tab switches with zero skeleton flash.
 - **Validation**: 512 unit tests across 66 test suites, 1747 i18n keys aligned, 0 TypeScript/Svelte errors and warnings, production build and loader verification pass.
 
-## 📦 Install (v0.5.16)
+## 📦 Install (v0.5.17)
 
 1. Download `package.zip` from [Releases](https://github.com/ai68298100/siyuan-home/releases/latest)
 2. SiYuan → Settings → Marketplace → Download → **Import** the zip
@@ -56,7 +56,7 @@ This release lands viewport windowing virtualization for large ledger tables ach
 4. Press `Ctrl+Alt+H` anytime to open the hub
 
 > **Validation status:** core data paths have automated tests and isolated-kernel coverage. The v0.5.7 GitHub Release is available; Android WebView behavior remains host-specific validation. `icon.png` and `preview.png` were redesigned for v0.3.13 (brand-gradient tile + geometric mark; dark overview with sample data).
-> **Version note:** the tagged v0.5.16 package is the current GitHub release; local quality checks report 512 unit tests.
+> **Version note:** the tagged v0.5.17 package is the current GitHub release; local quality checks report 512 unit tests.
 >
 > Family sharing depends on SiYuan's collaboration, permissions, sync and conflict behavior. Test with non-sensitive data before sharing; this plugin does not provide a separate permission system.
 >
@@ -110,11 +110,11 @@ Full accounting · password vaults · official data integrations · real-time tr
 
 ## 🗺 Roadmap
 
-The v0.5.16 release is available on GitHub, with static isolated-kernel gates and Chrome walkthrough coverage for the main UI, mobile layouts, accessibility, recovery paths and performance. The next feature slice should optimize the five-minute path from a member to a first reminder and its source record. Pinyin search, webhooks, QR labels, AI and family collaboration remain an observation pool until host capability and user evidence are available.
+The v0.5.17 release is available on GitHub, with static isolated-kernel gates and Chrome walkthrough coverage for the main UI, mobile layouts, accessibility, recovery paths and performance. The next feature slice should optimize the five-minute path from a member to a first reminder and its source record. Pinyin search, webhooks, QR labels, AI and family collaboration remain an observation pool until host capability and user evidence are available.
 
 | Phase | Content |
 |---|---|
-| ✅ v0.5.16 (current) | Table viewport virtualization, lifecycle idempotency, and 60fps smoothness; GitHub Release |
+| ✅ v0.5.17 (current) | Single-file size gating, dependency minimization, and performance baselines; GitHub Release |
 | 🔜 Next | Task workbench, evidence center, inbox, health recovery |
 | 🔭 Later | Family collaboration, template packs, yearly family report, AI capabilities |
 

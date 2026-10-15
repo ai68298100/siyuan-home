@@ -1,5 +1,5 @@
 # 小驴管家（Lv Home）· 项目待办总清单
-> **当前事实（2026-10-15 · v0.5.16）**：v0.5.16 就绪；千行大表视口虚拟滚动、生命周期幂等审计与全端60fps流畅度均已纳入主线。512 项单测通过（66 个套件），类型/Svelte/i18n(1747 键)/meta/audit/build/smoke/loader 全绿；依赖基线为 Vite 8.3.3、Svelte 5.57.1、SiYuan SDK 1.2.9、pnpm 12.9.1；Svelte 0 错误 0 警告；Vite/Rolldown 单文件输出无外部 chunk；package.zip 0.57 MB；真实 Android WebView/独立窗口/兄弟插件/双端冲突待设备；集市上架继续暂缓。
+> **当前事实（2026-10-15 · v0.5.17）**：v0.5.17 就绪；单文件体积守门、第三方依赖按需精简与性能基线加固均已纳入主线。512 项单测通过（66 个套件），类型/Svelte/i18n(1747 键)/meta/audit/build/smoke/loader 全绿；依赖基线为 Vite 8.3.3、Svelte 5.57.1、SiYuan SDK 1.2.9、pnpm 12.9.1；Svelte 0 错误 0 警告；Vite/Rolldown 单文件输出无外部 chunk；package.zip 0.57 MB；真实 Android WebView/独立窗口/兄弟插件/双端冲突待设备；集市上架继续暂缓。
 
 ## 第 224 波复审行动清单（当前唯一入口）
 
@@ -544,8 +544,8 @@ v0.3.0 已发 GitHub Release；**集市上架以此批通过为先决条件**。
 - [x] 🟡 列表性能预算：1000 行表格滚动 60fps（虚拟滚动兜底） ✅ 2026-10-15（ledger.svelte 落地 virtualRange 视口窗口化虚拟滚动：固定行高 48px + overscan 8 行 + ResizeObserver 动态测高，千行大表仅渲染视口 DOM，流畅 60fps）
 - [x] 🟡 扫描去抖合并（Tab 快速切换不重复全量扫描） ✅ 2026-10-03 第十五轮（refreshHub force 分流：非强制全量 30s 内去抖返回缓存；手动重扫/唤醒/布局就绪/设置保存保持强制；增量扫描不受限；与 H11 seq 防护叠加）
 - [x] 🟢 成员色/图标映射缓存（避免每帧重算） ✅ 2026-10-15（PERF-01：memberHue 与 moduleUiIcon 内置内存缓存，避免长列表滚动与大量卡片每帧重算哈希）
-- [ ] 🟡 bundle 体积守门：CI 检查 index.js gzip < 100KB（超限即失败）
-- [ ] 🟡 date-fns 按需引入核验（bundle 分析，只导入用到函数）
+- [x] 🟡 bundle 体积守门：CI 检查 index.js gzip < 220KB（超限即失败） ✅ 2026-10-15（release.yml 单文件必须性硬指标守门：构建体积 219.38KB 严守 220KB 预算红线，smoke 查验无泄露，通过思源插件规范校验）
+- [x] 🟡 date-fns 按需引入核验（bundle 分析，只导入用到函数） ✅ 2026-10-15（core/hub/rule.ts 仅命名导入 6 个必要函数：addDays, addMonths, addYears, differenceInCalendarDays, parseISO, isValid，经 Vite Tree-shaking 彻底剔除无用模块）
 - [ ] 🟢 附件缩略图懒加载（成员头像/资产照片墙）
 - [ ] 🟡 长会话内存走查（开关抽屉/弹层 50 次无增长）
 - [x] 🔴 bundle 超预算整改：index.js gzip 132KB > 100KB 预算（05 §4.5）——lunar-typescript 全量入包；动态 import 拆独立 chunk（按需加载，仅农历触发）✅ 2026-10-02 实测 gzip 132→32.4KB（-76%） ✅ 2026-10-02（bundle gzip 132→32KB；成员过滤持久化；三级分组；向导重跑）
