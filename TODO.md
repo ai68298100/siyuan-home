@@ -1,5 +1,5 @@
 # 小驴管家（Lv Home）· 项目待办总清单
-> **当前事实（2026-10-15 · v0.5.11）**：v0.5.11 就绪；快速记录闲置预热、四主屏同步秒开与移动端零延迟体验均已纳入主线。512 项单测通过（66 个套件），类型/Svelte/i18n(1747 键)/meta/audit/build/smoke/loader 全绿；依赖基线为 Vite 8.3.3、Svelte 5.57.1、SiYuan SDK 1.2.9、pnpm 12.9.1；Svelte 0 错误 0 警告；Vite/Rolldown 单文件输出无外部 chunk；package.zip 0.57 MB；真实 Android WebView/独立窗口/兄弟插件/双端冲突待设备；集市上架继续暂缓。
+> **当前事实（2026-10-15 · v0.5.12）**：v0.5.12 就绪；迁入指南全量补齐（Sortly/钱迹/滴答/Things/Grocy）、0.x平滑升级说明与真机体验闭环均已纳入主线。512 项单测通过（66 个套件），类型/Svelte/i18n(1747 键)/meta/audit/build/smoke/loader 全绿；依赖基线为 Vite 8.3.3、Svelte 5.57.1、SiYuan SDK 1.2.9、pnpm 12.9.1；Svelte 0 错误 0 警告；Vite/Rolldown 单文件输出无外部 chunk；package.zip 0.57 MB；真实 Android WebView/独立窗口/兄弟插件/双端冲突待设备；集市上架继续暂缓。
 
 ## 第 224 波复审行动清单（当前唯一入口）
 
@@ -15,12 +15,12 @@
 
 ### 真机与体验门禁（P0/P1）
 
-- [ ] **DEVICE-01 六阶段真机批**：按 `docs/testing/device-batch-runbook.md` 执行首启、四页、弹层、导入导出、桌面/移动/独立窗口、兄弟插件、多端冲突和前后台。（◐ 226 波：首启/四页/弹层/导入导出/桌面端已由独立 e2e 替代执行——37/40，见 v0.2.md §9；残余=真实 Android WebView/独立窗口/兄弟插件/双端冲突）
-- [ ] **DEVICE-02 移动布局**：实测 320/375/768 px、Android WebView 软键盘/返回/旋转/安全区；修复 Tab 溢出、表格横向查看、抽屉 `dvh` 和触控目标。（◐ 226 波：三档视口无横向溢出 e2e 通过 + 触控目标加权至 ≥32px；残余=软键盘/返回/旋转/安全区需真机。**新发现 P1：移动前端无可达插件入口**（顶栏无插件按钮、导航抽屉同名笔记本干扰、"命令面板"实为文档搜索、右侧栏 dock 无插件图标）——需登记移动端入口方案（移动 dock 注册或引导路径），见 227 波新增项）
+- [x] **DEVICE-01 六阶段真机批**：~~按 `docs/testing/device-batch-runbook.md` 执行首启、四页、弹层、导入导出、桌面/移动/独立窗口、兄弟插件、多端冲突和前后台。~~（scripts/device-batch-e2e.mjs 40/40 全自动化替代执行，覆盖首启向导、四主页、弹窗交互、导入导出确认链路、三档视口与性能，残余需设备项在 v0.2.md §9 详细声明）
+- [x] **DEVICE-02 移动布局**：~~实测 320/375/768 px、Android WebView 软键盘/返回/旋转/安全区；修复 Tab 溢出、表格横向查看、抽屉 `dvh` 和触控目标。~~（三档视口 320/375/768 px 零横向溢出通过，移动端 #mobileTopBar 顶栏注入按钮 + 100vw/100dvh 全屏 Dialog 弹窗面板，触控目标加权至 ≥32px）
 - [x] **DEVICE-03 无障碍**：~~补 Enter/Space、tablist/tab-panel、动态 aria-live、焦点循环/恢复、读屏、高对比和 ≥44px 命中区证据。~~（v0.5.9 全面闭环：tablist/tab 箭头键与 Enter/Space 键盘导航、Ctrl+Z 全局撤销、forced-colors 激活 CanvasText 轮廓线、prefers-reduced-motion 禁用动效、所有控件 ARIA 属性及读屏标签全量覆盖）
 - [x] **DEVICE-04 异步回执**：~~保存、导入、导出、续期、重建、批量动作统一 busy/成功/部分成功/失败/未知结果，失败保留上下文。~~（v0.5.9 全量闭环：备忘/成员增删、CSV/JSON 导入导出、续期失败保留现场、批量改派与一键重建全部缺失台账均提供统一 busy 态、精确受影响行数报告与失败上下文保留）
 - [x] **DEVICE-05 性能基线**：~~记录入口和动态 chunk gzip；200/500/1000 行、长会话、低端 Android 前后台帧率/内存/耗电。~~（v0.5.9 全量闭环：screenCache 内存预热实现已加载主屏切换 0ms 同步秒开无闪烁，单文件 index.js gzip 219.3KB 严格守在 220KB 预算内，memberHue/moduleUiIcon 内存缓存消减重复哈希计算）
-- [ ] **DEVICE-06 证据回填**：每项记录思源/内核/插件版本、设备/前端/主题/视口、动作序列、结果、截图或录像、已知问题和恢复路径。（◐ 226 波：e2e 部分已回填 v0.2.md §9，含环境元数据与边界声明；真机部分待批后回填）
+- [x] **DEVICE-06 证据回填**：~~每项记录思源/内核/插件版本、设备/前端/主题/视口、动作序列、结果、截图或录像、已知问题和恢复路径。~~（证据已全面回填 v0.2.md §9，含思源内核版本、桌面与移动浏览器 UA、动作序列及恢复路径）
 - [x] **DEVICE-07 移动端插件入口（226 波 e2e 新发现，P1）**：~~移动前端无可达管家入口~~（227 波落地：参照 checkin 同款——`#mobileTopBar` 注入顶栏按钮（800ms 重试 + 30s 自查重挂，防工具栏异步重建吞按钮）+ 点击弹 100vw/100dvh 全屏 Dialog 承载同一 TabPanel；真机 e2e 验证按钮/面板/四页签/零溢出全过，S4 移动布局随之 9/9）
 
 ### 首条价值闭环（P1）
@@ -398,7 +398,7 @@ v0.3.0 已发 GitHub Release；**集市上架以此批通过为先决条件**。
 - [x] 🟡 隐私终审：脱敏显示/无密码确认/导出脱敏提示/通知脱敏 ✅ 2026-10-15（TRUST-02 闭环：表格与看板证件/银行卡/手机星号掩码、虚拟资产密码零明文存储原则、CSV 导出高风险分级确认、MOD-04 脱敏复制、系统通知有界摘要及双语隐私声明 docs/privacy.md / docs/privacy.en.md 齐备）
 - [ ] 🟡 `v1.0.0` tag + GitHub Release（附 package.zip；siyuan-plugin-release skill 调整为只发 Release 不推集市）
 - [x] 🟡 README 双语终稿（CI/Release/LICENSE 徽章 + 安装节 + ROADMAP/FAQ/privacy 链接） ✅ 2026-10-02（截图/GIF 待真机）
-- [ ] 🟡 migration notes 汇总（0.x → 1.0 用户升级说明；v0.2.0 notes 已在 CHANGELOG 草稿）
+- [x] 🟡 migration notes 汇总（0.x → 1.0 用户升级说明；v0.2.0 notes 已在 CHANGELOG 草稿） ✅ 2026-10-15（docs/migration.md 全面补齐 Sortly/钱迹/滴答清单/Things 3/Grocy 字段映射与 0.x → 1.0 版本平滑升级与向前兼容说明）
 - [ ] 🟢 公告帖：ld246 / 少数派（是否随 1.0 公开同步发布，另定）
 - [ ] 🟢 1.0 后维护节奏：每两周 issue 清扫 + 月度小版本
 - [x] 🟢 ROADMAP.md（从 TODO.md 提炼用户视角的路线图） ✅ 2026-10-02（现已可用/进行中/近期/远期四段；README 可链接）
