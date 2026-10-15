@@ -224,6 +224,16 @@
     const scanErrors = $derived.by(() => { void version; return plugin.scan?.errors ?? []; });
     const permissionDenied = $derived(scanErrors.some((error) => error.moduleId === "permission"));
     const scanStale = $derived.by(() => { void version; return plugin.scan?.stale === true; });
+    const captureDrafts = $derived.by(() => { void version; return plugin.runtime?.captureDrafts ?? []; });
+    const captureDraftCount = $derived(captureDrafts.length);
+    const healthAttention = $derived(scanStale || scanErrors.length > 0 || captureDraftCount > 0);
+    const healthErrorModules = $derived.by(() => {
+        void version;
+        return scanErrors
+            .filter((error) => error.moduleId !== "permission" && error.moduleId !== "auth")
+            .slice(0, 3)
+            .map((error) => t(`module.${error.moduleId}`) !== `module.${error.moduleId}` ? t(`module.${error.moduleId}`) : error.moduleId);
+    });
     const snapshotLabel = $derived.by(() => {
         const at = plugin.runtime?.scannedAt;
         return formatLocalTime(at, { hour: "2-digit", minute: "2-digit" }) ?? "—";
@@ -648,19 +658,40 @@
         </div>
         <span class="lv-focus-icon" aria-hidden="true"><UiIcon name="users" size={18} /></span>
     </button>
-    <button type="button" class="lv-focus-card" onclick={() => plugin.openSetting()} aria-label={`${t("dash.focusData")}`}>
+    <button type="button" class="lv-focus-card" onclick={() => plugin.openSetting("health")} aria-label={`${t("dash.focusData")}`}>
         <div class="lv-focus-copy">
             <span class="lv-focus-label">{t("dash.focusData")}</span>
-            <strong class="lv-focus-num" style={scanStale || scanErrors.length ? "color:var(--lv-warn);font-size:20px" : "color:var(--lv-ok);font-size:20px"}>
-                {scanStale || scanErrors.length ? t("dash.stale") : t("diag.ok")}
+            <strong class="lv-focus-num" style={healthAttention ? "color:var(--lv-warn);font-size:20px" : "color:var(--lv-ok);font-size:20px"}>
+                {healthAttention ? t("dash.needsReview") : t("diag.ok")}
             </strong>
-            <span class="lv-focus-sub">{scanStale ? t("dash.focusStale") : scanErrors.length > 0 ? t("dash.focusDataErr").replace("${t}", snapshotLabel).replace("${n}", String(scanErrors.length)) : t("dash.focusDataOk").replace("${t}", snapshotLabel)}</span>
+            <span class="lv-focus-sub">
+                {scanStale ? t("dash.focusStale") : scanErrors.length > 0 ? t("dash.focusDataErr").replace("${t}", snapshotLabel).replace("${n}", String(scanErrors.length)) : t("dash.focusDataOk").replace("${t}", snapshotLabel)}
+                {#if captureDraftCount > 0} · {t("dash.captureDraftCount").replace("${n}", String(captureDraftCount))}{/if}
+            </span>
         </div>
-        <span class="lv-focus-icon" style={scanStale || scanErrors.length ? "color:var(--lv-warn);background:var(--lv-warn-soft)" : "color:var(--lv-ok);background:var(--lv-ok-soft)"} aria-hidden="true">
-            <UiIcon name={scanStale || scanErrors.length ? "alert" : "check"} size={18} />
+        <span class="lv-focus-icon" style={healthAttention ? "color:var(--lv-warn);background:var(--lv-warn-soft)" : "color:var(--lv-ok);background:var(--lv-ok-soft)"} aria-hidden="true">
+            <UiIcon name={healthAttention ? "alert" : "check"} size={18} />
         </span>
     </button>
 </div>
+
+{#if healthAttention}
+    <section class="lv-card lv-health-summary" aria-label={t("dash.healthSummaryTitle")}>
+        <div class="lv-health-summary__copy">
+            <b>{t("dash.healthSummaryTitle")}</b>
+            <span>
+                {#if scanErrors.length > 0}{t("dash.healthSummaryErrors").replace("${n}", String(scanErrors.length))}{/if}
+                {#if scanStale}{#if scanErrors.length > 0} · {/if}{t("dash.healthSummaryStale")}{/if}
+                {#if captureDraftCount > 0}{#if scanErrors.length > 0 || scanStale} · {/if}{t("dash.captureDraftCount").replace("${n}", String(captureDraftCount))}{/if}
+            </span>
+            {#if healthErrorModules.length > 0}<small>{t("dash.healthSummaryModules").replace("${modules}", healthErrorModules.join("、"))}</small>{/if}
+        </div>
+        <div class="lv-health-summary__actions">
+            {#if captureDraftCount > 0}<button class="b3-button b3-button--outline b3-button--small" onclick={() => onGoto("reminders")}>{t("dash.openCaptureDrafts")}</button>{/if}
+            <button class="b3-button b3-button--outline b3-button--small" onclick={() => plugin.openSetting("health")}>{t("dash.openHealth")}</button>
+        </div>
+    </section>
+{/if}
 
 {#if paymentView && paymentView.sourceCount > 0}
     <section class="lv-payment-banner lv-card lv-payment-overview" aria-label={t("payment.summaryTitle")}>

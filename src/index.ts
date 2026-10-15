@@ -912,11 +912,11 @@ export default class LvHomePlugin extends Plugin {
         return unmount;
     }
 
-    openSetting() {
+    openSetting(section?: "health") {
         svelteDialog({
             title: this.i18nText("settingsTitle"),
             component: HomeSettingsPanel,
-            props: { plugin: this, settings: this.settings },
+            props: { plugin: this, settings: this.settings, initialDataSection: section },
             width: "min(920px, calc(100vw - 32px))",
             height: "min(760px, calc(100vh - 96px))",
         });

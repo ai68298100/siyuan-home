@@ -25,9 +25,10 @@
         saveData?: (name: string, data: unknown) => Promise<void>;
     }
 
-    let { plugin, settings }: {
+    let { plugin, settings, initialDataSection }: {
         plugin: IHomePluginLike;
         settings: HomeSettings;
+        initialDataSection?: "health";
     } = $props();
 
     // i18n 取值统一转 string（1.2.8 起 JSONValue）
@@ -40,10 +41,12 @@
     }
 
     type SettingsArea = "modules" | "members" | "reminders" | "data" | "about";
-    let area: SettingsArea = $state("modules");
+    // svelte-ignore state_referenced_locally
+    let area: SettingsArea = $state(initialDataSection === "health" ? "data" : "modules");
     let moduleGroup: ModuleGroupId = $state("people");
     let reminderSection: "schedule" | "webhook" | "leads" | "checkin" = $state("schedule");
-    let dataSection: "migration" | "demo" | "ecosystem" | "health" | "shortcuts" = $state("migration");
+    // svelte-ignore state_referenced_locally
+    let dataSection: "migration" | "demo" | "ecosystem" | "health" | "shortcuts" = $state(initialDataSection === "health" ? "health" : "migration");
     let saving = $state(false);
     // 33.4 编辑事务：draft 副本，保存才落盘（取消/关闭不污染 settings）。
     // 此处捕获初始快照是设计意图，抑制 svelte 的 locally-referenced 提示。

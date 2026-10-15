@@ -29,7 +29,7 @@ export interface HomePluginLike extends Plugin {
     ensureCoreLedgers(): Promise<ProvisioningReport>;
     showTab(): void;
     showTabDocs(docId?: string): void;
-    openSetting(): void;
+    openSetting(section?: "health"): void;
     setActiveLedger(id: string): void;
     listHandled(): HandledEntry[];
     /** C7：向导完成（家庭构成 + 预选模块 → 建库 + 首扫） */
