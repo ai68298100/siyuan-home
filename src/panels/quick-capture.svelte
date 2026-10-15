@@ -4,7 +4,7 @@
     import { confirm, showMessage } from "siyuan";
     import { tick } from "svelte";
     import { addDetachedRow, RowIdentityPendingError, setCell } from "@/core/siyuan";
-    import { removeCaptureDraft, saveRuntime, upsertCaptureDraft } from "@/core/hub/runtime";
+    import { collectCaptureDraftSources, removeCaptureDraft, saveRuntime, upsertCaptureDraft } from "@/core/hub/runtime";
     import type { CaptureDraft } from "@/core/hub/runtime";
     import { captureCellValue, getCaptureFields, validateCaptureInput } from "@/core/capture";
     import type { ColumnDef, ModuleSchema } from "@/core/schema";
@@ -45,6 +45,9 @@
     /** Stable per submission.  Retries after a timeout reuse the same key so
      * the kernel's idempotency cache cannot create a second detached row. */
     let saveOperationKey = $state<string | undefined>();
+    // Keep idempotency keys per module as the sheet can hold unsaved forms for
+    // more than one destination while the user switches between modules.
+    let saveOperationKeysByModule: Record<string, string | undefined> = $state({});
 
     function nextSaveOperationKey(): string {
         try { return `capture:${crypto.randomUUID()}`; }
@@ -125,6 +128,7 @@
         valuesByModule = { ...valuesByModule, [module]: restored };
         values = restored;
         saveOperationKey = draft.operationKey;
+        saveOperationKeysByModule = { ...saveOperationKeysByModule, [module]: draft.operationKey };
         pendingModuleId = draft.rowId ? module : undefined;
         pendingRowId = draft.rowId;
         identityPending = draft.status === "pending" && !draft.rowId;
@@ -138,7 +142,8 @@
         // module without a persisted recovery draft must never reuse another
         // module's idempotency key.
         const draft = runtimeDraft(module);
-        saveOperationKey = draft?.operationKey;
+        saveOperationKey = draft?.operationKey ?? saveOperationKeysByModule[module];
+        if (saveOperationKey) saveOperationKeysByModule = { ...saveOperationKeysByModule, [module]: saveOperationKey };
     }
 
     function hasDraftContent(source = values): boolean {
@@ -149,14 +154,16 @@
 
     async function persistCaptureDraft(module: string, status: CaptureDraft["status"], rowId: string | undefined, error: string | undefined, source = values) {
         if (!plugin.runtime || !module) return;
-        if (!saveOperationKey) saveOperationKey = nextSaveOperationKey();
         const previous = runtimeDraft(module);
+        const moduleOperationKey = previous?.operationKey ?? saveOperationKeysByModule[module] ?? (module === moduleId ? saveOperationKey : undefined) ?? nextSaveOperationKey();
+        saveOperationKeysByModule = { ...saveOperationKeysByModule, [module]: moduleOperationKey };
+        if (module === moduleId) saveOperationKey = moduleOperationKey;
         const draft: CaptureDraft = {
-            id: previous?.id ?? `capture:${module}:${saveOperationKey}`,
+            id: previous?.id ?? `capture:${module}:${moduleOperationKey}`,
             moduleId: module,
             values: draftValues(source),
             createdAt: previous?.createdAt ?? new Date().toISOString(),
-            operationKey: saveOperationKey,
+            operationKey: moduleOperationKey,
             status,
             ...(rowId ? { rowId } : {}),
             ...(error ? { error } : {}),
@@ -227,8 +234,15 @@
         // input before hiding it so a plugin reload or workspace restart does
         // not discard a form that has not reached the save request yet.
         try {
-            if (targetModule && (hasDraftContent() || pendingRowId || identityPending)) {
-                await persistCaptureDraft(targetModule, pendingRowId || identityPending ? "pending" : "failed", pendingRowId, saveError || undefined);
+            // The sheet keeps an in-memory snapshot for every module visited
+            // during this session. Persist all non-empty snapshots on close;
+            // otherwise switching A -> B and closing would silently lose A.
+            const sources = collectCaptureDraftSources(valuesByModule, moduleId, values);
+            for (const [module, source] of sources) {
+                const isPending = module === pendingModuleId && (!!pendingRowId || identityPending);
+                if (!hasDraftContent(source) && !isPending) continue;
+                await persistCaptureDraft(module, isPending ? "pending" : "failed", isPending ? pendingRowId : undefined,
+                    module === targetModule ? saveError || undefined : runtimeDraft(module)?.error, source);
             }
             open = false;
             onClose?.();
@@ -426,6 +440,9 @@
                 pendingRowId = undefined;
                 pendingModuleId = undefined;
                 saveOperationKey = undefined;
+                const nextKeys = { ...saveOperationKeysByModule };
+                delete nextKeys[moduleId];
+                saveOperationKeysByModule = nextKeys;
                 if (targetRowId && plugin.openActivityTarget) {
                     plugin.openActivityTarget({ moduleId, rowId: targetRowId, source: "ledger" });
                 } else if (targetRowId) {
@@ -444,6 +461,9 @@
             pendingRowId = undefined;
             pendingModuleId = undefined;
             saveOperationKey = undefined;
+            const nextKeys = { ...saveOperationKeysByModule };
+            delete nextKeys[moduleId];
+            saveOperationKeysByModule = nextKeys;
         } catch (e) {
             const messageKey = pendingRowId ? "capture.partialFailed" : "capture.failed";
             saveError = t(messageKey).replace("${msg}", e instanceof Error ? e.message : String(e));
@@ -478,6 +498,9 @@
                 pendingRowId = undefined;
                 pendingModuleId = undefined;
                 saveOperationKey = undefined;
+                const nextKeys = { ...saveOperationKeysByModule };
+                delete nextKeys[targetModule];
+                saveOperationKeysByModule = nextKeys;
                 identityPending = false;
                 identityChecked = false;
                 saveError = "";

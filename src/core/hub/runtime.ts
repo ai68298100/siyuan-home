@@ -44,6 +44,27 @@ export interface CaptureDraft {
     error?: string;
 }
 
+/** Values currently held by the quick-capture form before they are normalized. */
+export type CaptureDraftSourceValues = Record<string, string | number | boolean | undefined>;
+
+/**
+ * Collect the in-memory form for every module touched by the mounted capture
+ * sheet. The current module wins over the cached module snapshot because its
+ * inputs may have changed since the last module-switch effect ran.
+ */
+export function collectCaptureDraftSources(
+    valuesByModule: Record<string, CaptureDraftSourceValues> | undefined,
+    currentModuleId: string | undefined,
+    currentValues: CaptureDraftSourceValues | undefined,
+): [string, CaptureDraftSourceValues][] {
+    const sources = new Map<string, CaptureDraftSourceValues>();
+    for (const [moduleId, values] of Object.entries(valuesByModule ?? {})) {
+        sources.set(moduleId, { ...values });
+    }
+    if (currentModuleId) sources.set(currentModuleId, { ...(currentValues ?? {}) });
+    return [...sources.entries()];
+}
+
 /** 已处理记录（H07）：oneoff 完成动作的真实留痕，可恢复 */
 export interface HandledRecord {
     title: string;

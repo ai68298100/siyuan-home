@@ -4,7 +4,7 @@
  */
 import { describe, it, expect, beforeEach } from "vitest";
 import { loadSettings, saveSettings, normalizeImportedSettings, normalizeCheckinBindings } from "@/core/settings";
-import { loadRuntime, saveRuntime, defaultRuntime, removeCaptureDraft, upsertCaptureDraft } from "@/core/hub/runtime";
+import { collectCaptureDraftSources, loadRuntime, saveRuntime, defaultRuntime, removeCaptureDraft, upsertCaptureDraft } from "@/core/hub/runtime";
 import { coalescedNotify, resetNotifyState } from "@/libs/notify-queue";
 
 function pluginWithSettings(data: unknown) {
@@ -330,6 +330,21 @@ describe("坏文件容错（15 组）", () => {
         expect(upsertCaptureDraft(list, updated)).toEqual([updated, other]);
         expect(removeCaptureDraft(list, "d1")).toEqual([other]);
         expect(removeCaptureDraft(list, "members")).toEqual([first]);
+    });
+
+    it("快速记录关闭时收集所有访问过的模块，并让当前模块覆盖缓存快照", () => {
+        const sources = collectCaptureDraftSources(
+            {
+                certs: { name: "护照" },
+                members: { name: "旧家人" },
+            },
+            "members",
+            { name: "新家人", note: "待补" },
+        );
+        expect(sources).toEqual([
+            ["certs", { name: "护照" }],
+            ["members", { name: "新家人", note: "待补" }],
+        ]);
     });
 
     it("运行态序列化去重按插件实例隔离：新实例的首写不会被旧实例跳过", async () => {
