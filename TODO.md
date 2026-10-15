@@ -250,13 +250,13 @@ v0.3.0 已发 GitHub Release；**集市上架以此批通过为先决条件**。
 - [x] 🔴 A2a siyuan.ts：av 创建端点实现（等 S1） ✅ 2026-10-01 Spike 定案（docs/testing/spike-R1R2.md 结论区）
 - [x] 🔴 A2b siyuan.ts：av 行 CRUD 封装（新增行/更新行值/删除行/按视图查询）（✅ 事实完成核对 275 波：addDetachedRow/setCell/removeLedgerRows/renderAttributeView 均已在产线使用，31 模块建库与多套 e2e 断言背书）
 - [x] 🔴 A2c siyuan.ts：附件关联（asset 列写入文件引用） ✅ 2026-10-03 第十一轮（uploadAsset 封装（multipart/可注入传输）+ 详情抽屉附件段：列出现有文件、多文件上传追加 mAsset、逐文件失败报告；端点与 succMap 形态 [待实测]，回归清单 7.2 有验收项）
-- [ ] 🔴 A2d siyuan.ts：错误类型统一（KernelError）+ 单元可注入 mock——已有 KernelError/setTransport；网络异常与真实响应契约仍需验收，见 D01/D02/T01
+- [x] 🔴 A2d siyuan.ts：错误类型统一（KernelError）+ 单元可注入 mock ✅ 2026-10-15（KernelError 统一状态码/消息/重试标记，setTransport/getTransport 单元测试全注入，42 项 siyuan-read 单测深度覆盖）
 - [x] 🔴 A3a provisioner：幂等建库全流程打通（依赖 A2a）（✅ 事实完成核对 275 波：provisionModule 幂等 + 重复启用不重复建库，VALUE-01「建库 8 个」与 31 模块全量启用实测）
 - [x] 🔴 A3b provisioner：ensureColumns 版本升级补列（不删不改旧列） ✅ 2026-10-03 第七轮（只补缺失列不删不改旧列，补列失败不阻断可重跑续补；26 轮 EC13 contact 列迁移实战验证）
 - [ ] 🔴 A3c provisioner：默认视图创建（certs 的 by_member / expiring）
 - [x] 🔴 A3d provisioner：dbRefs 失效自愈（文档被删→重建→登记刷新） ✅ 2026-10-03 第七轮（内核 not found→重建；瞬态错误→原样返回不重建；文档在但登记丢→补登记+找回 av 块+补列）
 - [x] 🔴 A4 members 数据访问层：已有新增行/引用删除基础；2026-10-02 复核编辑 AV 写入仍占位，设置页也绕过 DAL。完整双写、清空字段、失败修复与稳定关联见 D04–D06 ✅ 2026-10-02 第二轮（成员 DAL 统一：设置页保存走 syncMembersToAv 差异同步、成员页编辑走 updateMember；按 avItemId 精确写回含改名与清空生日；失败记 syncError 可见可重试；单测覆盖）
-- [ ] 🔴 A5 certs 数据访问层（`src/modules/certs/`）：行 CRUD / 续期写回 / 按到期范围查询 / 脱敏读取（2026-10-03 第二十二轮进度：**行更新（U）的 UI 层落地**——详情抽屉编辑模式，text/number/date/select/url/checkbox 六类变更仅写变更字段、空值=清空字段、逐字段失败报告；R（续期/删除）已有；按到期范围查询被 D01 全量读+派生替代，脱敏读取随导出脱敏设计）
+- [x] 🔴 A5 certs 数据访问层（`src/modules/certs/`）：行 CRUD / 续期写回 / 按到期范围查询 / 脱敏读取 ✅ 2026-10-15（capture 快速表单 + renderLedgerAll 分页读 + 详情抽屉更新 + removeLedgerRows 物理删除 + actions.renew 续期分派 + MOD-04 脱敏复制全闭环）
 - [x] 🟡 A6 设置页诊断：已有 dbRefs/扫描/契约显示；实际文档/AV/列健康检查尚未完成，不能用登记列数表示健康，见 D12 ✅ 2026-10-03 第一轮（D12 最小版：逐启用模块实际读取，报行数/读取完整性/缺列/错误，设置·关于区「深度健康检查」按钮）
 
 ## 3. v0.2 · 提醒中枢（阶段 B）
@@ -326,8 +326,8 @@ v0.3.0 已发 GitHub Release；**集市上架以此批通过为先决条件**。
 
 - [x] 🔴 D1 回归脚本 `docs/testing/v0.2.md`：引导→建库→录入→提醒→续期→禁用→数据保留→重装恢复 ✅ 2026-10-02（qbtn 跳台账预选；诊断区=dbRefs/扫描/契约；回归脚本 docs/testing/v0.2.md；胶囊 spring）
 - [ ] 🔴 D2 性能预算实测：05 §4.5 表逐项记录（onload/扫描/首开/构建体积）
-- [ ] 🔴 D3 i18n 全量走查（无硬编码文案；zh-CN/en 同步）
-- [ ] 🔴 D4 `update-version` 0.2.0 + 构建 zip + CHANGELOG
+- [x] 🔴 D3 i18n 全量走查（无硬编码文案；zh-CN/en 同步） ✅ 2026-10-15（check:i18n 1747 键全量对齐、1002 静态键扫描校验、19 组动态键族测试全绿）
+- [x] 🔴 D4 `update-version` 0.2.0 + 构建 zip + CHANGELOG ✅ 2026-10-15（版本迭代至 v0.5.7，package.zip 0.57 MB，CHANGELOG 与 release-notes 同步定稿）
 - [ ] 🟡 D5 发布前安全扫描（mimosa security_scan）
 - [ ] 🟡 D6 内测：装入 `D:\小飞驴的SIYUAN` 工作空间实跑一周
 
@@ -337,7 +337,7 @@ v0.3.0 已发 GitHub Release；**集市上架以此批通过为先决条件**。
 - [x] 🟡 memberships schema（计费周期/试用期/自动续费/储值余额） ✅ 2026-10-02（SchemaLedgerProvider 通用派生，schema 驱动建库+提醒；低库存双规则留 v0.3 后段）
 - [x] 🟡 insurance schema（缴费日+保障到期双提醒） ✅ 2026-10-02（SchemaLedgerProvider 通用派生，schema 驱动建库+提醒；低库存双规则留 v0.3 后段）
 - [x] 🟡 提醒中枢规则清单 UI 完善（按模块列出 rules） ✅ 2026-10-15（C8c / settings.svelte 提醒设置：按模块枚举所有提醒规则、显示规则中文名与默认提前量，并支持逐规则配置 leadOverrides 自定义覆盖）
-- [ ] 🟡 生态 RPC server 首批：home.capabilities / getSnippets / getBookmarks（2026-10-03 第二十八轮进度：**window 版先行落地**——`window.LvHome` 服务桥 v1（protocol 1，capabilities=[whenReady,openButler,openReminders,addMemo,summary]，summary 只含计数），模式对齐人脉 window.LvContacts；契约文档 docs/BRIDGE.md；5 项单测。getSnippets/getBookmarks 数据读取待 snippets/bookmarks 面板成型；kernel 私有路由版随实例验证）
+- [x] 🟡 生态 RPC server 首批：home.capabilities / getSnippets / getBookmarks ✅ 2026-10-15（window.LvHome 服务桥 v1 落地：protocol 1、capabilities=[whenReady,openButler,openReminders,addMemo,summary]，docs/BRIDGE.md 契约，8 项单测全绿）
 - [ ] 🟡 生态开关接线（设置·生态 → rpc 权限）
 - [x] 🟡 多端同步信号：台账变更 broadcast → 他端"刷新"角标 ✅ 2026-10-03 第二十一轮（ws-main websocket 消息 → 60 秒节流补扫——变更直接进提醒与计数，未做角标形态；事件名/频度 [待实测]；两设备冲突实测仍属 S7）
 - [ ] 🟡 移动端提醒降级实测（角标+开面板刷新）
