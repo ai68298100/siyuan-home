@@ -415,7 +415,7 @@ v0.3.0 已发 GitHub Release；**集市上架以此批通过为先决条件**。
 - [ ] 🟢 用户自定义台账模块（自定义字段集建库，复用建库器与提醒中枢）
 - [ ] 🟢 家庭成员间状态共享（kernel broadcast 多端，家务完成同步）
 - [ ] 🟢 i18n 扩展：zh-TW / ja
-- [ ] 🟢 无障碍专项审查（键盘全可达/对比度/读屏标签）
+- [x] 🟢 无障碍专项审查（键盘全可达/对比度/读屏标签） ✅ 2026-10-15（tablist/tab 键盘导航、Ctrl+Z 全局撤销、forced-colors 激活 CanvasText 轮廓、prefers-reduced-motion 禁用动效、ARIA role/label 语义全覆盖）
 - [ ] 🟢 发布快照数据（savePublishData，3.8.4+）探索
 
 ## 14. 调研补齐（🟢 可选，前次因并发限制中断于 16 款/9 轮）
@@ -532,8 +532,8 @@ v0.3.0 已发 GitHub Release；**集市上架以此批通过为先决条件**。
 ## 19. 安全加固
 
 - [x] 🔴 面板渲染用户内容统一转义（标题/备注防 XSS——台账内容来自用户输入） ✅ 2026-10-15（SEC-01：建立 src/core/escape.ts 集中转义库，对弹窗与面板 innerHTML 拼接的用户输入字段全量执行 escapeHtml 与 escapeAttr 安全转义，防范 XSS 注入风险）
-- [ ] 🔴 日志审计：永不输出 token / 证件号 / 金额到 console
-- [ ] 🟡 附件处理边界：仅展示图片/PDF 预览，不执行未知类型
+- [x] 🔴 日志审计：永不输出 token / 证件号 / 金额到 console ✅ 2026-10-15（全局 console 审计完成：仅保留脱敏模块 id、错误信息与状态码，杜绝任何 token、证件号码、明文密码及金额输出）
+- [x] 🟡 附件处理边界：仅展示图片/PDF 预览，不执行未知类型 ✅ 2026-10-15（ledger 详情抽屉中经 isDangerousAsset 阻断可执行文件并提示警告徽章，仅图片/PDF 开放安全预览）
 - [ ] 🟡 RPC 入参校验：生态调用方参数 schema 校验（防脏数据入库）
 - [ ] 🟡 依赖最小化审查：每个新依赖记录必要性理由（已核：lunar-typescript/date-fns）
 - [x] 🟡 `pnpm audit` 纳入发布前检查 + lockfile 提交 ✅ 2026-10-03 第四十四轮（check:audit script（--prod --audit-level moderate）纳入 check 链；当前 0 known vulnerabilities）
