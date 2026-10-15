@@ -20,6 +20,8 @@
         openSetting: () => void;
         refreshHub?: (only?: string | string[], force?: boolean) => Promise<unknown>;
         showTabDocs?: (docId?: string) => void;
+        /** Navigate to a committed ledger row through the mounted ledger view. */
+        openActivityTarget?: (target: { moduleId: string; rowId: string; source?: "ledger" | "rowlog" }) => void;
     }
 
     let { plugin, t, version, open = $bindable(false), onClose }: {
@@ -278,7 +280,7 @@
             .replace("${max}", String(field.max ?? ""));
     }
 
-    async function save(continueAfter = false) {
+    async function save(continueAfter = false, viewAfter = false) {
         if (saving || identityPending) return;
         const title = String(values.name ?? "").trim();
         saveError = "";
@@ -394,7 +396,23 @@
                 showMessage(t("capture.savedRefreshFailed").replace("${module}", modLabel(moduleId)), 5000, "error");
             }
             if (!refreshFailed) showMessage(t("capture.saved").replace("${module}", modLabel(moduleId)), 3000, "info");
-            if (continueAfter) {
+            if (viewAfter) {
+                // Keep navigation on the same one-shot target path used by the
+                // activity feed. The ledger will select the row after its next
+                // complete read, even when the refresh above was unavailable.
+                const targetRowId = itemID;
+                values = {};
+                valuesByModule = { ...valuesByModule, [moduleId]: {} };
+                open = false;
+                pendingRowId = undefined;
+                pendingModuleId = undefined;
+                saveOperationKey = undefined;
+                if (targetRowId && plugin.openActivityTarget) {
+                    plugin.openActivityTarget({ moduleId, rowId: targetRowId, source: "ledger" });
+                } else if (targetRowId) {
+                    showMessage(t("activity.navigationUnavailable"), 4000, "error");
+                }
+            } else if (continueAfter) {
                 // 268 波：连续录入——清空字段、保留模块（家庭录入常成批）
                 values = {};
                 valuesByModule = { ...valuesByModule, [moduleId]: {} };
@@ -552,6 +570,9 @@
             </button>
             <button class="lv-btn primary" onclick={() => save(false)} disabled={saving || identityPending || modules.length === 0 || captureFields.length === 0}>
                 {saving ? t("ledger.saving") : pendingRowId ? t("capture.retryClose") : t("capture.saveClose")}
+            </button>
+            <button class="lv-btn primary" onclick={() => save(false, true)} disabled={saving || identityPending || modules.length === 0 || captureFields.length === 0}>
+                {saving ? t("ledger.saving") : pendingRowId ? t("capture.retryView") : t("capture.saveView")}
             </button>
         </div>
     </div>
