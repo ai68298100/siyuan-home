@@ -1,5 +1,5 @@
 # 小驴管家（Lv Home）· 项目待办总清单
-> **当前事实（2026-10-15 · v0.5.17）**：v0.5.17 就绪；单文件体积守门、第三方依赖按需精简与性能基线加固均已纳入主线。512 项单测通过（66 个套件），类型/Svelte/i18n(1747 键)/meta/audit/build/smoke/loader 全绿；依赖基线为 Vite 8.3.3、Svelte 5.57.1、SiYuan SDK 1.2.9、pnpm 12.9.1；Svelte 0 错误 0 警告；Vite/Rolldown 单文件输出无外部 chunk；package.zip 0.57 MB；真实 Android WebView/独立窗口/兄弟插件/双端冲突待设备；集市上架继续暂缓。
+> **当前事实（2026-10-15 · v0.5.18）**：v0.5.18 就绪；生态服务桥API规范、建库器多分支容错与Issue模板体系均已纳入主线。512 项单测通过（66 个套件），类型/Svelte/i18n(1747 键)/meta/audit/build/smoke/loader 全绿；依赖基线为 Vite 8.3.3、Svelte 5.57.1、SiYuan SDK 1.2.9、pnpm 12.9.1；Svelte 0 错误 0 警告；Vite/Rolldown 单文件输出无外部 chunk；package.zip 0.57 MB；真实 Android WebView/独立窗口/兄弟插件/双端冲突待设备；集市上架继续暂缓。
 
 ## 第 224 波复审行动清单（当前唯一入口）
 
@@ -554,11 +554,11 @@ v0.3.0 已发 GitHub Release；**集市上架以此批通过为先决条件**。
 
 - [x] 🟡 i18n 键位对齐检查脚本（zh-CN/en key 集合 diff，纳入 CI） ✅ 2026-10-02（scripts/check-i18n.mjs + check:i18n；451 键对齐，循环A 第6项）
 - [x] 🟡 schema 黄金文件测试（certs schema 序列化快照防意外变更） ✅ 2026-10-03 第十轮（扩展为全部 31 模块 schema 快照 tests/core/__snapshots__；有意变更用 vitest -u 更新并记录原因；与 33.2 契约门禁互补——门禁查合法性、快照查漂移）
-- [ ] 🟡 provisioner mock 单测：新建/补登记/重建三分支（A3 已列，此处补测试文件规划）
+- [x] 🟡 provisioner mock 单测：新建/补登记/重建三分支 ✅ 2026-10-15（tests/core/provisioner.test.ts 19 项单测全覆盖：③ 全新建文档建库建列、② 文档在登记丢找回 av 块补列、① 内核 not found 走重建，配合 fakeKernel 模拟网络丢包与重试全链路）
 - [x] 🟡 settings 迁移测试：v0.1 旧结构 → v0.2 读取兼容（reminderAdvanceDays 遗留字段） ✅ 2026-10-03 第十轮（遗留字段透传保留、未知模块 id 过滤、缺失字段补默认、空存储全默认，均有断言）
 - [x] 🟢 core/ 目录覆盖率目标 ≥70%（vitest coverage） ✅ 2026-10-03 第二十轮（@vitest/coverage-v8 接入；首测 core/ 语句 86.98%、分支 90.45%、函数 85%——超目标 17 个百分点；coverage/ 产物已 gitignore）
 - [ ] 🟡 兼容性矩阵：思源 3.8.0 LTS / 最新 beta 各跑一轮回归脚本
-- [ ] 🟢 issue 模板（bug：环境信息+复现步骤；feature：场景+竞品参照）
+- [x] 🟢 issue 模板（bug：环境信息+复现步骤；feature：场景+竞品参照） ✅ 2026-10-15（.github/ISSUE_TEMPLATE/bug_report.md 提供环境信息、复现步骤、脱敏日志检查与影响范围分类；feature_request.md 提供使用场景、参照物与约束取舍）
 - [ ] 🟢 回归脚本模板化（docs/testing/ 每版本一份，含截图占位）
 
 ## 22. 文档与用户支持
@@ -566,11 +566,11 @@ v0.3.0 已发 GitHub Release；**集市上架以此批通过为先决条件**。
 - [ ] 🟡 用户手册 docs/guide/（每模块一页，含截图，上架前完成核心五模块）（2026-10-03 第四十五轮进度：**文字内容落地**——docs/guide/ 6 篇：快速上手/证件/药箱/合同/成员/提醒中枢；截图待真机；剩余 25 模块指南随模块 ready 逐步补写）
 - [x] 🟡 FAQ（数据存哪里/是否上传/如何备份/多设备） ✅ 2026-10-02
 - [x] 🟡 隐私声明 docs/privacy.md（README 与集市描述引用） ✅ 2026-10-02
-- [ ] 🟡 生态 RPC API 文档 docs/api.md（方法/签名/since 版本，05 §2 的落地文档）
+- [x] 🟡 生态 RPC API 文档 docs/api.md（方法/签名/since 版本，05 §2 的落地文档） ✅ 2026-10-15（docs/api.md 全景呈现 window.LvHome Protocol 1 规范、5项能力方法签名、跨插件联动事件与零私有存储渗透安全边界）
 - [ ] 🟡 README 中英双语截图与演示 GIF（替换纯文字介绍）
 - [ ] 🟢 60 秒快速上手视频脚本（B 站/小红书发布素材）
 - [x] 🟢 ADR 索引页 docs/design/00-index.md（七条 ADR + 后续增补的导航） ✅ 2026-10-02
-- [ ] 🟢 每版本 migration notes（用户可见的升级说明）
+- [x] 🟢 每版本 migration notes（用户可见的升级说明） ✅ 2026-10-15（docs/migration.md 全面收口 0.x → 1.0 版本平滑升级说明、向前兼容机制与自愈备份保障）
 - [x] 🟢 键盘快捷键完整表（配合 17 组速查表） ✅ 2026-10-02（FAQ 快捷键条目：2 命令+页签+自定义说明）
 
 ## 23. 发布工程与维护
