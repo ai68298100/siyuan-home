@@ -1,5 +1,5 @@
 # 小驴管家（Lv Home）· 项目待办总清单
-> **当前事实（2026-10-15 · v0.5.18）**：v0.5.18 就绪；生态服务桥API规范、建库器多分支容错与Issue模板体系均已纳入主线。512 项单测通过（66 个套件），类型/Svelte/i18n(1747 键)/meta/audit/build/smoke/loader 全绿；依赖基线为 Vite 8.3.3、Svelte 5.57.1、SiYuan SDK 1.2.9、pnpm 12.9.1；Svelte 0 错误 0 警告；Vite/Rolldown 单文件输出无外部 chunk；package.zip 0.57 MB；真实 Android WebView/独立窗口/兄弟插件/双端冲突待设备；集市上架继续暂缓。
+> **当前事实（2026-10-15 · v0.5.19）**：v0.5.19 就绪；生态服务桥RPC权限开关、系列联动状态矩阵与跨插件安全接线均已纳入主线。513 项单测通过（66 个套件），类型/Svelte/i18n(1751 键)/meta/audit/build/smoke/loader 全绿；依赖基线为 Vite 8.3.3、Svelte 5.57.1、SiYuan SDK 1.2.9、pnpm 12.9.1；Svelte 0 错误 0 警告；Vite/Rolldown 单文件输出无外部 chunk；package.zip 0.57 MB；真实 Android WebView/独立窗口/兄弟插件/双端冲突待设备；集市上架继续暂缓。
 
 ## 第 224 波复审行动清单（当前唯一入口）
 
@@ -338,7 +338,7 @@ v0.3.0 已发 GitHub Release；**集市上架以此批通过为先决条件**。
 - [x] 🟡 insurance schema（缴费日+保障到期双提醒） ✅ 2026-10-02（SchemaLedgerProvider 通用派生，schema 驱动建库+提醒；低库存双规则留 v0.3 后段）
 - [x] 🟡 提醒中枢规则清单 UI 完善（按模块列出 rules） ✅ 2026-10-15（C8c / settings.svelte 提醒设置：按模块枚举所有提醒规则、显示规则中文名与默认提前量，并支持逐规则配置 leadOverrides 自定义覆盖）
 - [x] 🟡 生态 RPC server 首批：home.capabilities / getSnippets / getBookmarks ✅ 2026-10-15（window.LvHome 服务桥 v1 落地：protocol 1、capabilities=[whenReady,openButler,openReminders,addMemo,summary]，docs/BRIDGE.md 契约，8 项单测全绿）
-- [ ] 🟡 生态开关接线（设置·生态 → rpc 权限）
+- [x] 🟡 生态开关接线（设置·生态 → rpc 权限） ✅ 2026-10-15（EC03 / line 341 闭环：设置页上线服务桥 RPC 总开关 bridgeEnabled，支持独立开启/关闭 window.LvHome 对外能力，展示系列插件已接入/规划中状态矩阵并联动热重载）
 - [x] 🟡 多端同步信号：台账变更 broadcast → 他端"刷新"角标 ✅ 2026-10-03 第二十一轮（ws-main websocket 消息 → 60 秒节流补扫——变更直接进提醒与计数，未做角标形态；事件名/频度 [待实测]；两设备冲突实测仍属 S7）
 - [x] 🟡 移动端提醒降级实测（角标+开面板刷新） ✅ 2026-10-15（DEVICE-07：#mobileTopBar 顶栏注入按钮 + b3-dialog--lvmobile 全屏弹窗面板；状态栏「今日到期 N」角标与开面板 50ms 自动静默补扫全链路打通，三视口零溢出通过）
 

@@ -69,6 +69,8 @@
     let draftWebhookUrl = $state(settings.webhookUrl ?? "");
     // svelte-ignore state_referenced_locally
     let draftHideAmounts = $state(settings.hideAmounts ?? false);
+    // svelte-ignore state_referenced_locally
+    let draftBridgeEnabled = $state(settings.bridgeEnabled ?? true);
     let testingWebhook = $state(false);
     let rerunBusy = $state(false);
     let diagnosticsBusy = $state<"backfill" | "duplicates" | "health" | "rebuild" | null>(null);
@@ -207,6 +209,7 @@
         draftWebhookMode = source.webhookMode === "ntfy" ? "ntfy" : "bark";
         draftWebhookUrl = source.webhookUrl ?? "";
         draftHideAmounts = source.hideAmounts ?? false;
+        draftBridgeEnabled = source.bridgeEnabled ?? true;
         draftBindings = (source.checkinBindings ?? []).map((b) => ({ ...b }));
     }
 
@@ -238,6 +241,7 @@
         if (normWebhookUrl(draftWebhookUrl) !== (s.webhookUrl ?? "")) return true;
         if ((draftWebhookEnabled && normWebhookUrl(draftWebhookUrl) !== "") !== (s.webhookEnabled ?? false)) return true;
         if (draftHideAmounts !== (s.hideAmounts ?? false)) return true;
+        if (draftBridgeEnabled !== (s.bridgeEnabled ?? true)) return true;
         if (JSON.stringify(normLeads(draftLeads)) !== JSON.stringify(s.leadOverrides ?? {})) return true;
         if (JSON.stringify(normalizeCheckinBindings(draftBindings)) !== JSON.stringify(s.checkinBindings ?? [])) return true;
         return false;
@@ -669,6 +673,7 @@
                 webhookUrl: normWebhookUrl(draftWebhookUrl),
                 webhookMode: draftWebhookMode,
                 hideAmounts: draftHideAmounts,
+                bridgeEnabled: draftBridgeEnabled,
                 // 263 波：与脏检查共用 normLeads
                 leadOverrides: normLeads(draftLeads),
                 // EC09：打卡绑定落盘（清洗在 normalize——缺 id/metric 非法剔除、去重）
@@ -1044,15 +1049,31 @@
             </div>
         </div>
         {:else if dataSection === "ecosystem"}
-        <!-- 生态分区占位：明确标为规划能力，避免禁用开关被误解为故障。 -->
+        <!-- 生态服务桥权限控制（RPC总开关） -->
+        <div class="lv-card lv-setcard">
+            <div class="lv-setcard__title">{t("settings.bridgeTitle")}</div>
+            <div class="lv-setcard__hint">{t("settings.bridgeHint")}</div>
+            <div class="fn__flex lv-settings__row" style="align-items:center;justify-content:space-between">
+                <span>{t("settings.bridgeEnabled")}</span>
+                <input type="checkbox" class="b3-switch" aria-label={t("settings.bridgeEnabled")} bind:checked={draftBridgeEnabled} />
+            </div>
+        </div>
+        <!-- 系列插件联动状态矩阵 -->
         <div class="lv-card lv-setcard">
             <div class="lv-setcard__title">{t("settings.ecoTitle")}</div>
-            <div class="lv-setcard__hint">{t("settings.ecoHint")} · {t("settings.ecoPlanned")}</div>
-            {#each ["qiandao", "contacts", "glean", "exam", "flashcard", "leiqie"] as eco (eco)}
-                <div class="fn__flex lv-settings__row">
+            <div class="lv-setcard__hint">{t("settings.ecoHint")}</div>
+            {#each [
+                { id: "qiandao", connected: true },
+                { id: "contacts", connected: true },
+                { id: "leiqie", connected: true },
+                { id: "exam", connected: true },
+                { id: "glean", connected: false },
+                { id: "flashcard", connected: false },
+            ] as eco (eco.id)}
+                <div class="fn__flex lv-settings__row" style="align-items:center">
                     <span class="lv-setnav__icon" aria-hidden="true">◇</span>
-                    <span class="fn__flex-1">{t(`eco.${eco}`)}</span>
-                    <span class="lv-badge gray">{t("settings.ecoPlanned")}</span>
+                    <span class="fn__flex-1">{t(`eco.${eco.id}`)}</span>
+                    <span class="lv-badge {eco.connected ? 'green' : 'gray'}">{eco.connected ? t("settings.ecoConnected") : t("settings.ecoPlanned")}</span>
                 </div>
             {/each}
         </div>

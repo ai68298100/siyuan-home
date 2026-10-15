@@ -27,6 +27,7 @@ export function defaultSettings(): HomeSettings {
         webhookUrl: "",
         webhookMode: "bark",
         hideAmounts: false,
+        bridgeEnabled: true,
         avatar: DEFAULT_AVATAR,
     };
 }
@@ -214,6 +215,7 @@ export async function loadSettings(plugin: Plugin): Promise<HomeSettings> {
         webhookEnabled: typeof data.webhookEnabled === "boolean" ? data.webhookEnabled : defaults.webhookEnabled,
         webhookUrl: typeof data.webhookUrl === "string" ? data.webhookUrl : defaults.webhookUrl,
         webhookMode: data.webhookMode === "ntfy" ? "ntfy" : "bark",
+        bridgeEnabled: typeof data.bridgeEnabled === "boolean" ? data.bridgeEnabled : defaults.bridgeEnabled ?? true,
         checkinBindings: normalizeCheckinBindings(data.checkinBindings),
         avatar: normalizeAvatarText(data.avatar),
         avatarImage: normalizeAvatarImage(data.avatarImage),
@@ -298,6 +300,7 @@ export function normalizeImportedSettings(input: unknown): NormalizedImport {
         webhookUrl: typeof data.webhookUrl === "string" ? data.webhookUrl : defaults.webhookUrl,
         webhookMode: data.webhookMode === "ntfy" ? "ntfy" : "bark",
         hideAmounts: typeof data.hideAmounts === "boolean" ? data.hideAmounts : defaults.hideAmounts,
+        bridgeEnabled: typeof data.bridgeEnabled === "boolean" ? data.bridgeEnabled : defaults.bridgeEnabled ?? true,
     };
     return { settings, droppedModules, repairedMembers };
 }

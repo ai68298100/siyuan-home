@@ -80,6 +80,7 @@ export default class LvHomePlugin extends Plugin {
     private mobileTopBarRetry?: number;
     private mobileDialog?: Dialog;
     private mobileDialogUnmount?: () => void;
+    private settingsReplacedHandler?: (e: Event) => void;
     /** C6c captureTo idempotency window: duplicate block-menu clicks while
      * the first kernel write is still pending must not add duplicate rows. */
     private readonly captureDedupe = new Map<string, number>();
@@ -309,15 +310,14 @@ export default class LvHomePlugin extends Plugin {
         // EC09/EC10：启动时初始打卡摘要拉取（打卡可能已先于管家加载）
         this.scheduleTimeout(() => this.pullCheckinSummary(), 3000);
 
-        // EC03/v0.3 生态首批：管家服务桥 window.LvHome（对齐人脉 window.LvContacts 模式；卸载注销）
-        this.disposeLvHomeBridge = mountLvHomeBridge({
-            settings: this.settings,
-            get scan() { return self.scan; },
-            showTab: () => self.showTab(),
-            openRemindersTab: () => self.openRemindersScreen(),
-            addMemo: (title, due) => self.addMemo(title, due),
-            onBridgeDisposed: () => { self.disposeLvHomeBridge = undefined; },
-        });
+        // EC03/v0.3 生态首批：管家服务桥 window.LvHome（受 settings.bridgeEnabled 控制；卸载注销）
+        this.syncBridgeState();
+        this.settingsReplacedHandler = (e: Event) => {
+            const detail = (e as CustomEvent<{ plugin?: any; settings?: HomeSettings }>).detail;
+            if (detail?.plugin && detail.plugin !== this) return;
+            this.syncBridgeState();
+        };
+        window.addEventListener("siyuan-home:settings-replaced", this.settingsReplacedHandler);
 
         // EC21：消费 lv-exam:stats 聚合（脱敏 PublicStats v1，无题目内容）——仅缓存子集供考试模块卡展示
         this.examStatsHandler = (e: Event) => {
@@ -453,6 +453,28 @@ export default class LvHomePlugin extends Plugin {
                 read: () => this.buildHomeSummarySnapshot(),
             });
             if (typeof dispose === "function") this.homeModuleDisposer = dispose;
+        }
+    }
+
+    /** 同步服务桥挂载状态（受 settings.bridgeEnabled 控制） */
+    private syncBridgeState(): void {
+        const self = this;
+        if (this.settings.bridgeEnabled !== false) {
+            if (!this.disposeLvHomeBridge) {
+                this.disposeLvHomeBridge = mountLvHomeBridge({
+                    settings: this.settings,
+                    get scan() { return self.scan; },
+                    showTab: () => self.showTab(),
+                    openRemindersTab: () => self.openRemindersScreen(),
+                    addMemo: (title, due) => self.addMemo(title, due),
+                    onBridgeDisposed: () => { self.disposeLvHomeBridge = undefined; },
+                });
+            }
+        } else {
+            if (this.disposeLvHomeBridge) {
+                this.disposeLvHomeBridge();
+                this.disposeLvHomeBridge = undefined;
+            }
         }
     }
 
@@ -912,6 +934,10 @@ export default class LvHomePlugin extends Plugin {
             this.checkinEventHandler = undefined;
         }
         // EC03/v0.3：服务桥卸载（delete window.LvHome）
+        if (this.settingsReplacedHandler) {
+            window.removeEventListener("siyuan-home:settings-replaced", this.settingsReplacedHandler);
+            this.settingsReplacedHandler = undefined;
+        }
         if (this.disposeLvHomeBridge) this.disposeLvHomeBridge();
         this.disposeLvHomeBridge = undefined;
         // EC16：雷切动作注销 + 重试计时器清理

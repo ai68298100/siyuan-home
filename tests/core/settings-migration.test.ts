@@ -245,6 +245,25 @@ describe("坏文件容错（15 组）", () => {
         expect(settings.leadOverrides?.["overflow"]).toBe(3650);
     });
 
+    it("bridgeEnabled 服务桥权限配置归一化：布尔型透传，缺省默认 true", async () => {
+        const p1 = pluginWithSettings({ bridgeEnabled: false });
+        const s1 = await loadSettings(p1);
+        expect(s1.bridgeEnabled).toBe(false);
+
+        const p2 = pluginWithSettings({});
+        const s2 = await loadSettings(p2);
+        expect(s2.bridgeEnabled).toBe(true);
+
+        const p3 = pluginWithSettings({ bridgeEnabled: "invalid" });
+        const s3 = await loadSettings(p3);
+        expect(s3.bridgeEnabled).toBe(true);
+
+        const { settings: imp1 } = normalizeImportedSettings({ bridgeEnabled: false });
+        expect(imp1.bridgeEnabled).toBe(false);
+        const { settings: imp2 } = normalizeImportedSettings({});
+        expect(imp2.bridgeEnabled).toBe(true);
+    });
+
     it("运行态缓存逐项归一化：错误 map/list/cache 字段安全回退", async () => {
         const plugin = pluginWithSettings(null);
         plugin.loadData = async (name: string) => name === "hub-runtime.json" ? {

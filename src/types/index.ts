@@ -174,6 +174,8 @@ export interface HomeSettings {
     webhookMode?: "bark" | "ntfy";
     /** PRIV-01 / C8f：隐私模式，面板遮蔽金额数值（防窥视） */
     hideAmounts?: boolean;
+    /** EC03 / line 341：生态服务桥总开关（window.LvHome RPC权限） */
+    bridgeEnabled?: boolean;
     /** 顶栏个人头像：单个字符预设或自定义短文字 */
     avatar?: string;
     /** 经裁剪压缩的本地头像 data URL（不超过 1 MB） */
