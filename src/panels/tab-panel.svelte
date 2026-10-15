@@ -147,9 +147,13 @@
                 if (id !== screen && !screenCache[id]) void loadScreen(id);
             });
         }, 150);
+        const captureTimer = window.setTimeout(() => {
+            void loadCapture();
+        }, 250);
         return () => {
             window.clearTimeout(scanTimer);
             window.clearTimeout(preloadTimer);
+            window.clearTimeout(captureTimer);
             restoreTimers.forEach((timer) => window.clearTimeout(timer));
             restoreTimers = [];
         };
