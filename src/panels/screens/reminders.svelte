@@ -3,7 +3,7 @@
     import { onDestroy } from "svelte";
     import { fade } from "svelte/transition";
     import type { HomePluginLike } from "@/types/plugin";
-    import { saveRuntime, upsertNamedView, deleteNamedView, setPlanDate, type HubNamedView } from "@/core/hub/runtime";
+    import { removeCaptureDraft, saveRuntime, upsertNamedView, deleteNamedView, setPlanDate, type CaptureDraft, type HubNamedView } from "@/core/hub/runtime";
     import { escapeHtml } from "@/core/escape";
     import { buildDisplay as display } from "@/core/hub/display";
     import { relativeDue, weekdayKey, localDateKey } from "@/core/hub/rule";
@@ -25,6 +25,23 @@
     function captureDraftLabel(moduleId: string): string {
         const key = `module.${moduleId}`;
         return t(key) !== key ? t(key) : moduleId;
+    }
+
+    function discardCaptureDraft(draft: CaptureDraft) {
+        confirm(
+            t("capture.recoveryDiscardConfirm").replace("${module}", captureDraftLabel(draft.moduleId)),
+            t("capture.recoveryDiscardBody"),
+            async () => {
+                plugin.runtime.captureDrafts = removeCaptureDraft(plugin.runtime.captureDrafts, draft.id);
+                plugin.hubListeners.forEach((listener) => listener());
+                try {
+                    await saveRuntime(plugin, plugin.runtime);
+                    showMessage(t("capture.recoveryDiscarded"), 3000, "info");
+                } catch (error) {
+                    showMessage(String(error), 5000, "error");
+                }
+            },
+        );
     }
 
     // UIX-06 / §17 智能筛选命名视图（滴答清单智能清单印证）
@@ -1064,7 +1081,10 @@
                     <strong>{captureDraftLabel(draft.moduleId)}</strong>
                     <span class="lv-caption">{draft.status === "pending" ? t("capture.recoveryPending") : t("capture.recoveryFailed")}{draft.error ? ` · ${draft.error}` : ""}</span>
                 </div>
-                <button class="b3-button b3-button--outline" onclick={() => onCapture?.(draft.moduleId)}>{t("capture.recoveryOpen")}</button>
+                <div class="lv-capture-recovery__actions">
+                    <button class="b3-button b3-button--outline" onclick={() => onCapture?.(draft.moduleId)}>{t("capture.recoveryOpen")}</button>
+                    <button class="b3-button b3-button--text" onclick={(event) => { event.stopPropagation(); discardCaptureDraft(draft); }}>{t("capture.recoveryDiscard")}</button>
+                </div>
             </div>
         {/each}
     </section>
@@ -1263,6 +1283,7 @@
     .lv-capture-recovery__row { padding: 7px 0; border-top: 1px solid var(--lv-line); }
     .lv-capture-recovery__meta { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
     .lv-capture-recovery__meta strong, .lv-capture-recovery__meta span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .lv-capture-recovery__actions { display: inline-flex; align-items: center; gap: 6px; flex: 0 0 auto; }
     .lv-hub-batchbar { padding: 8px 13px; margin-bottom: 12px; border-color: var(--lv-accent-line); background: var(--lv-surface); }
     .lv-hub-batchbar .lv-caption { color: var(--lv-tx-2); font-weight: 600; }
     .lv-named-views {
