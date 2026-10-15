@@ -258,6 +258,10 @@
         return t("payment.daysAfter").replace("${days}", String(daysUntil));
     }
 
+    function paymentCycleLabel(item: { moduleId: string; cycle: string }): string {
+        return optLabel(t, item.moduleId === "insurance" ? "pay_cycle" : "cycle", item.cycle);
+    }
+
     const medicineSummary = $derived.by(() => {
         if (active !== "medicine" || !ref?.columns) return undefined;
         return calculateMedicineSummary(rows, ref.columns);
@@ -4674,7 +4678,7 @@
                 {#each paymentSummary.upcoming.slice(0, 3) as item (item.moduleId + item.rowId)}
                     <button type="button" class="lv-payment-top__tag" title={item.title} aria-label={item.title}
                         onclick={() => openPaymentSource(item)}>
-                        {item.title} · {paymentDueLabel(item.daysUntil)} · {item.dueDate} · ¥{formatAmount(item.amount, plugin.settings.hideAmounts)}
+                        {item.title} · {paymentCycleLabel(item)} · {paymentDueLabel(item.daysUntil)} · {item.dueDate} · ¥{formatAmount(item.amount, plugin.settings.hideAmounts)}
                     </button>
                 {/each}
             </div>

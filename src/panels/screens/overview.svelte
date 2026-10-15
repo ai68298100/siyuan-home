@@ -7,7 +7,7 @@
     import { localDateKey } from "@/core/hub/rule";
     import { parseNaturalDate } from "@/core/dateparse";
     import { formatLocalDate, formatLocalTime } from "@/core/date-display";
-    import { formatAmount, memberHue } from "@/core/format";
+    import { formatAmount, memberHue, optLabel } from "@/core/format";
     import { showMessage } from "siyuan";
     import { MODULE_GROUPS, getModule, moduleTone } from "@/core/modules";
     import UiIcon from "@/ui/icon.svelte";
@@ -263,6 +263,10 @@
         if (daysUntil === 0) return t("payment.today");
         if (daysUntil === 1) return t("payment.tomorrow");
         return t("payment.daysAfter").replace("${days}", String(daysUntil));
+    }
+
+    function paymentCycleLabel(item: { moduleId: string; cycle: string }): string {
+        return optLabel(t, item.moduleId === "insurance" ? "pay_cycle" : "cycle", item.cycle);
     }
 
     // 261 波：「查看全部」= 新意图——清掉上次会话遗留的筛选（逾期/某成员/某模块）再进入；
@@ -661,7 +665,7 @@
                 {#each paymentSummary.upcoming.slice(0, 3) as item (item.moduleId + item.rowId)}
                     <button type="button" class="lv-payment-top__tag" title={item.title} aria-label={item.title}
                         onclick={() => openPaymentSource(item)}>
-                        {t(`module.${item.moduleId}`)} · {item.title} · {paymentDueLabel(item.daysUntil)} · {item.dueDate} · ¥{formatAmount(item.amount, plugin.settings.hideAmounts)}
+                        {t(`module.${item.moduleId}`)} · {item.title} · {paymentCycleLabel(item)} · {paymentDueLabel(item.daysUntil)} · {item.dueDate} · ¥{formatAmount(item.amount, plugin.settings.hideAmounts)}
                     </button>
                 {/each}
             </div>
