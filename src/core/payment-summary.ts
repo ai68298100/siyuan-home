@@ -28,9 +28,11 @@ export interface UpcomingPaymentItem {
     amount: number;
     cycle: string;
     monthlyCost: number;
+    /** Calendar days from the scan date; the upcoming window is 0..30. */
+    daysUntil: number;
 }
 
-export interface PaymentSummary {
+export interface PaymentBreakdown {
     /** Active rows that have a positive amount and a recognized payment source. */
     sourceCount: number;
     /** Monthly equivalent across active membership and insurance rows. */
@@ -41,6 +43,11 @@ export interface PaymentSummary {
     next7Total: number;
     /** Amount due today through the next thirty calendar days. */
     next30Total: number;
+}
+
+export interface PaymentSummary extends PaymentBreakdown {
+    /** Per-ledger totals. Missing keys mean that ledger had no usable payment rows. */
+    byModule: Partial<Record<PaymentModuleId, PaymentBreakdown>>;
     /** Items due in the next thirty calendar days, sorted by date then title. */
     upcoming: UpcomingPaymentItem[];
 }
@@ -110,6 +117,20 @@ function roundMoney(value: number): number {
     return Math.round(value * 100) / 100;
 }
 
+function emptyBreakdown(): PaymentBreakdown {
+    return { sourceCount: 0, monthlyTotal: 0, annualTotal: 0, next7Total: 0, next30Total: 0 };
+}
+
+function roundBreakdown(value: PaymentBreakdown): PaymentBreakdown {
+    return {
+        sourceCount: value.sourceCount,
+        monthlyTotal: roundMoney(value.monthlyTotal),
+        annualTotal: roundMoney(value.monthlyTotal * 12),
+        next7Total: roundMoney(value.next7Total),
+        next30Total: roundMoney(value.next30Total),
+    };
+}
+
 function sourceFields(moduleId: PaymentModuleId): { amount: string; cycle: string; due: string } {
     return moduleId === "insurance"
         ? { amount: "premium", cycle: "pay_cycle", due: "next_pay" }
@@ -128,6 +149,7 @@ export function buildPaymentSummary(sources: PaymentSource[], today: Date): Paym
     let next30Total = 0;
     let sourceCount = 0;
     const upcoming: UpcomingPaymentItem[] = [];
+    const moduleTotals = new Map<PaymentModuleId, PaymentBreakdown>();
 
     for (const source of sources) {
         const columns = source.columns;
@@ -150,13 +172,21 @@ export function buildPaymentSummary(sources: PaymentSource[], today: Date): Paym
             const monthlyCost = amount * (MONTHLY_FACTORS[cycle] ?? 1);
             monthlyTotal += monthlyCost;
             sourceCount++;
+            const moduleTotal = moduleTotals.get(source.moduleId) ?? emptyBreakdown();
+            moduleTotal.monthlyTotal += monthlyCost;
+            moduleTotal.sourceCount++;
+            moduleTotals.set(source.moduleId, moduleTotal);
 
             const dueDate = dueColumn ? readDate(row.cells?.[dueColumn]) : undefined;
             if (!dueDate) continue;
             const days = daysBetween(now, dateFromKey(dueDate));
             if (days < 0 || days > 30) continue;
-            if (days <= 7) next7Total += amount;
+            if (days <= 7) {
+                next7Total += amount;
+                moduleTotal.next7Total += amount;
+            }
             next30Total += amount;
+            moduleTotal.next30Total += amount;
             upcoming.push({
                 moduleId: source.moduleId,
                 rowId: row.itemID,
@@ -165,17 +195,20 @@ export function buildPaymentSummary(sources: PaymentSource[], today: Date): Paym
                 amount: roundMoney(amount),
                 cycle: cycle || "month",
                 monthlyCost: roundMoney(monthlyCost),
+                daysUntil: days,
             });
         }
     }
 
     upcoming.sort((a, b) => a.dueDate.localeCompare(b.dueDate) || a.title.localeCompare(b.title, undefined, { numeric: true }));
+    const byModule = Object.fromEntries([...moduleTotals.entries()].map(([moduleId, value]) => [moduleId, roundBreakdown(value)])) as Partial<Record<PaymentModuleId, PaymentBreakdown>>;
     return {
         sourceCount,
         monthlyTotal: roundMoney(monthlyTotal),
         annualTotal: roundMoney(monthlyTotal * 12),
         next7Total: roundMoney(next7Total),
         next30Total: roundMoney(next30Total),
+        byModule,
         upcoming,
     };
 }

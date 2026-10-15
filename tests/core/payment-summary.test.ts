@@ -38,7 +38,12 @@ describe("buildPaymentSummary", () => {
         expect(summary.annualTotal).toBe(1320);
         expect(summary.next7Total).toBe(420);
         expect(summary.next30Total).toBe(420);
+        expect(summary.byModule).toEqual({
+            memberships: { sourceCount: 1, monthlyTotal: 10, annualTotal: 120, next7Total: 120, next30Total: 120 },
+            insurance: { sourceCount: 1, monthlyTotal: 100, annualTotal: 1200, next7Total: 300, next30Total: 300 },
+        });
         expect(summary.upcoming.map((item) => item.rowId)).toEqual(["m1", "i1"]);
+        expect(summary.upcoming.map((item) => item.daysUntil)).toEqual([5, 7]);
     });
 
     it("includes today and the seventh day, excludes overdue and day 31", () => {
@@ -86,6 +91,6 @@ describe("buildPaymentSummary", () => {
 
     it("does not treat a missing source column as a payment", () => {
         const summary = buildPaymentSummary([{ moduleId: "insurance", columns: { name: "name" }, rows: [{ itemID: "x", cells: { name: cell("保单", "text") } }] }], today);
-        expect(summary).toEqual({ sourceCount: 0, monthlyTotal: 0, annualTotal: 0, next7Total: 0, next30Total: 0, upcoming: [] });
+        expect(summary).toEqual({ sourceCount: 0, monthlyTotal: 0, annualTotal: 0, next7Total: 0, next30Total: 0, byModule: {}, upcoming: [] });
     });
 });

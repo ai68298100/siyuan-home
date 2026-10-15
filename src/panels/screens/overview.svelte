@@ -255,6 +255,12 @@
         openLedgerFor(item.moduleId);
     }
 
+    function paymentDueLabel(daysUntil: number): string {
+        if (daysUntil === 0) return t("payment.today");
+        if (daysUntil === 1) return t("payment.tomorrow");
+        return t("payment.daysAfter").replace("${days}", String(daysUntil));
+    }
+
     // 261 波：「查看全部」= 新意图——清掉上次会话遗留的筛选（逾期/某成员/某模块）再进入；
     // 与模块卡下钻（预筛该模块）语义相反，各自成立
     async function viewAllReminders() {
@@ -651,12 +657,23 @@
                 {#each paymentSummary.upcoming.slice(0, 3) as item (item.moduleId + item.rowId)}
                     <button type="button" class="lv-payment-top__tag" title={item.title} aria-label={item.title}
                         onclick={() => openPaymentSource(item)}>
-                        {item.title} · {item.dueDate} · ¥{formatAmount(item.amount, plugin.settings.hideAmounts)}
+                        {t(`module.${item.moduleId}`)} · {item.title} · {paymentDueLabel(item.daysUntil)} · {item.dueDate} · ¥{formatAmount(item.amount, plugin.settings.hideAmounts)}
                     </button>
                 {/each}
             </div>
         {:else}
             <div class="lv-payment-empty">{t("payment.noUpcoming")}</div>
+        {/if}
+        {#if paymentSummary.byModule.memberships?.sourceCount || paymentSummary.byModule.insurance?.sourceCount}
+            <div class="lv-payment-breakdown" aria-label={t("payment.breakdown")}>
+                <span class="lv-payment-top__title">{t("payment.breakdown")}：</span>
+                {#if paymentSummary.byModule.memberships?.sourceCount}
+                    <span class="lv-payment-breakdown__item">{t("module.memberships")} · ¥{formatAmount(paymentSummary.byModule.memberships.monthlyTotal, plugin.settings.hideAmounts)}{t("payment.perMonth")}</span>
+                {/if}
+                {#if paymentSummary.byModule.insurance?.sourceCount}
+                    <span class="lv-payment-breakdown__item">{t("module.insurance")} · ¥{formatAmount(paymentSummary.byModule.insurance.monthlyTotal, plugin.settings.hideAmounts)}{t("payment.perMonth")}</span>
+                {/if}
+            </div>
         {/if}
     </section>
 {/if}
