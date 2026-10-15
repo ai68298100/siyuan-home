@@ -1,13 +1,20 @@
 # 小驴管家（Lv Home）· 项目待办总清单
-> **当前事实（2026-10-15 · v0.5.19）**：v0.5.19 就绪；生态服务桥RPC权限开关、系列联动状态矩阵与跨插件安全接线均已纳入主线。513 项单测通过（66 个套件），类型/Svelte/i18n(1751 键)/meta/audit/build/smoke/loader 全绿；依赖基线为 Vite 8.3.3、Svelte 5.57.1、SiYuan SDK 1.2.9、pnpm 12.9.1；Svelte 0 错误 0 警告；Vite/Rolldown 单文件输出无外部 chunk；package.zip 0.57 MB；真实 Android WebView/独立窗口/兄弟插件/双端冲突待设备；集市上架继续暂缓。
+> **当前事实（2026-10-16 · v0.5.21）**：v0.5.21 为当前发布版本；532 项单测通过（68 个套件），`pnpm check` 已通过（类型/Svelte/i18n 1813 键/meta/audit，Svelte 0 错误 0 警告），package.zip 当前约 0.58 MB。近期付款摘要覆盖会员/保险月均、年度等效、未来 7/30 天、逾期金额、成员筛选、来源行定位和数据质量提示；快速记录失败恢复、健康检查与定向修复已纳入主线。Chrome 页签生命周期及独立后台恢复/首录/导入批次已有门禁；真实 Android WebView、独立窗口、兄弟插件、多端冲突仍待设备，集市上架继续暂缓。
 
-## 第 224 波复审行动清单（当前唯一入口）
+## 当前行动清单（v0.5.21，唯一入口）
+
+### 当前下一步（P0/P1）
+
+- [ ] **NEXT-01 发布回归**：复跑 `pnpm check`、`pnpm test --run`、`pnpm build`、`pnpm run smoke`、`pnpm run verify:loader`，确认 v0.5.21 包内容和闪烁/路由循环修复。
+- [ ] **NEXT-02 工作台小切片**：资料依据增加字段来源展示；总览增加待恢复录入数量与健康摘要入口；完整资料库与独立收件箱仍待契约评审。
+- [ ] **NEXT-03 付款数据质量**：区分显式 0 元免费项目与缺失/非法金额，继续保持会员/保险摘要与来源行口径一致。
+- [ ] **NEXT-04 真实宿主验证**：Chrome/思源 3.8.x 连续切页、刷新、前后台和窄屏回归；Android/WebView、独立窗口、兄弟插件和多端冲突按设备批手册执行。
 
 ### 发布信任门禁（P0）
 
 - [x] **REL-01 版本单源**：~~修复 `src/index.ts` 诊断/关于显示 0.2.0；由 package/plugin 或构建注入统一版本，并加入漂移测试。~~（225 波完成：vite define 从 plugin.json 注入 `__PLUGIN_VERSION__`，字面量清零；package↔plugin 漂移由 check:meta 既有交叉校验覆盖）
 - [x] **REL-02 跨平台 smoke**：~~移除对系统 `unzip` 的硬依赖。~~（273 波：解压回退链 unzip → PowerShell → python zipfile + SMOKE_EXTRACT 强制指定 + 产出校验；Windows PowerShell 路径实测通过）
-- [x] **REL-03 文档事实同步**：README 中文、ROADMAP、TODO 顶部已统一到 v0.3.11/282 tests/892 i18n/独立后台 e2e 已完成/真实 Android UI 未完成/集市暂缓；旧状态评审保留日期并标为历史基线，当前事实以本页和 2026-10-07 审计报告为准。
+- [x] **REL-03 文档事实同步**：README 中文/英文、ROADMAP、MODULES、TODO 顶部已同步到 v0.5.21、532 项单测、1813 个 i18n 键和当前付款摘要/恢复能力；旧状态评审保留日期并标为历史基线。后续门禁数字以本页当前事实和发布工作流输出为准。
 - [x] **REL-04 Release 门禁**：~~tag 工作流增加 test、smoke、包内容/体积/版本交叉检查；门禁失败不得创建或覆盖 Release。~~（269 波完成：release.yml 版本三源校验/check 之后补 Unit tests + verify:loader + Package smoke + 体积预算 220KB，全部先于 Release action）
 - [x] **TRUST-01 能力证据矩阵**：~~逐模块登记……~~（275 波完成：scripts/trust-matrix.mjs 生成 docs/capability-matrix.md——31/31 模块 schema 契约、8 台账内核实读全过（真实行列数）、横切能力引用 e2e 断言、L3 残余显性登记；对外文案只引用 L2 及以上）
 - [x] **TRUST-02 共享与隐私文案**：~~说明思源同步、协作权限、冲突/撤回和备份边界；“插件不主动外联”不写成整个环境绝对无网络。~~（v0.5.7 完成：docs/privacy.md 与 docs/privacy.en.md 详细阐述思源工作空间同步流转、多端协作权限依托、块级协同冲突与撤回机制、关于区 JSON 导出与快照备份边界，并严格区分全本地离线运算与用户主动授权外联场景（可选 Webhook / 在线 OCR））
