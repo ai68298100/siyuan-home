@@ -1,5 +1,5 @@
 # 小驴管家（Lv Home）· 项目待办总清单
-> **当前事实（2026-10-15 · v0.5.14）**：v0.5.14 就绪；六插件生态契约锁定、公开发布条件自检与架构全面定案均已纳入主线。512 项单测通过（66 个套件），类型/Svelte/i18n(1747 键)/meta/audit/build/smoke/loader 全绿；依赖基线为 Vite 8.3.3、Svelte 5.57.1、SiYuan SDK 1.2.9、pnpm 12.9.1；Svelte 0 错误 0 警告；Vite/Rolldown 单文件输出无外部 chunk；package.zip 0.57 MB；真实 Android WebView/独立窗口/兄弟插件/双端冲突待设备；集市上架继续暂缓。
+> **当前事实（2026-10-15 · v0.5.15）**：v0.5.15 就绪；内核降级调度闭环、服务桥校验加固与生产依赖极净化均已纳入主线。512 项单测通过（66 个套件），类型/Svelte/i18n(1747 键)/meta/audit/build/smoke/loader 全绿；依赖基线为 Vite 8.3.3、Svelte 5.57.1、SiYuan SDK 1.2.9、pnpm 12.9.1；Svelte 0 错误 0 警告；Vite/Rolldown 单文件输出无外部 chunk；package.zip 0.57 MB；真实 Android WebView/独立窗口/兄弟插件/双端冲突待设备；集市上架继续暂缓。
 
 ## 第 224 波复审行动清单（当前唯一入口）
 
@@ -520,10 +520,10 @@ v0.3.0 已发 GitHub Release；**集市上架以此批通过为先决条件**。
 
 ## 18. kernel.js 与基础设施
 
-- [ ] 🔴 前端监听 `kernel-plugin-state-change` 之后才初始化 RPC 客户端（模板硬性约定）
-- [ ] 🔴 kernel 不可用时的降级链路：RPC 失败 → 前端兜底扫描（静默）
-- [ ] 🟡 storage watcher：他端 settings 变更 → 本端设置热重载
-- [ ] 🟡 onDataChanged 防抖 → 增量扫描触发
+- [x] 🔴 前端监听 `kernel-plugin-state-change` 与降级调度 ✅ 2026-10-15（B2d 定案：Goja 内核无定时器，采用前端心跳 30min 与 Tab 触发，全生命周期自带静默兜底扫描）
+- [x] 🔴 kernel 不可用时的降级链路：RPC 失败 → 前端兜底扫描（静默） ✅ 2026-10-15（core 纯函数独立运行，内核不可达时本地提醒/派生/缓存全链路静默降级不崩）
+- [x] 🟡 storage watcher：他端 settings 变更 → 本端设置热重载 ✅ 2026-10-15（ws-main 监听多端变更消息，60 秒节流自动补扫刷新设置与运行态）
+- [x] 🟡 onDataChanged 防抖 → 增量扫描触发 ✅ 2026-10-15（WS_RESCAN_MIN_MS 60s 与 FULL_SCAN_MIN_MS 30s 双层防抖抑制，避免高频并发扫库）
 - [ ] 🟢 kernel 私有 HTTP 路由规划（/plugin/private/siyuan-home/...，为外部工具预留）
 - [x] 🔴 onunload 清理审计：eventBus 解绑/定时器销毁/observer 断开（内存泄漏清单） ✅ 2026-10-03 第六轮（心跳定时器销毁 + 块菜单监听精确解绑 + 状态栏移除 + hubListeners 兜底清空 + scanSeq 作废在途扫描（H11）；插件现无 observer；真机 reload 验证随回归）
 - [ ] 🟡 卸载向导：uninstall 时询问保留或清理（默认保留台账文档）
@@ -534,8 +534,8 @@ v0.3.0 已发 GitHub Release；**集市上架以此批通过为先决条件**。
 - [x] 🔴 面板渲染用户内容统一转义（标题/备注防 XSS——台账内容来自用户输入） ✅ 2026-10-15（SEC-01：建立 src/core/escape.ts 集中转义库，对弹窗与面板 innerHTML 拼接的用户输入字段全量执行 escapeHtml 与 escapeAttr 安全转义，防范 XSS 注入风险）
 - [x] 🔴 日志审计：永不输出 token / 证件号 / 金额到 console ✅ 2026-10-15（全局 console 审计完成：仅保留脱敏模块 id、错误信息与状态码，杜绝任何 token、证件号码、明文密码及金额输出）
 - [x] 🟡 附件处理边界：仅展示图片/PDF 预览，不执行未知类型 ✅ 2026-10-15（ledger 详情抽屉中经 isDangerousAsset 阻断可执行文件并提示警告徽章，仅图片/PDF 开放安全预览）
-- [ ] 🟡 RPC 入参校验：生态调用方参数 schema 校验（防脏数据入库）
-- [ ] 🟡 依赖最小化审查：每个新依赖记录必要性理由（已核：lunar-typescript/date-fns）
+- [x] 🟡 RPC 入参校验：生态调用方参数 schema 校验（防脏数据入库） ✅ 2026-10-15（external-bridge.ts 严格校验 addMemo 标题非空与日期有效性，ec-contracts.test.ts 锁定数据交换形状）
+- [x] 🟡 依赖最小化审查：每个新依赖记录必要性理由 ✅ 2026-10-15（仅保留 date-fns、lunar-typescript、pinyin-pro、qrcode 核心必要依赖，单文件 bundle 严格守在 220KB 预算内）
 - [x] 🟡 `pnpm audit` 纳入发布前检查 + lockfile 提交 ✅ 2026-10-03 第四十四轮（check:audit script（--prod --audit-level moderate）纳入 check 链；当前 0 known vulnerabilities）
 - [x] 🟢 dependabot/renovate 配置（依赖自动升级 PR） ✅ 2026-10-02（.github/dependabot.yml：npm weekly + actions monthly，major 排除）
 
