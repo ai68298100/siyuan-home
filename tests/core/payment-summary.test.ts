@@ -38,6 +38,7 @@ describe("buildPaymentSummary", () => {
         expect(summary.annualTotal).toBe(1320);
         expect(summary.next7Total).toBe(420);
         expect(summary.next30Total).toBe(420);
+        expect(summary.dataQuality).toEqual({ missingCycle: 0, unknownCycle: 0, missingDate: 0 });
         expect(summary.byModule).toEqual({
             memberships: { sourceCount: 1, monthlyTotal: 10, annualTotal: 120, next7Total: 120, next30Total: 120 },
             insurance: { sourceCount: 1, monthlyTotal: 100, annualTotal: 1200, next7Total: 300, next30Total: 300 },
@@ -72,6 +73,7 @@ describe("buildPaymentSummary", () => {
 
         expect(summary.sourceCount).toBe(1);
         expect(summary.monthlyTotal).toBe(12);
+        expect(summary.dataQuality).toEqual({ missingCycle: 1, unknownCycle: 0, missingDate: 1 });
         expect(summary.upcoming).toEqual([]);
     });
 
@@ -91,6 +93,15 @@ describe("buildPaymentSummary", () => {
 
     it("does not treat a missing source column as a payment", () => {
         const summary = buildPaymentSummary([{ moduleId: "insurance", columns: { name: "name" }, rows: [{ itemID: "x", cells: { name: cell("保单", "text") } }] }], today);
-        expect(summary).toEqual({ sourceCount: 0, monthlyTotal: 0, annualTotal: 0, next7Total: 0, next30Total: 0, byModule: {}, upcoming: [] });
+        expect(summary).toEqual({ sourceCount: 0, monthlyTotal: 0, annualTotal: 0, next7Total: 0, next30Total: 0, byModule: {}, dataQuality: { missingCycle: 0, unknownCycle: 0, missingDate: 0 }, upcoming: [] });
+    });
+
+    it("marks missing and unknown cycle values instead of hiding data quality issues", () => {
+        const summary = buildPaymentSummary([source("memberships", [
+            { itemID: "missing-cycle", cells: { amount: cell(20, "number"), next_pay: cell("2026-10-20", "date") } },
+            { itemID: "unknown-cycle", cells: { amount: cell(30, "number"), cycle: cell("biweekly", "select"), next_pay: cell("2026-10-20", "date") } },
+        ])], today);
+        expect(summary.dataQuality).toEqual({ missingCycle: 1, unknownCycle: 1, missingDate: 0 });
+        expect(summary.monthlyTotal).toBe(50);
     });
 });

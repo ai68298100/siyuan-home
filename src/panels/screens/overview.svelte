@@ -63,6 +63,10 @@
         void version;
         return plugin.scan?.paymentSummary;
     });
+    const paymentQualityIssueCount = $derived.by(() => {
+        const quality = paymentSummary?.dataQuality;
+        return quality ? quality.missingCycle + quality.unknownCycle + quality.missingDate : 0;
+    });
     // 260 波：首扫 loading 态——runtime 无快照时间且无错误时，"最近没有要紧事"是撒谎
     // （未知 ≠ 0，13 §3.4）；骨架屏表达"正在读取"
     const firstScanPending = $derived.by(() => {
@@ -673,6 +677,14 @@
                 {#if paymentSummary.byModule.insurance?.sourceCount}
                     <span class="lv-payment-breakdown__item">{t("module.insurance")} · ¥{formatAmount(paymentSummary.byModule.insurance.monthlyTotal, plugin.settings.hideAmounts)}{t("payment.perMonth")}</span>
                 {/if}
+            </div>
+        {/if}
+        {#if paymentQualityIssueCount > 0}
+            <div class="lv-payment-quality" role="status">
+                {t("payment.dataQuality").replace("${count}", String(paymentQualityIssueCount))} ·
+                {#if paymentSummary.dataQuality.missingCycle > 0}{t("payment.missingCycle")} ×{paymentSummary.dataQuality.missingCycle}{/if}
+                {#if paymentSummary.dataQuality.unknownCycle > 0} {t("payment.unknownCycle")} ×{paymentSummary.dataQuality.unknownCycle}{/if}
+                {#if paymentSummary.dataQuality.missingDate > 0} {t("payment.missingDate")} ×{paymentSummary.dataQuality.missingDate}{/if}
             </div>
         {/if}
     </section>

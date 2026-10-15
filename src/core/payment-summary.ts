@@ -48,6 +48,12 @@ export interface PaymentBreakdown {
 export interface PaymentSummary extends PaymentBreakdown {
     /** Per-ledger totals. Missing keys mean that ledger had no usable payment rows. */
     byModule: Partial<Record<PaymentModuleId, PaymentBreakdown>>;
+    /** Rows that need attention before the monthly projection is fully trustworthy. */
+    dataQuality: {
+        missingCycle: number;
+        unknownCycle: number;
+        missingDate: number;
+    };
     /** Items due in the next thirty calendar days, sorted by date then title. */
     upcoming: UpcomingPaymentItem[];
 }
@@ -150,6 +156,7 @@ export function buildPaymentSummary(sources: PaymentSource[], today: Date): Paym
     let sourceCount = 0;
     const upcoming: UpcomingPaymentItem[] = [];
     const moduleTotals = new Map<PaymentModuleId, PaymentBreakdown>();
+    const dataQuality = { missingCycle: 0, unknownCycle: 0, missingDate: 0 };
 
     for (const source of sources) {
         const columns = source.columns;
@@ -168,7 +175,12 @@ export function buildPaymentSummary(sources: PaymentSource[], today: Date): Paym
 
             const amount = readNumber(row.cells?.[amountColumn]);
             if (amount <= 0) continue;
-            const cycle = cycleColumn ? (selectCellContent(row.cells?.[cycleColumn]) ?? readText(row.cells?.[cycleColumn])) : "month";
+            const rawCycle = cycleColumn ? (selectCellContent(row.cells?.[cycleColumn]) ?? readText(row.cells?.[cycleColumn])).trim() : "";
+            if (!rawCycle) dataQuality.missingCycle++;
+            else if (!Object.prototype.hasOwnProperty.call(MONTHLY_FACTORS, rawCycle)) dataQuality.unknownCycle++;
+            const cycle = rawCycle || "month";
+            // Keep the row visible for correction, but mark unknown values instead
+            // of silently presenting them as a trustworthy monthly projection.
             const monthlyCost = amount * (MONTHLY_FACTORS[cycle] ?? 1);
             monthlyTotal += monthlyCost;
             sourceCount++;
@@ -178,7 +190,10 @@ export function buildPaymentSummary(sources: PaymentSource[], today: Date): Paym
             moduleTotals.set(source.moduleId, moduleTotal);
 
             const dueDate = dueColumn ? readDate(row.cells?.[dueColumn]) : undefined;
-            if (!dueDate) continue;
+            if (!dueDate) {
+                dataQuality.missingDate++;
+                continue;
+            }
             const days = daysBetween(now, dateFromKey(dueDate));
             if (days < 0 || days > 30) continue;
             if (days <= 7) {
@@ -209,6 +224,7 @@ export function buildPaymentSummary(sources: PaymentSource[], today: Date): Paym
         next7Total: roundMoney(next7Total),
         next30Total: roundMoney(next30Total),
         byModule,
+        dataQuality,
         upcoming,
     };
 }
