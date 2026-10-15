@@ -39,17 +39,17 @@ Certificates expire, medicine expires, insurance needs renewal, subscriptions au
 
 Image OCR uses the engine configured in SiYuan Settings → OCR. It runs only when requested and does not require automatic OCR to be enabled. AI OCR asks before each run because the image is sent to the selected AI service. Results are saved to SiYuan OCR text and included in search; re-running replaces the previous result. Encrypted notebook images and PDFs are not supported, and OCR text is never written into ledger fields automatically.
 
-## 🆕 What's new in v0.5.9
+## 🆕 What's new in v0.5.10
 
-This release expands plugin family ecosystem integrations, enforces strict console security audits, blocks dangerous attachment types, and achieves full accessibility review certification while maintaining zero-flicker synchronous tab transitions.
+This release unifies asynchronous feedback across all operations, completes full-spectrum accessibility coverage, embeds four core life scenario template packs, and solidifies zero-flicker synchronous tab transitions.
 
-- **Ecosystem**: Deep integration with SpeedSwitch (siyuan-speed-switch) registering quick actions and a live household summary widget (`lvhome.summary`), plus Contacts (siyuan-contacts) search, link and snapshot display (EC13–EC19).
-- **Security**: Full console audit confirming zero leakage of tokens, national IDs, credentials, or amounts; attachment drawer employs `isDangerousAsset` to block executable files and scripts (SEC-02).
-- **Accessibility**: Full keyboard navigation across tablists and member cards, Ctrl+Z global undo, forced-colors CanvasText outlines, prefers-reduced-motion animation suppression, and comprehensive ARIA labeling (A11Y-01).
+- **Feedback**: Unified busy state feedback and contextual error retention across memo saves, member modifications, batch reassignments, missing ledger rebuilding, and CSV/JSON exports (DEVICE-04).
+- **Accessibility**: Standard keyboard accessibility across all four screens (arrow key tab navigation, Enter/Space actions, Ctrl+Z global undo), forced-colors CanvasText outline, prefers-reduced-motion animation suppression, and comprehensive ARIA labeling (DEVICE-03 / A11Y-01).
+- **Templates**: Built-in template suites for travel packing (5 themes), national emergency kit储备 with semi-annual inspection log, annual health checkup plan, and parent-teacher meeting records (MOD-11/19).
 - **Stability**: In-memory `screenCache` and 150ms idle preheating keep tab switching 100% synchronous, completely eliminating skeleton flash and router feedback loops.
 - **Validation**: 512 unit tests across 66 test suites, 1747 i18n keys aligned, 0 TypeScript/Svelte errors and warnings, production build and loader verification pass.
 
-## 📦 Install (v0.5.9)
+## 📦 Install (v0.5.10)
 
 1. Download `package.zip` from [Releases](https://github.com/ai68298100/siyuan-home/releases/latest)
 2. SiYuan → Settings → Marketplace → Download → **Import** the zip
@@ -57,7 +57,7 @@ This release expands plugin family ecosystem integrations, enforces strict conso
 4. Press `Ctrl+Alt+H` anytime to open the hub
 
 > **Validation status:** core data paths have automated tests and isolated-kernel coverage. The v0.5.7 GitHub Release is available; Android WebView behavior remains host-specific validation. `icon.png` and `preview.png` were redesigned for v0.3.13 (brand-gradient tile + geometric mark; dark overview with sample data).
-> **Version note:** the tagged v0.5.9 package is the current GitHub release; local quality checks report 512 unit tests.
+> **Version note:** the tagged v0.5.10 package is the current GitHub release; local quality checks report 512 unit tests.
 >
 > Family sharing depends on SiYuan's collaboration, permissions, sync and conflict behavior. Test with non-sensitive data before sharing; this plugin does not provide a separate permission system.
 >
@@ -111,11 +111,11 @@ Full accounting · password vaults · official data integrations · real-time tr
 
 ## 🗺 Roadmap
 
-The v0.5.9 release is available on GitHub, with static isolated-kernel gates and Chrome walkthrough coverage for the main UI, mobile layouts, accessibility, recovery paths and performance. The next feature slice should optimize the five-minute path from a member to a first reminder and its source record. Pinyin search, webhooks, QR labels, AI and family collaboration remain an observation pool until host capability and user evidence are available.
+The v0.5.10 release is available on GitHub, with static isolated-kernel gates and Chrome walkthrough coverage for the main UI, mobile layouts, accessibility, recovery paths and performance. The next feature slice should optimize the five-minute path from a member to a first reminder and its source record. Pinyin search, webhooks, QR labels, AI and family collaboration remain an observation pool until host capability and user evidence are available.
 
 | Phase | Content |
 |---|---|
-| ✅ v0.5.9 (current) | Ecosystem integrations, security console audit, dangerous asset blocking, and full accessibility certification; GitHub Release |
+| ✅ v0.5.10 (current) | Unified async feedback, full accessibility coverage, 4 scenario template packs, and hardware baseline; GitHub Release |
 | 🔜 Next | Task workbench, evidence center, inbox, health recovery |
 | 🔭 Later | Family collaboration, template packs, yearly family report, AI capabilities |
 
