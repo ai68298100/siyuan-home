@@ -46,6 +46,8 @@ export interface PaymentBreakdown {
     next7Total: number;
     /** Amount due today through the next thirty calendar days. */
     next30Total: number;
+    /** Amount whose payment date is already past due. */
+    overdueTotal: number;
 }
 
 export interface PaymentScope extends PaymentBreakdown {
@@ -64,6 +66,8 @@ export interface PaymentSummary extends PaymentScope {
     byMember: Record<string, PaymentScope>;
     /** Items due in the next thirty calendar days, sorted by date then title. */
     upcoming: UpcomingPaymentItem[];
+    /** Active payment rows whose date is before the scan date, oldest first. */
+    overdue: UpcomingPaymentItem[];
 }
 
 const MONTHLY_FACTORS: Record<string, number> = {
@@ -132,7 +136,7 @@ function roundMoney(value: number): number {
 }
 
 function emptyBreakdown(): PaymentBreakdown {
-    return { sourceCount: 0, monthlyTotal: 0, annualTotal: 0, next7Total: 0, next30Total: 0 };
+    return { sourceCount: 0, monthlyTotal: 0, annualTotal: 0, next7Total: 0, next30Total: 0, overdueTotal: 0 };
 }
 
 function roundBreakdown(value: PaymentBreakdown): PaymentBreakdown {
@@ -142,6 +146,7 @@ function roundBreakdown(value: PaymentBreakdown): PaymentBreakdown {
         annualTotal: roundMoney(value.monthlyTotal * 12),
         next7Total: roundMoney(value.next7Total),
         next30Total: roundMoney(value.next30Total),
+        overdueTotal: roundMoney(value.overdueTotal),
     };
 }
 
@@ -177,8 +182,10 @@ export function buildPaymentSummary(sources: PaymentSource[], today: Date): Paym
     let monthlyTotal = 0;
     let next7Total = 0;
     let next30Total = 0;
+    let overdueTotal = 0;
     let sourceCount = 0;
     const upcoming: UpcomingPaymentItem[] = [];
+    const overdue: UpcomingPaymentItem[] = [];
     const moduleTotals = new Map<PaymentModuleId, PaymentBreakdown>();
     const memberTotals = new Map<string, PaymentScope>();
     const dataQuality = emptyQuality();
@@ -236,7 +243,28 @@ export function buildPaymentSummary(sources: PaymentSource[], today: Date): Paym
                 continue;
             }
             const days = daysBetween(now, dateFromKey(dueDate));
-            if (days < 0 || days > 30) continue;
+            const item = {
+                moduleId: source.moduleId,
+                rowId: row.itemID,
+                title: (nameColumn ? readText(row.cells?.[nameColumn]) : "") || "—",
+                dueDate,
+                amount: roundMoney(amount),
+                cycle: cycle || "month",
+                monthlyCost: roundMoney(monthlyCost),
+                daysUntil: days,
+                ...(row.memberId ? { memberId: row.memberId } : {}),
+            } satisfies UpcomingPaymentItem;
+            if (days < 0) {
+                overdueTotal += amount;
+                moduleTotal.overdueTotal += amount;
+                if (memberScope) {
+                    memberScope.overdueTotal += amount;
+                    memberScope.byModule[source.moduleId].overdueTotal += amount;
+                }
+                overdue.push(item);
+                continue;
+            }
+            if (days > 30) continue;
             if (days <= 7) {
                 next7Total += amount;
                 moduleTotal.next7Total += amount;
@@ -251,21 +279,12 @@ export function buildPaymentSummary(sources: PaymentSource[], today: Date): Paym
                 memberScope.next30Total += amount;
                 memberScope.byModule[source.moduleId].next30Total += amount;
             }
-            upcoming.push({
-                moduleId: source.moduleId,
-                rowId: row.itemID,
-                title: (nameColumn ? readText(row.cells?.[nameColumn]) : "") || "—",
-                dueDate,
-                amount: roundMoney(amount),
-                cycle: cycle || "month",
-                monthlyCost: roundMoney(monthlyCost),
-                daysUntil: days,
-                ...(row.memberId ? { memberId: row.memberId } : {}),
-            });
+            upcoming.push(item);
         }
     }
 
     upcoming.sort((a, b) => a.dueDate.localeCompare(b.dueDate) || a.title.localeCompare(b.title, undefined, { numeric: true }));
+    overdue.sort((a, b) => a.dueDate.localeCompare(b.dueDate) || a.title.localeCompare(b.title, undefined, { numeric: true }));
     const byModule = Object.fromEntries([...moduleTotals.entries()].map(([moduleId, value]) => [moduleId, roundBreakdown(value)])) as Partial<Record<PaymentModuleId, PaymentBreakdown>>;
     const byMember = Object.fromEntries([...memberTotals.entries()].map(([memberId, value]) => [memberId, finalizeScope(value)]));
     return {
@@ -274,10 +293,12 @@ export function buildPaymentSummary(sources: PaymentSource[], today: Date): Paym
         annualTotal: roundMoney(monthlyTotal * 12),
         next7Total: roundMoney(next7Total),
         next30Total: roundMoney(next30Total),
+        overdueTotal: roundMoney(overdueTotal),
         byModule,
         dataQuality: { ...dataQuality },
         byMember,
         upcoming,
+        overdue,
     };
 }
 

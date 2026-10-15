@@ -39,10 +39,11 @@ describe("buildPaymentSummary", () => {
         expect(summary.next7Total).toBe(420);
         expect(summary.next30Total).toBe(420);
         expect(summary.dataQuality).toEqual({ missingCycle: 0, unknownCycle: 0, missingDate: 0 });
+        expect(summary.overdueTotal).toBe(0);
         expect(summary.byMember.m1).toBeUndefined();
         expect(summary.byModule).toEqual({
-            memberships: { sourceCount: 1, monthlyTotal: 10, annualTotal: 120, next7Total: 120, next30Total: 120 },
-            insurance: { sourceCount: 1, monthlyTotal: 100, annualTotal: 1200, next7Total: 300, next30Total: 300 },
+            memberships: { sourceCount: 1, monthlyTotal: 10, annualTotal: 120, next7Total: 120, next30Total: 120, overdueTotal: 0 },
+            insurance: { sourceCount: 1, monthlyTotal: 100, annualTotal: 1200, next7Total: 300, next30Total: 300, overdueTotal: 0 },
         });
         expect(summary.upcoming.map((item) => item.rowId)).toEqual(["m1", "i1"]);
         expect(summary.upcoming.map((item) => item.daysUntil)).toEqual([5, 7]);
@@ -58,6 +59,8 @@ describe("buildPaymentSummary", () => {
 
         expect(summary.next7Total).toBe(50);
         expect(summary.next30Total).toBe(50);
+        expect(summary.overdueTotal).toBe(10);
+        expect(summary.overdue.map((item) => item.rowId)).toEqual(["overdue"]);
         expect(summary.upcoming.map((item) => item.rowId)).toEqual(["today", "day7"]);
     });
 
@@ -75,6 +78,7 @@ describe("buildPaymentSummary", () => {
         expect(summary.sourceCount).toBe(1);
         expect(summary.monthlyTotal).toBe(12);
         expect(summary.dataQuality).toEqual({ missingCycle: 1, unknownCycle: 0, missingDate: 1 });
+        expect(summary.overdueTotal).toBe(0);
         expect(summary.upcoming).toEqual([]);
     });
 
@@ -94,7 +98,7 @@ describe("buildPaymentSummary", () => {
 
     it("does not treat a missing source column as a payment", () => {
         const summary = buildPaymentSummary([{ moduleId: "insurance", columns: { name: "name" }, rows: [{ itemID: "x", cells: { name: cell("保单", "text") } }] }], today);
-        expect(summary).toEqual({ sourceCount: 0, monthlyTotal: 0, annualTotal: 0, next7Total: 0, next30Total: 0, byModule: {}, dataQuality: { missingCycle: 0, unknownCycle: 0, missingDate: 0 }, byMember: {}, upcoming: [] });
+        expect(summary).toEqual({ sourceCount: 0, monthlyTotal: 0, annualTotal: 0, next7Total: 0, next30Total: 0, overdueTotal: 0, byModule: {}, dataQuality: { missingCycle: 0, unknownCycle: 0, missingDate: 0 }, byMember: {}, upcoming: [], overdue: [] });
     });
 
     it("marks missing and unknown cycle values instead of hiding data quality issues", () => {
@@ -111,8 +115,21 @@ describe("buildPaymentSummary", () => {
             { itemID: "m1-row", memberId: "m1", cells: { amount: cell(120, "number"), cycle: cell("year", "select"), next_pay: cell("2026-10-20", "date") } },
             { itemID: "m2-row", memberId: "m2", cells: { amount: cell(30, "number"), cycle: cell("month", "select"), next_pay: cell("2026-10-30", "date") } },
         ])], today);
-        expect(summary.byMember.m1).toMatchObject({ sourceCount: 1, monthlyTotal: 10, next7Total: 120, next30Total: 120 });
-        expect(summary.byMember.m1.byModule.memberships).toMatchObject({ monthlyTotal: 10 });
+        expect(summary.byMember.m1).toMatchObject({ sourceCount: 1, monthlyTotal: 10, next7Total: 120, next30Total: 120, overdueTotal: 0 });
+        expect(summary.byMember.m1.byModule.memberships).toMatchObject({ monthlyTotal: 10, overdueTotal: 0 });
         expect(summary.upcoming.find((item) => item.memberId === "m1")?.rowId).toBe("m1-row");
+    });
+
+    it("keeps overdue payments visible and includes them in member/module scopes", () => {
+        const summary = buildPaymentSummary([source("memberships", [
+            { itemID: "m1-overdue", memberId: "m1", cells: { name: cell("云盘", "text"), amount: cell(120, "number"), cycle: cell("year", "select"), next_pay: cell("2026-10-10", "date") } },
+            { itemID: "m2-future", memberId: "m2", cells: { name: cell("网盘", "text"), amount: cell(30, "number"), cycle: cell("month", "select"), next_pay: cell("2026-10-20", "date") } },
+        ])], today);
+
+        expect(summary.overdueTotal).toBe(120);
+        expect(summary.overdue.map((item) => item.rowId)).toEqual(["m1-overdue"]);
+        expect(summary.byModule.memberships?.overdueTotal).toBe(120);
+        expect(summary.byMember.m1.overdueTotal).toBe(120);
+        expect(summary.byMember.m2.overdueTotal).toBe(0);
     });
 });

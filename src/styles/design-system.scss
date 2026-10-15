@@ -319,6 +319,8 @@
     b { color: var(--lv-tx); font-weight: 650; }
     &.highlight { background: color-mix(in srgb, var(--lv-warn-soft) 55%, var(--lv-surface)); border-color: color-mix(in srgb, var(--lv-warn) 32%, transparent); color: var(--lv-warn);
       b { color: var(--lv-warn); } }
+    &.overdue { background: color-mix(in srgb, var(--lv-danger, #c53030) 7%, var(--lv-surface)); border-color: color-mix(in srgb, var(--lv-danger, #c53030) 28%, var(--lv-line)); color: var(--lv-danger, #c53030);
+      b { color: var(--lv-danger, #c53030); } }
   }
   .lv-payment-top { display: flex; align-items: center; gap: 6px 10px; flex-wrap: wrap; padding-top: 8px; border-top: 1px solid var(--lv-line);
     font-size: 11.5px; color: var(--lv-tx-3);
@@ -327,6 +329,7 @@
       &:hover, &:focus-visible { border-color: var(--lv-accent); color: var(--lv-tx); outline: none; }
     }
   }
+  .lv-payment-top--overdue { color: var(--lv-danger, #c53030); }
   .lv-payment-empty { font-size: 12px; color: var(--lv-tx-3); padding-top: 8px; border-top: 1px solid var(--lv-line); }
   .lv-payment-breakdown { display: flex; align-items: center; gap: 6px 10px; flex-wrap: wrap; padding-top: 8px; border-top: 1px solid var(--lv-line); font-size: 11.5px; color: var(--lv-tx-2); }
   .lv-payment-breakdown__item { padding: 3px 8px; border-radius: 6px; background: color-mix(in srgb, var(--lv-surface-2) 80%, transparent); font-variant-numeric: tabular-nums; }

@@ -69,11 +69,15 @@
         const scoped = summary.byMember?.[memberFilter];
         if (!scoped) {
             return {
-                sourceCount: 0, monthlyTotal: 0, annualTotal: 0, next7Total: 0, next30Total: 0,
-                byModule: {}, dataQuality: { missingCycle: 0, unknownCycle: 0, missingDate: 0 }, upcoming: [],
+                sourceCount: 0, monthlyTotal: 0, annualTotal: 0, next7Total: 0, next30Total: 0, overdueTotal: 0,
+                byModule: {}, dataQuality: { missingCycle: 0, unknownCycle: 0, missingDate: 0 }, upcoming: [], overdue: [],
             };
         }
-        return { ...scoped, upcoming: summary.upcoming.filter((item) => item.memberId === memberFilter) };
+        return {
+            ...scoped,
+            upcoming: summary.upcoming.filter((item) => item.memberId === memberFilter),
+            overdue: summary.overdue.filter((item) => item.memberId === memberFilter),
+        };
     });
     const paymentQualityIssueCount = $derived.by(() => {
         const quality = paymentView?.dataQuality;
@@ -667,10 +671,24 @@
                 <span class="lv-payment-sub">{t("payment.next30")}{#if paymentView.upcoming.length > 0} · {paymentView.upcoming.length} {t("payment.items")}{/if}</span>
             </div>
             <div class="lv-payment-stats">
+                {#if paymentView.overdueTotal > 0}
+                    <div class="lv-payment-chip overdue"><span><b>¥ {formatAmount(paymentView.overdueTotal, plugin.settings.hideAmounts)}</b> {t("payment.overdue")}</span></div>
+                {/if}
                 <div class="lv-payment-chip"><span><b>¥ {formatAmount(paymentView.next7Total, plugin.settings.hideAmounts)}</b> {t("payment.next7")}</span></div>
                 <div class="lv-payment-chip highlight"><span><b>¥ {formatAmount(paymentView.monthlyTotal, plugin.settings.hideAmounts)}</b> {t("payment.monthlyEquivalent")}</span></div>
             </div>
         </div>
+        {#if paymentView.overdue.length > 0}
+            <div class="lv-payment-top lv-payment-top--overdue">
+                <span class="lv-payment-top__title">{t("payment.overdueItems")}：</span>
+                {#each paymentView.overdue.slice(0, 3) as item (item.moduleId + item.rowId)}
+                    <button type="button" class="lv-payment-top__tag" title={item.title} aria-label={item.title}
+                        onclick={() => openPaymentSource(item)}>
+                        {t(`module.${item.moduleId}`)} · {item.title} · {Math.abs(item.daysUntil)}{t("payment.daysOverdue")} · {item.dueDate} · ¥{formatAmount(item.amount, plugin.settings.hideAmounts)}
+                    </button>
+                {/each}
+            </div>
+        {/if}
         {#if paymentView.upcoming.length > 0}
             <div class="lv-payment-top">
                 <span class="lv-payment-top__title">{t("payment.upcoming")}：</span>
@@ -681,7 +699,7 @@
                     </button>
                 {/each}
             </div>
-        {:else}
+        {:else if paymentView.overdue.length === 0}
             <div class="lv-payment-empty">{t("payment.noUpcoming")}</div>
         {/if}
         {#if paymentView.byModule.memberships?.sourceCount || paymentView.byModule.insurance?.sourceCount}

@@ -4672,10 +4672,24 @@
                 <span class="lv-payment-sub">{t("payment.annualEquivalent")}：¥ {formatAmount(paymentSummary.annualTotal, plugin.settings.hideAmounts)}</span>
             </div>
             <div class="lv-payment-stats">
+                {#if paymentSummary.overdueTotal > 0}
+                    <div class="lv-payment-chip overdue"><span><b>¥ {formatAmount(paymentSummary.overdueTotal, plugin.settings.hideAmounts)}</b> {t("payment.overdue")}</span></div>
+                {/if}
                 <div class="lv-payment-chip"><span><b>{paymentSummary.next7Total > 0 ? `¥ ${formatAmount(paymentSummary.next7Total, plugin.settings.hideAmounts)}` : "—"}</b> {t("payment.next7")}</span></div>
                 <div class="lv-payment-chip highlight"><span><b>{paymentSummary.next30Total > 0 ? `¥ ${formatAmount(paymentSummary.next30Total, plugin.settings.hideAmounts)}` : "—"}</b> {t("payment.next30")}</span></div>
             </div>
         </div>
+        {#if paymentSummary.overdue.length > 0}
+            <div class="lv-payment-top lv-payment-top--overdue">
+                <span class="lv-payment-top__title">{t("payment.overdueItems")}：</span>
+                {#each paymentSummary.overdue.slice(0, 3) as item (item.moduleId + item.rowId)}
+                    <button type="button" class="lv-payment-top__tag" title={item.title} aria-label={item.title}
+                        onclick={() => openPaymentSource(item)}>
+                        {item.title} · {Math.abs(item.daysUntil)}{t("payment.daysOverdue")} · {item.dueDate} · ¥{formatAmount(item.amount, plugin.settings.hideAmounts)}
+                    </button>
+                {/each}
+            </div>
+        {/if}
         {#if paymentSummary.upcoming.length > 0}
             <div class="lv-payment-top">
                 <span class="lv-payment-top__title">{t("payment.upcoming")}：</span>
@@ -4686,7 +4700,7 @@
                     </button>
                 {/each}
             </div>
-        {:else}
+        {:else if paymentSummary.overdue.length === 0}
             <div class="lv-payment-empty">{t("payment.noUpcoming")}</div>
         {/if}
         {#if paymentQualityIssueCount > 0}
