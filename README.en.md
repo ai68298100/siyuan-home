@@ -111,11 +111,11 @@ Full accounting · password vaults · official data integrations · real-time tr
 
 ## 🗺 Roadmap
 
-The v0.5.21 release is available on GitHub, with static isolated-kernel gates and Chrome tab-lifecycle coverage for the main UI. The next feature slice should optimize the five-minute path from a member to a first reminder and its source record. Recurring-payment summaries, the evidence center, inbox and health recovery come before pinyin search, webhooks, QR labels, AI and family collaboration.
+The v0.5.21 release is available on GitHub, with static isolated-kernel gates and Chrome tab-lifecycle coverage for the main UI. Recurring-payment summaries for memberships and insurance now show monthly equivalents, upcoming 7/30-day amounts, data-quality hints and links back to source rows. The next feature slice should optimize the five-minute path from a member to a first reminder and its source record, then prioritize the evidence center, inbox and health recovery before pinyin search, webhooks, QR labels, AI and family collaboration.
 
 | Phase | Content |
 |---|---|
-| ✅ v0.5.21 (current) | SiYuan 3.8.x flicker and `tree not found` route-loop fix, stable tab restore, and regression gates; GitHub Release |
+| ✅ v0.5.21 (current) | SiYuan 3.8.x flicker and `tree not found` route-loop fix, stable tab restore, membership/insurance recurring-payment summary, and regression gates; GitHub Release |
 | 🔜 Next | Task workbench, evidence center, inbox, health recovery |
 | 🔭 Later | Family collaboration, template packs, yearly family report, AI capabilities |
 
