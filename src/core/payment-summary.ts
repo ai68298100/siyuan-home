@@ -12,6 +12,8 @@ export type PaymentModuleId = "memberships" | "insurance";
 export interface PaymentRowLike {
     itemID: string;
     cells: Record<string, any>;
+    /** Resolved settings member id, when the source row has a member relation. */
+    memberId?: string;
 }
 
 export interface PaymentSource {
@@ -30,6 +32,7 @@ export interface UpcomingPaymentItem {
     monthlyCost: number;
     /** Calendar days from the scan date; the upcoming window is 0..30. */
     daysUntil: number;
+    memberId?: string;
 }
 
 export interface PaymentBreakdown {
@@ -45,7 +48,7 @@ export interface PaymentBreakdown {
     next30Total: number;
 }
 
-export interface PaymentSummary extends PaymentBreakdown {
+export interface PaymentScope extends PaymentBreakdown {
     /** Per-ledger totals. Missing keys mean that ledger had no usable payment rows. */
     byModule: Partial<Record<PaymentModuleId, PaymentBreakdown>>;
     /** Rows that need attention before the monthly projection is fully trustworthy. */
@@ -54,6 +57,11 @@ export interface PaymentSummary extends PaymentBreakdown {
         unknownCycle: number;
         missingDate: number;
     };
+}
+
+export interface PaymentSummary extends PaymentScope {
+    /** Member-scoped totals for rows whose relation resolved to a settings member. */
+    byMember: Record<string, PaymentScope>;
     /** Items due in the next thirty calendar days, sorted by date then title. */
     upcoming: UpcomingPaymentItem[];
 }
@@ -137,6 +145,22 @@ function roundBreakdown(value: PaymentBreakdown): PaymentBreakdown {
     };
 }
 
+function emptyQuality(): PaymentScope["dataQuality"] {
+    return { missingCycle: 0, unknownCycle: 0, missingDate: 0 };
+}
+
+function emptyScope(): PaymentScope {
+    return { ...emptyBreakdown(), byModule: {}, dataQuality: emptyQuality() };
+}
+
+function finalizeScope(value: PaymentScope): PaymentScope {
+    return {
+        ...roundBreakdown(value),
+        byModule: Object.fromEntries(Object.entries(value.byModule).map(([moduleId, breakdown]) => [moduleId, roundBreakdown(breakdown)])),
+        dataQuality: { ...value.dataQuality },
+    };
+}
+
 function sourceFields(moduleId: PaymentModuleId): { amount: string; cycle: string; due: string } {
     return moduleId === "insurance"
         ? { amount: "premium", cycle: "pay_cycle", due: "next_pay" }
@@ -156,7 +180,8 @@ export function buildPaymentSummary(sources: PaymentSource[], today: Date): Paym
     let sourceCount = 0;
     const upcoming: UpcomingPaymentItem[] = [];
     const moduleTotals = new Map<PaymentModuleId, PaymentBreakdown>();
-    const dataQuality = { missingCycle: 0, unknownCycle: 0, missingDate: 0 };
+    const memberTotals = new Map<string, PaymentScope>();
+    const dataQuality = emptyQuality();
 
     for (const source of sources) {
         const columns = source.columns;
@@ -175,9 +200,15 @@ export function buildPaymentSummary(sources: PaymentSource[], today: Date): Paym
 
             const amount = readNumber(row.cells?.[amountColumn]);
             if (amount <= 0) continue;
+            const memberScope = row.memberId ? (memberTotals.get(row.memberId) ?? emptyScope()) : undefined;
             const rawCycle = cycleColumn ? (selectCellContent(row.cells?.[cycleColumn]) ?? readText(row.cells?.[cycleColumn])).trim() : "";
-            if (!rawCycle) dataQuality.missingCycle++;
-            else if (!Object.prototype.hasOwnProperty.call(MONTHLY_FACTORS, rawCycle)) dataQuality.unknownCycle++;
+            if (!rawCycle) {
+                dataQuality.missingCycle++;
+                if (memberScope) memberScope.dataQuality.missingCycle++;
+            } else if (!Object.prototype.hasOwnProperty.call(MONTHLY_FACTORS, rawCycle)) {
+                dataQuality.unknownCycle++;
+                if (memberScope) memberScope.dataQuality.unknownCycle++;
+            }
             const cycle = rawCycle || "month";
             // Keep the row visible for correction, but mark unknown values instead
             // of silently presenting them as a trustworthy monthly projection.
@@ -188,10 +219,20 @@ export function buildPaymentSummary(sources: PaymentSource[], today: Date): Paym
             moduleTotal.monthlyTotal += monthlyCost;
             moduleTotal.sourceCount++;
             moduleTotals.set(source.moduleId, moduleTotal);
+            if (memberScope) {
+                memberScope.monthlyTotal += monthlyCost;
+                memberScope.sourceCount++;
+                const memberModule = memberScope.byModule[source.moduleId] ?? emptyBreakdown();
+                memberModule.monthlyTotal += monthlyCost;
+                memberModule.sourceCount++;
+                memberScope.byModule[source.moduleId] = memberModule;
+                memberTotals.set(row.memberId!, memberScope);
+            }
 
             const dueDate = dueColumn ? readDate(row.cells?.[dueColumn]) : undefined;
             if (!dueDate) {
                 dataQuality.missingDate++;
+                if (memberScope) memberScope.dataQuality.missingDate++;
                 continue;
             }
             const days = daysBetween(now, dateFromKey(dueDate));
@@ -199,9 +240,17 @@ export function buildPaymentSummary(sources: PaymentSource[], today: Date): Paym
             if (days <= 7) {
                 next7Total += amount;
                 moduleTotal.next7Total += amount;
+                if (memberScope) {
+                    memberScope.next7Total += amount;
+                    memberScope.byModule[source.moduleId].next7Total += amount;
+                }
             }
             next30Total += amount;
             moduleTotal.next30Total += amount;
+            if (memberScope) {
+                memberScope.next30Total += amount;
+                memberScope.byModule[source.moduleId].next30Total += amount;
+            }
             upcoming.push({
                 moduleId: source.moduleId,
                 rowId: row.itemID,
@@ -211,12 +260,14 @@ export function buildPaymentSummary(sources: PaymentSource[], today: Date): Paym
                 cycle: cycle || "month",
                 monthlyCost: roundMoney(monthlyCost),
                 daysUntil: days,
+                ...(row.memberId ? { memberId: row.memberId } : {}),
             });
         }
     }
 
     upcoming.sort((a, b) => a.dueDate.localeCompare(b.dueDate) || a.title.localeCompare(b.title, undefined, { numeric: true }));
     const byModule = Object.fromEntries([...moduleTotals.entries()].map(([moduleId, value]) => [moduleId, roundBreakdown(value)])) as Partial<Record<PaymentModuleId, PaymentBreakdown>>;
+    const byMember = Object.fromEntries([...memberTotals.entries()].map(([memberId, value]) => [memberId, finalizeScope(value)]));
     return {
         sourceCount,
         monthlyTotal: roundMoney(monthlyTotal),
@@ -224,7 +275,8 @@ export function buildPaymentSummary(sources: PaymentSource[], today: Date): Paym
         next7Total: roundMoney(next7Total),
         next30Total: roundMoney(next30Total),
         byModule,
-        dataQuality,
+        dataQuality: { ...dataQuality },
+        byMember,
         upcoming,
     };
 }

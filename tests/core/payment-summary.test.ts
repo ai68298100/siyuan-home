@@ -39,6 +39,7 @@ describe("buildPaymentSummary", () => {
         expect(summary.next7Total).toBe(420);
         expect(summary.next30Total).toBe(420);
         expect(summary.dataQuality).toEqual({ missingCycle: 0, unknownCycle: 0, missingDate: 0 });
+        expect(summary.byMember.m1).toBeUndefined();
         expect(summary.byModule).toEqual({
             memberships: { sourceCount: 1, monthlyTotal: 10, annualTotal: 120, next7Total: 120, next30Total: 120 },
             insurance: { sourceCount: 1, monthlyTotal: 100, annualTotal: 1200, next7Total: 300, next30Total: 300 },
@@ -93,7 +94,7 @@ describe("buildPaymentSummary", () => {
 
     it("does not treat a missing source column as a payment", () => {
         const summary = buildPaymentSummary([{ moduleId: "insurance", columns: { name: "name" }, rows: [{ itemID: "x", cells: { name: cell("保单", "text") } }] }], today);
-        expect(summary).toEqual({ sourceCount: 0, monthlyTotal: 0, annualTotal: 0, next7Total: 0, next30Total: 0, byModule: {}, dataQuality: { missingCycle: 0, unknownCycle: 0, missingDate: 0 }, upcoming: [] });
+        expect(summary).toEqual({ sourceCount: 0, monthlyTotal: 0, annualTotal: 0, next7Total: 0, next30Total: 0, byModule: {}, dataQuality: { missingCycle: 0, unknownCycle: 0, missingDate: 0 }, byMember: {}, upcoming: [] });
     });
 
     it("marks missing and unknown cycle values instead of hiding data quality issues", () => {
@@ -103,5 +104,15 @@ describe("buildPaymentSummary", () => {
         ])], today);
         expect(summary.dataQuality).toEqual({ missingCycle: 1, unknownCycle: 1, missingDate: 0 });
         expect(summary.monthlyTotal).toBe(50);
+    });
+
+    it("builds a member-scoped breakdown from resolved row member ids", () => {
+        const summary = buildPaymentSummary([source("memberships", [
+            { itemID: "m1-row", memberId: "m1", cells: { amount: cell(120, "number"), cycle: cell("year", "select"), next_pay: cell("2026-10-20", "date") } },
+            { itemID: "m2-row", memberId: "m2", cells: { amount: cell(30, "number"), cycle: cell("month", "select"), next_pay: cell("2026-10-30", "date") } },
+        ])], today);
+        expect(summary.byMember.m1).toMatchObject({ sourceCount: 1, monthlyTotal: 10, next7Total: 120, next30Total: 120 });
+        expect(summary.byMember.m1.byModule.memberships).toMatchObject({ monthlyTotal: 10 });
+        expect(summary.upcoming.find((item) => item.memberId === "m1")?.rowId).toBe("m1-row");
     });
 });

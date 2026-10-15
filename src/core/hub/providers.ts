@@ -212,7 +212,14 @@ export class SchemaLedgerProvider implements DataProvider {
         // 264 波：行数口径（同 certs）
         this.deps.onStats?.(this.moduleId, { rowCount: loaded.rows.length, memberCounts: memberCountsFrom(loaded.rows, loaded.ref, members) });
         if (this.moduleId === "memberships" || this.moduleId === "insurance") {
-            this.deps.onPaymentSource?.({ moduleId: this.moduleId, columns: loaded.ref.columns, rows: loaded.rows });
+            const memberByAvItemId = new Map(members.filter((member) => member.avItemId).map((member) => [member.avItemId!, member.id]));
+            const memberColumn = loaded.ref.columns.member;
+            const paymentRows = loaded.rows.map((row) => {
+                const blockID = memberColumn ? row.cells[memberColumn]?.relation?.blockIDs?.[0] : undefined;
+                const memberId = blockID ? memberByAvItemId.get(blockID) : undefined;
+                return memberId ? { ...row, memberId } : row;
+            });
+            this.deps.onPaymentSource?.({ moduleId: this.moduleId, columns: loaded.ref.columns, rows: paymentRows });
         }
         return out;
     }

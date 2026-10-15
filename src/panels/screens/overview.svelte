@@ -63,8 +63,20 @@
         void version;
         return plugin.scan?.paymentSummary;
     });
+    const paymentView = $derived.by(() => {
+        const summary = paymentSummary;
+        if (!summary || !memberFilter) return summary;
+        const scoped = summary.byMember?.[memberFilter];
+        if (!scoped) {
+            return {
+                sourceCount: 0, monthlyTotal: 0, annualTotal: 0, next7Total: 0, next30Total: 0,
+                byModule: {}, dataQuality: { missingCycle: 0, unknownCycle: 0, missingDate: 0 }, upcoming: [],
+            };
+        }
+        return { ...scoped, upcoming: summary.upcoming.filter((item) => item.memberId === memberFilter) };
+    });
     const paymentQualityIssueCount = $derived.by(() => {
-        const quality = paymentSummary?.dataQuality;
+        const quality = paymentView?.dataQuality;
         return quality ? quality.missingCycle + quality.unknownCycle + quality.missingDate : 0;
     });
     // 260 波：首扫 loading 态——runtime 无快照时间且无错误时，"最近没有要紧事"是撒谎
@@ -646,23 +658,23 @@
     </button>
 </div>
 
-{#if !memberFilter && paymentSummary && paymentSummary.sourceCount > 0}
+{#if paymentView && paymentView.sourceCount > 0}
     <section class="lv-payment-banner lv-card lv-payment-overview" aria-label={t("payment.summaryTitle")}>
         <div class="lv-payment-hero">
             <div class="lv-payment-metric">
                 <span class="lv-payment-label">{t("payment.summaryTitle")}</span>
-                <b class="lv-payment-amount lv-num">¥ {formatAmount(paymentSummary.next30Total, plugin.settings.hideAmounts)}</b>
-                <span class="lv-payment-sub">{t("payment.next30")}{#if paymentSummary.upcoming.length > 0} · {paymentSummary.upcoming.length} {t("payment.items")}{/if}</span>
+                <b class="lv-payment-amount lv-num">¥ {formatAmount(paymentView.next30Total, plugin.settings.hideAmounts)}</b>
+                <span class="lv-payment-sub">{t("payment.next30")}{#if paymentView.upcoming.length > 0} · {paymentView.upcoming.length} {t("payment.items")}{/if}</span>
             </div>
             <div class="lv-payment-stats">
-                <div class="lv-payment-chip"><span><b>¥ {formatAmount(paymentSummary.next7Total, plugin.settings.hideAmounts)}</b> {t("payment.next7")}</span></div>
-                <div class="lv-payment-chip highlight"><span><b>¥ {formatAmount(paymentSummary.monthlyTotal, plugin.settings.hideAmounts)}</b> {t("payment.monthlyEquivalent")}</span></div>
+                <div class="lv-payment-chip"><span><b>¥ {formatAmount(paymentView.next7Total, plugin.settings.hideAmounts)}</b> {t("payment.next7")}</span></div>
+                <div class="lv-payment-chip highlight"><span><b>¥ {formatAmount(paymentView.monthlyTotal, plugin.settings.hideAmounts)}</b> {t("payment.monthlyEquivalent")}</span></div>
             </div>
         </div>
-        {#if paymentSummary.upcoming.length > 0}
+        {#if paymentView.upcoming.length > 0}
             <div class="lv-payment-top">
                 <span class="lv-payment-top__title">{t("payment.upcoming")}：</span>
-                {#each paymentSummary.upcoming.slice(0, 3) as item (item.moduleId + item.rowId)}
+                {#each paymentView.upcoming.slice(0, 3) as item (item.moduleId + item.rowId)}
                     <button type="button" class="lv-payment-top__tag" title={item.title} aria-label={item.title}
                         onclick={() => openPaymentSource(item)}>
                         {t(`module.${item.moduleId}`)} · {item.title} · {paymentCycleLabel(item)} · {paymentDueLabel(item.daysUntil)} · {item.dueDate} · ¥{formatAmount(item.amount, plugin.settings.hideAmounts)}
@@ -672,23 +684,23 @@
         {:else}
             <div class="lv-payment-empty">{t("payment.noUpcoming")}</div>
         {/if}
-        {#if paymentSummary.byModule.memberships?.sourceCount || paymentSummary.byModule.insurance?.sourceCount}
+        {#if paymentView.byModule.memberships?.sourceCount || paymentView.byModule.insurance?.sourceCount}
             <div class="lv-payment-breakdown" aria-label={t("payment.breakdown")}>
                 <span class="lv-payment-top__title">{t("payment.breakdown")}：</span>
-                {#if paymentSummary.byModule.memberships?.sourceCount}
-                    <span class="lv-payment-breakdown__item">{t("module.memberships")} · ¥{formatAmount(paymentSummary.byModule.memberships.monthlyTotal, plugin.settings.hideAmounts)}{t("payment.perMonth")}</span>
+                {#if paymentView.byModule.memberships?.sourceCount}
+                    <span class="lv-payment-breakdown__item">{t("module.memberships")} · ¥{formatAmount(paymentView.byModule.memberships.monthlyTotal, plugin.settings.hideAmounts)}{t("payment.perMonth")}</span>
                 {/if}
-                {#if paymentSummary.byModule.insurance?.sourceCount}
-                    <span class="lv-payment-breakdown__item">{t("module.insurance")} · ¥{formatAmount(paymentSummary.byModule.insurance.monthlyTotal, plugin.settings.hideAmounts)}{t("payment.perMonth")}</span>
+                {#if paymentView.byModule.insurance?.sourceCount}
+                    <span class="lv-payment-breakdown__item">{t("module.insurance")} · ¥{formatAmount(paymentView.byModule.insurance.monthlyTotal, plugin.settings.hideAmounts)}{t("payment.perMonth")}</span>
                 {/if}
             </div>
         {/if}
         {#if paymentQualityIssueCount > 0}
             <div class="lv-payment-quality" role="status">
                 {t("payment.dataQuality").replace("${count}", String(paymentQualityIssueCount))} ·
-                {#if paymentSummary.dataQuality.missingCycle > 0}{t("payment.missingCycle")} ×{paymentSummary.dataQuality.missingCycle}{/if}
-                {#if paymentSummary.dataQuality.unknownCycle > 0} {t("payment.unknownCycle")} ×{paymentSummary.dataQuality.unknownCycle}{/if}
-                {#if paymentSummary.dataQuality.missingDate > 0} {t("payment.missingDate")} ×{paymentSummary.dataQuality.missingDate}{/if}
+                {#if paymentView.dataQuality.missingCycle > 0}{t("payment.missingCycle")} ×{paymentView.dataQuality.missingCycle}{/if}
+                {#if paymentView.dataQuality.unknownCycle > 0} {t("payment.unknownCycle")} ×{paymentView.dataQuality.unknownCycle}{/if}
+                {#if paymentView.dataQuality.missingDate > 0} {t("payment.missingDate")} ×{paymentView.dataQuality.missingDate}{/if}
             </div>
         {/if}
     </section>
