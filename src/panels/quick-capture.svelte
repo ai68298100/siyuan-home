@@ -141,14 +141,20 @@
         saveOperationKey = draft?.operationKey;
     }
 
-    async function persistCaptureDraft(module: string, status: CaptureDraft["status"], rowId: string | undefined, error: string | undefined) {
+    function hasDraftContent(source = values): boolean {
+        return Object.entries(source).some(([key, value]) => key === "name"
+            ? typeof value === "string" && value.trim().length > 0
+            : value !== undefined && value !== null && value !== "" && value !== false);
+    }
+
+    async function persistCaptureDraft(module: string, status: CaptureDraft["status"], rowId: string | undefined, error: string | undefined, source = values) {
         if (!plugin.runtime || !module) return;
         if (!saveOperationKey) saveOperationKey = nextSaveOperationKey();
         const previous = runtimeDraft(module);
         const draft: CaptureDraft = {
             id: previous?.id ?? `capture:${module}:${saveOperationKey}`,
             moduleId: module,
-            values: draftValues(),
+            values: draftValues(source),
             createdAt: previous?.createdAt ?? new Date().toISOString(),
             operationKey: saveOperationKey,
             status,
@@ -207,15 +213,28 @@
     });
 
     let saving = $state(false);
+    let closing = $state(false);
     let saveError = $state("");
     let fieldErrors: Record<string, string> = $state({});
     let identityChecked = $state(false);
     let nameEl: HTMLInputElement | undefined = $state();
 
-    function close() {
-        if (saving) return;
-        open = false;
-        onClose?.();
+    async function close() {
+        if (saving || closing) return;
+        closing = true;
+        const targetModule = pendingModuleId ?? moduleId;
+        // Closing the sheet is also a recoverable boundary. Persist non-empty
+        // input before hiding it so a plugin reload or workspace restart does
+        // not discard a form that has not reached the save request yet.
+        try {
+            if (targetModule && (hasDraftContent() || pendingRowId || identityPending)) {
+                await persistCaptureDraft(targetModule, pendingRowId || identityPending ? "pending" : "failed", pendingRowId, saveError || undefined);
+            }
+            open = false;
+            onClose?.();
+        } finally {
+            closing = false;
+        }
     }
     function onWindowKeydown(e: KeyboardEvent) {
         if (!open) return;
@@ -435,7 +454,7 @@
         // saving=false 到 DOM 重新可聚焦之间隔着一个 Svelte 刷新（微任务）——tick 后再聚焦
         if (refocusName) await tick().then(() => nameEl?.focus());
     }
-    function openPendingLedger() {
+    async function openPendingLedger() {
         const targetModule = pendingModuleId ?? moduleId;
         const docId = plugin.settings.dbRefs[targetModule]?.docId;
         if (!docId || !plugin.showTabDocs) {
@@ -443,7 +462,7 @@
             return;
         }
         identityChecked = true;
-        close();
+        await close();
         plugin.showTabDocs(docId);
     }
 
@@ -479,7 +498,7 @@
             <select class="b3-select" style="margin-left:auto;max-width:200px" bind:value={moduleId} aria-label={t("capture.moduleSelect")} disabled={saving || identityPending || !!pendingRowId}>
                 {#each modOptions as m (m.id)}<option value={m.id}>{m.label}</option>{/each}
             </select>
-            <button class="lv-iconbtn" aria-label={t("capture.closeKeepDraft")} title={t("capture.closeKeepDraft")} onclick={close} disabled={saving}><UiIcon name="close" size={16} /></button>
+            <button class="lv-iconbtn" aria-label={t("capture.closeKeepDraft")} title={t("capture.closeKeepDraft")} onclick={close} disabled={saving || closing}><UiIcon name="close" size={16} /></button>
         </div>
         <div class="lv-sheet-body lv-cap-body">
             {#if modules.length === 0}
@@ -558,7 +577,7 @@
             {/if}
         </div>
         <div class="lv-sheet-foot">
-            <button class="b3-button b3-button--text" onclick={close} disabled={saving}>{t("cancel")}</button>
+            <button class="b3-button b3-button--text" onclick={close} disabled={saving || closing}>{t("cancel")}</button>
             <span class="fn__flex-1"></span>
             {#if identityPending}
                 <button class="lv-btn ghost" onclick={openPendingLedger} disabled={saving}>{t("capture.checkLedger")}</button>
