@@ -77,8 +77,8 @@
 - **提醒事项行就地展开关键摘要（UIX-05）**：
   - 提醒中枢事项行标题新增就地展开指示器（▸/▾），无需跳转到台账或打开笨重抽屉，即可就地查看所属模块、规则模式、关联成员、精确到期倒计时与农历/自动续约等特征标签，并支持一键直达来源台账文档。
 - **质量与门禁**：
-  - 新增 `plan-date.test.ts`、`escape.test.ts`、`asset-lifecycle.test.ts`、`annual-report.test.ts`、`travel-certs.test.ts`、`pets.test.ts`、`media.test.ts`、`schooling.test.ts`、`allergy-check.test.ts`、`assets-valuation.test.ts`、`favors.test.ts`、`shopping-asset.test.ts`、`warranty.test.ts`、`solids.test.ts`、`desensitize.test.ts`、`named-views.test.ts` 与 `members-reassign.test.ts` 纯逻辑单测，全量单元测试扩充至 66 个文件共 **509 项全绿**。
-  - 多语言词条扩充至 1742 键中英文全量对齐；TypeScript、Svelte 0 错误 0 警告，单文件打包与加载器语义通过。
+  - 新增 `plan-date.test.ts`、`escape.test.ts`、`asset-lifecycle.test.ts`、`annual-report.test.ts`、`travel-certs.test.ts`、`pets.test.ts`、`media.test.ts`、`schooling.test.ts`、`allergy-check.test.ts`、`assets-valuation.test.ts`、`favors.test.ts`、`shopping-asset.test.ts`、`warranty.test.ts`、`solids.test.ts`、`desensitize.test.ts`、`named-views.test.ts` 与 `members-reassign.test.ts` 纯逻辑单测，全量单元测试扩充至 66 个文件共 **511 项全绿**。
+  - 多语言词条扩充至 1745 键中英文全量对齐；TypeScript、Svelte 0 错误 0 警告，单文件打包与加载器语义通过。
 
 ## v0.5.6 2026-10-15
 

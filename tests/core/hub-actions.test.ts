@@ -449,6 +449,16 @@ describe("H12 静默时段（摘要与逾期提示共用）", () => {
         expect(inSilentHours(s, undefined, at(8))).toBe(false);
     });
 
+    it("todaySilent 今日免打扰快捷开关生效：全天静默并覆盖正常时段", () => {
+        const s = settings();
+        const date = at(12); // 中午 12 点，本为非静默
+        expect(inSilentHours(s, undefined, date)).toBe(false);
+        expect(inSilentHours(s, { todaySilent: "2026-10-01" }, date)).toBe(true);
+        // 次日 10-02 不再受昨日今日免打扰影响
+        const nextDay = new Date(2026, 9, 2, 12, 0, 0);
+        expect(inSilentHours(s, { todaySilent: "2026-10-01" }, nextDay)).toBe(false);
+    });
+
     it("摘要：静默时段不弹且不标记已发（结束后补发）", () => {
         const scan = { reminders: [], counts: { overdue: 1, soon: 1, lead: 0 }, scannedAt: "", errors: [], stale: false, derived: [], byModule: {} } as any;
         const s = { ...settings(), notifyHour: 8 };

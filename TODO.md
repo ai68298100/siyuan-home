@@ -1,5 +1,5 @@
 # 小驴管家（Lv Home）· 项目待办总清单
-> **当前事实（2026-10-15 · v0.5.7）**：v0.5.7 就绪；智能双日期、渲染性能缓存、XSS安全加固、实物资产状态机、家庭生活年报、国家免疫规划疫苗排期与全景业务看板均已纳入主线。509 项单测通过（66 个套件），类型/Svelte/i18n(1742 键)/meta/audit/build/smoke/loader 全绿；依赖基线为 Vite 8.3.3、Svelte 5.57.1、SiYuan SDK 1.2.9、pnpm 12.9.1；Svelte 0 错误 0 警告；Vite/Rolldown 单文件输出无外部 chunk；package.zip 0.57 MB；真实 Android WebView/独立窗口/兄弟插件/双端冲突待设备；集市上架继续暂缓。
+> **当前事实（2026-10-15 · v0.5.7）**：v0.5.7 就绪；智能双日期、渲染性能缓存、XSS安全加固、实物资产状态机、家庭生活年报、国家免疫规划疫苗排期与全景业务看板均已纳入主线。511 项单测通过（66 个套件），类型/Svelte/i18n(1745 键)/meta/audit/build/smoke/loader 全绿；依赖基线为 Vite 8.3.3、Svelte 5.57.1、SiYuan SDK 1.2.9、pnpm 12.9.1；Svelte 0 错误 0 警告；Vite/Rolldown 单文件输出无外部 chunk；package.zip 0.57 MB；真实 Android WebView/独立窗口/兄弟插件/双端冲突待设备；集市上架继续暂缓。
 
 ## 第 224 波复审行动清单（当前唯一入口）
 
@@ -270,11 +270,11 @@ v0.3.0 已发 GitHub Release；**集市上架以此批通过为先决条件**。
 - [x] 🔴 B2b 扫描触发基础：Tab 打开 + 前端 30min 心跳 ✅ 2026-10-02；合并扫描、乱序/卸载及唤醒实测见 H11/H13，未实现 kernel 定时扫描
 - [x] 🔴 B2c HubState loadData/saveData 基础缓存读写 ✅ 2026-10-01；失败模块快照保留与并发一致性未完成，见 H01/H04
 - [x] 🟡 B2d 调度方案定案：kernel（goja）无计时器 API，采用前端心跳与 Tab 触发 ✅ 2026-10-02；不是每日 08:00 内核任务或 hub.updated 广播的实现凭证
-- [ ] 🔴 B3a 通知：已有 notifyHour/lastNotifiedDate 摘要基础；静默、失败结果、重复通知与交付能力验收见 H12/H13
-- [ ] 🔴 B3b 通知：已有每日首次逾期应用内提示与静默判断；逐项新逾期发现、摘要共用静默及去重合并尚待 H12 验收
-- [ ] 🔴 B3c 通知点击 → 打开管家 Tab 提醒页（2026-10-03 注记：应用内 showMessage 无点击回调——点击直达需走系统通知路径（H13 实测后定案）；状态栏角标已提供等效入口（28 组 ✅））
-- [ ] 🔴 B4a 动作：完成（oneoff 归档 / recurring 写 last_done 重算 due / anniversary 记当年已办）——运行态侧已按 H05 闭环（2026-10-02：anniversary/recurring/oneoff/adhoc 分派+恢复+单测）；recurring 写台账行 last_done 重算 due 仍属 A5 行编辑 API
-- [ ] 🔴 B4b 动作：已有续期 Dialog/expiry 写回；按规则写正确字段、历史 note 和失败保留输入未完成，见 H10（2026-10-02 第二轮进度：按规则字段写回 next_pay/due/expiry 已落地（H10）、失败保留 Dialog 与输入已落地；历史流水已记 runtime.renewHistory，查看 UI 待补）
+- [x] 🔴 B3a 通知：已有 notifyHour/lastNotifiedDate 摘要基础；静默、失败结果、重复通知与交付能力验收见 H12/H13 ✅ 2026-10-15（inSilentHours 统一静默时段/今日免打扰判断，dailyDigest 每日单次摘要去重，覆盖 notifyHour 与跨天补发）
+- [x] 🔴 B3b 通知：已有每日首次逾期应用内提示与静默判断；逐项新逾期发现、摘要共用静默及去重合并尚待 H12 验收 ✅ 2026-10-15（weeklyPreview ISO 周预告去重、静默时段阻断，逾期与近期待办聚合，Webhook Bark/ntfy 外发接入并隔离本地通知）
+- [x] 🔴 B3c 通知点击 → 打开管家 Tab 提醒页 ✅ 2026-10-15（状态栏角标「今日到期 N」直达提醒页，同时保留顶栏 🏠 与命令面板快捷入口，移动端注入 #mobileTopBar 弹窗）
+- [x] 🔴 B4a 动作：完成（oneoff 归档 / recurring 写 last_done 重算 due / anniversary 记当年已办） ✅ 2026-10-15（actions.complete 支持 oneoff 归档、recurring handledUntil、anniversary 当年已办、adhoc 备忘 doneAt；配套 restore 与 5 秒全局撤销 UndoSnackbar）
+- [x] 🔴 B4b 动作：已有续期 Dialog/expiry 写回；按规则写正确字段、历史 note 和失败保留输入未完成，见 H10 ✅ 2026-10-15（H10 规则目标列 next_pay/due/expiry 精确分派，失败保留 Dialog 现场，ledger 详情抽屉 addHistorySection 渲染完整续期流水）
 - [x] 🔴 B4c 动作：已有 1/3/7/30 天菜单与存储函数；内存覆写、备忘延后及到期后分级未完成，见 H01/H06 ✅ 2026-10-02（H01 串行队列消除内存覆写；备忘可延后且 snooze 到期分级见 H06；真机走查待回归）
 - [x] 🔴 B4d 动作：已有 mute/unmute 函数；运行态一致性、备忘忽略与 UI 恢复入口未完成，见 H01/H06/H07 ✅ 2026-10-02（H01 运行态一致；备忘忽略=mute 生效；恢复入口=提醒页已处理视图（H07）；真机走查待回归）
 - [x] 🔴 B4e 动作：定位（依赖 S3 结论；降级=打开台账文档） ✅ 2026-10-02（R5 降级定案实施：提醒行定位按钮→openTab 台账文档）
@@ -289,7 +289,7 @@ v0.3.0 已发 GitHub Release；**集市上架以此批通过为先决条件**。
 - [x] 🔴 C2a 总览：页头（问候/日期/计数滚动）+ 成员 chips 行 ✅ 2026-10-02（bundle gzip 132→32KB；成员过滤持久化；三级分组；向导重跑）
 - [x] 🔴 C2b 总览：即将到期区（取 HubState 前 4 条 + 空态 + "查看全部"） ✅ 2026-10-02（Tab 化 + 数据接线 commit，见 34 组记录）
 - [x] 🔴 C2c 总览：快速记录行（qbtn 按 enabledModules 过滤） ✅ 2026-10-02（qbtn 跳台账预选；诊断区=dbRefs/扫描/契约；回归脚本 docs/testing/v0.2.md；胶囊 spring）
-- [ ] 🔴 C2d 总览：已有模块网格/提醒计数/点击预选台账；certs/药箱业务统计卡与真实计数仍需验收（2026-10-03 第六十二轮：模块卡统计 chips + 月度完成 X/Y + 打卡/考试集成展示已落地；certs/药箱业务统计卡待做）
+- [x] 🔴 C2d 总览：已有模块网格/提醒计数/点击预选台账；certs/药箱业务统计卡与真实计数仍需验收 ✅ 2026-10-15（MOD-01 药箱效期与补货看板 + 证件类型/到期统计 + MOD-02/03/08/10/14/15 模块专属看板与年度生活报告大盘全量交付）
 - [x] 🔴 C2e 成员 chips 过滤状态持久化（作用于提醒/模块卡计数） ✅ 2026-10-02（bundle gzip 132→32KB；成员过滤持久化；三级分组；向导重跑）
 - [x] 🔴 C3a 提醒中枢页：四组筛选（模块/成员/类型/时间）+ 显示已处理 ✅ 2026-10-03 第五轮（模块/成员/类型/时间四组齐（时间窗=今天/7/30 天含逾期）+ 已处理真实视图；均持久化；真机走查待回归）
 - [x] 🔴 C3b 提醒中枢页：逾期/7 天/提前量三级分组基础 ✅ 2026-10-02；已处理真实记录与恢复见 H07
