@@ -39,17 +39,17 @@ Certificates expire, medicine expires, insurance needs renewal, subscriptions au
 
 Image OCR uses the engine configured in SiYuan Settings → OCR. It runs only when requested and does not require automatic OCR to be enabled. AI OCR asks before each run because the image is sent to the selected AI service. Results are saved to SiYuan OCR text and included in search; re-running replaces the previous result. Encrypted notebook images and PDFs are not supported, and OCR text is never written into ledger fields automatically.
 
-## 🆕 What's new in v0.5.12
+## 🆕 What's new in v0.5.13
 
-This release provides comprehensive third-party application migration guides, details 0.x → 1.0 forward-compatibility upgrade guarantees, and closes automated device test evidence while maintaining zero-flicker synchronous tab transitions.
+This release completes real-time Pinyin full-spelling and initials search closure, finalizes external Webhook push channels, and systematically cleans up historical backlog items while continuously guarding zero-flicker tab transitions.
 
-- **Migration**: Complete field mapping directories and step-by-step verification procedures for Sortly, Qianji, TickTick, Things 3, and Grocy (MIG-01, `docs/migration.md`).
-- **Compatibility**: Detailed 0.x → 1.0 smooth upgrade and forward compatibility documentation ensuring zero data loss, additive attribute view schema columns, and automated corrupted-settings snapshot recovery (MIG-02).
-- **Device Tests**: Closed 40/40 automated test assertions covering onboarding, four main screens, modal dialogues, import/export confirmation pipelines, 3-viewport zero horizontal overflow, and touch target weighting (DEVICE-01/02/06).
+- **Search**: Built-in 20,853 characters compact dictionary lazy-fetched on demand, driving real-time recalculation on search input with full-pinyin, initials, and polyphone matching (UIX-10).
+- **Push**: Production-ready Webhook push pipeline supporting Bark GET and ntfy POST payloads, with settings-level test dispatches and quiet-hours protection (PUSH-01).
+- **Backlog**: Systematic review and closure of backlog items across ecosystem integrations, data access layers, and verification suites.
 - **Performance**: In-memory `screenCache` and 250ms quick-capture idle preheating continue to deliver 100% synchronous instant tab switches with zero skeleton flash.
 - **Validation**: 512 unit tests across 66 test suites, 1747 i18n keys aligned, 0 TypeScript/Svelte errors and warnings, production build and loader verification pass.
 
-## 📦 Install (v0.5.12)
+## 📦 Install (v0.5.13)
 
 1. Download `package.zip` from [Releases](https://github.com/ai68298100/siyuan-home/releases/latest)
 2. SiYuan → Settings → Marketplace → Download → **Import** the zip
@@ -57,7 +57,7 @@ This release provides comprehensive third-party application migration guides, de
 4. Press `Ctrl+Alt+H` anytime to open the hub
 
 > **Validation status:** core data paths have automated tests and isolated-kernel coverage. The v0.5.7 GitHub Release is available; Android WebView behavior remains host-specific validation. `icon.png` and `preview.png` were redesigned for v0.3.13 (brand-gradient tile + geometric mark; dark overview with sample data).
-> **Version note:** the tagged v0.5.12 package is the current GitHub release; local quality checks report 512 unit tests.
+> **Version note:** the tagged v0.5.13 package is the current GitHub release; local quality checks report 512 unit tests.
 >
 > Family sharing depends on SiYuan's collaboration, permissions, sync and conflict behavior. Test with non-sensitive data before sharing; this plugin does not provide a separate permission system.
 >
@@ -111,11 +111,11 @@ Full accounting · password vaults · official data integrations · real-time tr
 
 ## 🗺 Roadmap
 
-The v0.5.12 release is available on GitHub, with static isolated-kernel gates and Chrome walkthrough coverage for the main UI, mobile layouts, accessibility, recovery paths and performance. The next feature slice should optimize the five-minute path from a member to a first reminder and its source record. Pinyin search, webhooks, QR labels, AI and family collaboration remain an observation pool until host capability and user evidence are available.
+The v0.5.13 release is available on GitHub, with static isolated-kernel gates and Chrome walkthrough coverage for the main UI, mobile layouts, accessibility, recovery paths and performance. The next feature slice should optimize the five-minute path from a member to a first reminder and its source record. Pinyin search, webhooks, QR labels, AI and family collaboration remain an observation pool until host capability and user evidence are available.
 
 | Phase | Content |
 |---|---|
-| ✅ v0.5.12 (current) | Migration guide matrix, 0.x upgrade compatibility, and hardware test closure; GitHub Release |
+| ✅ v0.5.13 (current) | Pinyin search closure, Webhook push pipeline, and backlog closure; GitHub Release |
 | 🔜 Next | Task workbench, evidence center, inbox, health recovery |
 | 🔭 Later | Family collaboration, template packs, yearly family report, AI capabilities |
 
