@@ -98,13 +98,15 @@
     }
     async function loadScreen(target: ScreenId): Promise<void> {
         if (screenCache[target]) {
-            ScreenView = screenCache[target]!;
-            loadedScreen = target;
-            screenLoadError = "";
+            if (target === screen) {
+                ScreenView = screenCache[target]!;
+                loadedScreen = target;
+                screenLoadError = "";
+            }
             return;
         }
         const request = ++screenLoadRequest;
-        screenLoadError = "";
+        if (target === screen) screenLoadError = "";
         try {
             const module = target === "overview"
                 ? await import("./screens/overview.svelte")
@@ -113,13 +115,14 @@
                     : target === "ledger"
                         ? await import("./screens/ledger.svelte")
                         : await import("./screens/members.svelte");
-            if (request !== screenLoadRequest) return;
             const comp = module.default as unknown as ScreenComponent;
             screenCache[target] = comp;
-            ScreenView = comp;
-            loadedScreen = target;
+            if (request === screenLoadRequest && target === screen) {
+                ScreenView = comp;
+                loadedScreen = target;
+            }
         } catch (error) {
-            if (request !== screenLoadRequest) return;
+            if (request !== screenLoadRequest || target !== screen) return;
             loadedScreen = null;
             screenLoadError = error instanceof Error ? error.message : String(error);
         }
@@ -137,9 +140,16 @@
     onMount(() => {
         void loadScreen(screen);
         saveScreenSession(screen);
-        const timer = window.setTimeout(() => { void refreshInitialScan(); }, 50);
+        const scanTimer = window.setTimeout(() => { void refreshInitialScan(); }, 50);
+        const preloadTimer = window.setTimeout(() => {
+            const allScreens: ScreenId[] = ["overview", "reminders", "ledger", "members"];
+            allScreens.forEach((id) => {
+                if (id !== screen && !screenCache[id]) void loadScreen(id);
+            });
+        }, 150);
         return () => {
-            window.clearTimeout(timer);
+            window.clearTimeout(scanTimer);
+            window.clearTimeout(preloadTimer);
             restoreTimers.forEach((timer) => window.clearTimeout(timer));
             restoreTimers = [];
         };
