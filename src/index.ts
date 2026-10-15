@@ -514,11 +514,17 @@ export default class LvHomePlugin extends Plugin {
         // PF01/PF02：性能标记（PerformanceObserver / DevTools 可读取）
         const perfMark = `lvhome-scan-${seq}`;
         performance.mark(`${perfMark}-start`);
-        let onlySet = only ? new Set(Array.isArray(only) ? only : [only]) : undefined;
+        const requestedOnly = only ? new Set(Array.isArray(only) ? only : [only]) : undefined;
+        // Payment rows feed the overview summary. A ledger write commonly calls
+        // refreshHub([active]) without `force`; keep that path synchronous with
+        // the AV row update instead of letting the generic 30s full-scan debounce
+        // return a stale payment projection.
+        const paymentRefresh = !!requestedOnly && (requestedOnly.has("memberships") || requestedOnly.has("insurance"));
+        let onlySet = requestedOnly;
         // 付款摘要来自 memberships/insurance 的完整行快照；写入这些模块后
         // 走一次全量扫描，确保总览不会继续展示旧的金额投影。
         if (onlySet?.has("memberships") || onlySet?.has("insurance")) onlySet = undefined;
-        if (!onlySet && !force && this.lastScanAt && Date.now() - this.lastScanAt < LvHomePlugin.FULL_SCAN_MIN_MS) {
+        if (!onlySet && !force && !paymentRefresh && this.lastScanAt && Date.now() - this.lastScanAt < LvHomePlugin.FULL_SCAN_MIN_MS) {
             const cached = this.scan;
             if (cached) {
                 this.hubListeners.forEach((fn) => fn());
