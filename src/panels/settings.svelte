@@ -3,6 +3,7 @@
     import { MODULE_GROUPS, modulesByGroup } from "@/core/modules";
     import { newMember, saveSettings, normalizeCheckinBindings } from "@/core/settings";
     import type { ProvisioningReport } from "@/core/provisioner";
+    import type { HealthReport } from "@/core/health";
     import type { HomeSettings, MemberRole, FamilyMember, CheckinBinding, ModuleGroupId } from "@/types";
     import { formatLocalDateTime } from "@/core/date-display";
     import UiIcon from "@/ui/icon.svelte";
@@ -16,6 +17,7 @@
         schemaCatalog?: Record<string, { columns?: { key: string }[]; reminders?: { key: string; field: string; kind: string; leadDays: number }[] }>;
         /** 保存后广播到全部页签（H02）；force=设置变更不受去抖限制 */
         refreshHub?: (only?: string | string[], force?: boolean) => Promise<unknown>;
+        repairLedger?: (moduleId: string) => Promise<ProvisioningReport>;
         /** C8b：新启用模块立即建库 */
         ensureCoreLedgers?: () => Promise<ProvisioningReport>;
         /** UG03/DL07：导入前备份探测与恢复 */
@@ -41,7 +43,7 @@
     let area: SettingsArea = $state("modules");
     let moduleGroup: ModuleGroupId = $state("people");
     let reminderSection: "schedule" | "webhook" | "leads" | "checkin" = $state("schedule");
-    let dataSection: "migration" | "demo" | "ecosystem" | "shortcuts" = $state("migration");
+    let dataSection: "migration" | "demo" | "ecosystem" | "health" | "shortcuts" = $state("migration");
     let saving = $state(false);
     // 33.4 编辑事务：draft 副本，保存才落盘（取消/关闭不污染 settings）。
     // 此处捕获初始快照是设计意图，抑制 svelte 的 locally-referenced 提示。
@@ -73,7 +75,9 @@
     let draftBridgeEnabled = $state(settings.bridgeEnabled ?? true);
     let testingWebhook = $state(false);
     let rerunBusy = $state(false);
-    let diagnosticsBusy = $state<"backfill" | "duplicates" | "health" | "rebuild" | null>(null);
+    let diagnosticsBusy = $state<"backfill" | "duplicates" | "health" | "repair" | "rebuild" | null>(null);
+    let healthReport = $state<HealthReport | null>(null);
+    let repairingModule = $state("");
     let exportingDiagnostics = $state(false);
     let demoBusy = $state(false);
     let demoAction = $state<"generate" | "clear" | null>(null);
@@ -465,6 +469,7 @@
         try {
             const { runHealthCheck } = await import("@/core/health");
             const report = await runHealthCheck(plugin.settings, plugin.schemaCatalog ?? {});
+            healthReport = report;
             const bad = report.modules.filter((m) => !m.ok);
             const detail = bad.map((m) => `${t(`module.${m.moduleId}`)}: ${m.error ?? t("diag.healthMissingCols").replace("${n}", String(m.missingColumns?.length ?? 0))}`).join("；");
             showMessage(
@@ -475,6 +480,32 @@
         } catch (error) {
             showMessage(`${settingHint("健康检查失败", "Health check failed")}${error instanceof Error ? ` (${error.message})` : ""}`, 6000, "error");
         } finally {
+            diagnosticsBusy = null;
+        }
+    }
+
+    async function repairHealthModule(moduleId: string) {
+        if (diagnosticsBusy) return;
+        if (!plugin.repairLedger) {
+            showMessage(t("settings.healthRepairUnavailable"), 5000, "error");
+            return;
+        }
+        diagnosticsBusy = "repair";
+        repairingModule = moduleId;
+        try {
+            await plugin.repairLedger(moduleId);
+            const { runHealthCheck } = await import("@/core/health");
+            healthReport = await runHealthCheck(plugin.settings, plugin.schemaCatalog ?? {});
+            const result = healthReport.modules.find((module) => module.moduleId === moduleId);
+            if (result?.ok) {
+                showMessage(t("settings.healthRepairDone").replace("${module}", t(`module.${moduleId}`)), 4000, "info");
+            } else {
+                showMessage(t("settings.healthRepairPartial").replace("${module}", t(`module.${moduleId}`)), 6000, "error");
+            }
+        } catch (error) {
+            showMessage(`${t("settings.healthRepairFailed")}${error instanceof Error ? ` (${error.message})` : ""}`, 6000, "error");
+        } finally {
+            repairingModule = "";
             diagnosticsBusy = null;
         }
     }
@@ -1020,6 +1051,7 @@
             <button class="lv-setnav__item {dataSection === 'migration' ? 'on' : ''}" aria-current={dataSection === 'migration' ? 'true' : undefined} onclick={() => (dataSection = "migration")}>{t("settings.migrateTitle")}</button>
             <button class="lv-setnav__item {dataSection === 'demo' ? 'on' : ''}" aria-current={dataSection === 'demo' ? 'true' : undefined} onclick={() => (dataSection = "demo")}>{t("settings.demoTitle")}</button>
             <button class="lv-setnav__item {dataSection === 'ecosystem' ? 'on' : ''}" aria-current={dataSection === 'ecosystem' ? 'true' : undefined} onclick={() => (dataSection = "ecosystem")}>{t("settings.ecoTitle")}</button>
+            <button class="lv-setnav__item {dataSection === 'health' ? 'on' : ''}" aria-current={dataSection === 'health' ? 'true' : undefined} onclick={() => (dataSection = "health")}>{t("settings.healthTitle")}</button>
             <button class="lv-setnav__item {dataSection === 'shortcuts' ? 'on' : ''}" aria-current={dataSection === 'shortcuts' ? 'true' : undefined} onclick={() => (dataSection = "shortcuts")}>{t("faq.shortcuts")}</button>
         </nav>
         <div class="lv-settings__scroll">
@@ -1046,6 +1078,52 @@
             <div class="lv-setcard__actions">
                 <button class="b3-button b3-button--outline" disabled={demoBusy} aria-busy={demoBusy && demoAction === "generate"} onclick={generateDemo}>{demoAction === "generate" ? t("ledger.saving") : t("settings.demoGenerate")}</button>
                 <button class="b3-button b3-button--outline" disabled={demoBusy} aria-busy={demoBusy && demoAction === "clear"} onclick={clearDemo}>{demoAction === "clear" ? t("ledger.saving") : t("settings.demoClear")}</button>
+            </div>
+        </div>
+        {:else if dataSection === "health"}
+        <!-- PP10：健康与恢复清单——把只读检查结果留在设置页，避免结果只存在 Toast 中。 -->
+        <div class="lv-card lv-setcard">
+            <div class="lv-setcard__title">{t("settings.healthTitle")}</div>
+            <div class="lv-setcard__hint">{t("settings.healthHint")}</div>
+            {#if healthReport}
+                {@const unhealthy = healthReport.modules.filter((m) => !m.ok)}
+                <p class="lv-caption" style="margin:2px 0 10px">
+                    {t("hub.scannedAt")} {formatLocalDateTime(healthReport.at) ?? "—"}
+                    · {unhealthy.length === 0
+                        ? t("diag.healthSummary").replace("${total}", String(healthReport.modules.length))
+                        : t("diag.healthSummaryBad").replace("${ok}", String(healthReport.modules.length - unhealthy.length)).replace("${total}", String(healthReport.modules.length)).replace("${detail}", "")}
+                </p>
+                <div style="display:grid;gap:6px">
+                    {#each healthReport.modules as module (module.moduleId)}
+                        <div class="fn__flex" style="align-items:flex-start;gap:8px;padding:7px 9px;border-radius:8px;background:var(--b3-theme-background-light)">
+                            <span class="lv-badge {module.ok ? 'green' : 'red'}">{module.ok ? t("diag.ok") : t("diag.healthIssue")}</span>
+                            <span class="fn__flex-1" style="min-width:0">
+                                <b>{t(`module.${module.moduleId}`)}</b>
+                                <span class="lv-caption" style="display:block">
+                                    {#if module.rows !== undefined}{module.rows} {t("diag.rows")}{/if}
+                                    {#if module.complete === false} · {t("diag.healthIncomplete")}{/if}
+                                    {#if module.missingColumns?.length} · {t("diag.healthMissingCols").replace("${n}", String(module.missingColumns.length))}{/if}
+                                    {#if module.error} · {module.error}{/if}
+                                </span>
+                            </span>
+                            {#if !module.ok}
+                                <button class="b3-button b3-button--text b3-button--small" disabled={diagnosticsBusy !== null || exportingDiagnostics} aria-busy={repairingModule === module.moduleId} onclick={() => repairHealthModule(module.moduleId)}>
+                                    {repairingModule === module.moduleId ? t("ledger.saving") : t("settings.healthRepair")}
+                                </button>
+                            {/if}
+                        </div>
+                    {/each}
+                </div>
+            {:else}
+                <p class="lv-setcard__hint" role="status">{t("settings.healthNever")}</p>
+            {/if}
+            <div class="lv-setcard__actions" style="margin-top:10px">
+                <button class="b3-button b3-button--outline" disabled={diagnosticsBusy !== null || exportingDiagnostics} aria-busy={diagnosticsBusy === "health"} onclick={runDeepHealthCheck}>
+                    {diagnosticsBusy === "health" ? t("ledger.saving") : t("settings.healthRun")}
+                </button>
+                <button class="b3-button b3-button--outline" disabled={diagnosticsBusy !== null || exportingDiagnostics} aria-busy={diagnosticsBusy === "rebuild"} onclick={runRebuildAllLedgers}>
+                    {diagnosticsBusy === "rebuild" ? t("diag.rebuilding") : t("diag.rebuildAll")}
+                </button>
             </div>
         </div>
         {:else if dataSection === "ecosystem"}

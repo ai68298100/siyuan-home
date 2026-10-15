@@ -496,6 +496,20 @@ export default class LvHomePlugin extends Plugin {
         return getProvisioningReport(this.settings);
     }
 
+    /** PP10：只修复一个健康异常模块，复用幂等建库/补列路径，不触碰其他台账。 */
+    async repairLedger(moduleId: string): Promise<ProvisioningReport> {
+        const schema = this.schemaCatalog[moduleId];
+        if (!schema) throw new Error(`unknown module: ${moduleId}`);
+        if (!this.settings.enabledModules.includes(moduleId)) {
+            throw new Error(`module is disabled: ${moduleId}`);
+        }
+        const resolveName = (key: string) => String(this.i18n[`field.${key}`] ?? key);
+        await provisionModule(this.settings, moduleId, schema, this.i18nText(`module.${moduleId}`), { resolveName });
+        await saveSettings(this, this.settings);
+        await this.refreshHub(moduleId, true);
+        return getProvisioningReport(this.settings);
+    }
+
     private async provisionLedgers(): Promise<void> {
         const resolveName = (key: string) => String(this.i18n[`field.${key}`] ?? key);
         const enabled = new Set(this.settings.enabledModules);
