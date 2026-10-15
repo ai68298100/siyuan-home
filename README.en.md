@@ -39,31 +39,27 @@ Certificates expire, medicine expires, insurance needs renewal, subscriptions au
 
 Image OCR uses the engine configured in SiYuan Settings → OCR. It runs only when requested and does not require automatic OCR to be enabled. AI OCR asks before each run because the image is sent to the selected AI service. Results are saved to SiYuan OCR text and included in search; re-running replaces the previous result. Encrypted notebook images and PDFs are not supported, and OCR text is never written into ledger fields automatically.
 
-## 🆕 What's new in v0.5.1
+## 🆕 What's new in v0.5.7
 
-This release keeps the vehicle workspace and first-install fixes from v0.5.0, then improves startup, long-list rendering, image stability and shared visual tokens across the plugin.
+This release introduces smart dual dates (plan date vs deadline), performance caching, unified XSS escaping, asset lifecycle state machine, annual family report, national immunization schedule, and full-spectrum life dashboards across modules.
 
-- **Added**: per-vehicle refueling, charging and maintenance logs with consumption, cost, trend, category and next date/odometer summaries.
-- **Added**: energy entries for date, odometer, grade/mode, quantity, unit/total cost, full-tank/full-charge boundary, station and notes. Full-to-full calculations are preferred; incomplete data is labeled as estimated or pending.
-- **Improved**: first-install provisioning accepts the object response returned by SiYuan 3.8.6+; save, failure, retry and empty states now have visible feedback across the main flows.
-- **Improved**: complete ID-card entry with validation and masking; on-demand SiYuan OCR explains engine setup, privacy and the fact that results never auto-fill ledger fields.
-- **Fixed**: empty member-card menus, select persistence on SiYuan 3.8.x, storage error-envelope contamination and cramped mobile top-bar actions.
-- **Validation**: TypeScript, Svelte, i18n, metadata, unit tests, production build, package smoke and isolated-kernel E2E all pass (40/40, 6/6, 4/4 and 5/5).
+- **Added**: Things 3 smart dual dates (UIX-07) with decoupled plan date and hard deadline, inline plan picker and overdue highlighting.
+- **Added**: Annual family life report generator (MOD-20) aggregating task completion, gift balance, media reading/viewing, and asset valuations with one-click copy.
+- **Added**: National child immunization program 0-6 years (22 doses) panoramic schedule (MOD-17) with age calculation and vaccination status sync.
+- **Added**: Physical asset lifecycle state machine (MOD-21) with inuse/idle/lent/repairing/disposed transitions and loan log integration.
+- **Added**: Travel 6-month passport validity checker (MOD-18), packing list templates (MOD-19), media progress dashboard (MOD-14), pet health & deworming manager (MOD-15), schooling milestone countdown (MOD-13), asset valuation dashboard (MOD-10), favors gift balance report (MOD-08), house warranty checker (MOD-06), food allergy checker (MOD-12), and infant food 3-day tolerance check (MOD-07).
+- **Improved**: Avatar hue and module icon memory caching (PERF-01), unified XSS sanitization (SEC-01), privacy desensitized copying (MOD-04), compact/comfortable table density toggle (UIX-04), inline reminder summary expander (UIX-05), one-click missing ledger rebuilding (SYS-01), and bulk orphan member reassign (MOD-05).
+- **Validation**: 509 unit tests across 66 test suites, 1742 i18n keys aligned, 0 TypeScript/Svelte errors and warnings, production build and loader verification pass.
 
-For v0.5.1, the main screens and quick-capture form load on demand, long ledger tables use viewport windowing, and shared tokens now cover spacing, typography, controls, radii, shadows, layering and motion. Chrome measurements recorded about 148 ms to first visible panel, 67–119 ms tab switches, 55 ms first quick-capture open, and 0 px desktop overflow.
-
-- **Performance**: overview, reminders, ledger and members are loaded on demand; ledger tables use viewport windowing for long lists, while vehicle cards keep progressive image loading.
-- **Design system**: spacing, typography, control sizes, radii, shadows, z-index and motion durations now use shared tokens across light and dark themes.
-- **Measured**: Chrome walkthrough first visible panel about 148 ms, tab switches 67–119 ms, first quick-capture open about 55 ms, and 0 px desktop overflow.
-## 📦 Install (v0.5.1)
+## 📦 Install (v0.5.7)
 
 1. Download `package.zip` from [Releases](https://github.com/ai68298100/siyuan-home/releases/latest)
 2. SiYuan → Settings → Marketplace → Download → **Import** the zip
 3. Enable the plugin → complete the 2-step onboarding (household → module picks and provisioning)
 4. Press `Ctrl+Alt+H` anytime to open the hub
 
-> **Validation status:** core data paths have automated tests and isolated-kernel coverage. The v0.5.1 GitHub Release is available; Android WebView behavior remains host-specific validation. `icon.png` and `preview.png` were redesigned for v0.3.13 (brand-gradient tile + geometric mark; dark overview with sample data).
-> **Version note:** the tagged v0.5.1 package is the current GitHub release; local quality checks report 409 unit tests.
+> **Validation status:** core data paths have automated tests and isolated-kernel coverage. The v0.5.7 GitHub Release is available; Android WebView behavior remains host-specific validation. `icon.png` and `preview.png` were redesigned for v0.3.13 (brand-gradient tile + geometric mark; dark overview with sample data).
+> **Version note:** the tagged v0.5.7 package is the current GitHub release; local quality checks report 509 unit tests.
 >
 > Family sharing depends on SiYuan's collaboration, permissions, sync and conflict behavior. Test with non-sensitive data before sharing; this plugin does not provide a separate permission system.
 >
@@ -117,11 +113,11 @@ Full accounting · password vaults · official data integrations · real-time tr
 
 ## 🗺 Roadmap
 
-The v0.5.1 release is available on GitHub, with static isolated-kernel gates and Chrome walkthrough coverage for the main UI, mobile layouts, accessibility, recovery paths and performance. The next feature slice should optimize the five-minute path from a member to a first reminder and its source record. Pinyin search, webhooks, QR labels, AI and family collaboration remain an observation pool until host capability and user evidence are available.
+The v0.5.7 release is available on GitHub, with static isolated-kernel gates and Chrome walkthrough coverage for the main UI, mobile layouts, accessibility, recovery paths and performance. The next feature slice should optimize the five-minute path from a member to a first reminder and its source record. Pinyin search, webhooks, QR labels, AI and family collaboration remain an observation pool until host capability and user evidence are available.
 
 | Phase | Content |
 |---|---|
-| ✅ v0.5.1 (current) | Vehicle energy and maintenance workspace plus lazy tab loading, virtualized ledger tables, shared design tokens, image layout stability, and Chrome walkthrough evidence |
+| ✅ v0.5.7 (current) | Smart dual dates, performance cache, XSS security, asset lifecycle, annual report, immunization schedule and modular dashboards; GitHub Release |
 | 🔜 Next | Task workbench, evidence center, inbox, health recovery |
 | 🔭 Later | Family collaboration, template packs, yearly family report, AI capabilities |
 
@@ -139,7 +135,7 @@ pnpm run dev      # dev (app + kernel watch)
 pnpm run build    # dist/ + package.zip
 pnpm run check    # 5-layer gate (types + svelte + i18n + meta + audit)
 pnpm run smoke    # release package and single-file loader smoke checks
-pnpm test         # unit tests (409)
+pnpm test         # unit tests (509)
 ```
 
 - Setup & conventions: [CONTRIBUTING.md](./CONTRIBUTING.md)
