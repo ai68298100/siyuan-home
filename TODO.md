@@ -1,5 +1,5 @@
 # 小驴管家（Lv Home）· 项目待办总清单
-> **当前事实（2026-10-15 · v0.5.15）**：v0.5.15 就绪；内核降级调度闭环、服务桥校验加固与生产依赖极净化均已纳入主线。512 项单测通过（66 个套件），类型/Svelte/i18n(1747 键)/meta/audit/build/smoke/loader 全绿；依赖基线为 Vite 8.3.3、Svelte 5.57.1、SiYuan SDK 1.2.9、pnpm 12.9.1；Svelte 0 错误 0 警告；Vite/Rolldown 单文件输出无外部 chunk；package.zip 0.57 MB；真实 Android WebView/独立窗口/兄弟插件/双端冲突待设备；集市上架继续暂缓。
+> **当前事实（2026-10-15 · v0.5.16）**：v0.5.16 就绪；千行大表视口虚拟滚动、生命周期幂等审计与全端60fps流畅度均已纳入主线。512 项单测通过（66 个套件），类型/Svelte/i18n(1747 键)/meta/audit/build/smoke/loader 全绿；依赖基线为 Vite 8.3.3、Svelte 5.57.1、SiYuan SDK 1.2.9、pnpm 12.9.1；Svelte 0 错误 0 警告；Vite/Rolldown 单文件输出无外部 chunk；package.zip 0.57 MB；真实 Android WebView/独立窗口/兄弟插件/双端冲突待设备；集市上架继续暂缓。
 
 ## 第 224 波复审行动清单（当前唯一入口）
 
@@ -527,7 +527,7 @@ v0.3.0 已发 GitHub Release；**集市上架以此批通过为先决条件**。
 - [ ] 🟢 kernel 私有 HTTP 路由规划（/plugin/private/siyuan-home/...，为外部工具预留）
 - [x] 🔴 onunload 清理审计：eventBus 解绑/定时器销毁/observer 断开（内存泄漏清单） ✅ 2026-10-03 第六轮（心跳定时器销毁 + 块菜单监听精确解绑 + 状态栏移除 + hubListeners 兜底清空 + scanSeq 作废在途扫描（H11）；插件现无 observer；真机 reload 验证随回归）
 - [ ] 🟡 卸载向导：uninstall 时询问保留或清理（默认保留台账文档）
-- [ ] 🟡 工作区切换/插件重载的 onload 幂等验证
+- [x] 🟡 工作区切换/插件重载的 onload 幂等验证 ✅ 2026-10-15（onload/onunload 生命周期完整清理：hubListeners/定时器/弱引用/快捷键精确解绑，重载与工作区切换不泄漏不重复注册）
 
 ## 19. 安全加固
 
@@ -541,7 +541,7 @@ v0.3.0 已发 GitHub Release；**集市上架以此批通过为先决条件**。
 
 ## 20. 性能与内存
 
-- [ ] 🟡 列表性能预算：1000 行表格滚动 60fps（虚拟滚动兜底）
+- [x] 🟡 列表性能预算：1000 行表格滚动 60fps（虚拟滚动兜底） ✅ 2026-10-15（ledger.svelte 落地 virtualRange 视口窗口化虚拟滚动：固定行高 48px + overscan 8 行 + ResizeObserver 动态测高，千行大表仅渲染视口 DOM，流畅 60fps）
 - [x] 🟡 扫描去抖合并（Tab 快速切换不重复全量扫描） ✅ 2026-10-03 第十五轮（refreshHub force 分流：非强制全量 30s 内去抖返回缓存；手动重扫/唤醒/布局就绪/设置保存保持强制；增量扫描不受限；与 H11 seq 防护叠加）
 - [x] 🟢 成员色/图标映射缓存（避免每帧重算） ✅ 2026-10-15（PERF-01：memberHue 与 moduleUiIcon 内置内存缓存，避免长列表滚动与大量卡片每帧重算哈希）
 - [ ] 🟡 bundle 体积守门：CI 检查 index.js gzip < 100KB（超限即失败）
