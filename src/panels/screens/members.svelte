@@ -9,6 +9,7 @@
     import { openContactPicker, getContactsBridge } from "@/libs/contact-picker";
     import UiIcon from "@/ui/icon.svelte";
     import ActivityFeed from "../activity-feed.svelte";
+    import { calculateImmunizationSchedule, type ChildImmunizationSchedule } from "@/core/immunization";
 
     let { plugin, t, version }: { plugin: HomePluginLike; t: (k: string) => string; version?: number } = $props();
 
@@ -42,6 +43,19 @@
         let count = 0;
         for (const m of members) count += alertsFor(m.id).length;
         return count;
+    });
+
+    // C5d / MOD-17：儿童国家免疫规划疫苗排期进度概览（0-6 岁 22 剂次）
+    const childImmunizations = $derived.by(() => {
+        void version;
+        const map = new Map<string, ChildImmunizationSchedule>();
+        for (const m of members) {
+            if ((m.role === "child" || m.role === "other") && m.birthday) {
+                const sched = calculateImmunizationSchedule(m.birthday, m.name, []);
+                if (sched) map.set(m.id, sched);
+            }
+        }
+        return map;
     });
     // （215 波的 birthdaySoon 于 219 波并入下方 memberStats 单遍派生，附 0/1 天文案修正）
 
@@ -552,6 +566,10 @@
                     <!-- 17 组/219 波：生日倒计时 chip（单遍预计算，数据来自提醒中枢既有派生） -->
                     <span class="lv-badge lv-member-birthday">生日 · {s.birthday}</span>
                 {/if}
+                {#if childImmunizations.has(m.id)}
+                    {@const sched = childImmunizations.get(m.id)}
+                    <span class="lv-badge green" title={t("immunization.dialogTitle")}>💉 {t("module.parenting")} · {sched?.totalDoses ?? 22}{t("members.vaxDosesUnit")}</span>
+                {/if}
             </div>
         {/if}
         {#if alertsFor(m.id).length > 0}
@@ -593,6 +611,25 @@
                             <button class="b3-button b3-button--text" disabled={memberActionBusy.has(r.id)} aria-busy={memberActionBusy.has(r.id)} onclick={() => void runMemberAction(r.id, () => plugin.complete(r))}>{memberActionBusy.has(r.id) ? t("ledger.saving") : t("act.done")}</button>
                         </div>
                     {/each}
+                {/if}
+                {#if childImmunizations.has(m.id)}
+                    {@const sched = childImmunizations.get(m.id)!}
+                    {@const nextDose = sched.schedule.find((s) => s.status === "overdue") ?? sched.schedule.find((s) => s.status === "upcoming")}
+                    <div class="lv-card" style="padding:10px 14px;background:var(--lv-surface-2);border-radius:var(--lv-r-2);display:flex;flex-direction:column;gap:6px">
+                        <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:6px">
+                            <span style="font-weight:600;font-size:12.5px;color:var(--lv-tx)">💉 {t("immunization.dialogTitle")}</span>
+                            {#if plugin.settings.dbRefs?.parenting?.docId}
+                                <button class="b3-button b3-button--text b3-button--small" style="font-size:11.5px;padding:2px 6px" onclick={() => plugin.showTabDocs(plugin.settings.dbRefs.parenting.docId)}>{t("immunization.scheduleButton")} →</button>
+                            {/if}
+                        </div>
+                        {#if nextDose}
+                            <div style="font-size:11.5px;color:var(--lv-tx-2);display:flex;gap:6px;align-items:center;flex-wrap:wrap">
+                                <span>{nextDose.status === "overdue" ? t("members.overdueVaxDose") : t("members.nextVaxDose")}：<b>{nextDose.vaccine}</b></span>
+                                <span class="lv-badge {nextDose.status === 'overdue' ? 'red' : 'yellow'}">{nextDose.targetDate}</span>
+                                <span class="lv-caption">({t("immunization.monthAge").replace("${n}", String(nextDose.monthAge))})</span>
+                            </div>
+                        {/if}
+                    </div>
                 {/if}
                 <ActivityFeed {plugin} {t} {version} memberId={m.id} compact />
             </div>

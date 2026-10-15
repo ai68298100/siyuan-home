@@ -88,6 +88,20 @@ describe("immunization.calculateImmunizationSchedule (MOD-17 疫苗排期推算�
     it("非法生日返回 null", () => {
         expect(calculateImmunizationSchedule("invalid", "宝宝", [])).toBeNull();
     });
+
+    it("空接种记录时正确推算儿童（C5d / 成员卡接入）的应种/逾期全量排期", () => {
+        const birth = "2026-06-01";
+        const today = "2026-10-15"; // 约 4 月龄
+        const res = calculateImmunizationSchedule(birth, "小明", [], today);
+        expect(res).not.toBeNull();
+        expect(res?.totalDoses).toBe(22);
+        expect(res?.receivedCount).toBe(0);
+        // 出生与2-3月龄等应种未种应计入 overdue
+        expect(res?.overdueCount).toBeGreaterThan(0);
+        const firstOverdue = res?.schedule.find((s) => s.status === "overdue");
+        expect(firstOverdue?.vaccine).toBe("乙肝疫苗");
+        expect(firstOverdue?.dose).toBe(1);
+    });
 });
 
 interface VaccineLike { vaccine: string; dose: number; monthAge: number }
