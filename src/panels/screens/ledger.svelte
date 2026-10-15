@@ -245,6 +245,10 @@
         if ((active !== "memberships" && active !== "insurance") || !ref?.columns) return undefined;
         return buildPaymentSummary([{ moduleId: active, columns: ref.columns, rows }], new Date());
     });
+    const paymentQualityIssueCount = $derived.by(() => {
+        const quality = paymentSummary?.dataQuality;
+        return quality ? quality.missingCycle + quality.unknownCycle + quality.missingDate : 0;
+    });
 
     /** 付款摘要来源定位：复用台账行详情抽屉，避免摘要复制一套编辑逻辑。 */
     function openPaymentSource(item: { rowId: string }) {
@@ -4684,6 +4688,14 @@
             </div>
         {:else}
             <div class="lv-payment-empty">{t("payment.noUpcoming")}</div>
+        {/if}
+        {#if paymentQualityIssueCount > 0}
+            <div class="lv-payment-quality" role="status">
+                {t("payment.dataQuality").replace("${count}", String(paymentQualityIssueCount))} ·
+                {#if paymentSummary.dataQuality.missingCycle > 0}{t("payment.missingCycle")} ×{paymentSummary.dataQuality.missingCycle}{/if}
+                {#if paymentSummary.dataQuality.unknownCycle > 0} {t("payment.unknownCycle")} ×{paymentSummary.dataQuality.unknownCycle}{/if}
+                {#if paymentSummary.dataQuality.missingDate > 0} {t("payment.missingDate")} ×{paymentSummary.dataQuality.missingDate}{/if}
+            </div>
         {/if}
     </section>
 {/if}
