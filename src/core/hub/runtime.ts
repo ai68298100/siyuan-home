@@ -26,6 +26,24 @@ export interface AdhocMemo {
     doneAt?: string;
 }
 
+/**
+ * 快速记录的可恢复草稿。
+ *
+ * 草稿只保存用户输入和恢复保存所需的幂等键，不把它复制成台账数据。
+ * `failed` 表示尚未确认创建行，`pending` 表示已经拿到行身份但仍需
+ * 补写字段或等待身份确认。每个模块最多保留一条草稿。
+ */
+export interface CaptureDraft {
+    id: string;
+    moduleId: string;
+    values: Record<string, string | number | boolean>;
+    createdAt: string;
+    operationKey: string;
+    status: "failed" | "pending";
+    rowId?: string;
+    error?: string;
+}
+
 /** 已处理记录（H07）：oneoff 完成动作的真实留痕，可恢复 */
 export interface HandledRecord {
     title: string;
@@ -93,6 +111,8 @@ export interface HubRuntime {
     renewHistory: Record<string, { from: string; to: string; at: string }[]>;
     /** 快速备忘 */
     memos: AdhocMemo[];
+    /** 快速记录失败/待确认草稿（只存运行态，按 moduleId 至多一条） */
+    captureDrafts: CaptureDraft[];
     /** 置顶备忘 id 清单（246 波收件箱深化）：列表组内置顶排序 */
     pinnedMemoIds?: string[];
     /** 每日摘要去重：最后通知日期 */
@@ -122,7 +142,7 @@ export interface HubRuntime {
 }
 
 export function defaultRuntime(): HubRuntime {
-    return { schemaVersion: 1, snoozed: {}, muted: {}, handledYear: {}, handledUntil: {}, handled: {}, renewHistory: {}, memos: [], hubNamedViews: [], plannedDates: {} };
+    return { schemaVersion: 1, snoozed: {}, muted: {}, handledYear: {}, handledUntil: {}, handled: {}, renewHistory: {}, memos: [], captureDrafts: [], hubNamedViews: [], plannedDates: {} };
 }
 
 function isPlainObject(value: unknown): value is Record<string, any> {
@@ -181,6 +201,83 @@ function normalizeMemo(value: unknown): AdhocMemo | undefined {
         createdAt: value.createdAt,
         ...(typeof value.doneAt === "string" ? { doneAt: value.doneAt } : {}),
     };
+}
+
+function captureDraftValues(value: unknown): Record<string, string | number | boolean> | undefined {
+    if (!isPlainObject(value)) return undefined;
+    const values: Record<string, string | number | boolean> = {};
+    for (const [key, item] of Object.entries(value)) {
+        if (!key.trim()) continue;
+        if (typeof item === "string" || typeof item === "boolean") {
+            values[key] = item;
+        } else if (typeof item === "number" && Number.isFinite(item)) {
+            values[key] = item;
+        }
+    }
+    return values;
+}
+
+/** Normalize one persisted quick-capture draft; malformed required fields drop the draft. */
+export function normalizeCaptureDraft(value: unknown): CaptureDraft | undefined {
+    if (!isPlainObject(value)) return undefined;
+    const id = typeof value.id === "string" ? value.id.trim() : "";
+    const moduleId = typeof value.moduleId === "string" ? value.moduleId.trim() : "";
+    const createdAt = typeof value.createdAt === "string" ? value.createdAt : "";
+    const operationKey = typeof value.operationKey === "string" ? value.operationKey.trim() : "";
+    const status = value.status === "failed" || value.status === "pending" ? value.status : undefined;
+    const values = captureDraftValues(value.values);
+    if (!id || !moduleId || !createdAt || !operationKey || !status || !values) return undefined;
+    return {
+        id,
+        moduleId,
+        values,
+        createdAt,
+        operationKey,
+        status,
+        ...(typeof value.rowId === "string" && value.rowId.trim() ? { rowId: value.rowId.trim() } : {}),
+        ...(typeof value.error === "string" && value.error.trim() ? { error: value.error } : {}),
+    };
+}
+
+/** Normalize and deduplicate persisted drafts (the last draft for a module wins). */
+export function normalizeCaptureDrafts(value: unknown): CaptureDraft[] {
+    if (!Array.isArray(value)) return [];
+    const result: CaptureDraft[] = [];
+    for (const raw of value) {
+        const draft = normalizeCaptureDraft(raw);
+        if (!draft) continue;
+        const index = result.findIndex((item) => item.moduleId === draft.moduleId);
+        if (index >= 0) result[index] = draft;
+        else result.push(draft);
+    }
+    return result;
+}
+
+/** Replace the existing draft for a module while preserving list order. */
+export function upsertCaptureDraft(drafts: CaptureDraft[] | undefined, draft: CaptureDraft): CaptureDraft[] {
+    const normalized = normalizeCaptureDraft(draft);
+    if (!normalized) return [...(drafts ?? [])];
+    const result: CaptureDraft[] = [];
+    let replaced = false;
+    for (const item of drafts ?? []) {
+        if (item.moduleId !== normalized.moduleId) {
+            result.push(item);
+            continue;
+        }
+        if (!replaced) {
+            result.push(normalized);
+            replaced = true;
+        }
+    }
+    if (!replaced) result.push(normalized);
+    return result;
+}
+
+/** Remove a draft by its id or module id. */
+export function removeCaptureDraft(drafts: CaptureDraft[] | undefined, idOrModuleId: string): CaptureDraft[] {
+    const target = idOrModuleId.trim();
+    if (!target) return [...(drafts ?? [])];
+    return (drafts ?? []).filter((draft) => draft.id !== target && draft.moduleId !== target);
 }
 
 function normalizeCache(value: unknown): HubRuntime["cache"] {
@@ -312,6 +409,7 @@ export async function loadRuntime(plugin: Plugin): Promise<HubRuntime> {
         handled: normalizeHandled(data.handled),
         renewHistory: normalizeRenewHistory(data.renewHistory),
         memos: Array.isArray(data.memos) ? data.memos.map(normalizeMemo).filter((m): m is AdhocMemo => !!m) : [],
+        captureDrafts: normalizeCaptureDrafts(data.captureDrafts),
         pinnedMemoIds: Array.isArray(data.pinnedMemoIds) ? data.pinnedMemoIds.filter((id: unknown): id is string => typeof id === "string") : undefined,
         lastNotifiedDate: optionalString("lastNotifiedDate"),
         lastOverdueAlertDate: optionalString("lastOverdueAlertDate"),

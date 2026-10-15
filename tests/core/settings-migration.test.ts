@@ -4,7 +4,7 @@
  */
 import { describe, it, expect, beforeEach } from "vitest";
 import { loadSettings, saveSettings, normalizeImportedSettings, normalizeCheckinBindings } from "@/core/settings";
-import { loadRuntime, saveRuntime, defaultRuntime } from "@/core/hub/runtime";
+import { loadRuntime, saveRuntime, defaultRuntime, removeCaptureDraft, upsertCaptureDraft } from "@/core/hub/runtime";
 import { coalescedNotify, resetNotifyState } from "@/libs/notify-queue";
 
 function pluginWithSettings(data: unknown) {
@@ -285,6 +285,51 @@ describe("坏文件容错（15 组）", () => {
         expect(rt.cache?.reminders).toEqual([]);
         expect(rt.cache?.derived).toHaveLength(1);
         expect(rt.cache?.byModule).toEqual({});
+    });
+
+    it("快速记录草稿归一化：合法草稿保留，坏模块/values/status 丢弃，坏可选行号清除", async () => {
+        const plugin = pluginWithSettings(null);
+        plugin.loadData = async (name: string) => name === "hub-runtime.json" ? {
+            captureDrafts: [
+                {
+                    id: "d1",
+                    moduleId: "certs",
+                    values: { name: "护照", amount: 12, checked: true, bad: null, infinity: Infinity },
+                    createdAt: "2026-10-15T08:00:00.000Z",
+                    operationKey: "capture:d1",
+                    status: "failed",
+                    rowId: 42,
+                    error: "保存失败",
+                },
+                { id: "bad-module", moduleId: 42, values: {}, createdAt: "now", operationKey: "k", status: "failed" },
+                { id: "bad-values", moduleId: "members", values: "bad", createdAt: "now", operationKey: "k", status: "failed" },
+                { id: "bad-status", moduleId: "health", values: {}, createdAt: "now", operationKey: "k", status: "retry" },
+                { id: "", moduleId: "vehicle", values: {}, createdAt: "now", operationKey: "k", status: "pending" },
+            ],
+        } : null;
+        const rt = await loadRuntime(plugin);
+        expect(rt.captureDrafts).toEqual([expect.objectContaining({
+            id: "d1",
+            moduleId: "certs",
+            values: { name: "护照", amount: 12, checked: true },
+            status: "failed",
+            error: "保存失败",
+        })]);
+        expect(rt.captureDrafts[0].rowId).toBeUndefined();
+    });
+
+    it("快速记录草稿按模块 upsert 并可按 id/moduleId 删除", () => {
+        const first = {
+            id: "d1", moduleId: "certs", values: { name: "旧" }, createdAt: "2026-10-15", operationKey: "op1", status: "failed" as const,
+        };
+        const other = {
+            id: "d2", moduleId: "members", values: { name: "家人" }, createdAt: "2026-10-15", operationKey: "op2", status: "pending" as const,
+        };
+        const updated = { ...first, id: "d3", values: { name: "新" }, operationKey: "op3" };
+        const list = upsertCaptureDraft(upsertCaptureDraft([], first), other);
+        expect(upsertCaptureDraft(list, updated)).toEqual([updated, other]);
+        expect(removeCaptureDraft(list, "d1")).toEqual([other]);
+        expect(removeCaptureDraft(list, "members")).toEqual([first]);
     });
 
     it("运行态序列化去重按插件实例隔离：新实例的首写不会被旧实例跳过", async () => {
