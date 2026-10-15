@@ -39,18 +39,17 @@ Certificates expire, medicine expires, insurance needs renewal, subscriptions au
 
 Image OCR uses the engine configured in SiYuan Settings → OCR. It runs only when requested and does not require automatic OCR to be enabled. AI OCR asks before each run because the image is sent to the selected AI service. Results are saved to SiYuan OCR text and included in search; re-running replaces the previous result. Encrypted notebook images and PDFs are not supported, and OCR text is never written into ledger fields automatically.
 
-## 🆕 What's new in v0.5.8
+## 🆕 What's new in v0.5.9
 
-This release completely eradicates tab-switching micro-flicker with the in-memory `screenCache` component pool and 150ms idle preloading (100% synchronous instant tab transitions), introduces one-click reset for reminder lead overrides, integrates child immunization milestones into member cards, and publishes the official bilingual Privacy & Boundaries policy.
+This release expands plugin family ecosystem integrations, enforces strict console security audits, blocks dangerous attachment types, and achieves full accessibility review certification while maintaining zero-flicker synchronous tab transitions.
 
-- **Performance**: In-memory `screenCache` and 150ms idle preheating eliminate asynchronous skeleton flash during tab navigation; switching between visited screens is 100% synchronous (PERF-02 / UIX-08).
-- **Hardening**: Completely isolated from host browser history and popstate events, confirming zero `tree not found` errors or router oscillation loops.
-- **Added**: One-click reset button for custom reminder lead overrides in Settings → Reminders (UIX-09), with 0-3650 day range clamping.
-- **Added**: National Child Immunization Program 0-6y (22 doses) progress badge on child member cards (MOD-22), with next-dose catch-up guidance and direct parenting ledger link.
-- **Documentation**: Official release of bilingual Privacy Statement & Sharing Boundaries (`docs/privacy.md` and `docs/privacy.en.md`, TRUST-02).
+- **Ecosystem**: Deep integration with SpeedSwitch (siyuan-speed-switch) registering quick actions and a live household summary widget (`lvhome.summary`), plus Contacts (siyuan-contacts) search, link and snapshot display (EC13–EC19).
+- **Security**: Full console audit confirming zero leakage of tokens, national IDs, credentials, or amounts; attachment drawer employs `isDangerousAsset` to block executable files and scripts (SEC-02).
+- **Accessibility**: Full keyboard navigation across tablists and member cards, Ctrl+Z global undo, forced-colors CanvasText outlines, prefers-reduced-motion animation suppression, and comprehensive ARIA labeling (A11Y-01).
+- **Stability**: In-memory `screenCache` and 150ms idle preheating keep tab switching 100% synchronous, completely eliminating skeleton flash and router feedback loops.
 - **Validation**: 512 unit tests across 66 test suites, 1747 i18n keys aligned, 0 TypeScript/Svelte errors and warnings, production build and loader verification pass.
 
-## 📦 Install (v0.5.8)
+## 📦 Install (v0.5.9)
 
 1. Download `package.zip` from [Releases](https://github.com/ai68298100/siyuan-home/releases/latest)
 2. SiYuan → Settings → Marketplace → Download → **Import** the zip
@@ -58,7 +57,7 @@ This release completely eradicates tab-switching micro-flicker with the in-memor
 4. Press `Ctrl+Alt+H` anytime to open the hub
 
 > **Validation status:** core data paths have automated tests and isolated-kernel coverage. The v0.5.7 GitHub Release is available; Android WebView behavior remains host-specific validation. `icon.png` and `preview.png` were redesigned for v0.3.13 (brand-gradient tile + geometric mark; dark overview with sample data).
-> **Version note:** the tagged v0.5.8 package is the current GitHub release; local quality checks report 512 unit tests.
+> **Version note:** the tagged v0.5.9 package is the current GitHub release; local quality checks report 512 unit tests.
 >
 > Family sharing depends on SiYuan's collaboration, permissions, sync and conflict behavior. Test with non-sensitive data before sharing; this plugin does not provide a separate permission system.
 >
@@ -112,11 +111,11 @@ Full accounting · password vaults · official data integrations · real-time tr
 
 ## 🗺 Roadmap
 
-The v0.5.8 release is available on GitHub, with static isolated-kernel gates and Chrome walkthrough coverage for the main UI, mobile layouts, accessibility, recovery paths and performance. The next feature slice should optimize the five-minute path from a member to a first reminder and its source record. Pinyin search, webhooks, QR labels, AI and family collaboration remain an observation pool until host capability and user evidence are available.
+The v0.5.9 release is available on GitHub, with static isolated-kernel gates and Chrome walkthrough coverage for the main UI, mobile layouts, accessibility, recovery paths and performance. The next feature slice should optimize the five-minute path from a member to a first reminder and its source record. Pinyin search, webhooks, QR labels, AI and family collaboration remain an observation pool until host capability and user evidence are available.
 
 | Phase | Content |
 |---|---|
-| ✅ v0.5.8 (current) | Zero-flicker tab switching (screenCache), reminder lead reset, child vaccine progress badge and full privacy boundaries; GitHub Release |
+| ✅ v0.5.9 (current) | Ecosystem integrations, security console audit, dangerous asset blocking, and full accessibility certification; GitHub Release |
 | 🔜 Next | Task workbench, evidence center, inbox, health recovery |
 | 🔭 Later | Family collaboration, template packs, yearly family report, AI capabilities |
 
