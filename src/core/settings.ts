@@ -26,6 +26,7 @@ export function defaultSettings(): HomeSettings {
         webhookEnabled: false,
         webhookUrl: "",
         webhookMode: "bark",
+        hideAmounts: false,
         avatar: DEFAULT_AVATAR,
     };
 }
@@ -286,6 +287,7 @@ export function normalizeImportedSettings(input: unknown): NormalizedImport {
         webhookEnabled: typeof data.webhookEnabled === "boolean" ? data.webhookEnabled : defaults.webhookEnabled,
         webhookUrl: typeof data.webhookUrl === "string" ? data.webhookUrl : defaults.webhookUrl,
         webhookMode: data.webhookMode === "ntfy" ? "ntfy" : "bark",
+        hideAmounts: typeof data.hideAmounts === "boolean" ? data.hideAmounts : defaults.hideAmounts,
     };
     return { settings, droppedModules, repairedMembers };
 }

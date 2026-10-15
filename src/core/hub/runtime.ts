@@ -35,6 +35,16 @@ export interface HandledRecord {
     at: string; // ISO
 }
 
+/** UIX-06 / §17 智能筛选命名视图（滴答清单智能清单印证） */
+export interface HubNamedView {
+    id: string;
+    name: string;
+    filter?: string;
+    memberId?: string;
+    moduleId?: string;
+    dueWithin?: string;
+}
+
 export interface HubRuntime {
     /** 运行态版本（33.3：协议版本化） */
     schemaVersion: 1;
@@ -105,10 +115,14 @@ export interface HubRuntime {
     monthlyDueTotals?: Record<string, number>;
     /** 266 波模块卡趋势条：日期键（localDateKey）→ { 模块 id → 当日待办计数 }；滚动窗口由写入方裁剪 */
     moduleHistory?: Record<string, Record<string, number>>;
+    /** UIX-06 / §17 智能筛选命名视图清单 */
+    hubNamedViews?: HubNamedView[];
+    /** UIX-07 / §17 计划处理日清单（Things 3 智能双日期：计划日与硬截止日分离） */
+    plannedDates?: Record<string, string>;
 }
 
 export function defaultRuntime(): HubRuntime {
-    return { schemaVersion: 1, snoozed: {}, muted: {}, handledYear: {}, handledUntil: {}, handled: {}, renewHistory: {}, memos: [] };
+    return { schemaVersion: 1, snoozed: {}, muted: {}, handledYear: {}, handledUntil: {}, handled: {}, renewHistory: {}, memos: [], hubNamedViews: [], plannedDates: {} };
 }
 
 function isPlainObject(value: unknown): value is Record<string, any> {
@@ -227,6 +241,46 @@ function normalizeNestedCounts(value: unknown): Record<string, Record<string, nu
     return Object.fromEntries(Object.entries(value).filter((entry) => isPlainObject(entry[1])).map(([date, counts]) => [date, numberRecord(counts)]));
 }
 
+function normalizeNamedViews(raw: unknown): HubNamedView[] {
+    if (!Array.isArray(raw)) return [];
+    return raw
+        .filter((v): v is Record<string, unknown> => isPlainObject(v) && typeof v.id === "string" && typeof v.name === "string" && v.name.trim().length > 0)
+        .map((v) => ({
+            id: String(v.id),
+            name: String(v.name).trim(),
+            filter: typeof v.filter === "string" ? v.filter : undefined,
+            memberId: typeof v.memberId === "string" ? v.memberId : undefined,
+            moduleId: typeof v.moduleId === "string" ? v.moduleId : undefined,
+            dueWithin: typeof v.dueWithin === "string" ? v.dueWithin : undefined,
+        }));
+}
+
+export function upsertNamedView(views: HubNamedView[] | undefined, view: Omit<HubNamedView, "id"> & { id?: string }): HubNamedView[] {
+    const list = views ?? [];
+    const name = view.name.trim();
+    if (!name) return list;
+    const id = view.id || `view_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
+    const idx = list.findIndex((v) => v.id === id);
+    const item: HubNamedView = {
+        id,
+        name,
+        filter: view.filter,
+        memberId: view.memberId,
+        moduleId: view.moduleId,
+        dueWithin: view.dueWithin,
+    };
+    if (idx >= 0) {
+        const next = [...list];
+        next[idx] = item;
+        return next;
+    }
+    return [...list, item];
+}
+
+export function deleteNamedView(views: HubNamedView[] | undefined, id: string): HubNamedView[] {
+    return (views ?? []).filter((v) => v.id !== id);
+}
+
 /** 旧缓存迁移（33.3）：缺字段补默认值；byModule/derived 为 H02/H04 新增。坏文件容错同 settings（15 组） */
 export async function loadRuntime(plugin: Plugin): Promise<HubRuntime> {
     const { data } = await import("../settings").then((m) => m.loadDataSafe(plugin, RUNTIME_NAME));
@@ -267,6 +321,8 @@ export async function loadRuntime(plugin: Plugin): Promise<HubRuntime> {
         monthlyCompletions: numberRecord(data.monthlyCompletions),
         monthlyDueTotals: numberRecord(data.monthlyDueTotals),
         moduleHistory: normalizeNestedCounts(data.moduleHistory),
+        hubNamedViews: normalizeNamedViews(data.hubNamedViews),
+        plannedDates: stringRecord(data.plannedDates),
     };
     if (isPlainObject(data.lastExamStats)
         && [data.lastExamStats.streak, data.lastExamStats.accuracy, data.lastExamStats.attempts, data.lastExamStats.generatedAt].every((n) => typeof n === "number" && Number.isFinite(n))) {
@@ -439,22 +495,25 @@ export function applyRuntime(
     for (const r of derived) {
         if (isHiddenByHandled(rt, r, today)) continue;
         const snoozeDate = rt.snoozed[r.id];
+        const planDate = rt.plannedDates?.[r.id];
         if (snoozeDate) {
             // snooze 未到 → 隐藏；已到 → 显示为"延后日"事项，按延后日距今分级（H06）
             if (todayKey < snoozeDate) continue;
             const daysLeft = Math.round((parseLocal(snoozeDate) - today.getTime()) / 86400000);
             const level: ReminderLevel = daysLeft < 0 ? "overdue" : "soon";
-            out.push({ ...r, dueDate: snoozeDate, daysLeft, level });
+            out.push({ ...r, dueDate: snoozeDate, daysLeft, level, ...(planDate ? { planDate } : {}) });
             continue;
         }
-        out.push(r);
+        out.push(planDate ? { ...r, planDate } : r);
     }
     for (const m of rt.memos ?? []) {
         if (m.doneAt) continue; // 已办备忘不进活跃列表（已处理视图可见可恢复）
         const daysLeft = Math.round((parseLocal(m.dueDate) - today.getTime()) / 86400000);
         const level: ReminderLevel = daysLeft < 0 ? "overdue" : daysLeft <= 7 ? "soon" : "lead";
+        const memoId = `adhoc::${m.id}`;
+        const planDate = rt.plannedDates?.[memoId] ?? rt.plannedDates?.[m.id];
         out.push({
-            id: `adhoc::${m.id}`,
+            id: memoId,
             moduleId: "adhoc",
             ruleKey: "memo",
             rowId: m.id,
@@ -463,6 +522,7 @@ export function applyRuntime(
             daysLeft,
             level,
             kind: "oneoff",
+            ...(planDate ? { planDate } : {}),
         });
     }
     return out.sort((a, b) => a.daysLeft - b.daysLeft || a.dueDate.localeCompare(b.dueDate));
@@ -524,4 +584,15 @@ export function listHandled(rt: HubRuntime, derived: Reminder[]): HandledEntry[]
 function parseLocal(ymd: string): number {
     const [y, m, d] = ymd.split("-").map(Number);
     return new Date(y, (m ?? 1) - 1, d ?? 1).getTime();
+}
+
+/** UIX-07 / §17 计划处理日设定（Things 3 计划日 Plan/When Date，与硬截止日 dueDate 分离） */
+export function setPlanDate(rt: HubRuntime, reminderId: string, planDate: string | undefined): void {
+    if (!rt.plannedDates) rt.plannedDates = {};
+    const val = (planDate ?? "").trim();
+    if (!val || val === "—") {
+        delete rt.plannedDates[reminderId];
+    } else {
+        rt.plannedDates[reminderId] = val;
+    }
 }

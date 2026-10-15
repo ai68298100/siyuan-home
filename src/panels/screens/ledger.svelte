@@ -16,7 +16,7 @@
     import { getCertificateProfile, getCertificateReminderField } from "@/core/schema";
     import type { ColumnDef } from "@/core/schema";
     import { getCaptureFields, getFormFields, validateCaptureInput, type CaptureInputError } from "@/core/capture";
-    import { assetHref, downloadAsset, isImageAsset, isEncryptedNotebookAsset } from "@/core/assets";
+    import { assetHref, downloadAsset, isImageAsset, isEncryptedNotebookAsset, isPdfAsset, isDangerousAsset } from "@/core/assets";
     import { calculateEnergyStats, type EnergyKind, type EnergyRecord } from "@/core/fuel";
     import { calculateMaintenanceStats, calculateVehicleCostSummary, createVehicleActionQueue, type MaintenanceRecord, type VehicleQuickAction } from "@/core/vehicle";
     import { loadRowLogs, updateRowLogs, getEntries, appendEntry, removeEntry } from "@/core/rowlog";
@@ -32,6 +32,21 @@
     import { calculateMembershipSpending } from "@/core/memberships";
     import { calculateMedicineSummary, formatMedicineRestockText } from "@/core/medicine";
     import { calculateRetirement, type RetirementWorkerType } from "@/core/retirement";
+    import { formatDesensitizedRecord } from "@/core/desensitize";
+    import { batchReassignMember } from "@/core/members";
+    import { matchWarrantyContracts, type ContractCandidate } from "@/core/warranty";
+    import { calculateSolidsObservation, buildAllergyFromFeeding } from "@/core/solids";
+    import { calculateFavorsSummary, formatFavorsReportText, type FavorRow } from "@/core/favors";
+    import { buildAssetFromShopping } from "@/core/shopping-asset";
+    import { calculateAssetValuation, type AssetRowData } from "@/core/assets-valuation";
+    import { checkAllergyConflicts, type FamilyAllergy } from "@/core/allergy-check";
+    import { calculateSchoolingMilestones, type SchoolingRowData } from "@/core/schooling";
+    import { calculateMediaSummary, type MediaRowData } from "@/core/media";
+    import { calculatePetCareSummary, type PetRowData } from "@/core/pets";
+    import { calculateImmunizationSchedule, type RecordedVaccineRow } from "@/core/immunization";
+    import { evaluateTravelCertsCheck, type TravelPlanContext, type CandidateCert } from "@/core/travel-certs";
+    import { getAllowedStatusTransitions } from "@/core/asset-lifecycle";
+    import { escapeHtml, escapeAttr } from "@/core/escape";
 
     let { plugin, t, version }: { plugin: HomePluginLike; t: (k: string) => string; version?: number } = $props();
 
@@ -62,6 +77,12 @@
     const panelMemory = panelSession(plugin);
     // Search matches title/note and pinyin; it is independent from member filtering.
     let searchText = $state(panelMemory.ledgerSearch);
+    let density = $state<"comfortable" | "compact">(panelMemory.ledgerDensity ?? "comfortable");
+
+    function toggleDensity() {
+        density = density === "comfortable" ? "compact" : "comfortable";
+        panelMemory.ledgerDensity = density;
+    }
     onDestroy(() => {
         loadRequest++;
         loadController?.abort();
@@ -243,6 +264,180 @@
         return calculateRetirement(targetRetireMember.birthday, currentRetireWorkerType);
     });
 
+    const favorsSummary = $derived.by(() => {
+        void version;
+        if (active !== "favors" || !ref?.columns) return undefined;
+        const nameCol = ref.columns.name;
+        const dirCol = ref.columns.direction;
+        const amtCol = ref.columns.amount;
+        const personCol = ref.columns.person;
+        const catCol = ref.columns.category;
+        const dateCol = ref.columns.date;
+        const fRows: FavorRow[] = rows.map((r) => ({
+            id: r.itemID,
+            name: cellText(r.cells[nameCol]),
+            category: cellText(r.cells[catCol]),
+            direction: r.cells[dirCol]?.select?.content ?? r.cells[dirCol]?.mSelect?.[0]?.content ?? r.cells[dirCol]?.text?.content,
+            person: cellText(r.cells[personCol]),
+            amount: r.cells[amtCol]?.number?.isNotEmpty && typeof r.cells[amtCol].number.content === "number" ? r.cells[amtCol].number.content : undefined,
+            date: cellText(r.cells[dateCol]),
+        }));
+        return calculateFavorsSummary(fRows);
+    });
+
+    const realAssetSummary = $derived.by(() => {
+        void version;
+        if (active !== "assets-real" || !ref?.columns) return undefined;
+        const nameCol = ref.columns.name;
+        const catCol = ref.columns.category;
+        const statusCol = ref.columns.status;
+        const amtCol = ref.columns.amount;
+        const aRows: AssetRowData[] = rows.map((r) => ({
+            id: r.itemID,
+            name: cellText(r.cells[nameCol]),
+            category: cellText(r.cells[catCol]),
+            status: r.cells[statusCol]?.select?.content ?? r.cells[statusCol]?.mSelect?.[0]?.content ?? r.cells[statusCol]?.text?.content ?? "inuse",
+            amount: r.cells[amtCol]?.number?.isNotEmpty && typeof r.cells[amtCol].number.content === "number" ? r.cells[amtCol].number.content : undefined,
+        }));
+        return calculateAssetValuation(aRows);
+    });
+
+    let selectedSchoolingIndex = $state(0);
+    const schoolingMilestones = $derived.by(() => {
+        void version;
+        if (active !== "schooling" || !ref?.columns) return [];
+        const nameCol = ref.columns.name;
+        const catCol = ref.columns.category;
+        const gradeCol = ref.columns.grade;
+        const schoolCol = ref.columns.school;
+        const statusCol = ref.columns.status;
+        const enrollCol = ref.columns.enroll_year;
+        const examCol = ref.columns.exam_date;
+        const sRows: SchoolingRowData[] = rows.map((r) => ({
+            id: r.itemID,
+            name: cellText(r.cells[nameCol]),
+            category: cellText(r.cells[catCol]),
+            grade: cellText(r.cells[gradeCol]),
+            school: cellText(r.cells[schoolCol]),
+            status: r.cells[statusCol]?.select?.content ?? r.cells[statusCol]?.mSelect?.[0]?.content ?? r.cells[statusCol]?.text?.content ?? "enrolled",
+            enroll_year: r.cells[enrollCol]?.number?.isNotEmpty && typeof r.cells[enrollCol].number.content === "number" ? r.cells[enrollCol].number.content : undefined,
+            exam_date: cellText(r.cells[examCol]) !== "—" ? cellText(r.cells[examCol]) : undefined,
+        }));
+        return calculateSchoolingMilestones(sRows);
+    });
+
+    const mediaSummary = $derived.by(() => {
+        void version;
+        if (active !== "media" || !ref?.columns) return undefined;
+        const nameCol = ref.columns.name;
+        const catCol = ref.columns.category;
+        const statusCol = ref.columns.status;
+        const ratingCol = ref.columns.rating;
+        const progressCol = ref.columns.progress;
+        const dateCol = ref.columns.date;
+        const nextUpdateCol = ref.columns.next_update;
+        const mRows: MediaRowData[] = rows.map((r) => ({
+            id: r.itemID,
+            name: cellText(r.cells[nameCol]),
+            category: cellText(r.cells[catCol]),
+            status: r.cells[statusCol]?.select?.content ?? r.cells[statusCol]?.mSelect?.[0]?.content ?? r.cells[statusCol]?.text?.content ?? "wishlist",
+            rating: r.cells[ratingCol]?.number?.isNotEmpty && typeof r.cells[ratingCol].number.content === "number" ? r.cells[ratingCol].number.content : undefined,
+            progress: cellText(r.cells[progressCol]),
+            date: cellText(r.cells[dateCol]),
+            next_update: cellText(r.cells[nextUpdateCol]),
+        }));
+        return calculateMediaSummary(mRows);
+    });
+
+    const petCareSummary = $derived.by(() => {
+        void version;
+        if (active !== "pets" || !ref?.columns) return undefined;
+        const nameCol = ref.columns.name;
+        const speciesCol = ref.columns.species;
+        const breedCol = ref.columns.breed;
+        const vaccineCol = ref.columns.vaccine_due;
+        const dewormCol = ref.columns.deworm_due;
+        const cycleCol = ref.columns.cycle;
+        const noteCol = ref.columns.note;
+        const pRows: PetRowData[] = rows.map((r) => ({
+            id: r.itemID,
+            name: cellText(r.cells[nameCol]),
+            species: cellText(r.cells[speciesCol]),
+            breed: cellText(r.cells[breedCol]),
+            vaccine_due: cellText(r.cells[vaccineCol]) !== "—" ? cellText(r.cells[vaccineCol]) : undefined,
+            deworm_due: cellText(r.cells[dewormCol]) !== "—" ? cellText(r.cells[dewormCol]) : undefined,
+            cycle: cellText(r.cells[cycleCol]),
+            note: cellText(r.cells[noteCol]),
+        }));
+        return calculatePetCareSummary(pRows);
+    });
+
+    function openFavorsReportModal() {
+        if (!favorsSummary) return;
+        const textReport = formatFavorsReportText(favorsSummary, formatAmount);
+        const dlg = new Dialog({
+            title: t("favors.reportTitle").replace("${year}", String(favorsSummary.year)),
+            content: `
+                <div class="b3-dialog__content fn__flex" style="flex-direction:column;gap:12px;max-height:60vh;overflow:auto;padding:16px 20px">
+                    <div class="fn__flex" style="gap:16px;justify-content:space-between;padding:12px 14px;border-radius:var(--lv-r-2);background:var(--lv-surface-2);border:1px solid var(--lv-line)">
+                        <div>
+                            <div class="ft__on-surface" style="font-size:11.5px">${t("favors.netAmount")}</div>
+                            <b style="font-size:22px;color:var(--lv-tx);font-weight:700">¥ ${formatAmount(favorsSummary.netAmount)}</b>
+                            <span style="font-size:11px;color:var(--lv-tx-3);margin-left:4px">${favorsSummary.netAmount >= 0 ? `(${t("favors.netIn")})` : `(${t("favors.netOut")})`}</span>
+                        </div>
+                        <div style="text-align:right">
+                            <div style="font-size:12px;color:var(--lv-ok)">${t("favors.totalIn")}：¥ ${formatAmount(favorsSummary.totalIn)}（${favorsSummary.countIn}笔）</div>
+                            <div style="font-size:12px;color:var(--lv-tx-2);margin-top:4px">${t("favors.totalOut")}：¥ ${formatAmount(favorsSummary.totalOut)}（${favorsSummary.countOut}笔）</div>
+                        </div>
+                    </div>
+                    ${favorsSummary.topIn.length > 0 ? `
+                        <div>
+                            <div class="ft__on-surface" style="font-size:12px;font-weight:600;margin-bottom:6px">${t("favors.topIn")}</div>
+                            <div class="fn__flex" style="flex-direction:column;gap:4px">
+                                ${favorsSummary.topIn.map((p, idx) => `
+                                    <div class="fn__flex" style="justify-content:space-between;font-size:12px;padding:4px 8px;background:var(--lv-surface);border-radius:4px">
+                                        <span>${idx + 1}. <b>${escapeHtml(p.person)}</b> (${p.count}笔)</span>
+                                        <b style="color:var(--lv-ok)">¥ ${formatAmount(p.totalIn)}</b>
+                                    </div>
+                                `).join("")}
+                            </div>
+                        </div>
+                    ` : ""}
+                    ${favorsSummary.topOut.length > 0 ? `
+                        <div>
+                            <div class="ft__on-surface" style="font-size:12px;font-weight:600;margin-bottom:6px">${t("favors.topOut")}</div>
+                            <div class="fn__flex" style="flex-direction:column;gap:4px">
+                                ${favorsSummary.topOut.map((p, idx) => `
+                                    <div class="fn__flex" style="justify-content:space-between;font-size:12px;padding:4px 8px;background:var(--lv-surface);border-radius:4px">
+                                        <span>${idx + 1}. <b>${escapeHtml(p.person)}</b> (${p.count}笔)</span>
+                                        <b style="color:var(--lv-tx-2)">¥ ${formatAmount(p.totalOut)}</b>
+                                    </div>
+                                `).join("")}
+                            </div>
+                        </div>
+                    ` : ""}
+                </div>
+                <div class="b3-dialog__action">
+                    <button class="b3-button b3-button--cancel" id="lv-favors-copy">${t("favors.copyReport")}</button>
+                    <button class="b3-button" id="lv-favors-close">${t("close")}</button>
+                </div>
+            `,
+            width: "440px",
+        });
+
+        const copyBtn = dlg.element.querySelector("#lv-favors-copy") as HTMLButtonElement;
+        const closeBtn = dlg.element.querySelector("#lv-favors-close") as HTMLButtonElement;
+        closeBtn.onclick = () => dlg.destroy();
+        copyBtn.onclick = async () => {
+            try {
+                await navigator.clipboard.writeText(textReport);
+                showMessage(t("favors.copyDone"), 2500, "info");
+            } catch (e) {
+                showMessage(String(e), 4000, "error");
+            }
+        };
+    }
+
     async function copyMedicineRestock() {
         if (!medicineSummary) return;
         const text = formatMedicineRestockText(medicineSummary, t);
@@ -408,6 +603,312 @@
         });
     }
 
+    // MOD-17 / §8 儿童国家免疫规划疫苗排期视图
+    function openImmunizationScheduleDialog() {
+        const children = (plugin.settings.members ?? []).filter((m) => m.role === "child" || !!m.birthday);
+        if (children.length === 0) {
+            showMessage(t("immunization.noChild"), 4500, "info");
+            return;
+        }
+
+        let childIndex = 0;
+        let activeChild = children[childIndex];
+
+        const vaccineCatVal = t("field.category.opt.vaccine_p");
+        const getRecordedVaccines = (childMemberId?: string): RecordedVaccineRow[] => {
+            const catCol = ref?.columns?.category;
+            const nameCol = ref?.columns?.name;
+            const vNameCol = ref?.columns?.vaccine_name;
+            const doseCol = ref?.columns?.dose_no;
+            const dateCol = ref?.columns?.date;
+            const memCol = ref?.columns?.member;
+
+            return rows.filter((r) => {
+                const cVal = String(cellText(r.cells[catCol]));
+                if (cVal !== "vaccine_p" && cVal !== vaccineCatVal) return false;
+                if (childMemberId && memCol) {
+                    const blockId = r.cells[memCol]?.relation?.blockIDs?.[0];
+                    if (blockId && blockId !== activeChild.avItemId) return false;
+                }
+                return true;
+            }).map((r) => ({
+                id: r.itemID,
+                name: cellText(r.cells[nameCol]),
+                vaccine_name: cellText(r.cells[vNameCol]),
+                dose_no: cellText(r.cells[doseCol]),
+                date: cellText(r.cells[dateCol]),
+            }));
+        };
+
+        const dlg = new Dialog({
+            title: t("immunization.dialogTitle"),
+            content: `
+                <div class="b3-dialog__content fn__flex" style="flex-direction:column;gap:12px;max-height:68vh;overflow:auto;padding:16px 20px">
+                    <div id="lv-vax-header" class="fn__flex" style="align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px"></div>
+                    <div id="lv-vax-summary" class="fn__flex" style="gap:8px;align-items:center;flex-wrap:wrap"></div>
+                    <div id="lv-vax-list" class="fn__flex" style="flex-direction:column;gap:6px;margin-top:6px"></div>
+                </div>
+                <div class="b3-dialog__action">
+                    <button class="b3-button" id="lv-vax-close">${t("close")}</button>
+                </div>
+            `,
+            width: "600px",
+        });
+
+        const headerEl = dlg.element.querySelector("#lv-vax-header") as HTMLElement;
+        const summaryEl = dlg.element.querySelector("#lv-vax-summary") as HTMLElement;
+        const listEl = dlg.element.querySelector("#lv-vax-list") as HTMLElement;
+        const closeBtn = dlg.element.querySelector("#lv-vax-close") as HTMLButtonElement;
+        closeBtn.onclick = () => dlg.destroy();
+
+        const renderDialogBody = () => {
+            activeChild = children[childIndex];
+            if (!activeChild?.birthday) {
+                summaryEl.innerHTML = `<span class="ft__error" style="font-size:12px">${escapeHtml(activeChild.name)} 尚未填写出生日期，无法推算标准接种月龄</span>`;
+                listEl.innerHTML = "";
+                return;
+            }
+
+            const recorded = getRecordedVaccines(activeChild.avItemId);
+            const schedule = calculateImmunizationSchedule(activeChild.birthday, activeChild.name, recorded);
+            if (!schedule) return;
+
+            headerEl.innerHTML = `
+                <div style="font-size:13px;font-weight:600;display:flex;align-items:center;gap:6px">
+                    <span>${escapeHtml(activeChild.name)}</span>
+                    <span class="lv-caption" style="font-size:11.5px">（出生于 ${escapeHtml(activeChild.birthday)}）</span>
+                </div>
+                ${children.length > 1 ? `
+                    <select id="lv-vax-child-select" class="b3-select" style="font-size:12px">
+                        ${children.map((c, i) => `<option value="${i}" ${i === childIndex ? "selected" : ""}>${escapeHtml(c.name)}</option>`).join("")}
+                    </select>
+                ` : ""}
+            `;
+
+            const childSelect = headerEl.querySelector("#lv-vax-child-select") as HTMLSelectElement | null;
+            if (childSelect) {
+                childSelect.onchange = (e) => {
+                    childIndex = Number((e.target as HTMLSelectElement).value);
+                    renderDialogBody();
+                };
+            }
+
+            summaryEl.innerHTML = `
+                <span class="lv-badge green lv-num">✓ ${t("immunization.received")} ${schedule.receivedCount}</span>
+                <span class="lv-badge ${schedule.overdueCount > 0 ? 'red' : 'green'} lv-num">${schedule.overdueCount > 0 ? '!' : '✓'} ${t("immunization.overdue")} ${schedule.overdueCount}</span>
+                <span class="lv-badge yellow lv-num">● ${t("immunization.upcoming")} ${schedule.upcomingCount}</span>
+                <span class="lv-caption" style="margin-left:auto;font-size:11px">共 ${schedule.totalDoses} 剂标准程序</span>
+            `;
+
+            listEl.innerHTML = "";
+            for (const item of schedule.schedule) {
+                const itemEl = document.createElement("div");
+                itemEl.style.cssText = `display:flex;align-items:center;justify-content:space-between;gap:12px;padding:8px 12px;border-radius:var(--lv-r-2);border:1px solid var(--lv-line);background:${item.status === 'received' ? 'var(--lv-surface)' : item.status === 'overdue' ? 'color-mix(in srgb, var(--lv-danger) 8%, var(--lv-surface))' : 'var(--lv-surface-2)'}`;
+
+                const left = document.createElement("div");
+                left.style.cssText = "min-width:0;display:flex;flex-direction:column;gap:2px";
+                left.innerHTML = `
+                    <div style="font-size:13px;font-weight:600;color:var(--lv-tx)">
+                        ${escapeHtml(item.vaccine)} · 第 ${item.dose} 剂
+                        <span class="lv-caption" style="font-size:11px;font-weight:normal;margin-left:6px">${t("immunization.monthAge").replace("${n}", String(item.monthAge))} ${item.note ? `(${escapeHtml(item.note)})` : ""}</span>
+                    </div>
+                    <div style="font-size:11.5px;color:var(--lv-tx-3)">
+                        ${t("immunization.targetDate")}：${escapeHtml(item.targetDate)}
+                        ${item.receivedDate ? ` · <b style="color:var(--lv-ok)">${t("immunization.actualDate")}：${escapeHtml(item.receivedDate)}</b>` : ""}
+                    </div>
+                `;
+
+                const right = document.createElement("div");
+                right.style.cssText = "display:flex;align-items:center;gap:8px;flex-shrink:0";
+
+                let statusBadge = "";
+                if (item.status === "received") {
+                    statusBadge = `<span class="lv-badge green">${t("immunization.received")}</span>`;
+                } else if (item.status === "overdue") {
+                    statusBadge = `<span class="lv-badge red">${t("immunization.overdue")}</span>`;
+                } else {
+                    statusBadge = `<span class="lv-badge yellow">${t("immunization.upcoming")}</span>`;
+                }
+                right.innerHTML = statusBadge;
+
+                if (item.status !== "received") {
+                    const logBtn = document.createElement("button");
+                    logBtn.className = "b3-button b3-button--text b3-button--small";
+                    logBtn.style.cssText = "font-size:11px;padding:2px 6px";
+                    logBtn.textContent = t("immunization.logVaccine");
+                    logBtn.onclick = async () => {
+                        const todayStr = localDateKey(new Date());
+                        logBtn.disabled = true;
+                        try {
+                            const { addDetachedRow, setCell } = await import("@/core/siyuan");
+                            const opKey = `vax:log:${activeChild.id}:${item.vaccine}:${item.dose}`;
+                            const newRowId = await addDetachedRow(ref!.avId!, `${item.vaccine}（第${item.dose}剂）`, {
+                                idempotencyKey: `${opKey}:row`,
+                                retries: 1,
+                            });
+                            const cols = ref!.columns ?? {};
+                            if (cols.category) {
+                                await setCell(ref!.avId!, cols.category, newRowId, selectCellValue("vaccine_p"), {
+                                    idempotencyKey: `${opKey}:category`,
+                                    retries: 1,
+                                });
+                            }
+                            if (cols.vaccine_name) {
+                                await setCell(ref!.avId!, cols.vaccine_name, newRowId, { type: "text", text: { content: item.vaccine } }, { idempotencyKey: `${opKey}:name`, retries: 1 });
+                            }
+                            if (cols.dose_no) {
+                                await setCell(ref!.avId!, cols.dose_no, newRowId, { type: "number", number: { content: item.dose, isNotEmpty: true } }, { idempotencyKey: `${opKey}:dose`, retries: 1 });
+                            }
+                            if (cols.date) {
+                                await setCell(ref!.avId!, cols.date, newRowId, {
+                                    type: "date",
+                                    date: { content: new Date(`${todayStr}T00:00:00`).getTime(), isNotEmpty: true, isNotTime: true },
+                                }, { idempotencyKey: `${opKey}:date`, retries: 1 });
+                            }
+                            if (cols.member && activeChild.avItemId) {
+                                await setCell(ref!.avId!, cols.member, newRowId, {
+                                    type: "relation",
+                                    relation: { blockIDs: [activeChild.avItemId], contents: null },
+                                }, { idempotencyKey: `${opKey}:member`, retries: 1 });
+                            }
+                            showMessage(t("immunization.logged").replace("${name}", item.vaccine).replace("${dose}", String(item.dose)), 2500, "info");
+                            await load();
+                            try { await plugin.refreshHub?.(["parenting"]); } catch { /* ignore */ }
+                            renderDialogBody();
+                        } catch (err) {
+                            showMessage(String(err), 5000, "error");
+                            logBtn.disabled = false;
+                        }
+                    };
+                    right.appendChild(logBtn);
+                }
+
+                itemEl.append(left, right);
+                listEl.appendChild(itemEl);
+            }
+        };
+
+        renderDialogBody();
+    }
+
+    // MOD-18 / §11 行前清单证件自查与护照 6 个月黄金规则核验
+    async function openTravelCertsCheckDialog(tripRow?: any) {
+        const targetRow = tripRow ?? (filteredRows.length > 0 ? filteredRows[0] : null);
+        if (!targetRow) {
+            showMessage(t("ledger.loadIncomplete"), 3000, "info");
+            return;
+        }
+
+        const certsRef = plugin.settings.dbRefs?.["certs"];
+        if (!certsRef?.avId) {
+            showMessage(t("travel.noCerts"), 5000, "error");
+            return;
+        }
+
+        const tripName = String(cellText(targetRow.cells[ref?.columns?.name]));
+        const destination = ref?.columns?.destination ? String(cellText(targetRow.cells[ref.columns.destination])) : "";
+        const startDate = ref?.columns?.date ? String(cellText(targetRow.cells[ref.columns.date])) : "";
+        const memberBid = ref?.columns?.member ? targetRow.cells[ref.columns.member]?.relation?.blockIDs?.[0] : undefined;
+        const memberObj = memberBid ? (plugin.settings.members ?? []).find((m) => m.avItemId === memberBid) : undefined;
+
+        try {
+            const { renderLedgerAll } = await import("@/core/siyuan");
+            const certsLedger = await renderLedgerAll(certsRef.avId);
+            const cNameCol = certsRef.columns?.name;
+            const cCatCol = certsRef.columns?.category;
+            const cExpCol = certsRef.columns?.expiry;
+            const cMemCol = certsRef.columns?.member;
+
+            const certs: CandidateCert[] = certsLedger.rows.map((cr) => ({
+                id: cr.itemID,
+                name: cellText(cr.cells[cNameCol]),
+                category: cellText(cr.cells[cCatCol]),
+                expiry: cellText(cr.cells[cExpCol]) !== "—" ? cellText(cr.cells[cExpCol]) : undefined,
+                memberId: cMemCol ? cr.cells[cMemCol]?.relation?.blockIDs?.[0] : undefined,
+            })).filter((c) => c.name && c.name !== "—");
+
+            if (certs.length === 0) {
+                showMessage(t("travel.noCerts"), 5000, "info");
+                return;
+            }
+
+            const context: TravelPlanContext = {
+                tripName,
+                destination: destination !== "—" ? destination : "",
+                startDate: startDate !== "—" ? startDate : undefined,
+                travelerMemberId: memberBid,
+                travelerName: memberObj?.name,
+            };
+
+            const summary = evaluateTravelCertsCheck(context, certs);
+
+            const dlg = new Dialog({
+                title: t("travel.checkTitle"),
+                content: `
+                    <div class="b3-dialog__content fn__flex" style="flex-direction:column;gap:12px;max-height:68vh;overflow:auto;padding:16px 20px">
+                        <div class="fn__flex" style="justify-content:space-between;align-items:center;padding:12px 14px;border-radius:var(--lv-r-2);background:var(--lv-surface-2);border:1px solid var(--lv-line)">
+                            <div>
+                                <div style="font-size:14px;font-weight:700;color:var(--lv-tx)">${escapeHtml(summary.tripName)}${summary.destination ? ` · ${escapeHtml(summary.destination)}` : ""}</div>
+                                <div class="lv-caption" style="font-size:11.5px;margin-top:2px">${t("travel.travelDate")}：${escapeHtml(summary.travelDate)}</div>
+                            </div>
+                            <div>
+                                <span class="lv-badge ${summary.overallStatus === 'pass' ? 'green' : summary.overallStatus === 'fail' ? 'red' : 'yellow'}" style="font-size:12px">
+                                    ${summary.overallStatus === 'pass' ? t("travel.statusPass") : summary.overallStatus === 'fail' ? t("travel.statusFail") : t("travel.statusWarn")}
+                                </span>
+                            </div>
+                        </div>
+                        <div style="font-size:11.5px;color:var(--lv-tx-3);line-height:1.4">
+                            💡 ${t("travel.ruleHint")}
+                        </div>
+                        <div class="fn__flex" style="flex-direction:column;gap:8px;margin-top:4px">
+                            ${summary.checks.map((ck) => `
+                                <div style="padding:10px 12px;border-radius:var(--lv-r-2);background:${ck.status === 'fail' ? 'color-mix(in srgb, var(--lv-danger) 8%, var(--lv-surface))' : 'var(--lv-surface)'};border:1px solid var(--lv-line);display:flex;flex-direction:column;gap:4px">
+                                    <div style="display:flex;justify-content:space-between;align-items:center">
+                                        <b style="font-size:13px;color:var(--lv-tx)">${escapeHtml(ck.certName)}</b>
+                                        <span class="lv-badge ${ck.status === 'pass' ? 'green' : ck.status === 'fail' ? 'red' : 'yellow'}">
+                                            ${ck.status === 'pass' ? '✓ 合规' : ck.status === 'fail' ? '! 风险' : '待核'}
+                                        </span>
+                                    </div>
+                                    <div style="font-size:12px;color:${ck.status === 'fail' ? 'var(--lv-danger)' : 'var(--lv-tx-2)'}">
+                                        ${escapeHtml(ck.message)}
+                                    </div>
+                                </div>
+                            `).join("")}
+                        </div>
+                    </div>
+                    <div class="b3-dialog__action">
+                        <button class="b3-button b3-button--outline" id="lv-travel-archive">${t("travel.archiveCheck")}</button>
+                        <button class="b3-button" id="lv-travel-close">${t("close")}</button>
+                    </div>
+                `,
+                width: "560px",
+            });
+
+            const archiveBtn = dlg.element.querySelector("#lv-travel-archive") as HTMLButtonElement;
+            const closeBtn = dlg.element.querySelector("#lv-travel-close") as HTMLButtonElement;
+            closeBtn.onclick = () => dlg.destroy();
+            archiveBtn.onclick = async () => {
+                archiveBtn.disabled = true;
+                try {
+                    const { updateRowLogs, appendEntry } = await import("@/core/rowlog");
+                    const travelAvId = ref?.avId || plugin.settings.dbRefs?.["travel-plan"]?.avId || "";
+                    await updateRowLogs(plugin as any, (current) => appendEntry(current, travelAvId, targetRow.itemID, "checks", {
+                        date: localDateKey(new Date()),
+                        result: summary.conclusionText,
+                        at: new Date().toISOString(),
+                    }));
+                    showMessage(t("travel.archiveDone"), 3000, "info");
+                    archiveBtn.textContent = "✓ 已存档";
+                } catch (err) {
+                    showMessage(String(err), 4000, "error");
+                    archiveBtn.disabled = false;
+                }
+            };
+        } catch (e) {
+            showMessage(String(e), 5000, "error");
+        }
+    }
+
     async function rebuildLedger() {
         rebuilding = true;
         try {
@@ -454,6 +955,105 @@
             onReload: load,
             onRefreshHub: (modules) => plugin.refreshHub?.(modules),
         });
+    }
+
+    // MOD-05 / §15 引用完整性：批量改派成员归属
+    function openBatchReassignModal() {
+        if (!ref?.avId || !ref?.columns?.member) return;
+        const memberColKey = ref.columns.member;
+        const validMembers = (plugin.settings.members ?? []).filter((m) => !!m.avItemId);
+        if (validMembers.length === 0) {
+            showMessage(t("ledger.reassignNoTarget"), 4000, "error");
+            return;
+        }
+
+        const isUnassignedRow = (r: any) => {
+            const blockId = r.cells?.[memberColKey]?.relation?.blockIDs?.[0];
+            return !blockId || !validMembers.some((m) => m.avItemId === blockId);
+        };
+        const unassignedRows = filteredRows.filter(isUnassignedRow);
+        const totalCount = filteredRows.length;
+        const unassignedCount = unassignedRows.length;
+
+        const dlg = new Dialog({
+            title: t("ledger.reassignTitle"),
+            content: `
+                <div class="b3-dialog__content fn__flex" style="flex-direction:column;gap:14px;padding:16px 20px">
+                    <div>
+                        <label class="ft__on-surface" style="font-size:12px;margin-bottom:6px;display:block;font-weight:600">${t("ledger.reassignTarget")}</label>
+                        <select id="lv-reassign-target-select" class="b3-select" style="width:100%">
+                            ${validMembers.map((m) => `<option value="${escapeAttr(m.avItemId)}">${escapeHtml(m.name)}（${escapeHtml(t(`role.${m.role}`) !== `role.${m.role}` ? t(`role.${m.role}`) : m.role)}）</option>`).join("")}
+                        </select>
+                    </div>
+                    <div>
+                        <label class="ft__on-surface" style="font-size:12px;margin-bottom:6px;display:block;font-weight:600">${t("ledger.reassignScope")}</label>
+                        <label class="fn__flex" style="align-items:center;gap:8px;font-size:13px;cursor:pointer">
+                            <input type="radio" name="lv-reassign-scope" value="unassigned" ${unassignedCount > 0 ? "checked" : ""} class="b3-radio" />
+                            <span>${t("ledger.reassignScopeUnassigned")}（${unassignedCount}）</span>
+                        </label>
+                        <label class="fn__flex" style="align-items:center;gap:8px;font-size:13px;cursor:pointer;margin-top:8px">
+                            <input type="radio" name="lv-reassign-scope" value="all" ${unassignedCount === 0 ? "checked" : ""} class="b3-radio" />
+                            <span>${t("ledger.reassignScopeAll")}（${totalCount}）</span>
+                        </label>
+                    </div>
+                </div>
+                <div class="b3-dialog__action">
+                    <button class="b3-button b3-button--cancel" id="lv-reassign-cancel">${t("cancel")}</button>
+                    <button class="b3-button b3-button--text" id="lv-reassign-confirm">${t("ledger.reassignConfirm").replace("${n}", String(unassignedCount > 0 ? unassignedCount : totalCount))}</button>
+                </div>
+            `,
+            width: "420px",
+        });
+
+        const targetSelect = dlg.element.querySelector("#lv-reassign-target-select") as HTMLSelectElement;
+        const cancelBtn = dlg.element.querySelector("#lv-reassign-cancel") as HTMLButtonElement;
+        const confirmBtn = dlg.element.querySelector("#lv-reassign-confirm") as HTMLButtonElement;
+        const radios = dlg.element.querySelectorAll<HTMLInputElement>("input[name='lv-reassign-scope']");
+
+        const updateConfirmText = () => {
+            const checked = dlg.element.querySelector<HTMLInputElement>("input[name='lv-reassign-scope']:checked")?.value;
+            const count = checked === "all" ? totalCount : unassignedCount;
+            confirmBtn.textContent = t("ledger.reassignConfirm").replace("${n}", String(count));
+            confirmBtn.disabled = count === 0;
+        };
+        radios.forEach((r) => r.onchange = updateConfirmText);
+        updateConfirmText();
+
+        cancelBtn.onclick = () => dlg.destroy();
+        confirmBtn.onclick = async () => {
+            const targetAvItemId = targetSelect.value;
+            const targetMember = validMembers.find((m) => m.avItemId === targetAvItemId);
+            const checkedScope = dlg.element.querySelector<HTMLInputElement>("input[name='lv-reassign-scope']:checked")?.value;
+            const rowsToReassign = (checkedScope === "all" ? filteredRows : unassignedRows).map((r) => r.itemID);
+
+            if (rowsToReassign.length === 0) {
+                showMessage(t("ledger.reassignNoRows"), 3000, "info");
+                return;
+            }
+
+            confirmBtn.disabled = true;
+            cancelBtn.disabled = true;
+            try {
+                const res = await batchReassignMember({
+                    avId: ref!.avId!,
+                    memberColKey,
+                    targetAvItemId,
+                    rowItemIds: rowsToReassign,
+                });
+                dlg.destroy();
+                if (res.successCount > 0) {
+                    showMessage(t("ledger.reassignDone").replace("${n}", String(res.successCount)).replace("${member}", targetMember?.name ?? ""), 3000, "info");
+                    await load();
+                    try {
+                        await plugin.refreshHub?.(undefined, true);
+                    } catch { /* ignored */ }
+                } else if (res.failedCount > 0) {
+                    showMessage(t("ledger.reassignFailed").replace("${msg}", res.errors[0] || ""), 5000, "error");
+                }
+            } catch (e) {
+                showMessage(t("ledger.reassignFailed").replace("${msg}", e instanceof Error ? e.message : String(e)), 5000, "error");
+            }
+        };
     }
 
     async function load() {
@@ -887,7 +1487,7 @@
                 const list = v.mSelect?.length ? v.mSelect.map((o: any) => o.content).join(", ") : "—";
                 return colKey && list !== "—" ? optLabelText(t, colKey, list) : list;
             }
-            case "number": return v.number?.isNotEmpty ? String(v.number.content) : "—";
+            case "number": return (!revealSensitive && colKey && AMOUNT_KEYS.has(colKey) && plugin.settings.hideAmounts) ? "****" : (v.number?.isNotEmpty ? String(v.number.content) : "—");
             case "url": return v.url?.content ?? "—";
             case "checkbox": return v.checkbox?.checked ? "是" : "—";
             case "block": return v.block?.content ?? "—";
@@ -961,7 +1561,7 @@
         const dlg = new Dialog({
             title: detailTitle,
             content: `<div class="b3-dialog__content b3-dialog__content--wrap" id="lv-detail-body" style="max-height:60vh;overflow:auto"></div>
-<div class="b3-dialog__action lv-detail-actions"><button class="b3-button b3-button--text ft__error" id="lv-detail-del" style="color:var(--b3-theme-error)">${t("delete")}</button><span class="fn__flex-1"></span><details class="lv-detail-more"><summary class="b3-button b3-button--outline">${t("ledger.detailMore")}</summary><div class="lv-detail-more-menu"><button class="b3-button b3-button--cancel" id="lv-detail-card-copy">${t("ledger.copyAsImage")}</button><button class="b3-button b3-button--cancel" id="lv-detail-card-png">${t("ledger.downloadPng")}</button><button class="b3-button b3-button--cancel" id="lv-detail-card-text">${t("ledger.copyAsText")}</button><button class="b3-button b3-button--cancel" id="lv-detail-open">${t("ledger.openDoc")} →</button></div></details><button class="b3-button b3-button--cancel" id="lv-detail-close">${t("close")}</button><button class="b3-button" id="lv-detail-edit">${t("ledger.detailEditAll")}</button></div>`,
+<div class="b3-dialog__action lv-detail-actions"><button class="b3-button b3-button--text ft__error" id="lv-detail-del" style="color:var(--b3-theme-error)">${t("delete")}</button><span class="fn__flex-1"></span><details class="lv-detail-more"><summary class="b3-button b3-button--outline">${t("ledger.detailMore")}</summary><div class="lv-detail-more-menu"><button class="b3-button b3-button--cancel" id="lv-detail-card-copy">${t("ledger.copyAsImage")}</button><button class="b3-button b3-button--cancel" id="lv-detail-card-png">${t("ledger.downloadPng")}</button><button class="b3-button b3-button--cancel" id="lv-detail-card-text">${t("ledger.copyAsText")}</button><button class="b3-button b3-button--cancel" id="lv-detail-card-text-masked">${t("ledger.copyAsMaskedText")}</button><button class="b3-button b3-button--cancel" id="lv-detail-open">${t("ledger.openDoc")} →</button></div></details><button class="b3-button b3-button--cancel" id="lv-detail-close">${t("close")}</button><button class="b3-button" id="lv-detail-edit">${t("ledger.detailEditAll")}</button></div>`,
             width: "520px",
         });
         const body = dlg.element.querySelector("#lv-detail-body") as HTMLElement;
@@ -1291,17 +1891,25 @@
                     name.textContent = `📎 ${f.name ?? f.content ?? "?"}`;
                     line.appendChild(name);
                     if (f.content) {
-                        try {
-                            const preview = document.createElement("a");
-                            preview.className = "b3-button b3-button--text";
-                            preview.style.cssText = "padding:2px 4px;font-size:12px";
-                            preview.textContent = t("ledger.previewAttachment");
-                            preview.href = assetHref(f.content);
-                            preview.target = "_blank";
-                            preview.rel = "noopener noreferrer";
-                            line.appendChild(preview);
-                        } catch {
-                            // A malformed/legacy path remains visible by name but cannot become a navigation target.
+                        if (isDangerousAsset(f.name || f.content || "")) {
+                            const warnBadge = document.createElement("span");
+                            warnBadge.className = "lv-badge red";
+                            warnBadge.style.cssText = "font-size:11px;margin-left:4px";
+                            warnBadge.textContent = `⚠️ ${t("ledger.dangerousAssetNotice")}`;
+                            line.appendChild(warnBadge);
+                        } else {
+                            try {
+                                const preview = document.createElement("a");
+                                preview.className = "b3-button b3-button--text";
+                                preview.style.cssText = "padding:2px 4px;font-size:12px";
+                                preview.textContent = isPdfAsset(f.content || "") ? t("ledger.previewPdf") : t("ledger.previewAttachment");
+                                preview.href = assetHref(f.content);
+                                preview.target = "_blank";
+                                preview.rel = "noopener noreferrer";
+                                line.appendChild(preview);
+                            } catch {
+                                // A malformed/legacy path remains visible by name but cannot become a navigation target.
+                            }
                         }
                         const download = document.createElement("button");
                         download.className = "b3-button b3-button--text";
@@ -1426,7 +2034,7 @@
             }
         }
         // View mode includes key/value rows, history, and attachments.
-        let cardRows: { label: string; value: string }[] = [];
+        let cardRows: { key?: string; label: string; value: string }[] = [];
         function buildView() {
             body.innerHTML = "";
             cardRows = [];
@@ -1453,7 +2061,7 @@
                 // 提案 B/210 波：金额白名单列的数值走千分位显示（CSV/导入仍为机器可读原始值）
                 const cell = row.cells[keyID];
                 if (AMOUNT_KEYS.has(col.key) && cell?.type === "number" && cell?.number?.isNotEmpty && typeof cell.number.content === "number") {
-                    v.textContent = formatAmount(cell.number.content);
+                    v.textContent = formatAmount(cell.number.content, plugin.settings.hideAmounts);
                 } else {
                     v.textContent = cellText(cell, col.key); // 211 波：select 值走枚举 i18n
                 }
@@ -1540,7 +2148,7 @@
             }
                 line.append(v);
                 body.appendChild(line);
-                cardRows.push({ label: colLabel(col), value: v.classList.contains("is-empty") ? "—" : String(v.textContent) });
+                cardRows.push({ key: col.key, label: colLabel(col), value: v.classList.contains("is-empty") ? "—" : String(v.textContent) });
             }
             // Append user-created columns outside the schema as a read-only section.
             const schemaKeyIDs = new Set(Object.values<string>(ref!.columns));
@@ -1581,6 +2189,7 @@
                     }
                     line.append(v);
                     body.appendChild(line);
+                    cardRows.push({ key: c.id, label: String(c.name), value: v.classList.contains("is-empty") ? "—" : String(v.textContent) });
                 }
             }
         // Shared row-log timeline section; deletion cleanup is handled with the row.
@@ -2710,6 +3319,107 @@
         }
         addStockInButton();
 
+        // Shopping purchase to physical asset creation linkage
+        function addRealAssetButton() {
+            if (active !== "shopping") return;
+            const assetRef = plugin.settings.dbRefs?.["assets-real"];
+            const name = String(cellText(row.cells[ref!.columns.name]));
+            if (!name || name === "—") return;
+
+            const btn = document.createElement("button");
+            btn.className = "b3-button b3-button--outline";
+            btn.style.cssText = "margin-top:8px;font-size:12px";
+            btn.textContent = `📦 ${t("ledger.toRealAsset")}`;
+
+            btn.onclick = () => {
+                if (!assetRef?.avId) {
+                    showMessage(t("ledger.toRealAssetNoLedger"), 5000, "error");
+                    return;
+                }
+
+                const catRaw = cellText(row.cells[ref!.columns.category]);
+                const amtRaw = row.cells[ref!.columns.amount]?.number?.content;
+                const dateRaw = cellText(row.cells[ref!.columns.date]);
+                const channelRaw = cellText(row.cells[ref!.columns.channel]);
+                const memberBid = ref!.columns.member ? row.cells[ref!.columns.member]?.relation?.blockIDs?.[0] : undefined;
+
+                const payload = buildAssetFromShopping({
+                    name,
+                    category: catRaw !== "—" ? catRaw : undefined,
+                    amount: typeof amtRaw === "number" ? amtRaw : undefined,
+                    date: dateRaw !== "—" ? dateRaw : undefined,
+                    channel: channelRaw !== "—" ? channelRaw : undefined,
+                    memberBlockId: memberBid,
+                });
+
+                const bodyText = t("ledger.toRealAssetBody")
+                    .replace("${name}", payload.name)
+                    .replace("${category}", t(`field.category.opt.${payload.category}`) !== `field.category.opt.${payload.category}` ? t(`field.category.opt.${payload.category}`) : payload.category)
+                    .replace("${amount}", formatAmount(payload.amount ?? 0));
+
+                confirm(t("ledger.toRealAssetTitle"), bodyText, async () => {
+                    btn.disabled = true;
+                    try {
+                        const { addDetachedRow, setCell } = await import("@/core/siyuan");
+                        const opKey = `ledger:shopping-to-asset:${row.itemID}`;
+                        const newRowId = await addDetachedRow(assetRef.avId!, payload.name, {
+                            idempotencyKey: `${opKey}:row`,
+                            retries: 1,
+                        });
+                        const cols = assetRef.columns ?? {};
+                        if (cols.category) {
+                            await setCell(assetRef.avId!, cols.category, newRowId, selectCellValue(payload.category), {
+                                idempotencyKey: `${opKey}:category`,
+                                retries: 1,
+                            });
+                        }
+                        if (cols.status) {
+                            await setCell(assetRef.avId!, cols.status, newRowId, selectCellValue(payload.status), {
+                                idempotencyKey: `${opKey}:status`,
+                                retries: 1,
+                            });
+                        }
+                        if (cols.amount && payload.amount !== undefined) {
+                            await setCell(assetRef.avId!, cols.amount, newRowId, {
+                                type: "number",
+                                number: { content: payload.amount, isNotEmpty: true },
+                            }, { idempotencyKey: `${opKey}:amount`, retries: 1 });
+                        }
+                        if (cols.date && payload.date) {
+                            await setCell(assetRef.avId!, cols.date, newRowId, {
+                                type: "date",
+                                date: { content: new Date(`${payload.date}T00:00:00`).getTime(), isNotEmpty: true, isNotTime: true },
+                            }, { idempotencyKey: `${opKey}:date`, retries: 1 });
+                        }
+                        if (cols.channel && payload.channel) {
+                            await setCell(assetRef.avId!, cols.channel, newRowId, {
+                                type: "text",
+                                text: { content: payload.channel },
+                            }, { idempotencyKey: `${opKey}:channel`, retries: 1 });
+                        }
+                        if (cols.member && payload.memberBlockId) {
+                            await setCell(assetRef.avId!, cols.member, newRowId, {
+                                type: "relation",
+                                relation: { blockIDs: [payload.memberBlockId], contents: null },
+                            }, { idempotencyKey: `${opKey}:member`, retries: 1 });
+                        }
+                        if (cols.note && payload.note) {
+                            await setCell(assetRef.avId!, cols.note, newRowId, {
+                                type: "text",
+                                text: { content: payload.note },
+                            }, { idempotencyKey: `${opKey}:note`, retries: 1 });
+                        }
+                        showMessage(t("ledger.toRealAssetDone").replace("${name}", payload.name), 3000, "info");
+                    } catch (e) {
+                        showMessage(t("ledger.toRealAssetFailed").replace("${msg}", e instanceof Error ? e.message : String(e)), 6000, "error");
+                        btn.disabled = false;
+                    }
+                });
+            };
+            body.appendChild(btn);
+        }
+        addRealAssetButton();
+
         // Certificate renewal chains show both forward and reverse relations.
         function addRenewChainSection() {
             if (active !== "certs") return;
@@ -2794,6 +3504,499 @@
             body.appendChild(linkBtn());
         }
         addRenewChainSection();
+
+        // House maintenance & warranty contracts linkage
+        async function addHouseWarrantySection() {
+            if (active !== "house") return;
+            const houseName = String(cellText(row.cells[ref!.columns.name]));
+            if (!houseName || houseName === "—") return;
+
+            const section = document.createElement("div");
+            section.className = "lv-warranty-section";
+            section.style.cssText = "margin-top:14px;padding-top:12px;border-top:1px solid var(--b3-border-color)";
+
+            const head = document.createElement("div");
+            head.className = "ft__on-surface";
+            head.style.cssText = "font-size:12px;font-weight:600;margin-bottom:8px;display:flex;align-items:center;justify-content:space-between";
+            head.textContent = t("warranty.sectionTitle");
+            section.appendChild(head);
+
+            const contractsRef = plugin.settings.dbRefs?.["contracts"];
+            if (!contractsRef?.avId) {
+                const empty = document.createElement("p");
+                empty.className = "lv-caption";
+                empty.textContent = t("warranty.noContracts");
+                section.appendChild(empty);
+                body.appendChild(section);
+                return;
+            }
+
+            try {
+                const { renderLedgerAll } = await import("@/core/siyuan");
+                const contractsLedger = await renderLedgerAll(contractsRef.avId);
+                const nameCol = contractsRef.columns?.name;
+                const catCol = contractsRef.columns?.category;
+                const expCol = contractsRef.columns?.expiry;
+                const partyCol = contractsRef.columns?.party;
+                const contactCol = contractsRef.columns?.contact;
+
+                const candidates: ContractCandidate[] = contractsLedger.rows.map((cr) => ({
+                    id: cr.itemID,
+                    name: cellText(cr.cells[nameCol]),
+                    category: cellText(cr.cells[catCol]),
+                    expiry: cellText(cr.cells[expCol]) !== "—" ? cellText(cr.cells[expCol]) : undefined,
+                    party: cellText(cr.cells[partyCol]) !== "—" ? cellText(cr.cells[partyCol]) : undefined,
+                    contact: cellText(cr.cells[contactCol]) !== "—" ? cellText(cr.cells[contactCol]) : undefined,
+                    docId: contractsRef.docId,
+                })).filter((c) => c.name && c.name !== "—");
+
+                const matches = matchWarrantyContracts(houseName, candidates);
+
+                if (matches.length === 0) {
+                    const empty = document.createElement("p");
+                    empty.className = "lv-caption";
+                    empty.textContent = t("warranty.noContracts");
+                    section.appendChild(empty);
+                } else {
+                    for (const m of matches) {
+                        const card = document.createElement("div");
+                        card.style.cssText = "padding:10px 12px;border:1px solid var(--lv-line);border-radius:var(--lv-r-2);background:var(--lv-surface-2);margin-bottom:8px";
+
+                        const cardHeader = document.createElement("div");
+                        cardHeader.style.cssText = "display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:6px";
+                        const titleEl = document.createElement("b");
+                        titleEl.style.cssText = "font-size:13px;color:var(--lv-tx)";
+                        titleEl.textContent = m.contract.name;
+
+                        const tag = document.createElement("span");
+                        const evalState = m.evaluation;
+                        let tagText = "";
+                        let tagColor = "var(--lv-tx-3)";
+                        let tagBg = "var(--lv-surface)";
+                        if (evalState.status === "valid") {
+                            tagText = t("warranty.statusValid").replace("${n}", String(evalState.daysLeft ?? 0));
+                            tagColor = "var(--lv-ok)";
+                            tagBg = "var(--lv-accent-soft)";
+                        } else if (evalState.status === "soon") {
+                            tagText = t("warranty.statusSoon").replace("${n}", String(evalState.daysLeft ?? 0));
+                            tagColor = "var(--lv-warn)";
+                            tagBg = "rgba(245, 158, 11, 0.12)";
+                        } else if (evalState.status === "expired") {
+                            tagText = t("warranty.statusExpired").replace("${n}", String(evalState.daysExpired ?? 0));
+                            tagColor = "var(--lv-danger)";
+                            tagBg = "rgba(239, 68, 68, 0.12)";
+                        } else {
+                            tagText = t("warranty.statusUnknown");
+                        }
+                        tag.style.cssText = `font-size:11px;font-weight:600;padding:2px 8px;border-radius:999px;color:${tagColor};background:${tagBg}`;
+                        tag.textContent = tagText;
+
+                        cardHeader.append(titleEl, tag);
+                        card.appendChild(cardHeader);
+
+                        const details = document.createElement("div");
+                        details.style.cssText = "font-size:12px;color:var(--lv-tx-3);display:flex;flex-wrap:wrap;gap:12px;margin-bottom:6px";
+                        if (m.contract.party) {
+                            details.innerHTML += `<span>${t("warranty.party")}：<b style="color:var(--lv-tx-2)">${escapeHtml(m.contract.party)}</b></span>`;
+                        }
+                        if (m.contract.contact) {
+                            details.innerHTML += `<span>${t("warranty.contact")}：<b style="color:var(--lv-tx-2)">${escapeHtml(m.contract.contact)}</b></span>`;
+                        }
+                        if (m.contract.expiry) {
+                            details.innerHTML += `<span>${t("warranty.expiry")}：<b style="color:var(--lv-tx-2)">${escapeHtml(m.contract.expiry)}</b></span>`;
+                        }
+                        card.appendChild(details);
+
+                        if (m.contract.docId) {
+                            const openBtn = document.createElement("button");
+                            openBtn.className = "b3-button b3-button--text b3-button--small";
+                            openBtn.style.cssText = "padding:0;font-size:11.5px";
+                            openBtn.textContent = `${t("warranty.openContract")} →`;
+                            openBtn.onclick = () => plugin.showTabDocs(m.contract.docId);
+                            card.appendChild(openBtn);
+                        }
+
+                        section.appendChild(card);
+                    }
+
+                    const disclaimer = document.createElement("p");
+                    disclaimer.className = "lv-caption";
+                    disclaimer.style.cssText = "margin-top:6px;line-height:1.4;color:var(--lv-tx-3);font-size:11.5px";
+                    disclaimer.textContent = `⚠️ ${t("warranty.disclaimer")}`;
+                    section.appendChild(disclaimer);
+                }
+            } catch (err) {
+                const errEl = document.createElement("p");
+                errEl.className = "ft__error";
+                errEl.style.fontSize = "12px";
+                errEl.textContent = String(err);
+                section.appendChild(errEl);
+            }
+            body.appendChild(section);
+        }
+        void addHouseWarrantySection();
+
+        // Parenting 3-day solid food observation timeline and health allergy link
+        function addParentingSolidsSection() {
+            if (active !== "parenting") return;
+            const categoryVal = String(cellText(row.cells[ref!.columns.category]));
+            // Only feeding records (or foods) have 3-day observation
+            if (categoryVal !== "feeding" && categoryVal !== t("field.category.opt.feeding")) return;
+            const foodName = String(cellText(row.cells[ref!.columns.name]));
+            const dateVal = String(cellText(row.cells[ref!.columns.date]));
+            if (!foodName || foodName === "—" || !dateVal || dateVal === "—") return;
+
+            const obs = calculateSolidsObservation(dateVal);
+
+            const section = document.createElement("div");
+            section.className = "lv-solids-section";
+            section.style.cssText = "margin-top:14px;padding-top:12px;border-top:1px solid var(--b3-border-color)";
+
+            const head = document.createElement("div");
+            head.className = "ft__on-surface";
+            head.style.cssText = "font-size:12px;font-weight:600;margin-bottom:8px;display:flex;align-items:center;justify-content:space-between";
+            const headTitle = document.createElement("span");
+            headTitle.textContent = t("solids.sectionTitle");
+            const headStatus = document.createElement("span");
+            headStatus.style.cssText = `font-size:11px;font-weight:600;padding:2px 8px;border-radius:999px;color:${obs.isObserving ? "var(--lv-warn)" : "var(--lv-ok)"};background:${obs.isObserving ? "rgba(245, 158, 11, 0.12)" : "var(--lv-accent-soft)"}`;
+            headStatus.textContent = obs.isObserving ? `${t(obs.labelKey)} · ${t("solids.remainingDays").replace("${n}", String(obs.remainingDays))}` : t("solids.completed");
+            head.append(headTitle, headStatus);
+            section.appendChild(head);
+
+            // 3-day timeline steps
+            const timeline = document.createElement("div");
+            timeline.style.cssText = "display:grid;grid-template-columns:repeat(3, 1fr);gap:8px;margin-bottom:10px";
+            for (const win of obs.dayWindows) {
+                const dayBox = document.createElement("div");
+                const isCurrent = win.isToday;
+                const isPassed = win.isPast;
+                dayBox.style.cssText = `padding:8px;border:1px solid ${isCurrent ? "var(--lv-accent)" : "var(--lv-line)"};border-radius:var(--lv-r-2);background:${isCurrent ? "var(--lv-accent-soft)" : "var(--lv-surface-2)"};text-align:center`;
+                dayBox.innerHTML = `
+                    <div style="font-size:11.5px;font-weight:600;color:${isCurrent ? "var(--lv-accent)" : "var(--lv-tx)"}">Day ${win.day}</div>
+                    <div style="font-size:11px;color:var(--lv-tx-3);margin-top:2px">${escapeHtml(win.date)}</div>
+                    <div style="font-size:10.5px;margin-top:4px;color:${isCurrent ? "var(--lv-accent)" : isPassed ? "var(--lv-ok)" : "var(--lv-tx-3)"}">${isCurrent ? "● 今日" : isPassed ? "✓ 已过" : "待观察"}</div>
+                `;
+                timeline.appendChild(dayBox);
+            }
+            section.appendChild(timeline);
+
+            const hint = document.createElement("p");
+            hint.className = "lv-caption";
+            hint.style.cssText = "font-size:11.5px;line-height:1.4;margin:0 0 10px 0;color:var(--lv-tx-3)";
+            hint.textContent = `💡 ${t("solids.hint")}`;
+            section.appendChild(hint);
+
+            // Allergy link button
+            const allergyBtn = document.createElement("button");
+            allergyBtn.className = "b3-button b3-button--outline";
+            allergyBtn.style.cssText = "font-size:12px;display:inline-flex;align-items:center;gap:6px";
+            allergyBtn.textContent = `⚠️ ${t("solids.linkAllergy")}`;
+            allergyBtn.onclick = () => {
+                const promptDlg = new Dialog({
+                    title: t("solids.linkAllergyTitle"),
+                    content: `
+                        <div class="b3-dialog__content fn__flex" style="flex-direction:column;gap:10px;padding:16px 20px">
+                            <label class="ft__on-surface" style="font-size:12px;font-weight:600">${t("solids.symptomsPrompt")}</label>
+                            <input id="lv-allergy-symptoms" class="b3-text-field" placeholder="例如：嘴角周围发红、轻微皮疹、腹泻" style="width:100%" />
+                        </div>
+                        <div class="b3-dialog__action">
+                            <button class="b3-button b3-button--cancel" id="lv-allergy-cancel">${t("cancel")}</button>
+                            <button class="b3-button b3-button--text ft__error" id="lv-allergy-confirm" style="color:var(--lv-danger)">${t("confirm")}</button>
+                        </div>
+                    `,
+                    width: "400px",
+                });
+                const symptomsInput = promptDlg.element.querySelector("#lv-allergy-symptoms") as HTMLInputElement;
+                const cancel = promptDlg.element.querySelector("#lv-allergy-cancel") as HTMLButtonElement;
+                const confirmBtn = promptDlg.element.querySelector("#lv-allergy-confirm") as HTMLButtonElement;
+                cancel.onclick = () => promptDlg.destroy();
+                confirmBtn.onclick = async () => {
+                    const healthRef = plugin.settings.dbRefs?.["health"];
+                    if (!healthRef?.avId) {
+                        showMessage(t("solids.linkAllergyFailed").replace("${msg}", "Health ledger not provisioned"), 5000, "error");
+                        return;
+                    }
+                    const symptoms = symptomsInput.value.trim();
+                    const memberBlockId = ref?.columns?.member ? row.cells[ref.columns.member]?.relation?.blockIDs?.[0] : undefined;
+                    const allergyPayload = buildAllergyFromFeeding({
+                        foodName,
+                        reactionDate: localDateKey(new Date()),
+                        symptoms,
+                        memberBlockId,
+                    });
+
+                    confirmBtn.disabled = true;
+                    cancel.disabled = true;
+                    try {
+                        const { addDetachedRow, setCell } = await import("@/core/siyuan");
+                        const operationKey = `ledger:solids-allergy:${row.itemID}`;
+                        const newRowId = await addDetachedRow(healthRef.avId, allergyPayload.name, {
+                            idempotencyKey: `${operationKey}:row`,
+                            retries: 1,
+                        });
+                        const hCols = healthRef.columns ?? {};
+                        if (hCols.category) {
+                            await setCell(healthRef.avId, hCols.category, newRowId, selectCellValue("allergy"), {
+                                idempotencyKey: `${operationKey}:category`,
+                                retries: 1,
+                            });
+                        }
+                        if (hCols.date) {
+                            await setCell(healthRef.avId, hCols.date, newRowId, {
+                                type: "date",
+                                date: { content: new Date(`${allergyPayload.date}T00:00:00`).getTime(), isNotEmpty: true, isNotTime: true },
+                            }, { idempotencyKey: `${operationKey}:date`, retries: 1 });
+                        }
+                        if (hCols.diagnosis) {
+                            await setCell(healthRef.avId, hCols.diagnosis, newRowId, {
+                                type: "text",
+                                text: { content: allergyPayload.diagnosis },
+                            }, { idempotencyKey: `${operationKey}:diagnosis`, retries: 1 });
+                        }
+                        if (hCols.note) {
+                            await setCell(healthRef.avId, hCols.note, newRowId, {
+                                type: "text",
+                                text: { content: allergyPayload.note },
+                            }, { idempotencyKey: `${operationKey}:note`, retries: 1 });
+                        }
+                        if (hCols.member && allergyPayload.memberBlockId) {
+                            await setCell(healthRef.avId, hCols.member, newRowId, {
+                                type: "relation",
+                                relation: { blockIDs: [allergyPayload.memberBlockId], contents: null },
+                            }, { idempotencyKey: `${operationKey}:member`, retries: 1 });
+                        }
+
+                        promptDlg.destroy();
+                        showMessage(t("solids.linkAllergyDone").replace("${name}", allergyPayload.name), 3000, "info");
+                        try {
+                            await plugin.refreshHub?.(["health"]);
+                        } catch { /* ignored */ }
+                    } catch (err) {
+                        showMessage(t("solids.linkAllergyFailed").replace("${msg}", err instanceof Error ? err.message : String(err)), 5000, "error");
+                        confirmBtn.disabled = false;
+                        cancel.disabled = false;
+                    }
+                };
+                setTimeout(() => symptomsInput?.focus(), 50);
+            };
+            section.appendChild(allergyBtn);
+
+            body.appendChild(section);
+        }
+        addParentingSolidsSection();
+
+        // Food ingredients allergy conflict screening against health ledger
+        async function addFoodAllergySection() {
+            if (active !== "food") return;
+            const healthRef = plugin.settings.dbRefs?.["health"];
+            if (!healthRef?.avId) return;
+
+            const dishName = String(cellText(row.cells[ref!.columns.name]));
+            const ingredients = ref!.columns.ingredients ? String(cellText(row.cells[ref!.columns.ingredients])) : "";
+            if (!dishName || dishName === "—") return;
+
+            try {
+                const { renderLedgerAll } = await import("@/core/siyuan");
+                const healthLedger = await renderLedgerAll(healthRef.avId);
+                const hNameCol = healthRef.columns?.name;
+                const hCatCol = healthRef.columns?.category;
+                const hDiagCol = healthRef.columns?.diagnosis;
+                const hMemCol = healthRef.columns?.member;
+
+                const allergyRows = healthLedger.rows.filter((hr) => {
+                    const catVal = String(cellText(hr.cells[hCatCol]));
+                    return catVal === "allergy" || catVal === t("field.category.opt.allergy");
+                });
+
+                if (allergyRows.length === 0) return;
+
+                const memMap = new Map((plugin.settings.members ?? []).map((m) => [m.avItemId, m.name]));
+
+                const allergies: FamilyAllergy[] = allergyRows.map((hr) => {
+                    const aName = cellText(hr.cells[hNameCol]);
+                    const aDiag = cellText(hr.cells[hDiagCol]);
+                    const memberBid = hMemCol ? hr.cells[hMemCol]?.relation?.blockIDs?.[0] : undefined;
+                    const memberName = memberBid ? memMap.get(memberBid) : undefined;
+                    return {
+                        name: aName,
+                        diagnosis: aDiag !== "—" ? aDiag : undefined,
+                        memberBlockId: memberBid,
+                        memberName,
+                    };
+                });
+
+                const conflicts = checkAllergyConflicts(dishName, ingredients !== "—" ? ingredients : "", allergies);
+
+                if (conflicts.length === 0) return;
+
+                const alertBox = document.createElement("div");
+                alertBox.className = "lv-allergy-alert";
+                alertBox.style.cssText = "margin-top:14px;padding:12px 14px;border-radius:var(--lv-r-2);background:color-mix(in srgb, var(--lv-danger) 10%, var(--lv-surface));border:1px solid color-mix(in srgb, var(--lv-danger) 35%, transparent);box-shadow:inset 0 1px 0 var(--lv-inset)";
+
+                const titleRow = document.createElement("div");
+                titleRow.style.cssText = "display:flex;align-items:center;gap:6px;font-size:13px;font-weight:700;color:var(--lv-danger);margin-bottom:6px";
+                titleRow.innerHTML = `<span>⚠️</span><span>${t("allergy.alertTitle")}</span>`;
+                alertBox.appendChild(titleRow);
+
+                const bannerNote = document.createElement("p");
+                bannerNote.style.cssText = "font-size:12px;color:var(--lv-tx);margin:0 0 8px 0;line-height:1.4";
+                bannerNote.textContent = t("allergy.alertBanner");
+                alertBox.appendChild(bannerNote);
+
+                const list = document.createElement("div");
+                list.style.cssText = "display:flex;flex-direction:column;gap:4px;margin-bottom:8px";
+                for (const c of conflicts) {
+                    const item = document.createElement("div");
+                    item.style.cssText = "display:flex;align-items:center;justify-content:space-between;padding:4px 8px;border-radius:4px;background:var(--lv-surface);font-size:12px;border:1px solid var(--lv-line)";
+                    const inLabel = c.matchedIn === "ingredients" ? t("allergy.matchedInIngredients") : t("allergy.matchedInName");
+                    item.innerHTML = `
+                        <span style="color:var(--lv-danger);font-weight:600">${escapeHtml(t("allergy.memberConflict").replace("${member}", c.memberName).replace("${allergen}", c.allergen))}</span>
+                        <span class="lv-caption" style="font-size:11px">${escapeHtml(inLabel)}</span>
+                    `;
+                    list.appendChild(item);
+                }
+                alertBox.appendChild(list);
+
+                const notice = document.createElement("p");
+                notice.className = "lv-caption";
+                notice.style.cssText = "font-size:11.5px;color:var(--lv-tx-3);margin:0;line-height:1.4";
+                notice.textContent = `💡 ${t("allergy.cautionNotice")}`;
+                alertBox.appendChild(notice);
+
+                body.appendChild(alertBox);
+            } catch {
+                // Silently skip if health ledger read fails
+            }
+        }
+        void addFoodAllergySection();
+
+        function addTravelCheckButton() {
+            if (active !== "travel-plan") return;
+            const btn = document.createElement("button");
+            btn.className = "b3-button b3-button--outline";
+            btn.style.cssText = "margin-top:8px;font-size:12px";
+            btn.textContent = `✈️ ${t("travel.checkButton")}`;
+            btn.onclick = () => openTravelCertsCheckDialog(row);
+            body.appendChild(btn);
+        }
+        addTravelCheckButton();
+
+        // Real asset lifecycle transitions & lending/repairing integration
+        function addAssetLifecycleSection() {
+            if (active !== "assets-real" || !ref?.columns?.status) return;
+            const statusCol = ref.columns.status;
+            const curStatus = String(cellText(row.cells[statusCol]));
+            const transitions = getAllowedStatusTransitions(curStatus);
+            if (transitions.length === 0) return;
+
+            const section = document.createElement("div");
+            section.className = "lv-asset-lifecycle-section";
+            section.style.cssText = "margin-top:14px;padding-top:12px;border-top:1px solid var(--b3-border-color)";
+
+            const header = document.createElement("div");
+            header.style.cssText = "display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:8px";
+            header.innerHTML = `
+                <span class="ft__on-surface" style="font-size:12px;font-weight:600">${t("asset.lifecycleTitle")}</span>
+                <span class="lv-badge" style="font-size:11px">${optLabel(t, "status", curStatus)}</span>
+            `;
+            section.appendChild(header);
+
+            const actionsRow = document.createElement("div");
+            actionsRow.style.cssText = "display:flex;align-items:center;gap:6px;flex-wrap:wrap";
+
+            for (const tr of transitions) {
+                const btn = document.createElement("button");
+                btn.className = "b3-button b3-button--outline b3-button--small";
+                btn.style.cssText = "font-size:12px;display:inline-flex;align-items:center;gap:4px";
+                btn.textContent = t(tr.actionKey);
+
+                btn.onclick = async () => {
+                    if (tr.requiresInput === "borrower") {
+                        const promptDlg = new Dialog({
+                            title: t("asset.action.lend"),
+                            content: `
+                                <div class="b3-dialog__content fn__flex" style="flex-direction:column;gap:10px;padding:16px 20px">
+                                    <label class="ft__on-surface" style="font-size:12px;font-weight:600">${t("asset.lendPrompt")}</label>
+                                    <input id="lv-lend-borrower" class="b3-text-field" placeholder="例如：表弟、朋友小张" style="width:100%" />
+                                </div>
+                                <div class="b3-dialog__action">
+                                    <button class="b3-button b3-button--cancel" id="lv-lend-cancel">${t("cancel")}</button>
+                                    <button class="b3-button" id="lv-lend-confirm">${t("confirm")}</button>
+                                </div>
+                            `,
+                            width: "380px",
+                        });
+                        const borrowerInput = promptDlg.element.querySelector("#lv-lend-borrower") as HTMLInputElement;
+                        const cancelBtn = promptDlg.element.querySelector("#lv-lend-cancel") as HTMLButtonElement;
+                        const confirmBtn = promptDlg.element.querySelector("#lv-lend-confirm") as HTMLButtonElement;
+                        cancelBtn.onclick = () => promptDlg.destroy();
+                        confirmBtn.onclick = async () => {
+                            const borrower = borrowerInput.value.trim();
+                            if (!borrower) {
+                                borrowerInput.focus();
+                                return;
+                            }
+                            confirmBtn.disabled = true;
+                            try {
+                                const { setCell } = await import("@/core/siyuan");
+                                const { updateRowLogs, appendEntry } = await import("@/core/rowlog");
+                                await setCell(ref!.avId!, statusCol, row.itemID, selectCellValue("lent"), {
+                                    idempotencyKey: `asset:status:${row.itemID}:lent`,
+                                    retries: 1,
+                                });
+                                await updateRowLogs(plugin as any, (current) => appendEntry(current, ref!.avId!, row.itemID, "loans", {
+                                    date: localDateKey(new Date()),
+                                    to: borrower,
+                                    back: "",
+                                    at: new Date().toISOString(),
+                                }));
+                                promptDlg.destroy();
+                                dlg.destroy();
+                                showMessage(t("asset.lendDone").replace("${to}", borrower), 3000, "info");
+                                await load();
+                            } catch (err) {
+                                showMessage(String(err), 5000, "error");
+                                confirmBtn.disabled = false;
+                            }
+                        };
+                        setTimeout(() => borrowerInput?.focus(), 50);
+                        return;
+                    }
+
+                    // 普通状态直接变更
+                    btn.disabled = true;
+                    try {
+                        const { setCell } = await import("@/core/siyuan");
+                        await setCell(ref!.avId!, statusCol, row.itemID, selectCellValue(tr.target), {
+                            idempotencyKey: `asset:status:${row.itemID}:${tr.target}`,
+                            retries: 1,
+                        });
+                        // 如果是归还，更新 loans
+                        if (tr.target === "inuse" && curStatus === "lent") {
+                            const { updateRowLogs, appendEntry } = await import("@/core/rowlog");
+                            await updateRowLogs(plugin as any, (current) => appendEntry(current, ref!.avId!, row.itemID, "loans", {
+                                date: localDateKey(new Date()),
+                                to: "已归还",
+                                back: localDateKey(new Date()),
+                                at: new Date().toISOString(),
+                            }));
+                        }
+                        dlg.destroy();
+                        showMessage(t("asset.statusUpdated").replace("${status}", optLabel(t, "status", tr.target)), 2500, "info");
+                        await load();
+                    } catch (err) {
+                        showMessage(String(err), 5000, "error");
+                        btn.disabled = false;
+                    }
+                };
+
+                actionsRow.appendChild(btn);
+            }
+
+            section.appendChild(actionsRow);
+            body.appendChild(section);
+        }
+        addAssetLifecycleSection();
 
             addFavorsSyncSection();
         }
@@ -3044,6 +4247,19 @@
                 showMessage(t("ledger.copyAsImageFail") + ` (${e instanceof Error ? e.message : String(e)})`, 5000, "error");
             }
         };
+        // Copy the detail card as desensitized text.
+        const maskedBtn = dlg.element.querySelector("#lv-detail-card-text-masked") as HTMLButtonElement | null;
+        if (maskedBtn) {
+            maskedBtn.onclick = async () => {
+                const text = formatDesensitizedRecord(cardTitle, cardRows);
+                try {
+                    await navigator.clipboard.writeText(text);
+                    showMessage(t("ledger.copyAsMaskedTextOk"), 2500, "info");
+                } catch (e) {
+                    showMessage(t("ledger.copyAsImageFail") + ` (${e instanceof Error ? e.message : String(e)})`, 5000, "error");
+                }
+            };
+        }
         // Row deletion is explicit and confirmed before mutation.
         (dlg.element.querySelector("#lv-detail-del") as HTMLButtonElement).onclick = () => {
             confirm(t("ledger.delTitle"), t("ledger.delBody").replace("${name}", cellText(row.cells[ref.columns.name])), async () => {
@@ -3316,18 +4532,25 @@
     {:else}
         <input class="b3-text-field" style="width:150px" type="search" placeholder={t("ledger.search")}
             bind:value={searchText} oninput={(event) => { panelMemory.ledgerSearch = event.currentTarget.value; }} title={t("ledger.search")} />
+        <button class="b3-button b3-button--outline" title={t("ledger.toggleDensity")} aria-label={t("ledger.toggleDensity")} onclick={toggleDensity}>
+            {density === "comfortable" ? t("ledger.densityCompact") : t("ledger.densityComfortable")}
+        </button>
         <button class="lv-btn primary" onclick={openNewRecord} disabled={rebuilding}>＋ {t("ledger.newRecord")}</button>
         <details class="lv-ledger-more">
             <summary class="b3-button b3-button--outline">{t("ledger.moreActions")}</summary>
             <div class="lv-ledger-more__menu">
+                <button class="b3-button b3-button--outline" onclick={toggleDensity}>{t("ledger.toggleDensity")}（{density === "comfortable" ? t("ledger.densityComfortable") : t("ledger.densityCompact")}）</button>
                 <button class="b3-button b3-button--outline" title={t("ledger.exportCsvTip")}
                     disabled={filteredRows.length === 0 || exporting || printing} aria-busy={exporting} onclick={exportCsv}>{exporting ? t("ledger.saving") : t("ledger.exportCsv")}</button>
                 <button class="b3-button b3-button--outline" title={t("ledger.printLabels")}
                     disabled={filteredRows.length === 0 || printing || exporting} aria-busy={printing} onclick={printLabels}>{printing ? t("ledger.saving") : t("ledger.printLabels")}</button>
                 {#if active === "vehicles"}<button class="b3-button b3-button--outline" onclick={openEnergyDashboard}>{t("fuel.dashboardButton")}</button>{/if}
-                {#if active === "parenting"}<button class="b3-button b3-button--outline" onclick={openGrowthChart}>{t("ledger.growthChart")}</button>{/if}
+                {#if active === "parenting"}<button class="b3-button b3-button--outline" onclick={openGrowthChart}>{t("ledger.growthChart")}</button><button class="b3-button b3-button--outline" onclick={openImmunizationScheduleDialog}>{t("immunization.scheduleButton")}</button>{/if}
+                {#if active === "travel-plan"}<button class="b3-button b3-button--outline" onclick={() => openTravelCertsCheckDialog()}>{t("travel.checkButton")}</button>{/if}
+                {#if active === "favors"}<button class="b3-button b3-button--outline" onclick={openFavorsReportModal}>{t("favors.reportButton")}</button>{/if}
                 {#if active === "stock"}<button class="b3-button b3-button--outline" onclick={openShoppingList}>{t("ledger.shoppingList")}</button>{/if}
                 {#if active !== "members" && active !== "adhoc"}<button class="b3-button b3-button--outline" disabled={printing || exporting} onclick={openCsvImport}>{t("ledger.importCsv")}</button>{/if}
+                {#if ref?.columns?.member}<button class="b3-button b3-button--outline" title={t("ledger.batchReassignMemberTip")} onclick={openBatchReassignModal}>{t("ledger.batchReassignMember")}</button>{/if}
                 <button class="b3-button b3-button--outline" onclick={() => plugin.showTabDocs(ref?.docId)}>{t("ledger.openDoc")} →</button>
             </div>
         </details>
@@ -3339,8 +4562,8 @@
         <div class="lv-membership-hero">
             <div class="lv-membership-metric">
                 <span class="lv-membership-label">{t("membership.banner.monthly")}</span>
-                <b class="lv-membership-amount lv-num">¥ {formatAmount(membershipSummary.monthlyTotal)}</b>
-                <span class="lv-membership-sub">{t("membership.banner.annual")}：¥ {formatAmount(membershipSummary.annualTotal)}</span>
+                <b class="lv-membership-amount lv-num">¥ {formatAmount(membershipSummary.monthlyTotal, plugin.settings.hideAmounts)}</b>
+                <span class="lv-membership-sub">{t("membership.banner.annual")}：¥ {formatAmount(membershipSummary.annualTotal, plugin.settings.hideAmounts)}</span>
             </div>
             <div class="lv-membership-stats">
                 <div class="lv-membership-chip">
@@ -3360,7 +4583,7 @@
                 <span class="lv-membership-top__title">{t("membership.banner.top")}：</span>
                 {#each membershipSummary.topItems as item (item.name)}
                     <span class="lv-membership-top__tag">
-                        {item.name} · ¥{formatAmount(item.monthlyCost)}{t("membership.banner.unitCnyPerMonth")}
+                        {item.name} · ¥{formatAmount(item.monthlyCost, plugin.settings.hideAmounts)}{t("membership.banner.unitCnyPerMonth")}
                     </span>
                 {/each}
             </div>
@@ -3402,6 +4625,208 @@
                 </button>
             {/if}
         </div>
+    </section>
+{/if}
+
+{#if active === "favors" && favorsSummary && favorsSummary.totalCount > 0}
+    <section class="lv-favors-banner lv-card" aria-label={t("favors.bannerTitle")}>
+        <div class="lv-favors-hero">
+            <div class="lv-favors-metric">
+                <span class="lv-favors-label">{t("favors.netAmount")}（{favorsSummary.year}）</span>
+                <b class="lv-favors-amount lv-num">¥ {formatAmount(favorsSummary.netAmount, plugin.settings.hideAmounts)}</b>
+                <div class="lv-favors-sub">
+                    <span>{t("favors.totalIn")}：<b style="color:var(--lv-ok)">¥ {formatAmount(favorsSummary.totalIn, plugin.settings.hideAmounts)}</b></span>
+                    <span>{t("favors.totalOut")}：¥ {formatAmount(favorsSummary.totalOut, plugin.settings.hideAmounts)}</span>
+                </div>
+            </div>
+            <div class="lv-favors-stats">
+                <div class="lv-favors-chip in">
+                    <span><b>{favorsSummary.countIn}</b> {t("favors.countIn")}</span>
+                </div>
+                <div class="lv-favors-chip out">
+                    <span><b>{favorsSummary.countOut}</b> {t("favors.countOut")}</span>
+                </div>
+                <button class="b3-button b3-button--outline b3-button--small" onclick={openFavorsReportModal}>
+                    {t("favors.reportButton")} →
+                </button>
+            </div>
+        </div>
+        {#if favorsSummary.topIn.length > 0}
+            <div class="lv-favors-top">
+                <span class="lv-favors-top__title">{t("favors.topIn")}：</span>
+                {#each favorsSummary.topIn.slice(0, 3) as p (p.person)}
+                    <span class="lv-favors-top__tag">
+                        {p.person} · ¥{formatAmount(p.totalIn, plugin.settings.hideAmounts)}
+                    </span>
+                {/each}
+            </div>
+        {/if}
+    </section>
+{/if}
+
+{#if active === "assets-real" && realAssetSummary && realAssetSummary.activeItemCount > 0}
+    <section class="lv-asset-banner lv-card" aria-label={t("assets.valuationTitle")}>
+        <div class="lv-asset-hero">
+            <div class="lv-asset-metric">
+                <span class="lv-asset-label">{t("assets.valuationTitle")}</span>
+                <b class="lv-asset-amount lv-num">¥ {formatAmount(realAssetSummary.totalRealValuation, plugin.settings.hideAmounts)}</b>
+                <span class="lv-asset-sub">{t("assets.activeCount")}：{realAssetSummary.activeItemCount} 件{#if realAssetSummary.disposedItemCount > 0} · {t("assets.disposedCount")}：{realAssetSummary.disposedItemCount} 件{/if}</span>
+            </div>
+            <div class="lv-asset-stats">
+                <div class="lv-asset-chip">
+                    <UiIcon name="homeAlt" size={14} />
+                    <span><b>{realAssetSummary.activeItemCount}</b> {t("assets.activeCount")}</span>
+                </div>
+            </div>
+        </div>
+        {#if realAssetSummary.topAssets.length > 0}
+            <div class="lv-asset-top">
+                <span class="lv-asset-top__title">{t("assets.topTitle")}：</span>
+                {#each realAssetSummary.topAssets.slice(0, 3) as item (item.name)}
+                    <span class="lv-asset-top__tag">
+                        {item.name} · ¥{formatAmount(item.amount, plugin.settings.hideAmounts)}
+                    </span>
+                {/each}
+            </div>
+        {/if}
+    </section>
+{/if}
+
+{#if active === "schooling" && schoolingMilestones.length > 0}
+    {@const currentMilestone = schoolingMilestones[selectedSchoolingIndex] ?? schoolingMilestones[0]}
+    <section class="lv-schooling-banner lv-card" aria-label={t("schooling.bannerTitle")}>
+        <div class="lv-schooling-top">
+            <div class="lv-schooling-header">
+                <UiIcon name="backpack" size={16} />
+                <span class="lv-schooling-title">{t("schooling.bannerTitle")}</span>
+            </div>
+            {#if schoolingMilestones.length > 1}
+                <div class="lv-schooling-students" role="tablist" aria-label={t("schooling.bannerTitle")}>
+                    {#each schoolingMilestones as m, idx (m.studentName + m.milestoneName)}
+                        <button type="button" class="lv-schooling-student-chip" class:active={(selectedSchoolingIndex < schoolingMilestones.length ? selectedSchoolingIndex : 0) === idx}
+                            onclick={() => { selectedSchoolingIndex = idx; }}>
+                            {m.studentName} · {m.milestoneName}
+                        </button>
+                    {/each}
+                </div>
+            {/if}
+        </div>
+
+        {#if currentMilestone}
+            <div class="lv-schooling-body">
+                <div class="lv-schooling-metric">
+                    <span class="lv-schooling-label">
+                        {currentMilestone.studentName}（{currentMilestone.schoolName}）· {t("schooling.countdown").replace("${milestone}", currentMilestone.milestoneName)}
+                    </span>
+                    <b class="lv-schooling-countdown lv-num">
+                        {#if currentMilestone.yearsLeft > 0}
+                            {currentMilestone.yearsLeft} <span class="unit">{t("schooling.years")}</span>
+                        {/if}
+                        {#if currentMilestone.monthsLeft > 0}
+                            {currentMilestone.monthsLeft} <span class="unit">{t("schooling.months")}</span>
+                        {/if}
+                        {#if currentMilestone.yearsLeft === 0 && currentMilestone.monthsLeft === 0}
+                            {currentMilestone.daysLeft} <span class="unit">{t("schooling.days")}</span>
+                        {/if}
+                    </b>
+                    <span class="lv-schooling-sub">
+                        {t("schooling.targetDate")}：<b>{currentMilestone.targetDate}</b> · {t("schooling.nextMilestone")}：<b>{currentMilestone.milestoneName}</b>
+                    </span>
+                </div>
+            </div>
+        {/if}
+    </section>
+{/if}
+
+{#if active === "media" && mediaSummary && mediaSummary.totalCount > 0}
+    <section class="lv-media-banner lv-card" aria-label={t("media.bannerTitle")}>
+        <div class="lv-media-hero">
+            <div class="lv-media-metric">
+                <span class="lv-media-label">{t("media.bannerTitle")}（{mediaSummary.year}）</span>
+                <b class="lv-media-amount lv-num">{mediaSummary.doneThisYearCount} <span style="font-size:14px;font-weight:500;color:var(--lv-tx-2)">{t("media.items")} {t("media.doneThisYear")}</span></b>
+                <div class="lv-media-sub">
+                    <span>{t("media.doneTotal")}：<b style="color:var(--lv-ok)">{mediaSummary.doneCount}</b></span>
+                    <span>{t("media.consuming")}：<b>{mediaSummary.consumingCount}</b></span>
+                    <span>{t("media.wishlist")}：{mediaSummary.wishlistCount}</span>
+                    {#if mediaSummary.averageRating > 0}
+                        <span>{t("media.averageRating")}：<b style="color:var(--lv-amber)">★ {mediaSummary.averageRating}</b></span>
+                    {/if}
+                </div>
+            </div>
+            <div class="lv-media-stats">
+                <div class="lv-media-chip active">
+                    <UiIcon name="film" size={14} />
+                    <span><b>{mediaSummary.consumingCount}</b> {t("media.consuming")}</span>
+                </div>
+                <div class="lv-media-chip">
+                    <UiIcon name="bookmark" size={14} />
+                    <span><b>{mediaSummary.wishlistCount}</b> {t("media.wishlist")}</span>
+                </div>
+            </div>
+        </div>
+        {#if mediaSummary.consumingList.length > 0}
+            <div class="lv-media-top">
+                <span class="lv-media-top__title">{t("media.currentConsuming")}：</span>
+                {#each mediaSummary.consumingList as item (item.name)}
+                    <span class="lv-media-top__tag">
+                        {item.name} · {item.progress}
+                    </span>
+                {/each}
+            </div>
+        {/if}
+    </section>
+{/if}
+
+{#if active === "pets" && petCareSummary && petCareSummary.totalPets > 0}
+    <section class="lv-pets-banner lv-card" aria-label={t("pets.bannerTitle")}>
+        <div class="lv-pets-hero">
+            <div class="lv-pets-metric">
+                <span class="lv-pets-label">{t("pets.bannerTitle")}</span>
+                <div class="lv-pets-tags">
+                    {#if petCareSummary.overdueCount > 0}
+                        <span class="lv-badge red lv-num">
+                            <UiIcon name="alert" size={12} /> {petCareSummary.overdueCount} {t("pets.overdue")}
+                        </span>
+                    {/if}
+                    {#if petCareSummary.upcomingVaccineCount > 0}
+                        <span class="lv-badge orange lv-num">
+                            <UiIcon name="heartPulse" size={12} /> {petCareSummary.upcomingVaccineCount} {t("pets.upcomingVaccine")}
+                        </span>
+                    {/if}
+                    {#if petCareSummary.upcomingDewormCount > 0}
+                        <span class="lv-badge yellow lv-num">
+                            <UiIcon name="clock" size={12} /> {petCareSummary.upcomingDewormCount} {t("pets.upcomingDeworm")}
+                        </span>
+                    {/if}
+                    {#if petCareSummary.overdueCount === 0 && petCareSummary.upcomingVaccineCount === 0 && petCareSummary.upcomingDewormCount === 0}
+                        <span class="lv-badge green">
+                            <UiIcon name="check" size={12} /> {t("pets.allHealthy")}
+                        </span>
+                    {/if}
+                </div>
+            </div>
+            <div class="lv-pets-stats">
+                <div class="lv-pets-chip">
+                    <UiIcon name="paw" size={14} />
+                    <span><b>{petCareSummary.totalPets}</b> {t("module.pets")}</span>
+                </div>
+            </div>
+        </div>
+        {#if petCareSummary.pets.some(p => p.needsCare)}
+            <div class="lv-pets-list">
+                {#each petCareSummary.pets.filter(p => p.needsCare) as pet (pet.name)}
+                    <div class="lv-pets-item">
+                        <b>{pet.name}</b>
+                        {#if pet.vaccineDue}
+                            <span style="color:var(--lv-{pet.vaccineStatus === 'overdue' ? 'danger' : 'warn'})">{t("pets.vaccineDue")}：{pet.vaccineDue}</span>
+                        {/if}
+                        {#if pet.dewormDue}
+                            <span style="color:var(--lv-{pet.dewormStatus === 'overdue' ? 'danger' : 'warn'})">{t("pets.dewormDue")}：{pet.dewormDue}</span>
+                        {/if}
+                    </div>
+                {/each}
+            </div>
+        {/if}
     </section>
 {/if}
 
@@ -3750,7 +5175,7 @@
         {/if}
     </div>
 {:else}
-    <div class="lv-card lv-table-wrap lv-table" style="margin-top:12px">
+    <div class="lv-card lv-table-wrap lv-table" class:compact={density === "compact"} style="margin-top:12px">
         <table bind:this={ledgerTableEl}>
             <thead><tr>
                 <!-- Severity indicator column. -->

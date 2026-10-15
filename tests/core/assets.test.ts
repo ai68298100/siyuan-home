@@ -1,5 +1,8 @@
 import { describe, expect, it, vi } from "vitest";
-import { assetHref, downloadAsset, isEncryptedNotebookAsset, isImageAsset, safeDownloadName } from "@/core/assets";
+import {
+    assetHref, downloadAsset, isEncryptedNotebookAsset, isImageAsset, safeDownloadName,
+    isPdfAsset, isDangerousAsset, getAssetPreviewKind,
+} from "@/core/assets";
 
 describe("assetHref", () => {
     it("resolves kernel relative paths on the supplied origin", () => {
@@ -35,6 +38,35 @@ describe("isImageAsset", () => {
         expect(isImageAsset("assets/siyuan-home/scan.pdf")).toBe(false);
         expect(isImageAsset("assets/../outside.png")).toBe(false);
         expect(isImageAsset("https://outside.example/photo.png")).toBe(false);
+    });
+});
+
+describe("isPdfAsset & isDangerousAsset (SEC-02 附件安全处理边界)", () => {
+    it("isPdfAsset 识别同源 PDF 附件", () => {
+        expect(isPdfAsset("assets/siyuan-home/contract.pdf")).toBe(true);
+        expect(isPdfAsset("/assets/siyuan-home/护照.PDF?box=nb-1")).toBe(true);
+        expect(isPdfAsset("assets/siyuan-home/photo.png")).toBe(false);
+        expect(isPdfAsset("assets/siyuan-home/script.js")).toBe(false);
+    });
+
+    it("isDangerousAsset 阻断可执行与脚本等高风险格式", () => {
+        expect(isDangerousAsset("malicious.exe")).toBe(true);
+        expect(isDangerousAsset("payload.bat")).toBe(true);
+        expect(isDangerousAsset("script.sh")).toBe(true);
+        expect(isDangerousAsset("run.vbs")).toBe(true);
+        expect(isDangerousAsset("hack.js")).toBe(true);
+        expect(isDangerousAsset("cmd.ps1")).toBe(true);
+
+        expect(isDangerousAsset("photo.png")).toBe(false);
+        expect(isDangerousAsset("document.pdf")).toBe(false);
+        expect(isDangerousAsset("data.txt")).toBe(false);
+    });
+
+    it("getAssetPreviewKind 分流仅允许图片与PDF安全预览，危险与未知文件仅供下载", () => {
+        expect(getAssetPreviewKind("assets/siyuan-home/pic.jpg")).toBe("image");
+        expect(getAssetPreviewKind("assets/siyuan-home/doc.pdf")).toBe("pdf");
+        expect(getAssetPreviewKind("assets/siyuan-home/app.exe")).toBe("download_only");
+        expect(getAssetPreviewKind("assets/siyuan-home/archive.zip")).toBe("download_only");
     });
 });
 

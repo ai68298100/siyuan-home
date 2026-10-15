@@ -68,8 +68,16 @@ export const MODULE_UI_ICONS: Record<string, UiIconName> = {
     adhoc: "note",
 };
 
+const iconCache = new Map<string, UiIconName>();
+
 export function moduleUiIcon(id: string): UiIconName {
-    return MODULE_UI_ICONS[id] ?? "folder";
+    if (!id) return "folder";
+    const cached = iconCache.get(id);
+    if (cached !== undefined) return cached;
+    const icon = MODULE_UI_ICONS[id] ?? "folder";
+    if (iconCache.size >= 200) iconCache.clear();
+    iconCache.set(id, icon);
+    return icon;
 }
 
 /** String renderer for the small imperative dialogs in the ledger screen. */

@@ -3,7 +3,8 @@
     import { onDestroy } from "svelte";
     import { fade } from "svelte/transition";
     import type { HomePluginLike } from "@/types/plugin";
-    import { saveRuntime } from "@/core/hub/runtime";
+    import { saveRuntime, upsertNamedView, deleteNamedView, setPlanDate, type HubNamedView } from "@/core/hub/runtime";
+    import { escapeHtml } from "@/core/escape";
     import { buildDisplay as display } from "@/core/hub/display";
     import { relativeDue, weekdayKey, localDateKey } from "@/core/hub/rule";
     import { addDetachedRow, setCell } from "@/core/siyuan";
@@ -15,6 +16,86 @@
     import { memberHue } from "@/core/format";
     import type { Reminder } from "@/types";
     let { plugin, t, version }: { plugin: HomePluginLike; t: (k: string) => string; version?: number } = $props();
+
+    // UIX-06 / §17 智能筛选命名视图（滴答清单智能清单印证）
+    const namedViews = $derived.by(() => {
+        void version;
+        return plugin.runtime.hubNamedViews ?? [];
+    });
+
+    function applyNamedView(v: HubNamedView) {
+        filter = v.filter ?? "all";
+        filterMember = v.memberId;
+        filterModule = v.moduleId;
+        dueWithin = v.dueWithin ?? "all";
+        pruneSelection();
+        void persistFilter();
+    }
+
+    function isNamedViewActive(v: HubNamedView): boolean {
+        return (v.filter ?? "all") === filter &&
+            v.memberId === filterMember &&
+            v.moduleId === filterModule &&
+            (v.dueWithin ?? "all") === dueWithin;
+    }
+
+    function openSaveViewDialog() {
+        const dlg = new Dialog({
+            title: t("hub.saveView"),
+            content: `
+                <div class="b3-dialog__content">
+                    <label class="fn__flex" style="flex-direction:column;gap:8px">
+                        <span class="ft__on-surface">${t("hub.viewName")}</span>
+                        <input id="lv-view-name-input" class="b3-text-field" placeholder="${t("hub.viewNamePlaceholder")}" style="width:100%" />
+                    </label>
+                </div>
+                <div class="b3-dialog__action">
+                    <button class="b3-button b3-button--cancel" id="lv-view-cancel">${t("cancel")}</button>
+                    <button class="b3-button b3-button--text" id="lv-view-confirm">${t("confirm")}</button>
+                </div>
+            `,
+            width: "360px",
+        });
+        const input = dlg.element.querySelector("#lv-view-name-input") as HTMLInputElement;
+        const cancelBtn = dlg.element.querySelector("#lv-view-cancel") as HTMLButtonElement;
+        const confirmBtn = dlg.element.querySelector("#lv-view-confirm") as HTMLButtonElement;
+        cancelBtn.onclick = () => dlg.destroy();
+        confirmBtn.onclick = async () => {
+            const name = input.value.trim();
+            if (!name) {
+                input.focus();
+                return;
+            }
+            plugin.runtime.hubNamedViews = upsertNamedView(plugin.runtime.hubNamedViews, {
+                name,
+                filter,
+                memberId: filterMember,
+                moduleId: filterModule,
+                dueWithin,
+            });
+            dlg.destroy();
+            try {
+                await saveRuntime(plugin, plugin.runtime);
+                showMessage(t("hub.viewSaved").replace("${name}", name), 3000, "info");
+            } catch (e) {
+                showMessage(String(e), 5000, "error");
+            }
+        };
+        setTimeout(() => input?.focus(), 50);
+    }
+
+    function handleDeleteView(v: HubNamedView, e: Event) {
+        e.stopPropagation();
+        confirm(t("hub.deleteViewConfirm").replace("${name}", v.name), "", async () => {
+            plugin.runtime.hubNamedViews = deleteNamedView(plugin.runtime.hubNamedViews, v.id);
+            try {
+                await saveRuntime(plugin, plugin.runtime);
+                showMessage(t("hub.viewDeleted"), 2500, "info");
+            } catch (e) {
+                showMessage(String(e), 5000, "error");
+            }
+        });
+    }
 
     // version（H02）：hub 变更时递增，驱动派生重算（plugin.* 为普通对象引用）
     const all = $derived.by(() => {
@@ -665,9 +746,80 @@
         else next.add(key);
         expandedMerges = next;
     }
+    let expandedSummaries = $state<Set<string>>(new Set());
+    function toggleSummary(id: string, event?: Event) {
+        if (event) event.stopPropagation();
+        const next = new Set(expandedSummaries);
+        if (next.has(id)) next.delete(id);
+        else next.add(id);
+        expandedSummaries = next;
+    }
     function memberName(id: string): string {
         return (plugin.settings.members ?? []).find((m) => m.id === id)?.name ?? t("members.unassigned");
     }
+    // UIX-07 / §17 计划处理日弹窗（Things 3 智能双日期：计划日与硬截止日分离）
+    function openPlanDateDialog(r: Reminder) {
+        const currentPlan = r.planDate ?? "";
+        const dlg = new Dialog({
+            title: t("hub.planDateDialogTitle"),
+            content: `
+                <div class="b3-dialog__content fn__flex" style="flex-direction:column;gap:12px;padding:16px 20px">
+                    <div style="font-size:13px;font-weight:600;color:var(--lv-tx)">${escapeHtml(r.title)}</div>
+                    <div class="lv-caption" style="font-size:12px;line-height:1.4">${t("hub.planDateIntro")}</div>
+                    <div style="display:flex;gap:16px;font-size:12px;color:var(--lv-tx-2);padding:8px 12px;border-radius:var(--lv-r-2);background:var(--lv-surface-2);border:1px solid var(--lv-line)">
+                        <span>${t("hub.deadline")}：<b style="color:${r.level === 'overdue' ? 'var(--lv-danger)' : 'var(--lv-tx)'}">${r.dueDate}</b></span>
+                    </div>
+                    <div>
+                        <label class="ft__on-surface" style="font-size:12px;font-weight:600;display:block;margin-bottom:4px">${t("hub.planDate")}</label>
+                        <input id="lv-plan-date-input" type="date" class="b3-text-field" value="${currentPlan}" style="width:100%" />
+                    </div>
+                </div>
+                <div class="b3-dialog__action">
+                    ${currentPlan ? `<button class="b3-button b3-button--cancel ft__error" id="lv-plan-clear" style="color:var(--lv-danger)">${t("hub.clearPlanDate")}</button>` : ""}
+                    <button class="b3-button b3-button--cancel" id="lv-plan-cancel">${t("cancel")}</button>
+                    <button class="b3-button b3-button--text" id="lv-plan-save">${t("save")}</button>
+                </div>
+            `,
+            width: "400px",
+        });
+
+        const dateInput = dlg.element.querySelector("#lv-plan-date-input") as HTMLInputElement;
+        const cancelBtn = dlg.element.querySelector("#lv-plan-cancel") as HTMLButtonElement;
+        const saveBtn = dlg.element.querySelector("#lv-plan-save") as HTMLButtonElement;
+        const clearBtn = dlg.element.querySelector("#lv-plan-clear") as HTMLButtonElement | null;
+
+        cancelBtn.onclick = () => dlg.destroy();
+        if (clearBtn) {
+            clearBtn.onclick = async () => {
+                setPlanDate(plugin.runtime, r.id, undefined);
+                dlg.destroy();
+                try {
+                    await saveRuntime(plugin, plugin.runtime);
+                    showMessage(t("hub.planDateCleared"), 2500, "info");
+                    await plugin.refreshHub();
+                } catch (err) {
+                    showMessage(String(err), 4000, "error");
+                }
+            };
+        }
+        saveBtn.onclick = async () => {
+            const val = dateInput.value.trim();
+            setPlanDate(plugin.runtime, r.id, val || undefined);
+            dlg.destroy();
+            try {
+                await saveRuntime(plugin, plugin.runtime);
+                if (val) {
+                    showMessage(t("hub.planDateSaved").replace("${date}", val), 2500, "info");
+                } else {
+                    showMessage(t("hub.planDateCleared"), 2500, "info");
+                }
+                await plugin.refreshHub();
+            } catch (err) {
+                showMessage(String(err), 4000, "error");
+            }
+        };
+    }
+
     // 17 组/186 波：相对到期短语（今天/明天/N 天后/逾期 N 天）；完整日期走 title 悬浮 + 标题下方 meta 行
     function relDue(daysLeft: number, fallback: string): string {
         const rel = relativeDue(daysLeft);
@@ -688,53 +840,120 @@
 
 {#snippet remRow(r: Reminder)}
     <!-- 261 波：完成/延后后行 150ms 淡出离场（瞬消失让用户怀疑误触；respects reduced-motion 由全局降级） -->
-    <div class="lv-rem {r.level}" class:lv-rem--batch={batchMode && viewMode === "list" && filter !== "handled"} out:fade={{ duration: 150 }}>
-    {#if batchMode && viewMode === "list" && filter !== "handled"}
-            <input type="checkbox" class="b3-checkbox" aria-label={t("hub.select")}
-                checked={selected.has(r.id)} disabled={batchBusy} onchange={() => toggleSelect(r.id)} style="flex-shrink:0" />
-        {/if}
-        <!-- 259 波：图标砖收回中性（对齐原型 .rem .ic）——级别语义由色轨+右侧大字承载 -->
-        <div class="lv-rem-ic" aria-hidden="true"><UiIcon name={moduleUiIcon(r.moduleId)} size={18} /></div>
-        <div class="lv-rem-t" title={(r.autoRenew ? `${t("hub.autoRenew")} · ` : "") + r.dueDate}>
-            <b>{r.title}{r.ruleKey === "reciprocate" ? ` · ${t("rule.reciprocate")}` : ""}</b>
-            <!-- 249 波：meta 补模块名（对齐原型三段 meta）；262 波：成员微头像前置（"这是谁的事"） -->
-            <span class="lv-num">{#if memberOf(r.memberId)}{@const member = memberOf(r.memberId)}<span class="lv-miniava" style="background:linear-gradient(135deg, hsl({memberHue(member.id)} 62% 52%), hsl({(memberHue(member.id) + 42) % 360} 62% 40%))" aria-hidden="true">{member.name.slice(0, 1)}</span>{/if}{r.moduleId !== "adhoc" ? (t(`module.${r.moduleId}`) !== `module.${r.moduleId}` ? t(`module.${r.moduleId}`) : r.moduleId) + " · " : ""}{r.dueDate}{#if !r.memberId} · {t("members.unassigned")}{/if}{r.lunar ? " 🌙" : ""}{r.autoRenew ? " 🔄" : ""}</span>
-        </div>
-        <!-- 对齐原型：相对到期大字居右（颜色随级别；文字本身已承载逾期/N天后语义，级别徽章不再重复） -->
-        <div class="lv-rem-when">
-            <b class="lv-num" style="color:var(--lv-{r.level === 'overdue' ? 'danger' : r.level === 'soon' ? 'warn' : 'amber'})">{relDue(r.daysLeft, r.dueDate)}</b>
-        </div>
-        <div class="lv-rem-ops">
-            <button class="b3-button b3-button--text" disabled={batchBusy || reminderBusy.has(r.id)} aria-busy={reminderBusy.has(r.id)} onclick={() => void completeItem(r)}>{reminderBusy.has(r.id) ? t("ledger.saving") : t("act.done")}</button>
-            <div class="lv-rem-more">
-                <button class="b3-button b3-button--text lv-rem-more-toggle" type="button" aria-expanded="false" aria-controls={`lv-rem-more-${r.id}`}
-                    onclick={toggleMoreMenu}>{t("ledger.detailMore")} <span aria-hidden="true">⌄</span></button>
-                <div id={`lv-rem-more-${r.id}`} class="lv-rem-more-menu" role="group" aria-label={t("ledger.detailMore")} use:closeMoreOnMenuClick>
-                    {#if ["certs", "insurance", "contracts"].includes(r.moduleId)}
-                        <!-- 续保/换证/合同续约：新到期日写回规则 field 列（26.6 + 98 波：contracts 规则带 field=expiry 与
-                             autoRenewField 升级路径，此前 🔄 决策提醒无"续"动作入口——漏项补齐） -->
-                    <button class="b3-button b3-button--text" disabled={batchBusy || reminderBusy.has(r.id)} onclick={() => renewDialog(r)}>{t("act.renew")}</button>
-                    {/if}
-                    {#if r.moduleId !== "adhoc" && plugin.settings.dbRefs[r.moduleId]?.docId}
-                        <button class="b3-button b3-button--text" disabled={batchBusy} title={t("act.locate")} onclick={() => plugin.showTabDocs(plugin.settings.dbRefs[r.moduleId].docId)}>{t("act.locate")}</button>
-                    {/if}
-                    <button class="b3-button b3-button--text" aria-haspopup="menu" disabled={batchBusy || reminderBusy.has(r.id)} aria-busy={reminderBusy.has(r.id)} onclick={(e) => snoozeMenu(r, e)}>{reminderBusy.has(r.id) ? t("ledger.saving") : `${t("act.snooze")} ▾`}</button>
-                    <button class="b3-button b3-button--text" disabled={batchBusy || reminderBusy.has(r.id)} aria-busy={reminderBusy.has(r.id)} onclick={() => void runReminderAction(() => plugin.mute(r.id), r.id)}>{reminderBusy.has(r.id) ? t("ledger.saving") : t("act.mute")}</button>
-                    {#if r.moduleId === "adhoc"}
-                        <!-- 246 波（收件箱深化）：备忘置顶（置顶项组内排最前） -->
-                        <button class="b3-button b3-button--text" title={isPinned(r) ? t("act.unpin") : t("act.pin")}
-                            disabled={batchBusy || reminderBusy.has(r.id)} aria-busy={reminderBusy.has(r.id)}
-                            onclick={() => void runReminderAction(async () => { await toggleMemoPin(plugin, r.id); await plugin.refreshHub(); }, r.id)}>{reminderBusy.has(r.id) ? t("ledger.saving") : (isPinned(r) ? t("act.unpin") : t("act.pin"))}</button>
-                        <!-- 246 波（收件箱深化）：备忘编辑（标题/到期日） -->
-                        <button class="b3-button b3-button--text" disabled={batchBusy || reminderBusy.has(r.id)} onclick={() => editMemoDialog(r)}>{t("memo.edit")}</button>
-                        <!-- H03：备忘的显式删除（唯一物理删除路径；未处理项不自动清理） -->
-                        <button class="b3-button b3-button--text" disabled={batchBusy || reminderBusy.has(r.id)} onclick={() => confirmDeleteMemo(r)}>{t("delete")}</button>
-                        <!-- 240 波（收件箱分诊）：备忘 → 正式台账行 -->
-                        <button class="b3-button b3-button--text" disabled={batchBusy || reminderBusy.has(r.id)} onclick={() => toLedgerDialog(r)}>{t("triage.title")}</button>
-                    {/if}
+    <div class="lv-rem-entry" out:fade={{ duration: 150 }}>
+        <div class="lv-rem {r.level}" class:lv-rem--batch={batchMode && viewMode === "list" && filter !== "handled"}>
+            {#if batchMode && viewMode === "list" && filter !== "handled"}
+                <input type="checkbox" class="b3-checkbox" aria-label={t("hub.select")}
+                    checked={selected.has(r.id)} disabled={batchBusy} onchange={() => toggleSelect(r.id)} style="flex-shrink:0" />
+            {/if}
+            <!-- 259 波：图标砖收回中性（对齐原型 .rem .ic）——级别语义由色轨+右侧大字承载 -->
+            <div class="lv-rem-ic" aria-hidden="true"><UiIcon name={moduleUiIcon(r.moduleId)} size={18} /></div>
+            <div class="lv-rem-t" title={(r.autoRenew ? `${t("hub.autoRenew")} · ` : "") + r.dueDate}>
+                <b>
+                    {r.title}{r.ruleKey === "reciprocate" ? ` · ${t("rule.reciprocate")}` : ""}
+                    <button type="button" class="lv-rem-expand-btn"
+                        title={expandedSummaries.has(r.id) ? t("hub.collapseSummary") : t("hub.expandSummary")}
+                        aria-expanded={expandedSummaries.has(r.id)}
+                        aria-label={expandedSummaries.has(r.id) ? t("hub.collapseSummary") : t("hub.expandSummary")}
+                        onclick={(e) => toggleSummary(r.id, e)}>
+                        <span aria-hidden="true" style="display:inline-block;transition:transform 0.2s;transform:rotate({expandedSummaries.has(r.id) ? '90deg' : '0deg'})">▸</span>
+                    </button>
+                </b>
+                <!-- 249 波：meta 补模块名（对齐原型三段 meta）；262 波：成员微头像前置（"这是谁的事"） -->
+                <span class="lv-num">{#if memberOf(r.memberId)}{@const member = memberOf(r.memberId)}<span class="lv-miniava" style="background:linear-gradient(135deg, hsl({memberHue(member.id)} 62% 52%), hsl({(memberHue(member.id) + 42) % 360} 62% 40%))" aria-hidden="true">{member.name.slice(0, 1)}</span>{/if}{r.moduleId !== "adhoc" ? (t(`module.${r.moduleId}`) !== `module.${r.moduleId}` ? t(`module.${r.moduleId}`) : r.moduleId) + " · " : ""}{#if r.planDate}<span class="lv-badge" style="font-size:11px;margin-right:4px;color:var(--lv-accent);border-color:var(--lv-accent-line);background:var(--lv-accent-soft)" title={`${t("hub.planDate")}：${r.planDate}`}>📅 {t("hub.planDate")}: {r.planDate} · </span>{/if}{r.dueDate}{#if !r.memberId} · {t("members.unassigned")}{/if}{r.lunar ? " 🌙" : ""}{r.autoRenew ? " 🔄" : ""}</span>
+            </div>
+            <!-- 对齐原型：相对到期大字居右（颜色随级别；文字本身已承载逾期/N天后语义，级别徽章不再重复） -->
+            <div class="lv-rem-when">
+                <b class="lv-num" style="color:var(--lv-{r.level === 'overdue' ? 'danger' : r.level === 'soon' ? 'warn' : 'amber'})">{relDue(r.daysLeft, r.dueDate)}</b>
+            </div>
+            <div class="lv-rem-ops">
+                <button class="b3-button b3-button--text" disabled={batchBusy || reminderBusy.has(r.id)} aria-busy={reminderBusy.has(r.id)} onclick={() => void completeItem(r)}>{reminderBusy.has(r.id) ? t("ledger.saving") : t("act.done")}</button>
+                <div class="lv-rem-more">
+                    <button class="b3-button b3-button--text lv-rem-more-toggle" type="button" aria-expanded="false" aria-controls={`lv-rem-more-${r.id}`}
+                        onclick={toggleMoreMenu}>{t("ledger.detailMore")} <span aria-hidden="true">⌄</span></button>
+                    <div id={`lv-rem-more-${r.id}`} class="lv-rem-more-menu" role="group" aria-label={t("ledger.detailMore")} use:closeMoreOnMenuClick>
+                        {#if ["certs", "insurance", "contracts"].includes(r.moduleId)}
+                            <!-- 续保/换证/合同续约：新到期日写回规则 field 列（26.6 + 98 波：contracts 规则带 field=expiry 与
+                                 autoRenewField 升级路径，此前 🔄 决策提醒无"续"动作入口——漏项补齐） -->
+                        <button class="b3-button b3-button--text" disabled={batchBusy || reminderBusy.has(r.id)} onclick={() => renewDialog(r)}>{t("act.renew")}</button>
+                        {/if}
+                        {#if r.moduleId !== "adhoc" && plugin.settings.dbRefs[r.moduleId]?.docId}
+                            <button class="b3-button b3-button--text" disabled={batchBusy} title={t("act.locate")} onclick={() => plugin.showTabDocs(plugin.settings.dbRefs[r.moduleId].docId)}>{t("act.locate")}</button>
+                        {/if}
+                        <button class="b3-button b3-button--text" aria-haspopup="menu" disabled={batchBusy || reminderBusy.has(r.id)} aria-busy={reminderBusy.has(r.id)} onclick={(e) => snoozeMenu(r, e)}>{reminderBusy.has(r.id) ? t("ledger.saving") : `${t("act.snooze")} ▾`}</button>
+                        <button class="b3-button b3-button--text" disabled={batchBusy || reminderBusy.has(r.id)} onclick={() => openPlanDateDialog(r)}>{t("hub.setPlanDate")}</button>
+                        <button class="b3-button b3-button--text" disabled={batchBusy || reminderBusy.has(r.id)} aria-busy={reminderBusy.has(r.id)} onclick={() => void runReminderAction(() => plugin.mute(r.id), r.id)}>{reminderBusy.has(r.id) ? t("ledger.saving") : t("act.mute")}</button>
+                        {#if r.moduleId === "adhoc"}
+                            <!-- 246 波（收件箱深化）：备忘置顶（置顶项组内排最前） -->
+                            <button class="b3-button b3-button--text" title={isPinned(r) ? t("act.unpin") : t("act.pin")}
+                                disabled={batchBusy || reminderBusy.has(r.id)} aria-busy={reminderBusy.has(r.id)}
+                                onclick={() => void runReminderAction(async () => { await toggleMemoPin(plugin, r.id); await plugin.refreshHub(); }, r.id)}>{reminderBusy.has(r.id) ? t("ledger.saving") : (isPinned(r) ? t("act.unpin") : t("act.pin"))}</button>
+                            <!-- 246 波（收件箱深化）：备忘编辑（标题/到期日） -->
+                            <button class="b3-button b3-button--text" disabled={batchBusy || reminderBusy.has(r.id)} onclick={() => editMemoDialog(r)}>{t("memo.edit")}</button>
+                            <!-- H03：备忘的显式删除（唯一物理删除路径；未处理项不自动清理） -->
+                            <button class="b3-button b3-button--text" disabled={batchBusy || reminderBusy.has(r.id)} onclick={() => confirmDeleteMemo(r)}>{t("delete")}</button>
+                            <!-- 240 波（收件箱分诊）：备忘 → 正式台账行 -->
+                            <button class="b3-button b3-button--text" disabled={batchBusy || reminderBusy.has(r.id)} onclick={() => toLedgerDialog(r)}>{t("triage.title")}</button>
+                        {/if}
+                    </div>
                 </div>
             </div>
         </div>
+        {#if expandedSummaries.has(r.id)}
+            <div class="lv-rem-summary">
+                <div class="lv-rem-summary__grid">
+                    <div class="lv-rem-summary__item">
+                        <span class="lv-rem-summary__k">{t("hub.summaryModule")}：</span>
+                        <span class="lv-rem-summary__v">{t(`module.${r.moduleId}`) !== `module.${r.moduleId}` ? t(`module.${r.moduleId}`) : r.moduleId}</span>
+                    </div>
+                    {#if r.ruleKey}
+                        <div class="lv-rem-summary__item">
+                            <span class="lv-rem-summary__k">{t("hub.summaryRule")}：</span>
+                            <span class="lv-rem-summary__v">{t(`rule.${r.ruleKey}`) !== `rule.${r.ruleKey}` ? t(`rule.${r.ruleKey}`) : r.ruleKey}</span>
+                        </div>
+                    {/if}
+                    <div class="lv-rem-summary__item">
+                        <span class="lv-rem-summary__k">{t("hub.summaryMember")}：</span>
+                        <span class="lv-rem-summary__v">{memberOf(r.memberId)?.name ? `${memberOf(r.memberId)!.name}（${t(`role.${memberOf(r.memberId)!.role}`) !== `role.${memberOf(r.memberId)!.role}` ? t(`role.${memberOf(r.memberId)!.role}`) : memberOf(r.memberId)!.role}）` : t("members.unassigned")}</span>
+                    </div>
+                    <div class="lv-rem-summary__item">
+                        <span class="lv-rem-summary__k">{t("hub.summaryDue")}：</span>
+                        <span class="lv-rem-summary__v">{r.dueDate}（{relDue(r.daysLeft, r.dueDate)}）</span>
+                    </div>
+                    {#if r.planDate}
+                        <div class="lv-rem-summary__item">
+                            <span class="lv-rem-summary__k">{t("hub.planDate")}：</span>
+                            <span class="lv-rem-summary__v" style="color:var(--lv-accent);font-weight:600">📅 {r.planDate}</span>
+                        </div>
+                    {/if}
+                    {#if r.kind}
+                        <div class="lv-rem-summary__item">
+                            <span class="lv-rem-summary__k">{t("hub.summaryKind")}：</span>
+                            <span class="lv-rem-summary__v">{r.kind}</span>
+                        </div>
+                    {/if}
+                    {#if r.lunar}
+                        <div class="lv-rem-summary__item">
+                            <span class="lv-rem-summary__k">{t("hub.summaryFeatures")}：</span>
+                            <span class="lv-rem-summary__v">🌙 {t("hub.summaryLunar")}</span>
+                        </div>
+                    {/if}
+                    {#if r.autoRenew}
+                        <div class="lv-rem-summary__item">
+                            <span class="lv-rem-summary__k">{t("hub.summaryFeatures")}：</span>
+                            <span class="lv-rem-summary__v">🔄 {t("hub.summaryAutoRenew")}</span>
+                        </div>
+                    {/if}
+                </div>
+                {#if r.moduleId !== "adhoc" && plugin.settings.dbRefs[r.moduleId]?.docId}
+                    <div class="lv-rem-summary__actions">
+                        <button class="b3-button b3-button--outline b3-button--small" onclick={() => plugin.showTabDocs(plugin.settings.dbRefs[r.moduleId].docId)}>
+                            {t("act.locate")} →
+                        </button>
+                    </div>
+                {/if}
+            </div>
+        {/if}
     </div>
 {/snippet}
 
@@ -781,6 +1000,23 @@
             <button class="b3-button b3-button--outline" class:is-filtered={filterModule === "adhoc"} disabled={batchBusy}
                 aria-pressed={filterModule === "adhoc"} onclick={() => { filterModule = filterModule === "adhoc" ? undefined : "adhoc"; persistFilter(); }}>
                 {t("hub.triageChip")}{#if filterModule === "adhoc"} ✓{/if}
+            </button>
+        </div>
+        <!-- UIX-06 / §17 智能筛选命名视图栏 -->
+        <div class="lv-named-views">
+            <span class="lv-named-views__label">{t("hub.namedViews")}：</span>
+            {#each namedViews as v (v.id)}
+                <div class="lv-named-view-chip" class:is-active={isNamedViewActive(v)}
+                    role="button" tabindex="0" onclick={() => applyNamedView(v)}
+                    onkeydown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); applyNamedView(v); } }}>
+                    <span class="lv-named-view-chip__name">{v.name}</span>
+                    <button type="button" class="lv-named-view-chip__del" title={t("delete")}
+                        onclick={(e) => handleDeleteView(v, e)} aria-label={`${t("delete")} ${v.name}`}>×</button>
+                </div>
+            {/each}
+            <button type="button" class="b3-button b3-button--text lv-named-views__add"
+                title={t("hub.saveView")} onclick={openSaveViewDialog}>
+                ＋ {t("hub.saveView")}
             </button>
         </div>
     </div>
@@ -991,6 +1227,72 @@
     .lv-hub-filters .is-filtered, .lv-hub-actions .is-active { color: var(--lv-accent); border-color: var(--lv-accent-line); background: var(--lv-accent-soft); }
     .lv-hub-batchbar { padding: 8px 13px; margin-bottom: 12px; border-color: var(--lv-accent-line); background: var(--lv-surface); }
     .lv-hub-batchbar .lv-caption { color: var(--lv-tx-2); font-weight: 600; }
+    .lv-named-views {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        margin-top: 8px;
+        padding-top: 8px;
+        border-top: 1px dashed var(--lv-line);
+        flex-wrap: wrap;
+    }
+    .lv-named-views__label {
+        font-size: 11px;
+        color: var(--lv-tx-3);
+        white-space: nowrap;
+        font-weight: 500;
+    }
+    .lv-named-view-chip {
+        display: inline-flex;
+        align-items: center;
+        gap: 4px;
+        padding: 2px 8px;
+        border-radius: 999px;
+        font-size: 11.5px;
+        background: var(--lv-surface-2);
+        border: 1px solid var(--lv-line);
+        color: var(--lv-tx-2);
+        cursor: pointer;
+        transition: all 0.15s ease;
+    }
+    .lv-named-view-chip:hover {
+        background: var(--lv-surface);
+        border-color: var(--lv-line-strong);
+        color: var(--lv-tx);
+    }
+    .lv-named-view-chip.is-active {
+        background: var(--lv-accent-soft);
+        border-color: var(--lv-accent-line);
+        color: var(--lv-accent);
+        font-weight: 600;
+    }
+    .lv-named-view-chip__del {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        width: 14px;
+        height: 14px;
+        padding: 0;
+        border: none;
+        border-radius: 50%;
+        background: transparent;
+        color: var(--lv-tx-3);
+        font-size: 13px;
+        line-height: 1;
+        cursor: pointer;
+    }
+    .lv-named-view-chip__del:hover {
+        background: var(--lv-danger);
+        color: #fff;
+    }
+    .lv-named-views__add {
+        font-size: 11.5px;
+        padding: 2px 6px;
+        color: var(--lv-tx-3);
+    }
+    .lv-named-views__add:hover {
+        color: var(--lv-accent);
+    }
     @media (max-width: 760px) {
         .lv-hub-head { align-items: flex-start; flex-direction: column; gap: 10px; margin-bottom: 14px; }
         .lv-hub-summary { align-self: stretch; width: 100%; }

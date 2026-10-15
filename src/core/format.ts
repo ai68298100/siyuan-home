@@ -7,7 +7,8 @@ export const AMOUNT_KEYS: ReadonlySet<string> = new Set([
     "amount", "price", "refund_amount", "deposit", "target_amount",
 ]);
 
-export function formatAmount(n: number): string {
+export function formatAmount(n: number, hideAmount = false): string {
+    if (hideAmount) return "****";
     if (!Number.isFinite(n)) return "—";
     // Avoid multiplying very large values into Infinity and keep diagnostic
     // cards usable when imported data contains an accidental huge amount.
@@ -33,9 +34,16 @@ export function optLabelText(t: (k: string) => string, colKey: string, joined: s
     return joined.split("、").map((x) => optLabel(t, colKey, x)).join("、");
 }
 
-/** 成员头像稳定色相（0-359）：id 哈希 → 同一成员恒定色相（总览 chips / 成员卡共用） */
+const hueCache = new Map<string, number>();
+
+/** 成员头像稳定色相（0-359）：id 哈希 → 同一成员恒定色相（PERF-01：内置缓存避免长列表高频每帧重算） */
 export function memberHue(id: string): number {
+    if (!id) return 0;
+    const cached = hueCache.get(id);
+    if (cached !== undefined) return cached;
     let h = 0;
     for (let i = 0; i < id.length; i++) h = (h * 31 + id.charCodeAt(i)) % 360;
+    if (hueCache.size >= 500) hueCache.clear();
+    hueCache.set(id, h);
     return h;
 }

@@ -4,6 +4,7 @@ export type PluginScreen = "overview" | "reminders" | "ledger" | "members";
 export interface PanelSessionState {
     scrollTop: Partial<Record<PluginScreen, number>>;
     ledgerSearch: string;
+    ledgerDensity?: "comfortable" | "compact";
 }
 
 const sessions = new WeakMap<object, PanelSessionState>();

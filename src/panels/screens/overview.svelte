@@ -374,6 +374,140 @@
         run(target);
         return { update: run, destroy: () => cancelAnimationFrame(raf) };
     }
+
+    // MOD-20 / §13 家庭年度生活报告生成器
+    async function openAnnualReportModal() {
+        const curYear = new Date().getFullYear();
+        let favorsStat: { totalIn: number; totalOut: number; netAmount: number; countIn: number; countOut: number } | undefined;
+        let mediaStat: { doneThisYearCount: number; consumingCount: number; averageRating: number } | undefined;
+        let assetStat: { totalValuation: number; activeItemCount: number } | undefined;
+
+        try {
+            const { renderLedgerAll } = await import("@/core/siyuan");
+            // 1. 尝试读取 favors
+            const favorsRef = plugin.settings.dbRefs?.["favors"];
+            if (favorsRef?.avId && favorsRef.columns) {
+                try {
+                    const l = await renderLedgerAll(favorsRef.avId);
+                    const { calculateFavorsSummary } = await import("@/core/favors");
+                    const dirCol = favorsRef.columns.direction;
+                    const amtCol = favorsRef.columns.amount;
+                    const personCol = favorsRef.columns.person;
+                    const dateCol = favorsRef.columns.date;
+                    const fRows = l.rows.map((r) => ({
+                        direction: r.cells[dirCol]?.select?.content ?? r.cells[dirCol]?.mSelect?.[0]?.content ?? r.cells[dirCol]?.text?.content,
+                        amount: r.cells[amtCol]?.number?.content,
+                        person: r.cells[personCol]?.text?.content,
+                        date: r.cells[dateCol]?.date?.content ? new Date(r.cells[dateCol].date.content).toISOString().slice(0, 10) : undefined,
+                    }));
+                    favorsStat = calculateFavorsSummary(fRows, curYear);
+                } catch { /* ignored */ }
+            }
+
+            // 2. 尝试读取 media
+            const mediaRef = plugin.settings.dbRefs?.["media"];
+            if (mediaRef?.avId && mediaRef.columns) {
+                try {
+                    const l = await renderLedgerAll(mediaRef.avId);
+                    const { calculateMediaSummary } = await import("@/core/media");
+                    const stCol = mediaRef.columns.status;
+                    const rtCol = mediaRef.columns.rating;
+                    const dateCol = mediaRef.columns.date;
+                    const mRows = l.rows.map((r) => ({
+                        name: r.cells[mediaRef.columns!.name]?.text?.content ?? "作品",
+                        status: r.cells[stCol]?.select?.content ?? r.cells[stCol]?.mSelect?.[0]?.content ?? r.cells[stCol]?.text?.content,
+                        rating: r.cells[rtCol]?.number?.content,
+                        date: r.cells[dateCol]?.date?.content ? new Date(r.cells[dateCol].date.content).toISOString().slice(0, 10) : undefined,
+                    }));
+                    mediaStat = calculateMediaSummary(mRows, curYear);
+                } catch { /* ignored */ }
+            }
+
+            // 3. 尝试读取 assets-real
+            const assetRef = plugin.settings.dbRefs?.["assets-real"];
+            if (assetRef?.avId && assetRef.columns) {
+                try {
+                    const l = await renderLedgerAll(assetRef.avId);
+                    const { calculateAssetValuation } = await import("@/core/assets-valuation");
+                    const amtCol = assetRef.columns.amount;
+                    const stCol = assetRef.columns.status;
+                    const aRows = l.rows.map((r) => ({
+                        id: r.itemID,
+                        amount: r.cells[amtCol]?.number?.content,
+                        status: r.cells[stCol]?.select?.content ?? r.cells[stCol]?.mSelect?.[0]?.content ?? r.cells[stCol]?.text?.content ?? "inuse",
+                    }));
+                    assetStat = calculateAssetValuation(aRows);
+                } catch { /* ignored */ }
+            }
+        } catch { /* fallback to defaults */ }
+
+        const { generateAnnualReport, formatAnnualReportText } = await import("@/core/annual-report");
+        const { formatAmount } = await import("@/core/format");
+        const report = generateAnnualReport({
+            year: curYear,
+            membersCount: members.length,
+            monthlyCompletions: plugin.runtime?.monthlyCompletions,
+            handledRecords: Object.values(plugin.runtime?.handled ?? {}),
+            favorsSummary: favorsStat,
+            mediaSummary: mediaStat,
+            assetValuation: assetStat,
+        });
+
+        const { Dialog } = await import("siyuan");
+        const dlg = new Dialog({
+            title: t("annualReport.title").replace("${year}", String(report.year)),
+            content: `
+                <div class="b3-dialog__content fn__flex" style="flex-direction:column;gap:14px;max-height:70vh;overflow:auto;padding:18px 22px">
+                    <div style="font-size:13px;color:var(--lv-tx-2);line-height:1.5">
+                        🏠 <b>小驴管家 · ${report.year} 年度家庭生活总结报告</b>
+                        <div class="lv-caption" style="margin-top:2px">共有 ${report.membersCount} 位家庭成员共同打理家底档案</div>
+                    </div>
+                    <div style="display:grid;grid-template-columns:repeat(2, 1fr);gap:10px">
+                        <div style="padding:12px;border-radius:var(--lv-r-2);background:var(--lv-surface-2);border:1px solid var(--lv-line)">
+                            <div class="lv-caption" style="font-size:11.5px">✅ ${t("annualReport.completedTasks")}</div>
+                            <div style="font-size:22px;font-weight:700;color:var(--lv-ok);margin-top:4px">${report.totalRemindersCompleted} <span style="font-size:12px;font-weight:normal;color:var(--lv-tx-3)">件完成</span></div>
+                        </div>
+                        <div style="padding:12px;border-radius:var(--lv-r-2);background:var(--lv-surface-2);border:1px solid var(--lv-line)">
+                            <div class="lv-caption" style="font-size:11.5px">🎁 ${t("annualReport.favorsNet")}</div>
+                            <div style="font-size:20px;font-weight:700;color:var(--lv-tx);margin-top:4px">¥ ${formatAmount(report.favors.netAmount)}</div>
+                            <div class="lv-caption" style="font-size:11px;margin-top:2px">收 ¥${formatAmount(report.favors.totalIn)} · 送 ¥${formatAmount(report.favors.totalOut)}</div>
+                        </div>
+                        <div style="padding:12px;border-radius:var(--lv-r-2);background:var(--lv-surface-2);border:1px solid var(--lv-line)">
+                            <div class="lv-caption" style="font-size:11.5px">🎬 ${t("annualReport.mediaDone")}</div>
+                            <div style="font-size:20px;font-weight:700;color:var(--lv-tx);margin-top:4px">${report.media.doneCount} <span style="font-size:12px;font-weight:normal;color:var(--lv-tx-3)">部完成</span></div>
+                            <div class="lv-caption" style="font-size:11px;margin-top:2px">在追 ${report.media.consumingCount} 部 · 均分 ★ ${report.media.averageRating}</div>
+                        </div>
+                        <div style="padding:12px;border-radius:var(--lv-r-2);background:var(--lv-surface-2);border:1px solid var(--lv-line)">
+                            <div class="lv-caption" style="font-size:11.5px">💎 ${t("annualReport.assetsTotal")}</div>
+                            <div style="font-size:20px;font-weight:700;color:var(--lv-tx);margin-top:4px">¥ ${formatAmount(report.assets.totalValuation)}</div>
+                            <div class="lv-caption" style="font-size:11px;margin-top:2px">在用保有 ${report.assets.itemCount} 件</div>
+                        </div>
+                    </div>
+                    <div style="font-size:12px;color:var(--lv-tx-3);line-height:1.5;padding:10px 12px;border-radius:var(--lv-r-1);background:var(--lv-surface);border:1px solid var(--lv-line)">
+                        ✨ 愿新的一年，日子清朗，家和安康。
+                    </div>
+                </div>
+                <div class="b3-dialog__action">
+                    <button class="b3-button b3-button--cancel" id="lv-annual-copy">${t("annualReport.copy")}</button>
+                    <button class="b3-button" id="lv-annual-close">${t("close")}</button>
+                </div>
+            `,
+            width: "500px",
+        });
+
+        const copyBtn = dlg.element.querySelector("#lv-annual-copy") as HTMLButtonElement;
+        const closeBtn = dlg.element.querySelector("#lv-annual-close") as HTMLButtonElement;
+        closeBtn.onclick = () => dlg.destroy();
+        copyBtn.onclick = async () => {
+            try {
+                const text = formatAnnualReportText(report, formatAmount);
+                await navigator.clipboard.writeText(text);
+                showMessage(t("annualReport.copyDone"), 2500, "info");
+            } catch (err) {
+                showMessage(String(err), 4000, "error");
+            }
+        };
+    }
 </script>
 
 {#if !onboarded}
@@ -398,6 +532,7 @@
         <div class="lv-hero-actions">
             <button class="b3-button lv-hero-open" onclick={() => onGoto("reminders")}><UiIcon name="clock" size={17} />{t("dash.heroOpen")}</button>
             {#if onCapture}<button class="b3-button b3-button--outline lv-hero-capture" onclick={() => onCapture()}><UiIcon name="add" size={16} />{t("dash.quickRecord")}</button>{/if}
+            <button class="b3-button b3-button--outline" onclick={openAnnualReportModal} title={t("annualReport.button")}><UiIcon name="sparkle" size={16} />{t("annualReport.button")}</button>
         </div>
         {#if monthlyDone > 0}<p><span class="lv-badge green">✓ {t("dash.monthlyDone").replace("${n}", monthlyDueTotal > 0 ? `${monthlyDone}/${monthlyDueTotal}` : String(monthlyDone))}</span></p>{/if}
     </div>

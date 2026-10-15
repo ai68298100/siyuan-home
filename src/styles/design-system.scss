@@ -440,6 +440,240 @@
     .lv-retirement-controls .lv-retirement-select { width: 100%; }
   }
 
+  // ── 4e. 人情往来年度报告与收送看板（MOD-08）────────────────────
+  .lv-favors-banner {
+    padding: 18px 22px; margin-bottom: 14px;
+    background: linear-gradient(135deg, var(--lv-surface) 0%, color-mix(in srgb, var(--lv-accent-soft) 25%, var(--lv-surface)) 100%);
+    border: 1px solid var(--lv-line); border-radius: var(--lv-r-3);
+    box-shadow: var(--lv-card-inset), var(--lv-shadow-card);
+    display: flex; flex-direction: column; gap: 12px;
+  }
+  .lv-favors-hero {
+    display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap;
+  }
+  .lv-favors-metric {
+    display: flex; flex-direction: column; gap: 2px; min-width: 0;
+    .lv-favors-label { font-size: 11.5px; color: var(--lv-tx-3); font-weight: 500; }
+    .lv-favors-amount { font-size: 26px; font-weight: 700; color: var(--lv-tx); line-height: 1.25; letter-spacing: -0.015em; }
+    .lv-favors-sub { font-size: 12px; color: var(--lv-tx-2); display: flex; gap: 12px; }
+  }
+  .lv-favors-stats {
+    display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+  }
+  .lv-favors-chip {
+    display: inline-flex; align-items: center; gap: 6px; padding: 6px 12px;
+    border-radius: var(--lv-r-2); background: var(--lv-surface);
+    border: 1px solid var(--lv-line); font-size: 12px; color: var(--lv-tx-2);
+    box-shadow: var(--lv-shadow-1);
+    b { color: var(--lv-tx); font-weight: 650; }
+    &.in { color: var(--lv-ok); b { color: var(--lv-ok); } }
+    &.out { color: var(--lv-tx); b { color: var(--lv-tx); } }
+  }
+  .lv-favors-top {
+    display: flex; align-items: center; gap: 6px 10px; flex-wrap: wrap;
+    padding-top: 10px; border-top: 1px solid var(--lv-line);
+    font-size: 11.5px; color: var(--lv-tx-3);
+    .lv-favors-top__title { font-weight: 500; flex: none; }
+    .lv-favors-top__tag {
+      padding: 2px 8px; border-radius: 6px;
+      background: color-mix(in srgb, var(--lv-surface-2) 80%, transparent);
+      border: 1px solid var(--lv-line); color: var(--lv-tx-2);
+      font-variant-numeric: tabular-nums;
+    }
+  }
+  @media (max-width: 600px) {
+    .lv-favors-banner { padding: 14px 16px; }
+    .lv-favors-metric .lv-favors-amount { font-size: 22px; }
+    .lv-favors-hero { flex-direction: column; align-items: flex-start; gap: 10px; }
+    .lv-favors-stats { width: 100%; }
+  }
+
+  // ── 4f. 家庭资产估值汇总看板（MOD-10）────────────────────
+  .lv-asset-banner {
+    padding: 18px 22px; margin-bottom: 14px;
+    background: linear-gradient(135deg, var(--lv-surface) 0%, color-mix(in srgb, var(--lv-accent-soft) 20%, var(--lv-surface)) 100%);
+    border: 1px solid var(--lv-line); border-radius: var(--lv-r-3);
+    box-shadow: var(--lv-card-inset), var(--lv-shadow-card);
+    display: flex; flex-direction: column; gap: 12px;
+  }
+  .lv-asset-hero {
+    display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap;
+  }
+  .lv-asset-metric {
+    display: flex; flex-direction: column; gap: 2px; min-width: 0;
+    .lv-asset-label { font-size: 11.5px; color: var(--lv-tx-3); font-weight: 500; }
+    .lv-asset-amount { font-size: 26px; font-weight: 700; color: var(--lv-tx); line-height: 1.25; letter-spacing: -0.015em; }
+    .lv-asset-sub { font-size: 12px; color: var(--lv-tx-2); }
+  }
+  .lv-asset-stats {
+    display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+  }
+  .lv-asset-chip {
+    display: inline-flex; align-items: center; gap: 6px; padding: 6px 12px;
+    border-radius: var(--lv-r-2); background: var(--lv-surface);
+    border: 1px solid var(--lv-line); font-size: 12px; color: var(--lv-tx-2);
+    box-shadow: var(--lv-shadow-1);
+    b { color: var(--lv-tx); font-weight: 650; }
+  }
+  .lv-asset-top {
+    display: flex; align-items: center; gap: 6px 10px; flex-wrap: wrap;
+    padding-top: 10px; border-top: 1px solid var(--lv-line);
+    font-size: 11.5px; color: var(--lv-tx-3);
+    .lv-asset-top__title { font-weight: 500; flex: none; }
+    .lv-asset-top__tag {
+      padding: 2px 8px; border-radius: 6px;
+      background: color-mix(in srgb, var(--lv-surface-2) 80%, transparent);
+      border: 1px solid var(--lv-line); color: var(--lv-tx-2);
+      font-variant-numeric: tabular-nums;
+    }
+  }
+  @media (max-width: 600px) {
+    .lv-asset-banner { padding: 14px 16px; }
+    .lv-asset-metric .lv-asset-amount { font-size: 22px; }
+    .lv-asset-hero { flex-direction: column; align-items: flex-start; gap: 10px; }
+    .lv-asset-stats { width: 100%; }
+  }
+
+  // ── 4g. 升学与教育里程碑倒计时看板（MOD-13）────────────────────
+  .lv-schooling-banner {
+    padding: 18px 22px; margin-bottom: 14px;
+    background: linear-gradient(135deg, var(--lv-surface) 0%, color-mix(in srgb, var(--lv-accent-soft) 22%, var(--lv-surface)) 100%);
+    border: 1px solid var(--lv-line); border-radius: var(--lv-r-3);
+    box-shadow: var(--lv-card-inset), var(--lv-shadow-card);
+    display: flex; flex-direction: column; gap: 12px;
+  }
+  .lv-schooling-top {
+    display: flex; align-items: center; justify-content: space-between; gap: 14px; flex-wrap: wrap;
+  }
+  .lv-schooling-header {
+    display: flex; align-items: center; gap: 8px; font-size: 13px; font-weight: 650; color: var(--lv-tx);
+  }
+  .lv-schooling-students {
+    display: flex; align-items: center; gap: 6px; flex-wrap: wrap;
+  }
+  .lv-schooling-student-chip {
+    padding: 3px 10px; border-radius: 999px; font-size: 11.5px;
+    background: var(--lv-surface); border: 1px solid var(--lv-line);
+    color: var(--lv-tx-2); cursor: pointer; transition: all var(--lv-t-fast) var(--lv-ease);
+    &.active {
+      background: var(--lv-accent-soft); border-color: var(--lv-accent-line);
+      color: var(--lv-accent); font-weight: 600;
+    }
+  }
+  .lv-schooling-body {
+    display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap;
+  }
+  .lv-schooling-metric {
+    display: flex; flex-direction: column; gap: 3px; min-width: 0;
+    .lv-schooling-label { font-size: 11.5px; color: var(--lv-tx-3); font-weight: 500; }
+    .lv-schooling-countdown {
+      font-size: 26px; font-weight: 700; color: var(--lv-tx); line-height: 1.25; letter-spacing: -0.015em;
+      .unit { font-size: 14px; font-weight: 500; color: var(--lv-tx-2); margin-inline: 2px 6px; }
+    }
+    .lv-schooling-sub {
+      font-size: 12px; color: var(--lv-tx-2); line-height: 1.5;
+      b { color: var(--lv-tx); }
+    }
+  }
+  @media (max-width: 600px) {
+    .lv-schooling-banner { padding: 14px 16px; }
+    .lv-schooling-body { flex-direction: column; align-items: flex-start; gap: 10px; }
+    .lv-schooling-metric .lv-schooling-countdown { font-size: 22px; }
+  }
+
+  // ── 4h. 影音书库状态与年度进度看板（MOD-14）────────────────────
+  .lv-media-banner {
+    padding: 18px 22px; margin-bottom: 14px;
+    background: linear-gradient(135deg, var(--lv-surface) 0%, color-mix(in srgb, var(--lv-accent-soft) 25%, var(--lv-surface)) 100%);
+    border: 1px solid var(--lv-line); border-radius: var(--lv-r-3);
+    box-shadow: var(--lv-card-inset), var(--lv-shadow-card);
+    display: flex; flex-direction: column; gap: 12px;
+  }
+  .lv-media-hero {
+    display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap;
+  }
+  .lv-media-metric {
+    display: flex; flex-direction: column; gap: 2px; min-width: 0;
+    .lv-media-label { font-size: 11.5px; color: var(--lv-tx-3); font-weight: 500; }
+    .lv-media-amount { font-size: 26px; font-weight: 700; color: var(--lv-tx); line-height: 1.25; letter-spacing: -0.015em; }
+    .lv-media-sub { font-size: 12px; color: var(--lv-tx-2); display: flex; gap: 12px; }
+  }
+  .lv-media-stats {
+    display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+  }
+  .lv-media-chip {
+    display: inline-flex; align-items: center; gap: 6px; padding: 6px 12px;
+    border-radius: var(--lv-r-2); background: var(--lv-surface);
+    border: 1px solid var(--lv-line); font-size: 12px; color: var(--lv-tx-2);
+    box-shadow: var(--lv-shadow-1);
+    b { color: var(--lv-tx); font-weight: 650; }
+    &.active {
+      background: var(--lv-accent-soft); border-color: var(--lv-accent-line);
+      color: var(--lv-accent); b { color: var(--lv-accent); }
+    }
+  }
+  .lv-media-top {
+    display: flex; align-items: center; gap: 6px 10px; flex-wrap: wrap;
+    padding-top: 10px; border-top: 1px solid var(--lv-line);
+    font-size: 11.5px; color: var(--lv-tx-3);
+    .lv-media-top__title { font-weight: 500; flex: none; }
+    .lv-media-top__tag {
+      padding: 2px 8px; border-radius: 6px;
+      background: color-mix(in srgb, var(--lv-surface-2) 80%, transparent);
+      border: 1px solid var(--lv-line); color: var(--lv-tx-2);
+      font-variant-numeric: tabular-nums;
+    }
+  }
+  @media (max-width: 600px) {
+    .lv-media-banner { padding: 14px 16px; }
+    .lv-media-metric .lv-media-amount { font-size: 22px; }
+    .lv-media-hero { flex-direction: column; align-items: flex-start; gap: 10px; }
+    .lv-media-stats { width: 100%; }
+  }
+
+  // ── 4i. 宠物疫苗与驱虫周期看板（MOD-15）────────────────────
+  .lv-pets-banner {
+    padding: 18px 22px; margin-bottom: 14px;
+    background: linear-gradient(135deg, var(--lv-surface) 0%, color-mix(in srgb, var(--lv-accent-soft) 22%, var(--lv-surface)) 100%);
+    border: 1px solid var(--lv-line); border-radius: var(--lv-r-3);
+    box-shadow: var(--lv-card-inset), var(--lv-shadow-card);
+    display: flex; flex-direction: column; gap: 12px;
+  }
+  .lv-pets-hero {
+    display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap;
+  }
+  .lv-pets-metric {
+    display: flex; flex-direction: column; gap: 6px; min-width: 0;
+    .lv-pets-label { font-size: 13px; font-weight: 650; color: var(--lv-tx); }
+    .lv-pets-tags { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+  }
+  .lv-pets-stats {
+    display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+  }
+  .lv-pets-chip {
+    display: inline-flex; align-items: center; gap: 6px; padding: 6px 12px;
+    border-radius: var(--lv-r-2); background: var(--lv-surface);
+    border: 1px solid var(--lv-line); font-size: 12px; color: var(--lv-tx-2);
+    box-shadow: var(--lv-shadow-1);
+    b { color: var(--lv-tx); font-weight: 650; }
+  }
+  .lv-pets-list {
+    display: flex; align-items: center; gap: 8px 12px; flex-wrap: wrap;
+    padding-top: 10px; border-top: 1px solid var(--lv-line);
+    font-size: 11.5px; color: var(--lv-tx-3);
+    .lv-pets-item {
+      display: inline-flex; align-items: center; gap: 6px;
+      padding: 3px 10px; border-radius: 6px;
+      background: color-mix(in srgb, var(--lv-surface-2) 80%, transparent);
+      border: 1px solid var(--lv-line); color: var(--lv-tx-2);
+    }
+  }
+  @media (max-width: 600px) {
+    .lv-pets-banner { padding: 14px 16px; }
+    .lv-pets-hero { flex-direction: column; align-items: flex-start; gap: 10px; }
+    .lv-pets-stats { width: 100%; }
+  }
+
   // ── 5. 按钮 ─────────────────────────────────────────────
   .lv-btn { display: inline-flex; align-items: center; justify-content: center; gap: var(--lv-space-2); min-height: var(--lv-control-lg); padding: var(--lv-space-2) 15px;
     border-radius: var(--lv-r-2); border: 1px solid var(--lv-line);
@@ -521,6 +755,13 @@
 
   // ── 7. 提醒行（色轨四级）───────────────────────────────
   .lv-rems { display: flex; flex-direction: column; overflow: hidden; border-radius: var(--lv-r-3); }
+  .lv-rem-entry {
+    display: flex;
+    flex-direction: column;
+    border-bottom: 1px solid var(--lv-line);
+    &:last-child { border-bottom: none; }
+    .lv-rem { border-bottom: none; }
+  }
   .lv-rem { display: flex; align-items: center; gap: 14px; padding: var(--lv-space-4) 20px 16px 18px; position: relative;
     border-bottom: 1px solid var(--lv-line); transition: background var(--lv-t-fast) var(--lv-ease);
     &:last-child { border-bottom: none; }
@@ -561,6 +802,55 @@
   .lv-rem-more-toggle { display: none; align-items: center; gap: var(--lv-space-1); }
   .lv-rem-more-menu { display: contents; }
   .lv-rem-more-menu .b3-button { white-space: nowrap; }
+
+  // UIX-05 / §17 提醒行就地展开关键摘要
+  .lv-rem-expand-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 2px 5px;
+    margin-left: 5px;
+    font-size: 11px;
+    color: var(--lv-tx-3);
+    border-radius: var(--lv-r-1);
+    vertical-align: middle;
+    cursor: pointer;
+    line-height: 1;
+    &:hover { color: var(--lv-tx); background: var(--lv-surface-2); }
+  }
+  .lv-rem-summary {
+    background: var(--lv-surface-2);
+    border-top: 1px dashed var(--lv-line);
+    border-bottom: 1px solid var(--lv-line);
+    padding: 10px 18px 10px 52px;
+    font-size: 12px;
+    color: var(--lv-tx-2);
+  }
+  .lv-rem-summary__grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+    gap: 6px 14px;
+  }
+  .lv-rem-summary__item {
+    display: flex;
+    align-items: baseline;
+    gap: 4px;
+  }
+  .lv-rem-summary__k {
+    color: var(--lv-tx-3);
+    font-size: 11.5px;
+    flex-shrink: 0;
+  }
+  .lv-rem-summary__v {
+    color: var(--lv-tx);
+    font-size: 12px;
+    word-break: break-all;
+  }
+  .lv-rem-summary__actions {
+    margin-top: 8px;
+    display: flex;
+    gap: 8px;
+  }
 
   // ── 8. 模块卡 / 色砖 / 趋势条 / 进度条 ──────────────────
   // 250 波：补上 .lv-mods 网格（此前模板使用但样式表从未定义，模块卡退化成全宽单列堆叠）
@@ -674,6 +964,15 @@
     tbody tr { transition: background var(--lv-t-fast) var(--lv-ease);
       &:hover { background: var(--lv-surface-2); }
       &.sel { background: var(--lv-accent-soft); box-shadow: inset 2px 0 0 var(--lv-accent); } } }
+  // UIX-04 / §17：台账表格紧凑密度（行高压缩，适配密集大表场景）
+  .lv-table.compact table, .lv-table.is-compact table {
+    font-size: 12px;
+    thead th { padding: 6px 12px; font-size: 11px; }
+    tbody td { padding: 6px 12px; }
+    .lv-sev-col { width: 36px; }
+    tbody .lv-sev-cell { width: 36px; padding: 2px; }
+    .lv-table-open { min-width: 32px; min-height: 24px; padding: 2px; font-size: 11.5px; }
+  }
   .lv-cell-sub { display: block; font-size: 11.5px; color: var(--lv-tx-3); margin-top: 1px; }
 
   // ── 10. 抽屉 / 蒙层 / 弹层 ─────────────────────────────

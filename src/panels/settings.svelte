@@ -67,9 +67,11 @@
     let draftWebhookMode = $state<"bark" | "ntfy">(settings.webhookMode === "ntfy" ? "ntfy" : "bark");
     // svelte-ignore state_referenced_locally
     let draftWebhookUrl = $state(settings.webhookUrl ?? "");
+    // svelte-ignore state_referenced_locally
+    let draftHideAmounts = $state(settings.hideAmounts ?? false);
     let testingWebhook = $state(false);
     let rerunBusy = $state(false);
-    let diagnosticsBusy = $state<"backfill" | "duplicates" | "health" | null>(null);
+    let diagnosticsBusy = $state<"backfill" | "duplicates" | "health" | "rebuild" | null>(null);
     let exportingDiagnostics = $state(false);
     let demoBusy = $state(false);
     let demoAction = $state<"generate" | "clear" | null>(null);
@@ -204,6 +206,7 @@
         draftWebhookEnabled = source.webhookEnabled ?? false;
         draftWebhookMode = source.webhookMode === "ntfy" ? "ntfy" : "bark";
         draftWebhookUrl = source.webhookUrl ?? "";
+        draftHideAmounts = source.hideAmounts ?? false;
         draftBindings = (source.checkinBindings ?? []).map((b) => ({ ...b }));
     }
 
@@ -234,6 +237,7 @@
         if (draftWebhookMode !== (s.webhookMode === "ntfy" ? "ntfy" : "bark")) return true;
         if (normWebhookUrl(draftWebhookUrl) !== (s.webhookUrl ?? "")) return true;
         if ((draftWebhookEnabled && normWebhookUrl(draftWebhookUrl) !== "") !== (s.webhookEnabled ?? false)) return true;
+        if (draftHideAmounts !== (s.hideAmounts ?? false)) return true;
         if (JSON.stringify(normLeads(draftLeads)) !== JSON.stringify(s.leadOverrides ?? {})) return true;
         if (JSON.stringify(normalizeCheckinBindings(draftBindings)) !== JSON.stringify(s.checkinBindings ?? [])) return true;
         return false;
@@ -471,6 +475,34 @@
         }
     }
 
+    async function runRebuildAllLedgers() {
+        if (diagnosticsBusy) return;
+        diagnosticsBusy = "rebuild";
+        try {
+            if (!plugin.ensureCoreLedgers) {
+                showMessage(settingHint("插件未提供建库服务", "Provisioning service not available"), 6000, "error");
+                return;
+            }
+            const report = await plugin.ensureCoreLedgers();
+            try {
+                await plugin.refreshHub?.(undefined, true);
+            } catch (e) {
+                showMessage(t("ledger.rebuildRefreshFailed").replace("${msg}", e instanceof Error ? e.message : String(e)), 6000, "error");
+                return;
+            }
+            if (report.issues.length > 0) {
+                const modules = report.issues.map(({ moduleId }) => t(`module.${moduleId}`)).join(", ");
+                showMessage(t("ledger.rebuildPartial").replace("${modules}", modules), 7000, "error");
+            } else {
+                showMessage(t("diag.rebuildAllDone"), 4000, "info");
+            }
+        } catch (error) {
+            showMessage(`${t("ledger.rebuildFailed").replace("${msg}", error instanceof Error ? error.message : String(error))}`, 6000, "error");
+        } finally {
+            diagnosticsBusy = null;
+        }
+    }
+
     async function rerunOnboarding() {
         if (rerunBusy || saving || migrationBusy || demoBusy) return;
         rerunBusy = true;
@@ -636,6 +668,7 @@
                 webhookEnabled: draftWebhookEnabled && normWebhookUrl(draftWebhookUrl) !== "",
                 webhookUrl: normWebhookUrl(draftWebhookUrl),
                 webhookMode: draftWebhookMode,
+                hideAmounts: draftHideAmounts,
                 // 263 波：与脏检查共用 normLeads
                 leadOverrides: normLeads(draftLeads),
                 // EC09：打卡绑定落盘（清洗在 normalize——缺 id/metric 非法剔除、去重）
@@ -1030,6 +1063,15 @@
         {@const diag = plugin.getDiagnostics?.()}
         <div class="lv-settings__pane-title">{t("tabAbout")}</div>
         <div class="lv-settings__scroll">
+        <!-- PRIV-01 / §4 C8f：隐私模式金额遮蔽开关 -->
+        <div class="lv-card lv-setcard">
+            <div class="lv-setcard__title">🔒 {t("settings.hideAmounts")}</div>
+            <div class="lv-setcard__hint">{t("settings.hideAmountsHint")}</div>
+            <div class="fn__flex lv-settings__row" style="align-items:center;justify-content:space-between">
+                <span>{t("settings.hideAmounts")}</span>
+                <input type="checkbox" class="b3-switch" aria-label={t("settings.hideAmounts")} bind:checked={draftHideAmounts} />
+            </div>
+        </div>
         <div class="lv-card lv-setcard">
             <div class="lv-settings__about">
                 <p>{t("about.line1")}</p>
@@ -1084,6 +1126,11 @@
                             disabled={diagnosticsBusy !== null || exportingDiagnostics}
                             aria-busy={diagnosticsBusy === "health"}
                             onclick={runDeepHealthCheck}>{diagnosticsBusy === "health" ? t("ledger.saving") : t("diag.health")}</button>
+                        <!-- §15 / 443：一键重建全部缺失台账 -->
+                        <button class="b3-button b3-button--outline"
+                            disabled={diagnosticsBusy !== null || exportingDiagnostics}
+                            aria-busy={diagnosticsBusy === "rebuild"}
+                            onclick={runRebuildAllLedgers}>{diagnosticsBusy === "rebuild" ? t("diag.rebuilding") : t("diag.rebuildAll")}</button>
                     </div>
                 </div>
             {/if}

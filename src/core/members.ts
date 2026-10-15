@@ -448,3 +448,43 @@ export async function backfillMemberLinks(
     if (dirty) await saveSettings(plugin, settings);
     return result;
 }
+
+export interface BatchReassignOptions {
+    avId: string;
+    memberColKey: string;
+    targetAvItemId: string;
+    rowItemIds: string[];
+}
+
+export interface BatchReassignResult {
+    successCount: number;
+    failedCount: number;
+    errors: string[];
+}
+
+/**
+ * 批量改派成员引用（MOD-05 / §15 引用完整性）：
+ * 将一组台账行上的成员关系列更新为目标成员的 avItemId。
+ */
+export async function batchReassignMember(
+    options: BatchReassignOptions,
+): Promise<BatchReassignResult> {
+    const { avId, memberColKey, targetAvItemId, rowItemIds } = options;
+    const result: BatchReassignResult = { successCount: 0, failedCount: 0, errors: [] };
+    for (const itemID of rowItemIds) {
+        try {
+            await setCell(avId, memberColKey, itemID, {
+                type: "relation",
+                relation: { blockIDs: [targetAvItemId], contents: null },
+            }, {
+                idempotencyKey: `reassign:${avId}:${memberColKey}:${itemID}:${targetAvItemId}`,
+                retries: 1,
+            });
+            result.successCount++;
+        } catch (e) {
+            result.failedCount++;
+            result.errors.push(e instanceof Error ? e.message : String(e));
+        }
+    }
+    return result;
+}

@@ -28,6 +28,23 @@ describe("templates.getTemplate", () => {
         expect(tpl).toContain("{{teacher}}");
     });
 
+    it("stock/emergency-kit.tpl 已注册（MOD-11 应急物资清单模板）", () => {
+        const tpl = getTemplate("stock/emergency-kit.tpl");
+        expect(tpl).toContain("家庭应急物资清单");
+        expect(tpl).toContain("{{location}}");
+        expect(tpl).toContain("半年定期巡检记录表");
+    });
+
+    it("travel/packing-list.tpl 已注册（MOD-19 出行行李清单模板库）", () => {
+        const tpl = getTemplate("travel/packing-list.tpl");
+        expect(tpl).toContain("行李打包清单");
+        expect(tpl).toContain("城市休闲游");
+        expect(tpl).toContain("海岛沙滩度假");
+        expect(tpl).toContain("户外露营与徒步");
+        expect(tpl).toContain("自驾长途出行");
+        expect(tpl).toContain("研学与游学考察");
+    });
+
     it("未注册文件 → undefined", () => {
         expect(getTemplate("ghost/none.tpl")).toBeUndefined();
     });

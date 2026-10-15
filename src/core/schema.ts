@@ -530,12 +530,13 @@ export const FAVORS_SCHEMA: ModuleSchema = {
 export const STOCK_SCHEMA: ModuleSchema = {
     columns: [
         ...d("name", "member"),
-        { ...FIELD_DICT.category, options: ["food_st", "daily_chem", "paper", "medical_st", "other_st"] },
+        { ...FIELD_DICT.category, options: ["food_st", "daily_chem", "paper", "medical_st", "other_st", "emergency_st"] },
         ...d("expiry", "location", "note"),
         { key: "qty", type: "number", labelKey: "field.qty", min: 0, unitKey: "capture.unitCount" },
         { key: "low_stock_at", type: "number", labelKey: "field.low_stock_at", min: 0, unitKey: "capture.unitCount" },
     ],
     capture: ["name", "qty", "low_stock_at", "expiry"],
+    templates: [{ key: "emergency_kit", nameKey: "tpl.emergencyKit", file: "stock/emergency-kit.tpl" }],
     // 品类分区（Apple Reminders Grocery 印证，26.6）：囤货按品类自动归组
     views: [
         { key: "by_category", type: "table", groupBy: "category" },
@@ -788,6 +789,7 @@ export const TRAVEL_PACKING_SCHEMA: ModuleSchema = {
         { key: "checklist_doc", type: "text", labelKey: "field.checklist_doc" },
     ],
     capture: ["name", "date", "status"],
+    templates: [{ key: "packing_list", nameKey: "tpl.packingList", file: "travel/packing-list.tpl" }],
     activity: { dateField: "date", detailFields: ["status"] },
 };
 

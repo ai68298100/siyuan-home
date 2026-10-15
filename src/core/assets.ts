@@ -93,6 +93,40 @@ export function isImageAsset(path: string): boolean {
     }
 }
 
+/** 检查附件是否为 PDF 文档 */
+export function isPdfAsset(path: string): boolean {
+    try {
+        const url = new URL(assetHref(path));
+        const filename = decodeURIComponent(url.pathname.split("/").pop() ?? "");
+        return /\.pdf$/i.test(filename);
+    } catch {
+        return false;
+    }
+}
+
+const DANGEROUS_EXTENSIONS = new Set([
+    "exe", "bat", "cmd", "sh", "vbs", "js", "mjs", "cjs", "ps1", "com",
+    "scr", "msi", "dll", "jar", "reg", "hta", "cpl", "pif", "vb", "wsf",
+]);
+
+/** 检查文件是否为危险可执行文件/脚本，杜绝浏览器或宿主直接执行未知类型（SEC-02） */
+export function isDangerousAsset(nameOrPath: string): boolean {
+    if (!nameOrPath) return false;
+    const clean = nameOrPath.split(/[?#]/, 1)[0].trim();
+    const ext = clean.split(".").pop()?.toLowerCase();
+    return !!ext && DANGEROUS_EXTENSIONS.has(ext);
+}
+
+export type AssetPreviewKind = "image" | "pdf" | "download_only";
+
+/** 附件预览安全边界判定：仅图片与 PDF 允许内联预览，其余未知格式只允许安全下载（SEC-02） */
+export function getAssetPreviewKind(path: string): AssetPreviewKind {
+    if (isDangerousAsset(path)) return "download_only";
+    if (isImageAsset(path)) return "image";
+    if (isPdfAsset(path)) return "pdf";
+    return "download_only";
+}
+
 /** The kernel identifies notebook-scoped asset references with the `box` query. */
 export function isEncryptedNotebookAsset(path: string, notebooks: readonly { id: string; encrypted?: boolean }[]): boolean {
     try {

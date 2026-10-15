@@ -105,8 +105,10 @@ export interface Reminder {
     rowId: string;
     memberId?: string;
     title: string;
-    /** 下次发生日 ISO */
+    /** 下次发生日 ISO（硬截止日 Deadline） */
     dueDate: string;
+    /** UIX-07 / §17 计划处理日（Things 3 计划日 Plan/When Date，可选） */
+    planDate?: string;
     daysLeft: number;
     level: ReminderLevel;
     /** 规则类型（H05 完成语义分派；adhoc 备忘视为 oneoff。旧缓存可能缺失） */
@@ -170,6 +172,8 @@ export interface HomeSettings {
     webhookEnabled?: boolean;
     webhookUrl?: string;
     webhookMode?: "bark" | "ntfy";
+    /** PRIV-01 / C8f：隐私模式，面板遮蔽金额数值（防窥视） */
+    hideAmounts?: boolean;
     /** 顶栏个人头像：单个字符预设或自定义短文字 */
     avatar?: string;
     /** 经裁剪压缩的本地头像 data URL（不超过 1 MB） */
