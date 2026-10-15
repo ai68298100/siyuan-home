@@ -40,6 +40,7 @@ describe("buildPaymentSummary", () => {
         expect(summary.next30Total).toBe(420);
         expect(summary.dataQuality).toEqual({ missingCycle: 0, unknownCycle: 0, missingDate: 0 });
         expect(summary.overdueTotal).toBe(0);
+        expect(summary.topRecurring.map((item) => item.rowId)).toEqual(["i1", "m1"]);
         expect(summary.byMember.m1).toBeUndefined();
         expect(summary.byModule).toEqual({
             memberships: { sourceCount: 1, monthlyTotal: 10, annualTotal: 120, next7Total: 120, next30Total: 120, overdueTotal: 0 },
@@ -98,7 +99,7 @@ describe("buildPaymentSummary", () => {
 
     it("does not treat a missing source column as a payment", () => {
         const summary = buildPaymentSummary([{ moduleId: "insurance", columns: { name: "name" }, rows: [{ itemID: "x", cells: { name: cell("保单", "text") } }] }], today);
-        expect(summary).toEqual({ sourceCount: 0, monthlyTotal: 0, annualTotal: 0, next7Total: 0, next30Total: 0, overdueTotal: 0, byModule: {}, dataQuality: { missingCycle: 0, unknownCycle: 0, missingDate: 0 }, byMember: {}, upcoming: [], overdue: [] });
+        expect(summary).toEqual({ sourceCount: 0, monthlyTotal: 0, annualTotal: 0, next7Total: 0, next30Total: 0, overdueTotal: 0, byModule: {}, dataQuality: { missingCycle: 0, unknownCycle: 0, missingDate: 0 }, byMember: {}, upcoming: [], overdue: [], topRecurring: [] });
     });
 
     it("marks missing and unknown cycle values instead of hiding data quality issues", () => {
@@ -108,6 +109,25 @@ describe("buildPaymentSummary", () => {
         ])], today);
         expect(summary.dataQuality).toEqual({ missingCycle: 1, unknownCycle: 1, missingDate: 0 });
         expect(summary.monthlyTotal).toBe(50);
+    });
+
+    it("ranks active commitments by monthly equivalent even without a due date", () => {
+        const summary = buildPaymentSummary([source("memberships", [
+            { itemID: "yearly", cells: { name: cell("年度大额", "text"), amount: cell(2400, "number"), cycle: cell("year", "select") } },
+            { itemID: "quarterly", cells: { name: cell("季度中额", "text"), amount: cell(300, "number"), cycle: cell("quarter", "select"), next_pay: cell("2026-10-20", "date") } },
+            { itemID: "monthly", cells: { name: cell("月付小额", "text"), amount: cell(80, "number"), cycle: cell("month", "select"), next_pay: cell("2026-10-20", "date") } },
+            { itemID: "inactive", cells: { name: cell("已退订", "text"), status: cell("refunded", "select"), amount: cell(9999, "number"), cycle: cell("month", "select") } },
+        ])], today);
+        expect(summary.topRecurring.map((item) => item.rowId)).toEqual(["yearly", "quarterly", "monthly"]);
+        expect(summary.topRecurring[0]).toMatchObject({ title: "年度大额", monthlyCost: 200, amount: 2400, cycle: "year" });
+    });
+
+    it("uses a stable title then row id tie-break for equal commitments", () => {
+        const summary = buildPaymentSummary([source("memberships", [
+            { itemID: "b", cells: { name: cell("乙", "text"), amount: cell(100, "number"), cycle: cell("month", "select") } },
+            { itemID: "a", cells: { name: cell("甲", "text"), amount: cell(100, "number"), cycle: cell("month", "select") } },
+        ])], today);
+        expect(summary.topRecurring.map((item) => item.rowId)).toEqual(["a", "b"]);
     });
 
     it("builds a member-scoped breakdown from resolved row member ids", () => {

@@ -70,13 +70,14 @@
         if (!scoped) {
             return {
                 sourceCount: 0, monthlyTotal: 0, annualTotal: 0, next7Total: 0, next30Total: 0, overdueTotal: 0,
-                byModule: {}, dataQuality: { missingCycle: 0, unknownCycle: 0, missingDate: 0 }, upcoming: [], overdue: [],
+                byModule: {}, dataQuality: { missingCycle: 0, unknownCycle: 0, missingDate: 0 }, upcoming: [], overdue: [], topRecurring: [],
             };
         }
         return {
             ...scoped,
             upcoming: summary.upcoming.filter((item) => item.memberId === memberFilter),
             overdue: summary.overdue.filter((item) => item.memberId === memberFilter),
+            topRecurring: summary.topRecurring.filter((item) => item.memberId === memberFilter),
         };
     });
     const paymentQualityIssueCount = $derived.by(() => {
@@ -742,6 +743,17 @@
                 {#if paymentView.byModule.insurance?.sourceCount}
                     <span class="lv-payment-breakdown__item">{t("module.insurance")} · ¥{formatAmount(paymentView.byModule.insurance.monthlyTotal, plugin.settings.hideAmounts)}{t("payment.perMonth")}</span>
                 {/if}
+            </div>
+        {/if}
+        {#if paymentView.topRecurring.length > 0}
+            <div class="lv-payment-top" aria-label={t("payment.topRecurring")}>
+                <span class="lv-payment-top__title">{t("payment.topRecurring")}：</span>
+                {#each paymentView.topRecurring.slice(0, 3) as item (item.moduleId + item.rowId)}
+                    <button type="button" class="lv-payment-top__tag" title={item.title} aria-label={item.title}
+                        onclick={() => openPaymentSource(item)}>
+                        {t(`module.${item.moduleId}`)} · {item.title} · {paymentCycleLabel(item)} · ¥{formatAmount(item.monthlyCost, plugin.settings.hideAmounts)}{t("payment.perMonth")}
+                    </button>
+                {/each}
             </div>
         {/if}
         {#if paymentQualityIssueCount > 0}

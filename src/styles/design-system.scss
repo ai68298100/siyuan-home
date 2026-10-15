@@ -584,11 +584,22 @@
       font-variant-numeric: tabular-nums;
     }
   }
+  .lv-asset-category { padding-top: 10px; border-top: 1px solid var(--lv-line); }
+  .lv-asset-category__title { margin-bottom: 8px; font-size: 11.5px; color: var(--lv-tx-3); font-weight: 500; }
+  .lv-asset-category__list { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px 18px; }
+  .lv-asset-category__row { min-width: 0; }
+  .lv-asset-category__meta { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 4px; font-size: 11.5px; color: var(--lv-tx-2);
+    span:first-child { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    span:last-child { flex: none; color: var(--lv-tx-3); font-variant-numeric: tabular-nums; }
+  }
+  .lv-asset-category__track { height: 6px; overflow: hidden; border-radius: 999px; background: var(--lv-surface-2); border: 1px solid var(--lv-line); }
+  .lv-asset-category__track span { display: block; height: 100%; border-radius: inherit; background: var(--lv-accent); transition: width var(--lv-t-med) var(--lv-ease); }
   @media (max-width: 600px) {
     .lv-asset-banner { padding: 14px 16px; }
     .lv-asset-metric .lv-asset-amount { font-size: 22px; }
     .lv-asset-hero { flex-direction: column; align-items: flex-start; gap: 10px; }
     .lv-asset-stats { width: 100%; }
+    .lv-asset-category__list { grid-template-columns: 1fr; }
   }
 
   // ── 4g. 升学与教育里程碑倒计时看板（MOD-13）────────────────────

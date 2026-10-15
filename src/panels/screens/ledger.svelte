@@ -4744,6 +4744,17 @@
         {:else if paymentSummary.overdue.length === 0}
             <div class="lv-payment-empty">{t("payment.noUpcoming")}</div>
         {/if}
+        {#if paymentSummary.topRecurring.length > 0}
+            <div class="lv-payment-top" aria-label={t("payment.topRecurring")}>
+                <span class="lv-payment-top__title">{t("payment.topRecurring")}：</span>
+                {#each paymentSummary.topRecurring.slice(0, 3) as item (item.moduleId + item.rowId)}
+                    <button type="button" class="lv-payment-top__tag" title={item.title} aria-label={item.title}
+                        onclick={() => openPaymentSource(item)}>
+                        {item.title} · {paymentCycleLabel(item)} · ¥{formatAmount(item.monthlyCost, plugin.settings.hideAmounts)}{t("payment.perMonth")}
+                    </button>
+                {/each}
+            </div>
+        {/if}
         {#if paymentQualityIssueCount > 0}
             <div class="lv-payment-quality" role="status">
                 {t("payment.dataQuality").replace("${count}", String(paymentQualityIssueCount))} ·
@@ -4890,6 +4901,24 @@
                         {item.name} · ¥{formatAmount(item.amount, plugin.settings.hideAmounts)}
                     </span>
                 {/each}
+            </div>
+        {/if}
+        {#if realAssetSummary.byCategory.length > 0}
+            <div class="lv-asset-category" aria-label={t("assets.categoryTitle")}>
+                <div class="lv-asset-category__title">{t("assets.categoryTitle")}</div>
+                <div class="lv-asset-category__list" role="list">
+                    {#each realAssetSummary.byCategory as item (item.category)}
+                        <div class="lv-asset-category__row" role="listitem">
+                            <div class="lv-asset-category__meta">
+                                <span>{optLabel(t, "category", item.category)}</span>
+                                <span>{item.count} · {item.percentage}%</span>
+                            </div>
+                            <div class="lv-asset-category__track" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow={item.percentage} aria-label={`${optLabel(t, "category", item.category)} ${item.percentage}%`}>
+                                <span style={`width:${Math.max(0, Math.min(100, item.percentage))}%`}></span>
+                            </div>
+                        </div>
+                    {/each}
+                </div>
             </div>
         {/if}
     </section>

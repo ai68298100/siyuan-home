@@ -35,6 +35,17 @@ export interface UpcomingPaymentItem {
     memberId?: string;
 }
 
+/** Active payment commitments ranked by their monthly equivalent. */
+export interface PaymentCommitmentItem {
+    moduleId: PaymentModuleId;
+    rowId: string;
+    title: string;
+    amount: number;
+    cycle: string;
+    monthlyCost: number;
+    memberId?: string;
+}
+
 export interface PaymentBreakdown {
     /** Active rows that have a positive amount and a recognized payment source. */
     sourceCount: number;
@@ -68,6 +79,8 @@ export interface PaymentSummary extends PaymentScope {
     upcoming: UpcomingPaymentItem[];
     /** Active payment rows whose date is before the scan date, oldest first. */
     overdue: UpcomingPaymentItem[];
+    /** All active commitments ranked by monthly equivalent; views take their top three. */
+    topRecurring: PaymentCommitmentItem[];
 }
 
 const MONTHLY_FACTORS: Record<string, number> = {
@@ -186,6 +199,7 @@ export function buildPaymentSummary(sources: PaymentSource[], today: Date): Paym
     let sourceCount = 0;
     const upcoming: UpcomingPaymentItem[] = [];
     const overdue: UpcomingPaymentItem[] = [];
+    const commitments: PaymentCommitmentItem[] = [];
     const moduleTotals = new Map<PaymentModuleId, PaymentBreakdown>();
     const memberTotals = new Map<string, PaymentScope>();
     const dataQuality = emptyQuality();
@@ -222,6 +236,15 @@ export function buildPaymentSummary(sources: PaymentSource[], today: Date): Paym
             const monthlyCost = amount * (MONTHLY_FACTORS[cycle] ?? 1);
             monthlyTotal += monthlyCost;
             sourceCount++;
+            commitments.push({
+                moduleId: source.moduleId,
+                rowId: row.itemID,
+                title: (nameColumn ? readText(row.cells?.[nameColumn]) : "") || "—",
+                amount: roundMoney(amount),
+                cycle,
+                monthlyCost: roundMoney(monthlyCost),
+                ...(row.memberId ? { memberId: row.memberId } : {}),
+            });
             const moduleTotal = moduleTotals.get(source.moduleId) ?? emptyBreakdown();
             moduleTotal.monthlyTotal += monthlyCost;
             moduleTotal.sourceCount++;
@@ -285,6 +308,7 @@ export function buildPaymentSummary(sources: PaymentSource[], today: Date): Paym
 
     upcoming.sort((a, b) => a.dueDate.localeCompare(b.dueDate) || a.title.localeCompare(b.title, undefined, { numeric: true }));
     overdue.sort((a, b) => a.dueDate.localeCompare(b.dueDate) || a.title.localeCompare(b.title, undefined, { numeric: true }));
+    commitments.sort((a, b) => b.monthlyCost - a.monthlyCost || a.title.localeCompare(b.title, undefined, { numeric: true }) || a.rowId.localeCompare(b.rowId));
     const byModule = Object.fromEntries([...moduleTotals.entries()].map(([moduleId, value]) => [moduleId, roundBreakdown(value)])) as Partial<Record<PaymentModuleId, PaymentBreakdown>>;
     const byMember = Object.fromEntries([...memberTotals.entries()].map(([memberId, value]) => [memberId, finalizeScope(value)]));
     return {
@@ -299,6 +323,7 @@ export function buildPaymentSummary(sources: PaymentSource[], today: Date): Paym
         byMember,
         upcoming,
         overdue,
+        topRecurring: commitments,
     };
 }
 
