@@ -2,7 +2,7 @@
  * 金额格式化单测（提案 B/210 波）：千分位、两位小数去尾零、负数、非有限值。
  */
 import { describe, it, expect } from "vitest";
-import { AMOUNT_KEYS, formatAmount, optLabel, optLabelText } from "@/core/format";
+import { AMOUNT_KEYS, formatAmount, optLabel, optLabelText, memberHue } from "@/core/format";
 
 const zh: Record<string, string> = {
     "field.category.opt.food_st": "食品",
@@ -29,12 +29,23 @@ describe("formatAmount", () => {
         expect(formatAmount(-1234567.89)).toBe("-1,234,567.89");
     });
 
+    it("非有限值和极大数不会渲染 Infinity 或撑破卡片", () => {
+        expect(formatAmount(Number.NaN)).toBe("—");
+        expect(formatAmount(Number.POSITIVE_INFINITY)).toBe("—");
+        expect(formatAmount(Number.MAX_VALUE)).toMatch(/^1\.7977e\+308$/);
+    });
+
     it("白名单含五个金额语义 key；非金额 key 不在册", () => {
         for (const k of ["amount", "price", "refund_amount", "deposit", "target_amount"]) {
             expect(AMOUNT_KEYS.has(k)).toBe(true);
         }
         expect(AMOUNT_KEYS.has("year")).toBe(false);
         expect(AMOUNT_KEYS.has("rating")).toBe(false);
+    });
+
+    it("hideAmount 为 true 时屏蔽金额为 ****", () => {
+        expect(formatAmount(1234.56, true)).toBe("****");
+        expect(formatAmount(0, true)).toBe("****");
     });
 });
 
@@ -53,5 +64,19 @@ describe("optLabel / optLabelText（211 波：枚举值 i18n）", () => {
         expect(optLabelText(t, "direction", "in、out")).toBe("收、支");
         expect(optLabelText(t, "direction", "—")).toBe("—");
         expect(optLabelText(t, "direction", "")).toBe("");
+    });
+});
+
+describe("memberHue（PERF-01 成员色相计算与缓存）", () => {
+    it("空 id 返回 0", () => {
+        expect(memberHue("")).toBe(0);
+    });
+
+    it("相同 id 恒定返回相同色相（0-359）且命中缓存", () => {
+        const h1 = memberHue("mem-123");
+        const h2 = memberHue("mem-123");
+        expect(h1).toBe(h2);
+        expect(h1).toBeGreaterThanOrEqual(0);
+        expect(h1).toBeLessThan(360);
     });
 });

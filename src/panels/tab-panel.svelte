@@ -1,33 +1,232 @@
 <script lang="ts">
-    import Overview from "./screens/overview.svelte";
-    import Reminders from "./screens/reminders.svelte";
-    import Ledger from "./screens/ledger.svelte";
-    import Members from "./screens/members.svelte";
-    import QuickCapture from "./quick-capture.svelte";
+    import { onMount } from "svelte";
+    import type { Component } from "svelte";
+    import { showMessage } from "siyuan";
+    import AvatarSettings from "./avatar-settings.svelte";
     import ErrorBoundary from "./error-boundary.svelte";
+    import UndoSnackbar from "./undo-snackbar.svelte";
+    import UiIcon from "@/ui/icon.svelte";
     import type { HomePluginLike } from "@/types/plugin";
+    import type { ActivityTarget } from "@/core/activity";
+    import { formatLocalTime } from "@/core/date-display";
+    import { panelSession, type PluginScreen } from "./panel-session";
 
-    let { plugin }: { plugin: HomePluginLike } = $props();
+    let { plugin, onMobileClose }: { plugin: HomePluginLike; onMobileClose?: () => void } = $props();
     // i18n 取值统一转 string（1.2.8 起 JSONValue；screens 以 props 接收 string 返回的 t）
     const t = (key: string) => String(plugin.i18n[key] ?? key);
 
-    type ScreenId = "overview" | "reminders" | "ledger" | "members";
-    // 261 波：切页签滚回面板顶部（对齐原型 go() 的 scrollTo；此前从长列表中部切页，
-    // 新页签直接从半腰开始展示）。滚动所有者= .lv-home（overflow:auto）
+    type ScreenId = PluginScreen;
+    type ScreenProps = {
+        plugin: HomePluginLike;
+        t: (key: string) => string;
+        version?: number;
+        initialScanError?: string;
+        onRetryScan?: () => void;
+        onCapture?: (moduleId?: string) => void;
+        onGoto?: (screen: ScreenId) => void;
+    };
+    type CaptureProps = { plugin: HomePluginLike; t: (key: string) => string; version?: number; open?: boolean; onClose?: () => void };
+    type ScreenComponent = Component<ScreenProps>;
+    // The plugin instance is stable for the lifetime of this panel; the
+    // session store is intentionally keyed to that initial instance.
+    // svelte-ignore state_referenced_locally
+    const session = panelSession(plugin);
     let homeEl: HTMLElement;
-    function gotoScreen(s: ScreenId) {
-        if (screen === s) return;
-        screen = s;
-        requestAnimationFrame(() => homeEl?.scrollTo({ top: 0 }));
+    let restoreTimers: number[] = [];
+    let pointerPreparedScreen: ScreenId | null = null;
+    // In Svelte 5 runes mode a capitalized component reference is dynamic by
+    // default. Keeping this reference capitalized avoids the deprecated
+    // <svelte:component> wrapper while preserving lazy loading behavior.
+    const screenCache: Partial<Record<ScreenId, ScreenComponent>> = {};
+    let ScreenView = $state<ScreenComponent | null>(null);
+    let loadedScreen = $state<ScreenId | null>(null);
+    let screenLoadError = $state("");
+    let screenLoadRequest = 0;
+    let CaptureView = $state<Component<CaptureProps> | null>(null);
+    let captureLoadRequest = 0;
+    function isScreen(value: unknown): value is ScreenId {
+        return value === "overview" || value === "reminders" || value === "ledger" || value === "members";
     }
+    function saveScreenSession(target: ScreenId) {
+        try { sessionStorage.setItem("siyuan-home:last-screen", target); } catch { /* Storage can be disabled by the host. */ }
+    }
+    function saveCurrentScroll() {
+        if (homeEl && isScreen(screen)) session.scrollTop[screen] = homeEl.scrollTop;
+    }
+    function restoreScroll(target: ScreenId) {
+        const top = session.scrollTop[target] ?? 0;
+        // The keyed screen is replaced after the event handler returns. A
+        // second frame makes the restore resilient to the browser moving the
+        // focused tab button into view while the new screen is mounted.
+        restoreTimers.forEach((timer) => window.clearTimeout(timer));
+        restoreTimers = [];
+        const apply = () => { if (homeEl) homeEl.scrollTop = top; };
+        requestAnimationFrame(() => {
+            apply();
+            requestAnimationFrame(() => {
+                apply();
+                // Ledger rows arrive asynchronously. Keep the restored
+                // position stable through that first render without leaving a
+                // long-lived timer or fighting later user scrolling.
+                restoreTimers.push(window.setTimeout(apply, 80), window.setTimeout(apply, 260));
+            });
+        });
+    }
+    function prepareTabNavigation(target: ScreenId) {
+        // Pointer focus can scroll the panel to the tab bar before onclick
+        // runs. Capture the user's position before that default focus scroll.
+        if (screen !== target) {
+            saveCurrentScroll();
+            pointerPreparedScreen = target;
+        } else pointerPreparedScreen = null;
+    }
+    function gotoScreen(s: ScreenId) {
+        if (screen === s) { pointerPreparedScreen = null; return; }
+        if (pointerPreparedScreen !== s) saveCurrentScroll();
+        pointerPreparedScreen = null;
+        if (s !== "ledger") plugin.pendingActivityTarget = undefined;
+        screen = s;
+        if (screenCache[s]) {
+            ScreenView = screenCache[s]!;
+            loadedScreen = s;
+            screenLoadError = "";
+        } else {
+            void loadScreen(s);
+        }
+        saveScreenSession(s);
+        restoreScroll(s);
+    }
+    async function loadScreen(target: ScreenId): Promise<void> {
+        if (screenCache[target]) {
+            if (target === screen) {
+                ScreenView = screenCache[target]!;
+                loadedScreen = target;
+                screenLoadError = "";
+            }
+            return;
+        }
+        const request = ++screenLoadRequest;
+        if (target === screen) screenLoadError = "";
+        try {
+            const module = target === "overview"
+                ? await import("./screens/overview.svelte")
+                : target === "reminders"
+                    ? await import("./screens/reminders.svelte")
+                    : target === "ledger"
+                        ? await import("./screens/ledger.svelte")
+                        : await import("./screens/members.svelte");
+            const comp = module.default as unknown as ScreenComponent;
+            screenCache[target] = comp;
+            if (request === screenLoadRequest && target === screen) {
+                ScreenView = comp;
+                loadedScreen = target;
+            }
+        } catch (error) {
+            if (request !== screenLoadRequest || target !== screen) return;
+            loadedScreen = null;
+            screenLoadError = error instanceof Error ? error.message : String(error);
+        }
+    }
+    async function loadCapture(): Promise<void> {
+        if (CaptureView) return;
+        const request = ++captureLoadRequest;
+        try {
+            const module = await import("./quick-capture.svelte");
+            if (request === captureLoadRequest) CaptureView = module.default as unknown as Component<CaptureProps>;
+        } catch (error) {
+            if (request === captureLoadRequest) showMessage(String(error), 5000, "error");
+        }
+    }
+    onMount(() => {
+        void loadScreen(screen);
+        saveScreenSession(screen);
+        const scanTimer = window.setTimeout(() => { void refreshInitialScan(); }, 50);
+        const preloadTimer = window.setTimeout(() => {
+            const allScreens: ScreenId[] = ["overview", "reminders", "ledger", "members"];
+            allScreens.forEach((id) => {
+                if (id !== screen && !screenCache[id]) void loadScreen(id);
+            });
+        }, 150);
+        const captureTimer = window.setTimeout(() => {
+            void loadCapture();
+        }, 250);
+        return () => {
+            window.clearTimeout(scanTimer);
+            window.clearTimeout(preloadTimer);
+            window.clearTimeout(captureTimer);
+            restoreTimers.forEach((timer) => window.clearTimeout(timer));
+            restoreTimers = [];
+        };
+    });
+    function openActivityTarget(target: Omit<ActivityTarget, "requestId">) {
+        if (!plugin.settings.enabledModules.includes(target.moduleId) || !plugin.settings.dbRefs?.[target.moduleId]?.avId) {
+            showMessage(t("activity.navigationUnavailable"), 4000, "error");
+            return;
+        }
+        const requestId = `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
+        session.scrollTop.ledger = 0;
+        if (screen === "ledger") {
+            // Recreate Ledger so its local selected module follows activeLedger
+            // and its successful load can consume the new one-shot target.
+            screen = "overview";
+            saveScreenSession("overview");
+            requestAnimationFrame(() => {
+                plugin.pendingActivityTarget = { ...target, requestId };
+                plugin.setActiveLedger(target.moduleId);
+                gotoScreen("ledger");
+            });
+            return;
+        }
+        plugin.pendingActivityTarget = { ...target, requestId };
+        plugin.setActiveLedger(target.moduleId);
+        gotoScreen("ledger");
+    }
+    let snackbar = $state<any>(null);
+    $effect(() => {
+        plugin.showUndo = (options) => snackbar?.show(options);
+        return () => {
+            if (plugin.showUndo) plugin.showUndo = undefined;
+        };
+    });
+
     // R6（2026-10-09）：对外入口（状态栏角标/服务桥 openReminders/命令面板）在面板已挂载时
     // 直切页签——pendingScreen 只在挂载时消费，SiYuan 恢复的旧页签路径永远走不到挂载消费
     $effect(() => {
-        plugin.panelScreenSwitch = (s: string) => gotoScreen(s as ScreenId);
-        return () => { if (plugin.panelScreenSwitch) plugin.panelScreenSwitch = undefined; };
+        const switchScreen = (s: string) => gotoScreen(s as ScreenId);
+        plugin.panelScreenSwitch = switchScreen;
+        return () => { if (plugin.panelScreenSwitch === switchScreen) plugin.panelScreenSwitch = undefined; };
+    });
+    $effect(() => {
+        plugin.openActivityTarget = openActivityTarget;
+        return () => {
+            if (plugin.openActivityTarget === openActivityTarget) {
+                plugin.openActivityTarget = undefined;
+                plugin.pendingActivityTarget = undefined;
+            }
+        };
     });
     // 267 波：快速记录弹层（常驻挂载保草稿；任意页签 ⚡ 呼出）
     let captureOpen = $state(false);
+    let captureInvoker: HTMLElement | undefined;
+    let captureWasOpen = false;
+    function openCapture(moduleId?: string, event?: MouseEvent) {
+        captureInvoker = event?.currentTarget instanceof HTMLElement
+            ? event.currentTarget
+            : document.activeElement instanceof HTMLElement ? document.activeElement : undefined;
+        if (moduleId) {
+            plugin.setActiveLedger(moduleId);
+            plugin.runtime.hubQuickModule = moduleId;
+        }
+        captureOpen = true;
+        void loadCapture();
+    }
+    $effect(() => {
+        if (captureOpen) captureWasOpen = true;
+        else if (captureWasOpen) {
+            captureWasOpen = false;
+            requestAnimationFrame(() => captureInvoker?.focus());
+        }
+    });
     // 268 波（Linear 式键盘优先）：N 键任意页签呼出快速记录——只在非输入焦点、
     // 无修饰键、非输入法组合、宿主弹窗未开时响应
     $effect(() => {
@@ -37,9 +236,9 @@
             if (e.isComposing || e.metaKey || e.ctrlKey || e.altKey) return;
             const el = e.target as HTMLElement | null;
             if (el && (["INPUT", "TEXTAREA", "SELECT"].includes(el.tagName) || el.isContentEditable)) return;
-            if (document.querySelector(".b3-dialog")) return; // 设置/续期等宿主弹窗打开时不抢键
+            if (document.querySelector("dialog[open], .b3-dialog, .lv-modal.open")) return; // 任意宿主或插件弹窗打开时不抢键
             e.preventDefault();
-            captureOpen = true;
+            openCapture();
         };
         window.addEventListener("keydown", onKey);
         return () => window.removeEventListener("keydown", onKey);
@@ -50,7 +249,13 @@
     const pendingScreen = plugin.pendingScreen as ScreenId | undefined;
     // svelte-ignore state_referenced_locally
     plugin.pendingScreen = undefined;
-    let screen: ScreenId = $state(pendingScreen ?? "overview");
+    function readLastScreen(): ScreenId | undefined {
+        try {
+            const value = sessionStorage.getItem("siyuan-home:last-screen");
+            return isScreen(value) ? value : undefined;
+        } catch { return undefined; }
+    }
+    let screen: ScreenId = $state(pendingScreen ?? readLastScreen() ?? "overview");
     // 提醒页签待办红点（version 驱动重算，随扫描更新）
     const pendingTotal = $derived.by(() => {
         void version;
@@ -90,16 +295,31 @@
     // Tab 挂载即注册刷新回调（扫描完成 → version 递增驱动各屏 $derived 重算，H02：
     // 动作/扫描后留在当前页即时更新，不靠切页重挂载；多实例安全）
     let version = $state(0);
+    let initialScanError = $state("");
+    async function refreshInitialScan(force = false) {
+        initialScanError = "";
+        try {
+            await plugin.refreshHub(undefined, force);
+            initialScanError = "";
+        } catch (e) {
+            initialScanError = e instanceof Error ? e.message : String(e);
+        }
+    }
     $effect(() => {
-        const listener = () => { version += 1; };
+        const listener = () => {
+            version += 1;
+            if (plugin.runtime?.scannedAt && !plugin.scan?.errors?.length) initialScanError = "";
+        };
+        const onSettingsReplaced = (event: Event) => {
+            const detail = (event as CustomEvent<{ plugin?: HomePluginLike }>).detail;
+            if (detail?.plugin && detail.plugin !== plugin) return;
+            listener();
+        };
         (plugin.hubListeners as Set<() => void>).add(listener);
-        // 225 波修复：refreshHub 必须延后到 effect 同步作用域之外——其缓存路径会在本次 flush 内
-        // 同步触发 hubListeners（version++），在 effect 依赖跟踪未定型时形成
-        // effect_update_depth_exceeded 无限循环（真机首启即崩、页签全冻结）
-        const timer = window.setTimeout(() => { void plugin.refreshHub(); }, 0);
+        window.addEventListener("siyuan-home:settings-replaced", onSettingsReplaced);
         return () => {
-            window.clearTimeout(timer);
             (plugin.hubListeners as Set<() => void>).delete(listener);
+            window.removeEventListener("siyuan-home:settings-replaced", onSettingsReplaced);
         };
     });
 </script>
@@ -107,11 +327,12 @@
 <div class="lv-home lv-tab" bind:this={homeEl}>
     <header class="lv-tabbar">
         <div class="lv-appbrand">
-            <span class="lv-logo" aria-hidden="true">🏠</span>
+            <span class="lv-logo" aria-hidden="true"><UiIcon name="home" size={19} className="lv-logo-mark" /></span>
             <div class="lv-appbrand-t">
                 <b>{t("butler")}</b>
                 <span>LV HOME</span>
             </div>
+            <AvatarSettings {plugin} {t} />
         </div>
         <div class="lv-tabs" bind:this={navEl} style="position:relative" role="tablist" aria-label={t("tab.title")}>
             <!-- 252 波：首次定位不带过渡（pill.w===0 时挂 init），避免挂载瞬间胶囊从左滑入 -->
@@ -119,7 +340,7 @@
             {#each screens as s, i (s.id)}
                 <button id={`lv-tab-${s.id}`} data-s={s.id} class="lv-tabs__item" class:on={screen === s.id}
                     role="tab" aria-selected={screen === s.id} aria-current={screen === s.id ? "page" : undefined} aria-controls={`lv-panel-${s.id}`}
-                    tabindex={screen === s.id ? 0 : -1} onkeydown={(e) => onTabKeydown(e, i)} onclick={() => gotoScreen(s.id)}>
+                    tabindex={screen === s.id ? 0 : -1} onpointerdown={() => prepareTabNavigation(s.id)} onkeydown={(e) => onTabKeydown(e, i)} onclick={() => gotoScreen(s.id)}>
                     {t(s.key)}
                     {#if s.id === "reminders" && pendingTotal > 0}<i class="lv-dot" aria-hidden="true"></i>{/if}
                 </button>
@@ -130,33 +351,40 @@
              绿=已扫描 / 橙=快照陈旧 / 红=有扫描错误（错误态不呼吸）。时间读 runtime.scannedAt：
              plugin.scan 首轮扫描完成前为空，此前"扫描于 —"与 strip 的快照时间互相矛盾 -->
         <span class="lv-hubstatus lv-caption" role="status"
-            aria-label={`${t("hub.scannedAt")} ${plugin.runtime?.scannedAt ? new Date(plugin.runtime.scannedAt).toLocaleTimeString() : "—"}${plugin.scan?.errors?.length ? ` · ${t("dash.stripErrors")} ${plugin.scan.errors.length}` : ""}`}>
+            aria-label={`${t("hub.scannedAt")} ${formatLocalTime(plugin.runtime?.scannedAt) ?? "—"}${plugin.scan?.errors?.length ? ` · ${t("dash.stripErrors")} ${plugin.scan.errors.length}` : ""}`}>
             <i class="lv-pulse" class:orange={plugin.scan?.stale && !plugin.scan?.errors?.length}
                 class:red={(plugin.scan?.errors?.length ?? 0) > 0} aria-hidden="true"></i>
-            <span class="lv-num">{plugin.runtime?.scannedAt ? new Date(plugin.runtime.scannedAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) : "—"}</span>
+            <span class="lv-num">{formatLocalTime(plugin.runtime?.scannedAt, { hour: "2-digit", minute: "2-digit" }) ?? "—"}</span>
             {#if plugin.scan?.stale}<span class="lv-badge orange" title={plugin.scan.errors.map((e) => e.moduleId).join(", ")}>{t("hub.stale")}</span>{/if}
         </span>
         <!-- 267 波：⚡ 快速记录（原型 top-actions 主入口；268 波支持 N 键呼出） -->
-        <button class="lv-iconbtn" aria-label={t("capture.title")} title={`${t("capture.title")} (N)`} style="font-size:15px" onclick={() => (captureOpen = true)}>⚡</button>
-        <button class="lv-iconbtn" aria-label={t("tab.settings")} title={t("tab.settings")} style="font-size:15px" onclick={() => plugin.openSetting()}>⚙</button>
+        <div class="lv-tabbar-actions">
+            <button class="lv-iconbtn" aria-label={t("capture.title")} title={`${t("capture.title")} (N)`} style="font-size:15px" onclick={(event) => openCapture(undefined, event)}><UiIcon name="bolt" size={16} /></button>
+            <button class="lv-iconbtn" aria-label={t("tab.settings")} title={t("tab.settings")} style="font-size:15px" onclick={() => plugin.openSetting()}><UiIcon name="settings" size={16} /></button>
+            {#if onMobileClose}
+                <button class="lv-iconbtn lv-mobile-close" aria-label={t("close")} title={t("close")} onclick={onMobileClose}><UiIcon name="close" size={16} /></button>
+            {/if}
+        </div>
     </header>
 
     {#key screen}
         <div id={`lv-panel-${screen}`} class="lv-screen lv-anim" role="tabpanel" tabindex="0" aria-labelledby={`lv-tab-${screen}`}>
             <ErrorBoundary {t} onretry={() => { /* screen switch resets naturally via {#key} */ }}>
-                {#if screen === "overview"}
-                    <Overview {plugin} {t} {version} onGoto={(s: ScreenId) => gotoScreen(s)} />
-                {:else if screen === "reminders"}
-                    <Reminders {plugin} {t} {version} />
-                {:else if screen === "ledger"}
-                    <Ledger {plugin} {t} {version} />
+                {#if screenLoadError}
+                    <div class="lv-card lv-empty" role="alert"><b>{t("error.unknown")}</b><span>{screenLoadError}</span><button class="b3-button b3-button--outline" onclick={() => void loadScreen(screen)}>{t("error.retry")}</button></div>
+                {:else if loadedScreen !== screen || !ScreenView}
+                    <div class="lv-card lv-screen-loading" role="status" aria-busy="true"><span class="lv-skel" style="width:42%;height:16px"></span><span class="lv-skel" style="width:78%;height:12px"></span><span class="lv-skel" style="width:64%;height:12px"></span></div>
                 {:else}
-                    <Members {plugin} {t} {version} />
+                    <ScreenView {plugin} {t} {version} {initialScanError} onRetryScan={() => refreshInitialScan(true)} onCapture={(moduleId?: string) => openCapture(moduleId)} onGoto={(s: ScreenId) => gotoScreen(s)} />
                 {/if}
             </ErrorBoundary>
         </div>
     {/key}
 
     <!-- 267 波：快速记录弹层（常驻挂载——关闭仅收起，草稿保留） -->
-    <QuickCapture {plugin} {t} {version} bind:open={captureOpen} />
+    {#if CaptureView}
+        <CaptureView {plugin} {t} {version} bind:open={captureOpen} />
+    {/if}
+
+    <UndoSnackbar bind:this={snackbar} {t} />
 </div>

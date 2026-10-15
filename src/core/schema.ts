@@ -24,6 +24,15 @@ export interface ColumnDef {
     /** select 默认值（D11：显式声明，调整枚举顺序不改变新行状态；缺省 = options[0]） */
     default?: string;
     required?: boolean;
+    /** 表单提示的 i18n 键；只在字段语义需要额外说明时配置。 */
+    placeholderKey?: string;
+    helpKey?: string;
+    /** 数值字段的单位 i18n 键，例如元、公里、件。 */
+    unitKey?: string;
+    /** 表单数值边界；约束由业务字段显式声明，不对未知数字字段臆测范围。 */
+    min?: number;
+    max?: number;
+    step?: number | "any";
     /** 视图默认宽度占比（相对） */
     width?: number;
 }
@@ -54,6 +63,8 @@ export interface ModuleSchema {
     templates?: DocTemplate[];
     /** 参与提醒中枢的日期列声明（docs/design/03 §2） */
     reminders?: ReminderRuleSpec[];
+    /** 活动时间线中的事项日期声明。禁止使用到期日、提醒日或其他预计日期。 */
+    activity?: { dateField: string; detailFields?: string[] };
     /** 数值阈值规则（H15）：值列 ≤ 阈值列时生成即时提醒（如药品/囤货低库存）。
      * 语义定案：值 ≤ 阈值触发（降到阈值即提醒）；值或阈值缺列/缺值不提醒（0 算有值）；
      * 补货到阈值之上自动解除（每次扫描重算）；忽略/恢复由运行态 mute/restore 管理。 */
@@ -77,7 +88,7 @@ export const FIELD_DICT: Record<string, ColumnDef> = {
     date:          { key: "date", type: "date", labelKey: "field.date" },
     expiry:        { key: "expiry", type: "date", labelKey: "field.expiry" },
     remind_before: { key: "remind_before", type: "number", labelKey: "field.remind_before" },
-    amount:        { key: "amount", type: "number", labelKey: "field.amount" },
+    amount:        { key: "amount", type: "number", labelKey: "field.amount", min: 0, step: 0.01, unitKey: "capture.unitCny" },
     cycle:         { key: "cycle", type: "select", labelKey: "field.cycle", options: ["day", "week", "month", "quarter", "year"] },
     location:      { key: "location", type: "text", labelKey: "field.location" },
     attachments:   { key: "attachments", type: "mAsset", labelKey: "field.attachments" },
@@ -261,7 +272,7 @@ const CERT_PROFILE_COLUMNS: ColumnDef[] = Object.values(CERTIFICATE_PROFILE_COLU
 
 const CERT_PRIVATE: ColumnDef[] = [
     { key: "x_cert_holder_name", type: "text", labelKey: "field.x_cert_holder_name" },
-    { key: "holder_no", type: "text", labelKey: "field.holder_no" },      // 证件号后四位，脱敏
+    { key: "holder_no", type: "text", labelKey: "field.holder_no" },      // 完整证件号码，界面默认脱敏展示
     { key: "issue_date", type: "date", labelKey: "field.issue_date" },
     { key: "x_cert_valid_from", type: "date", labelKey: "field.x_cert_valid_from" },
     { key: "issuance_rule", type: "select", labelKey: "field.issuance_rule",
@@ -339,8 +350,8 @@ export const MEDICINE_SCHEMA: ModuleSchema = {
         { ...FIELD_DICT.category, options: ["rx", "otc", "external", "device", "supplement"] },
         { ...FIELD_DICT.status, options: ["inuse", "standby", "med_expired", "discarded"], default: "inuse" },
         ...d("expiry", "remind_before"),
-        { key: "stock_qty", type: "number", labelKey: "field.stock_qty" },
-        { key: "low_stock_at", type: "number", labelKey: "field.low_stock_at" },
+        { key: "stock_qty", type: "number", labelKey: "field.stock_qty", min: 0, unitKey: "capture.unitCount" },
+        { key: "low_stock_at", type: "number", labelKey: "field.low_stock_at", min: 0, unitKey: "capture.unitCount" },
         ...d("location", "note"),
     ],
     capture: ["name", "category", "expiry", "stock_qty", "location"],
@@ -391,6 +402,7 @@ export const INSURANCE_SCHEMA: ModuleSchema = {
         ...d("expiry", "attachments", "note"),
     ],
     capture: ["name", "category", "insurer", "premium", "next_pay"],
+    activity: { dateField: "claim_date", detailFields: ["claim_status", "claim_amount", "insurer"] },
     views: [{ key: "paying", type: "table", groupBy: "member" }],
     reminders: [
         { key: "next_pay", field: "next_pay", kind: "recurring", leadDays: 30, cycleField: "pay_cycle" },
@@ -411,6 +423,7 @@ export const ASSETS_REAL_SCHEMA: ModuleSchema = {
         { key: "channel", type: "text", labelKey: "field.channel" },
     ],
     capture: ["name", "category", "amount", "date", "attachments"],
+    activity: { dateField: "date", detailFields: ["category", "amount", "location"] },
     views: [{ key: "by_location", type: "table", groupBy: "location" }],
     reminders: [{ key: "warranty", field: "warranty_expiry", kind: "oneoff", leadDays: 30 }],
 };
@@ -427,6 +440,7 @@ export const HEALTH_SCHEMA: ModuleSchema = {
         { key: "followup_date", type: "date", labelKey: "field.followup_date" },
     ],
     capture: ["name", "member", "category", "date", "attachments"],
+    activity: { dateField: "date", detailFields: ["category", "hospital", "department", "diagnosis"] },
     templates: [{ key: "checkup_plan", nameKey: "tpl.checkupPlan", file: "health/checkup-plan.tpl" }],
     views: [{ key: "by_member", type: "table", groupBy: "member" }],
     reminders: [{ key: "followup", field: "followup_date", kind: "oneoff", leadDays: 7 }],
@@ -440,7 +454,7 @@ export const SHOPPING_SCHEMA: ModuleSchema = {
         { key: "channel", type: "text", labelKey: "field.channel" },
         { key: "tracking_no", type: "text", labelKey: "field.tracking_no" },
         { key: "pickup_code", type: "text", labelKey: "field.pickup_code" },
-        { key: "qty", type: "number", labelKey: "field.qty" }, // 16 组：数量（购入→囤货联动用）
+        { key: "qty", type: "number", labelKey: "field.qty", min: 0, unitKey: "capture.unitCount" }, // 16 组：数量（购入→囤货联动用）
         // 提案 A/210 波：愿望（wish 类别行）的目标金额——存钱流水在 rowlog deposits，进度在抽屉分区
         { key: "target_amount", type: "number", labelKey: "field.target_amount" },
         // 16 组：退货/退款记录
@@ -449,6 +463,7 @@ export const SHOPPING_SCHEMA: ModuleSchema = {
         { key: "refund_amount", type: "number", labelKey: "field.refund_amount" },
     ],
     capture: ["name", "amount", "date", "channel"],
+    activity: { dateField: "date", detailFields: ["category", "amount", "channel", "qty"] },
 };
 
 export const CONTRACTS_SCHEMA: ModuleSchema = {
@@ -465,6 +480,7 @@ export const CONTRACTS_SCHEMA: ModuleSchema = {
         { key: "deposit_return_date", type: "date", labelKey: "field.deposit_return_date" },
     ],
     capture: ["name", "category", "expiry", "attachments"],
+    activity: { dateField: "date", detailFields: ["category", "party", "deposit"] },
     reminders: [{ key: "expiry", field: "expiry", kind: "oneoff", leadDays: 30, autoRenewField: "auto_renew" }],
 };
 
@@ -479,6 +495,7 @@ export const EXAMS_SCHEMA: ModuleSchema = {
         { key: "exam_date", type: "date", labelKey: "field.exam_date" },
     ],
     capture: ["name", "member", "exam_date", "expiry"],
+    activity: { dateField: "exam_date", detailFields: ["category", "status", "issuer"] },
     reminders: [{ key: "expiry", field: "expiry", kind: "oneoff", leadDays: 60 }],
 };
 
@@ -491,6 +508,7 @@ export const ALLOWANCE_SCHEMA: ModuleSchema = {
         { key: "source", type: "text", labelKey: "field.source" },
     ],
     capture: ["name", "category", "amount", "direction", "date"],
+    activity: { dateField: "date", detailFields: ["category", "direction", "amount", "source"] },
     views: [{ key: "by_member", type: "table", groupBy: "member" }],
 };
 
@@ -503,6 +521,7 @@ export const FAVORS_SCHEMA: ModuleSchema = {
         ...d("amount", "date", "note"),
     ],
     capture: ["name", "direction", "person", "amount", "date"],
+    activity: { dateField: "date", detailFields: ["category", "direction", "person", "amount"] },
     // 16 组/190 波：回礼提醒——收礼（direction=in）30 天后一次性（leadDays 0=到期当天起提醒）；提醒卡带「回礼」标记（rule.reciprocate）
     reminders: [{ key: "reciprocate", field: "date", kind: "after", offsetDays: 30, leadDays: 0, onlyIf: { field: "direction", equals: "in" } }],
     views: [{ key: "by_person", type: "table", groupBy: "person" }],
@@ -511,12 +530,13 @@ export const FAVORS_SCHEMA: ModuleSchema = {
 export const STOCK_SCHEMA: ModuleSchema = {
     columns: [
         ...d("name", "member"),
-        { ...FIELD_DICT.category, options: ["food_st", "daily_chem", "paper", "medical_st", "other_st"] },
+        { ...FIELD_DICT.category, options: ["food_st", "daily_chem", "paper", "medical_st", "other_st", "emergency_st"] },
         ...d("expiry", "location", "note"),
-        { key: "qty", type: "number", labelKey: "field.qty" },
-        { key: "low_stock_at", type: "number", labelKey: "field.low_stock_at" },
+        { key: "qty", type: "number", labelKey: "field.qty", min: 0, unitKey: "capture.unitCount" },
+        { key: "low_stock_at", type: "number", labelKey: "field.low_stock_at", min: 0, unitKey: "capture.unitCount" },
     ],
     capture: ["name", "qty", "low_stock_at", "expiry"],
+    templates: [{ key: "emergency_kit", nameKey: "tpl.emergencyKit", file: "stock/emergency-kit.tpl" }],
     // 品类分区（Apple Reminders Grocery 印证，26.6）：囤货按品类自动归组
     views: [
         { key: "by_category", type: "table", groupBy: "category" },
@@ -535,6 +555,7 @@ export const CHORES_SCHEMA: ModuleSchema = {
         { key: "last_done", type: "date", labelKey: "field.last_done" },
     ],
     capture: ["name", "member", "cycle", "due"],
+    activity: { dateField: "last_done", detailFields: ["category"] },
     // v0.2：due 作为一次性提醒；周期写回（中枢重算）见 03 §5 recurring 完整版
     reminders: [{ key: "due", field: "due", kind: "oneoff", leadDays: 7 }],
 };
@@ -557,13 +578,14 @@ export const FOOD_SCHEMA: ModuleSchema = {
     columns: [
         ...d("name", "member"),
         { ...FIELD_DICT.category, options: ["home_cook", "restaurant", "takeout"] },
-        { key: "rating", type: "number", labelKey: "field.rating" },
+        { key: "rating", type: "number", labelKey: "field.rating", min: 0, max: 5, step: 0.5 },
         ...d("date", "url", "note"),
         { key: "dislike_safe", type: "checkbox", labelKey: "field.dislike_safe" },
         // grocy 印证（26.6）：食材摘要（换行分隔）——采购时可对照 stock 采购建议手动补货；自动联动留 v0.8
         { key: "ingredients", type: "text", labelKey: "field.ingredients" },
     ],
     capture: ["name", "category", "rating", "date"],
+    activity: { dateField: "date", detailFields: ["category", "rating"] },
 };
 
 export const ADDRESS_SCHEMA: ModuleSchema = {
@@ -610,6 +632,7 @@ export const PARENTING_SCHEMA: ModuleSchema = {
         { key: "metric_value", type: "number", labelKey: "field.metric_value" },
     ],
     capture: ["name", "member", "category", "date"],
+    activity: { dateField: "date", detailFields: ["category", "vaccine_name", "dose_no", "metric_type", "metric_value"] },
     reminders: [{ key: "next_visit", field: "due", kind: "oneoff", leadDays: 7 }],
 };
 
@@ -627,6 +650,7 @@ export const SCHOOLING_SCHEMA: ModuleSchema = {
         { key: "exam_date", type: "date", labelKey: "field.exam_date" }, // 16 组：考试/重要日程（exams 模块管备考，这里管校内日程）
     ],
     capture: ["name", "school", "category", "amount", "due"],
+    activity: { dateField: "exam_date", detailFields: ["school", "category", "status"] },
     templates: [{ key: "parent_meeting", nameKey: "tpl.parentMeeting", file: "schooling/parent-meeting.tpl" }],
     reminders: [
         { key: "tuition", field: "due", kind: "oneoff", leadDays: 14 },
@@ -691,18 +715,34 @@ export const VEHICLES_SCHEMA: ModuleSchema = {
     columns: [
         ...d("name", "member"),
         { key: "plate", type: "text", labelKey: "field.plate" },
-        ...d("expiry", "note"),
-        { key: "mileage", type: "number", labelKey: "field.mileage" },
+        { key: "brand_model", type: "text", labelKey: "field.brand_model" },
+        { key: "vin", type: "text", labelKey: "field.vin" },
+        { key: "color", type: "text", labelKey: "field.color" },
+        { key: "energy_type", type: "select", labelKey: "field.energy_type", options: ["gasoline", "diesel", "hybrid", "electric", "other"], default: "gasoline" },
+        ...d("expiry", "note", "attachments"),
+        { key: "mileage", type: "number", labelKey: "field.mileage", min: 0, step: 1, unitKey: "capture.unitKm" },
+        { key: "purchase_date", type: "date", labelKey: "field.purchase_date" },
+        { key: "purchase_price", type: "number", labelKey: "field.purchase_price" },
+        { key: "current_value", type: "number", labelKey: "field.current_value" },
         { key: "inspection_due", type: "date", labelKey: "field.inspection_due" },
+        { key: "insurance_company", type: "text", labelKey: "field.insurance_company" },
+        { key: "insurance_due", type: "date", labelKey: "field.insurance_due" },
+        { key: "vehicle_tax_due", type: "date", labelKey: "field.vehicle_tax_due" },
+        { key: "battery_capacity", type: "number", labelKey: "field.battery_capacity" },
         // 电池更换（grocy 印证：铅酸 1.5-2 年/锂 5-8 年——用户按实际记录下次更换日）
         { key: "battery_due", type: "date", labelKey: "field.battery_due" },
         // 违章手动记录（12123 功能面：日期/地点/行为/罚款 摘要，多条例以换行分隔；官方数据不做对接）
         { key: "violations", type: "text", labelKey: "field.violations" },
     ],
-    capture: ["name", "plate", "expiry", "inspection_due"],
+    // Keep the quick form within the schema contract's five-field limit.
+    // The vehicle attachment is surfaced by the dedicated photo control.
+    capture: ["name", "plate", "brand_model", "energy_type", "mileage"],
+    activity: { dateField: "purchase_date", detailFields: ["plate", "brand_model", "energy_type", "mileage"] },
     reminders: [
         { key: "expiry", field: "expiry", kind: "oneoff", leadDays: 30 },
         { key: "inspection", field: "inspection_due", kind: "oneoff", leadDays: 30 },
+        { key: "insurance", field: "insurance_due", kind: "oneoff", leadDays: 30 },
+        { key: "vehicle_tax", field: "vehicle_tax_due", kind: "oneoff", leadDays: 30 },
         { key: "battery", field: "battery_due", kind: "oneoff", leadDays: 30 },
     ],
 };
@@ -726,6 +766,7 @@ export const TRAVEL_PLAN_SCHEMA: ModuleSchema = {
         { key: "destination", type: "text", labelKey: "field.destination" },
     ],
     capture: ["name", "destination", "date", "expiry"],
+    activity: { dateField: "date", detailFields: ["destination", "status"] },
     reminders: [{ key: "date", field: "date", kind: "oneoff", leadDays: 7 }],
 };
 
@@ -737,6 +778,7 @@ export const TRAVEL_BOOKING_SCHEMA: ModuleSchema = {
         { key: "order_no", type: "text", labelKey: "field.order_no" },
     ],
     capture: ["name", "category", "date", "order_no"],
+    activity: { dateField: "date", detailFields: ["category", "amount"] },
 };
 
 export const TRAVEL_PACKING_SCHEMA: ModuleSchema = {
@@ -747,6 +789,8 @@ export const TRAVEL_PACKING_SCHEMA: ModuleSchema = {
         { key: "checklist_doc", type: "text", labelKey: "field.checklist_doc" },
     ],
     capture: ["name", "date", "status"],
+    templates: [{ key: "packing_list", nameKey: "tpl.packingList", file: "travel/packing-list.tpl" }],
+    activity: { dateField: "date", detailFields: ["status"] },
 };
 
 export const TRAVEL_LOG_SCHEMA: ModuleSchema = {
@@ -756,6 +800,7 @@ export const TRAVEL_LOG_SCHEMA: ModuleSchema = {
         { key: "cities", type: "text", labelKey: "field.cities" },
     ],
     capture: ["name", "date", "amount"],
+    activity: { dateField: "date", detailFields: ["cities", "amount"] },
 };
 
 export const ASSETS_VIRTUAL_SCHEMA: ModuleSchema = {
@@ -786,8 +831,13 @@ export function validateSchema(id: string, schema: ModuleSchema): string[] {
     }
     // D11：capture ≤5（02 §4.1 快速录入上限）
     if ((schema.capture ?? []).length > 5) errors.push(`[${id}] capture 超过 5 列（02 §4.1）`);
+    if (!schema.capture?.length) errors.push(`[${id}] 必须明确声明快速录入字段`);
+    if (schema.capture?.[0] !== "name") errors.push(`[${id}] 快速录入首字段必须是 name`);
+    const captureSeen = new Set<string>();
     for (const k of schema.capture ?? []) {
         if (!keys.has(k)) errors.push(`[${id}] capture 引用未知列 "${k}"`);
+        if (captureSeen.has(k)) errors.push(`[${id}] capture 重复字段 "${k}"`);
+        captureSeen.add(k);
     }
     for (const v of schema.views ?? []) {
         if (v.groupBy && !keys.has(v.groupBy)) errors.push(`[${id}] view ${v.key} groupBy 未知列 "${v.groupBy}"`);
@@ -798,8 +848,16 @@ export function validateSchema(id: string, schema: ModuleSchema): string[] {
         if (r.cycleField && !keys.has(r.cycleField)) errors.push(`[${id}] reminder ${r.key} cycleField 未知列`);
         if (r.lunarField && !keys.has(r.lunarField)) errors.push(`[${id}] reminder ${r.key} lunarField 未知列`);
     }
-    // D11：数值阈值规则的两列必须存在且为 number 类型（阈值语义依赖数值比较）
     const byKey = new Map(schema.columns.map((c) => [c.key, c]));
+    if (schema.activity) {
+        const activityDate = byKey.get(schema.activity.dateField);
+        if (!activityDate) errors.push(`[${id}] activity.dateField 未知列 "${schema.activity.dateField}"`);
+        else if (activityDate.type !== "date") errors.push(`[${id}] activity.dateField "${schema.activity.dateField}" 必须是 date 列`);
+        for (const key of schema.activity.detailFields ?? []) {
+            if (!keys.has(key)) errors.push(`[${id}] activity.detailFields 引用未知列 "${key}"`);
+        }
+    }
+    // D11：数值阈值规则的两列必须存在且为 number 类型（阈值语义依赖数值比较）
     for (const n of schema.numericRules ?? []) {
         const f = byKey.get(n.field);
         const th = byKey.get(n.thresholdField);
@@ -812,6 +870,15 @@ export function validateSchema(id: string, schema: ModuleSchema): string[] {
     for (const c of schema.columns) {
         if (c.default !== undefined && !(c.options ?? []).includes(c.default)) {
             errors.push(`[${id}] 列 "${c.key}" default "${c.default}" 不在 options 内`);
+        }
+        if (c.type !== "number" && (c.min !== undefined || c.max !== undefined || c.step !== undefined)) {
+            errors.push(`[${id}] 非数值列 "${c.key}" 不能声明数值边界`);
+        }
+        if (c.min !== undefined && c.max !== undefined && c.min > c.max) {
+            errors.push(`[${id}] 列 "${c.key}" min 大于 max`);
+        }
+        if (typeof c.step === "number" && c.step <= 0) {
+            errors.push(`[${id}] 列 "${c.key}" step 必须大于 0`);
         }
     }
     return errors;

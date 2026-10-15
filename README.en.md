@@ -27,7 +27,7 @@ Certificates expire, medicine expires, insurance needs renewal, subscriptions au
 | ⏰ **Unified expiry reminders** | Certificates, medicine, policies, subscriptions, inspections, birthdays (lunar supported) — all derived automatically, lead time configurable per type (passport 1 year, medicine 30 days), overdue shown in red on top |
 | 👥 **Members as first-class citizens** | Self / spouse / partner / children / elders / kin — every ledger is organized per member, filter "everything about my son" in one click |
 | 🗃 **31 life modules** | People & records · assets & shopping · daily living · parenting & school · travel · media (details below) |
-| 📋 **Rich detail drawer** | Type-specific certificate fields (ID/passport/permits/licences/qualifications/degrees/titles), full ID-card number with GB 11643 validation (region/birth/checksum), gender & birthday auto-fill, masked display, record share card (copy as image / download PNG / copy as text), quick camera/photo/PDF upload, same-origin attachment preview/download, renewal history, replacement chains & timeline journals |
+| 📋 **Rich detail drawer** | Type-specific certificate fields (ID/passport/permits/licences/qualifications/degrees/titles), full ID-card number with GB 11643 validation (region/birth/checksum), gender & birthday auto-fill, masked display, record share card (copy as image / download PNG / copy as text), quick camera/photo/PDF upload, same-origin attachment preview/download, on-demand SiYuan OCR for image attachments, renewal history, replacement chains & timeline journals |
 | 📈 **Growth charts (parenting)** | Height/weight timelines with official WHO reference bands (P3–P97, 0–13 weeks weekly + 0–60 months), percentile on hover |
 | 🛒 **Smart lists** | Shopping suggestions from low stock (editable, copy-to-clipboard), media update reminders, reciprocation reminders for received gifts |
 | 📊 **Check-in & exam integration** | Display study streaks and accuracy from 小驴考试, check-in strength summaries from 小驴打卡 |
@@ -37,19 +37,30 @@ Certificates expire, medicine expires, insurance needs renewal, subscriptions au
 | 🧩 **Modules on demand** | Disabled modules create no data and stay out of the UI; parenting/school only suggested when you have kids |
 | 🔌 **Ecosystem ready** | Quick capture sheet (⚡ / `N`, schema-driven, auto-provision), statusbar badge with scan-health pulse, service bridge (`window.LvHome`), contacts picker via 小驴人脉 |
 
-## 📦 Install (v0.4.0)
+Image OCR uses the engine configured in SiYuan Settings → OCR. It runs only when requested and does not require automatic OCR to be enabled. AI OCR asks before each run because the image is sent to the selected AI service. Results are saved to SiYuan OCR text and included in search; re-running replaces the previous result. Encrypted notebook images and PDFs are not supported, and OCR text is never written into ledger fields automatically.
+
+## 🆕 What's new in v0.5.19
+
+This release introduces an RPC master permission toggle for the service bridge, provides live status indicators across the plugin family ecosystem, and completes cross-plugin permission integration while maintaining zero-flicker tab transitions.
+
+- **Permissions**: Added master service bridge toggle `bridgeEnabled` in Settings → Data & Ecosystem, granting users complete sovereignty over external `window.LvHome` exposure with hot teardown/remount via broadcast events (ECO-01).
+- **Matrix**: Upgraded family plugin display to reflect real integration status: Check-in, Contacts, SpeedSwitch, and Exam display a green "Connected" badge; Glean and Flashcard display "Planned".
+- **Performance**: In-memory `screenCache` and 250ms quick-capture idle preheating continue to deliver 100% synchronous instant tab switches with zero skeleton flash.
+- **Validation**: 513 unit tests across 66 test suites, 1751 i18n keys aligned, 0 TypeScript/Svelte errors and warnings, production build and loader verification pass.
+
+## 📦 Install (v0.5.19)
 
 1. Download `package.zip` from [Releases](https://github.com/ai68298100/siyuan-home/releases/latest)
 2. SiYuan → Settings → Marketplace → Download → **Import** the zip
 3. Enable the plugin → complete the 2-step onboarding (household → module picks and provisioning)
 4. Press `Ctrl+Alt+H` anytime to open the hub
 
-> **Validation status:** core data paths have automated tests and live-kernel coverage. The six-stage real SiYuan UI batch, including Android WebView and accessibility checks, is still pending; marketplace submission remains paused. `icon.png` and `preview.png` were redesigned for v0.3.13 (brand-gradient tile + geometric mark; dark overview with sample data).
-> **Version note:** the tagged v0.4.0 package is the current stable release artifact; `main` is in sync with it and currently reports 316 unit tests.
+> **Validation status:** core data paths have automated tests and isolated-kernel coverage. The v0.5.7 GitHub Release is available; Android WebView behavior remains host-specific validation. `icon.png` and `preview.png` were redesigned for v0.3.13 (brand-gradient tile + geometric mark; dark overview with sample data).
+> **Version note:** the tagged v0.5.19 package is the current GitHub release; local quality checks report 513 unit tests.
 >
 > Family sharing depends on SiYuan's collaboration, permissions, sync and conflict behavior. Test with non-sensitive data before sharing; this plugin does not provide a separate permission system.
 >
-> Privacy & FAQ: [privacy statement](https://github.com/ai68298100/siyuan-home/blob/main/docs/privacy.md) · [FAQ](https://github.com/ai68298100/siyuan-home/blob/main/docs/FAQ.md)
+> Privacy & FAQ: [privacy statement](https://github.com/ai68298100/siyuan-home/blob/main/docs/privacy.en.md) · [FAQ](https://github.com/ai68298100/siyuan-home/blob/main/docs/FAQ.md)
 
 ## 🧩 Module Overview (6 groups, 31 modules)
 
@@ -80,7 +91,7 @@ National immunization schedule (22 doses), growth records, school phases & miles
 <details open>
 <summary><b>Travel & Vehicles</b> — Vehicles · Transit Cards · Trip Plans · Bookings · Packing Lists · Trip Journal</summary>
 
-Service/inspection/insurance/battery reminders, itinerary timeline, voucher archive, document self-check
+Vehicle profiles, separate refueling and charging logs, consumption and cost statistics. Fuel economy uses full-to-full intervals; charging consumption is an estimate across full-charge cycles, and incomplete data is labeled clearly. Also includes service/inspection/insurance/battery reminders, itinerary timeline, voucher archive and document self-check.
 </details>
 
 <details open>
@@ -99,11 +110,11 @@ Full accounting · password vaults · official data integrations · real-time tr
 
 ## 🗺 Roadmap
 
-The current release is in a trust-and-validation phase: complete the real SiYuan UI batch, mobile/accessibility checks, recovery paths and production screenshots before marketplace submission. The next feature slice should optimize the five-minute path from a member to a first reminder and its source record. Pinyin search, webhooks, QR labels, AI and family collaboration remain an observation pool until host capability and user evidence are available.
+The v0.5.19 release is available on GitHub, with static isolated-kernel gates and Chrome walkthrough coverage for the main UI, mobile layouts, accessibility, recovery paths and performance. The next feature slice should optimize the five-minute path from a member to a first reminder and its source record. Pinyin search, webhooks, QR labels, AI and family collaboration remain an observation pool until host capability and user evidence are available.
 
 | Phase | Content |
 |---|---|
-| ✅ v0.3.12 (current) | v0.3.10 baseline plus Windows Corepack live-test startup fix, independent backend e2e evidence, and explicit AI outbound boundary |
+| ✅ v0.5.19 (current) | Service bridge RPC permission toggle, live ecosystem status matrix, and cross-plugin integration; GitHub Release |
 | 🔜 Next | Task workbench, evidence center, inbox, health recovery |
 | 🔭 Later | Family collaboration, template packs, yearly family report, AI capabilities |
 
@@ -121,7 +132,7 @@ pnpm run dev      # dev (app + kernel watch)
 pnpm run build    # dist/ + package.zip
 pnpm run check    # 5-layer gate (types + svelte + i18n + meta + audit)
 pnpm run smoke    # release package and single-file loader smoke checks
-pnpm test         # unit tests (293)
+pnpm test         # unit tests (512)
 ```
 
 - Setup & conventions: [CONTRIBUTING.md](./CONTRIBUTING.md)
@@ -133,7 +144,7 @@ pnpm test         # unit tests (293)
 
 | Category | Docs |
 |---|---|
-| Usage | [FAQ](https://github.com/ai68298100/siyuan-home/blob/main/docs/FAQ.md) · [Privacy](https://github.com/ai68298100/siyuan-home/blob/main/docs/privacy.md) · [Migration](https://github.com/ai68298100/siyuan-home/blob/main/docs/migration.md) · [Glossary](https://github.com/ai68298100/siyuan-home/blob/main/docs/glossary.en.md) |
+| Usage | [FAQ](https://github.com/ai68298100/siyuan-home/blob/main/docs/FAQ.md) · [Privacy](https://github.com/ai68298100/siyuan-home/blob/main/docs/privacy.en.md) · [Migration](https://github.com/ai68298100/siyuan-home/blob/main/docs/migration.md) · [Glossary](https://github.com/ai68298100/siyuan-home/blob/main/docs/glossary.en.md) |
 | Design | [01 Architecture](./docs/design/01-架构总览.md) · [02 Data model](./docs/design/02-数据模型与模块规格.md) · [03 Reminder hub](./docs/design/03-提醒中枢.md) · [07 Visual language](./docs/design/07-视觉设计语言.md) · [Index](./docs/design/00-index.md) |
 | Interactive prototype | [prototype/index.html](./prototype/index.html) (open in browser — dark/light themes, 7 screens incl. style guide) |
 

@@ -35,6 +35,16 @@ export interface HandledRecord {
     at: string; // ISO
 }
 
+/** UIX-06 / §17 智能筛选命名视图（滴答清单智能清单印证） */
+export interface HubNamedView {
+    id: string;
+    name: string;
+    filter?: string;
+    memberId?: string;
+    moduleId?: string;
+    dueWithin?: string;
+}
+
 export interface HubRuntime {
     /** 运行态版本（33.3：协议版本化） */
     schemaVersion: 1;
@@ -105,10 +115,14 @@ export interface HubRuntime {
     monthlyDueTotals?: Record<string, number>;
     /** 266 波模块卡趋势条：日期键（localDateKey）→ { 模块 id → 当日待办计数 }；滚动窗口由写入方裁剪 */
     moduleHistory?: Record<string, Record<string, number>>;
+    /** UIX-06 / §17 智能筛选命名视图清单 */
+    hubNamedViews?: HubNamedView[];
+    /** UIX-07 / §17 计划处理日清单（Things 3 智能双日期：计划日与硬截止日分离） */
+    plannedDates?: Record<string, string>;
 }
 
 export function defaultRuntime(): HubRuntime {
-    return { schemaVersion: 1, snoozed: {}, muted: {}, handledYear: {}, handledUntil: {}, handled: {}, renewHistory: {}, memos: [] };
+    return { schemaVersion: 1, snoozed: {}, muted: {}, handledYear: {}, handledUntil: {}, handled: {}, renewHistory: {}, memos: [], hubNamedViews: [], plannedDates: {} };
 }
 
 function isPlainObject(value: unknown): value is Record<string, any> {
@@ -227,6 +241,46 @@ function normalizeNestedCounts(value: unknown): Record<string, Record<string, nu
     return Object.fromEntries(Object.entries(value).filter((entry) => isPlainObject(entry[1])).map(([date, counts]) => [date, numberRecord(counts)]));
 }
 
+function normalizeNamedViews(raw: unknown): HubNamedView[] {
+    if (!Array.isArray(raw)) return [];
+    return raw
+        .filter((v): v is Record<string, unknown> => isPlainObject(v) && typeof v.id === "string" && typeof v.name === "string" && v.name.trim().length > 0)
+        .map((v) => ({
+            id: String(v.id),
+            name: String(v.name).trim(),
+            filter: typeof v.filter === "string" ? v.filter : undefined,
+            memberId: typeof v.memberId === "string" ? v.memberId : undefined,
+            moduleId: typeof v.moduleId === "string" ? v.moduleId : undefined,
+            dueWithin: typeof v.dueWithin === "string" ? v.dueWithin : undefined,
+        }));
+}
+
+export function upsertNamedView(views: HubNamedView[] | undefined, view: Omit<HubNamedView, "id"> & { id?: string }): HubNamedView[] {
+    const list = views ?? [];
+    const name = view.name.trim();
+    if (!name) return list;
+    const id = view.id || `view_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
+    const idx = list.findIndex((v) => v.id === id);
+    const item: HubNamedView = {
+        id,
+        name,
+        filter: view.filter,
+        memberId: view.memberId,
+        moduleId: view.moduleId,
+        dueWithin: view.dueWithin,
+    };
+    if (idx >= 0) {
+        const next = [...list];
+        next[idx] = item;
+        return next;
+    }
+    return [...list, item];
+}
+
+export function deleteNamedView(views: HubNamedView[] | undefined, id: string): HubNamedView[] {
+    return (views ?? []).filter((v) => v.id !== id);
+}
+
 /** 旧缓存迁移（33.3）：缺字段补默认值；byModule/derived 为 H02/H04 新增。坏文件容错同 settings（15 组） */
 export async function loadRuntime(plugin: Plugin): Promise<HubRuntime> {
     const { data } = await import("../settings").then((m) => m.loadDataSafe(plugin, RUNTIME_NAME));
@@ -267,6 +321,8 @@ export async function loadRuntime(plugin: Plugin): Promise<HubRuntime> {
         monthlyCompletions: numberRecord(data.monthlyCompletions),
         monthlyDueTotals: numberRecord(data.monthlyDueTotals),
         moduleHistory: normalizeNestedCounts(data.moduleHistory),
+        hubNamedViews: normalizeNamedViews(data.hubNamedViews),
+        plannedDates: stringRecord(data.plannedDates),
     };
     if (isPlainObject(data.lastExamStats)
         && [data.lastExamStats.streak, data.lastExamStats.accuracy, data.lastExamStats.attempts, data.lastExamStats.generatedAt].every((n) => typeof n === "number" && Number.isFinite(n))) {
@@ -291,13 +347,51 @@ export async function loadRuntime(plugin: Plugin): Promise<HubRuntime> {
 // A plugin instance owns a single storage namespace. Sharing this cache globally can
 // skip the first write by a newly created instance when its data happens to match.
 const lastSerializedByPlugin = new WeakMap<object, string>();
+/**
+ * serialize runtime writes per plugin instance.  Several panels can persist a
+ * preference at the same time (for example a filter change while a reminder
+ * action is completing).  Calling saveData directly from both handlers lets
+ * the slower write win and silently drops the other change.  Keep a small
+ * per-instance queue here; the snapshot is captured before queueing so a
+ * later mutation cannot alter an earlier write in flight.
+ */
+const runtimeSaveChains = new WeakMap<object, Promise<unknown>>();
+
+/** Shared per-plugin serialization boundary for all runtime read/modify/write
+ * actions and direct preference snapshots. */
+export function withRuntimeSaveLock<T>(plugin: Plugin, operation: () => Promise<T>): Promise<T> {
+    const previous = runtimeSaveChains.get(plugin) ?? Promise.resolve();
+    const run = previous.then(operation);
+    runtimeSaveChains.set(plugin, run.catch(() => undefined));
+    return run;
+}
+
+function cloneRuntime(rt: HubRuntime): HubRuntime {
+    // HubRuntime is deliberately JSON-shaped (it is persisted as JSON).  A
+    // JSON clone also works in older embedded WebViews where structuredClone
+    // is not available.
+    return JSON.parse(JSON.stringify(rt)) as HubRuntime;
+}
 
 export async function saveRuntime(plugin: Plugin, rt: HubRuntime): Promise<void> {
     // PF09：序列化比对，无变化不落盘（筛选/动作频繁触发的场景减少全量写入）
-    const json = JSON.stringify(rt);
-    if (lastSerializedByPlugin.get(plugin) === json) return;
-    await plugin.saveData(RUNTIME_NAME, rt);
-    lastSerializedByPlugin.set(plugin, json);
+    const snapshot = cloneRuntime(rt);
+    const json = JSON.stringify(snapshot);
+    return withRuntimeSaveLock(plugin, async () => persistRuntimeSnapshot(plugin, snapshot, json));
+}
+
+/** Persist while the caller already holds withRuntimeSaveLock. */
+export async function persistRuntimeUnderLock(plugin: Plugin, rt: HubRuntime): Promise<void> {
+    const snapshot = cloneRuntime(rt);
+    await persistRuntimeSnapshot(plugin, snapshot, JSON.stringify(snapshot));
+}
+
+async function persistRuntimeSnapshot(plugin: Plugin, snapshot: HubRuntime, json: string): Promise<void> {
+        // Re-check after an earlier queued write: it may already have stored
+        // this exact snapshot while this call was waiting.
+        if (lastSerializedByPlugin.get(plugin) === json) return;
+        await plugin.saveData(RUNTIME_NAME, snapshot);
+        lastSerializedByPlugin.set(plugin, json);
 }
 
 /** 已完成运行态记录的保留期（天）：过期后才可被 purgeHandled 清除 */
@@ -401,22 +495,25 @@ export function applyRuntime(
     for (const r of derived) {
         if (isHiddenByHandled(rt, r, today)) continue;
         const snoozeDate = rt.snoozed[r.id];
+        const planDate = rt.plannedDates?.[r.id];
         if (snoozeDate) {
             // snooze 未到 → 隐藏；已到 → 显示为"延后日"事项，按延后日距今分级（H06）
             if (todayKey < snoozeDate) continue;
             const daysLeft = Math.round((parseLocal(snoozeDate) - today.getTime()) / 86400000);
             const level: ReminderLevel = daysLeft < 0 ? "overdue" : "soon";
-            out.push({ ...r, dueDate: snoozeDate, daysLeft, level });
+            out.push({ ...r, dueDate: snoozeDate, daysLeft, level, ...(planDate ? { planDate } : {}) });
             continue;
         }
-        out.push(r);
+        out.push(planDate ? { ...r, planDate } : r);
     }
     for (const m of rt.memos ?? []) {
         if (m.doneAt) continue; // 已办备忘不进活跃列表（已处理视图可见可恢复）
         const daysLeft = Math.round((parseLocal(m.dueDate) - today.getTime()) / 86400000);
         const level: ReminderLevel = daysLeft < 0 ? "overdue" : daysLeft <= 7 ? "soon" : "lead";
+        const memoId = `adhoc::${m.id}`;
+        const planDate = rt.plannedDates?.[memoId] ?? rt.plannedDates?.[m.id];
         out.push({
-            id: `adhoc::${m.id}`,
+            id: memoId,
             moduleId: "adhoc",
             ruleKey: "memo",
             rowId: m.id,
@@ -425,6 +522,7 @@ export function applyRuntime(
             daysLeft,
             level,
             kind: "oneoff",
+            ...(planDate ? { planDate } : {}),
         });
     }
     return out.sort((a, b) => a.daysLeft - b.daysLeft || a.dueDate.localeCompare(b.dueDate));
@@ -441,6 +539,19 @@ export interface HandledEntry {
 }
 
 /**
+ * 运行态的 muted/handledYear/handledUntil 旧格式只保存提醒 ID。
+ * 提醒 ID 由 rule.ts 生成 `${rowId}::${moduleId}.${ruleKey}`，缓存不可用时
+ * 从这个稳定部分回推模块，避免模块筛选把历史条目当成无归属数据隐藏。
+ */
+function moduleIdFromReminderId(id: string): string {
+    const marker = id.indexOf("::");
+    if (marker < 0) return "";
+    const moduleAndRule = id.slice(marker + 2);
+    const dot = moduleAndRule.indexOf(".");
+    return dot > 0 ? moduleAndRule.slice(0, dot) : "";
+}
+
+/**
  * 已处理列表（提醒页"已处理"筛选的真实数据源）：
  * oneoff 已办 + 忽略中 + 周年当年已办 + recurring 本期已办 + 已完成备忘。
  * title 尽量从派生列表回查；不在扫描结果时给出可读的降级说明。
@@ -453,15 +564,15 @@ export function listHandled(rt: HubRuntime, derived: Reminder[]): HandledEntry[]
     }
     for (const id of Object.keys(rt.muted)) {
         const r = byId.get(id);
-        out.push({ id, title: r?.title ?? "", moduleId: r?.moduleId ?? "", dueDate: r?.dueDate, kind: "muted" });
+        out.push({ id, title: r?.title ?? "", moduleId: r?.moduleId ?? moduleIdFromReminderId(id), dueDate: r?.dueDate, kind: "muted" });
     }
     for (const [id, year] of Object.entries(rt.handledYear)) {
         const r = byId.get(id);
-        out.push({ id, title: r?.title ?? "", moduleId: r?.moduleId ?? "", dueDate: r?.dueDate, at: String(year), kind: "year" });
+        out.push({ id, title: r?.title ?? "", moduleId: r?.moduleId ?? moduleIdFromReminderId(id), dueDate: r?.dueDate, at: String(year), kind: "year" });
     }
     for (const [id, until] of Object.entries(rt.handledUntil)) {
         const r = byId.get(id);
-        out.push({ id, title: r?.title ?? "", moduleId: r?.moduleId ?? "", dueDate: until, kind: "period" });
+        out.push({ id, title: r?.title ?? "", moduleId: r?.moduleId ?? moduleIdFromReminderId(id), dueDate: until, kind: "period" });
     }
     for (const m of rt.memos ?? []) {
         if (!m.doneAt) continue;
@@ -473,4 +584,15 @@ export function listHandled(rt: HubRuntime, derived: Reminder[]): HandledEntry[]
 function parseLocal(ymd: string): number {
     const [y, m, d] = ymd.split("-").map(Number);
     return new Date(y, (m ?? 1) - 1, d ?? 1).getTime();
+}
+
+/** UIX-07 / §17 计划处理日设定（Things 3 计划日 Plan/When Date，与硬截止日 dueDate 分离） */
+export function setPlanDate(rt: HubRuntime, reminderId: string, planDate: string | undefined): void {
+    if (!rt.plannedDates) rt.plannedDates = {};
+    const val = (planDate ?? "").trim();
+    if (!val || val === "—") {
+        delete rt.plannedDates[reminderId];
+    } else {
+        rt.plannedDates[reminderId] = val;
+    }
 }

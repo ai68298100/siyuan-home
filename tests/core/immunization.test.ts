@@ -2,7 +2,7 @@
  * 免疫程序表单测（第一百零四波）：剂量日期推算（月末收敛/跨年）、程序表不变式、非法输入。
  */
 import { describe, it, expect } from "vitest";
-import { IMMUNIZATION_SCHEDULE, doseDate } from "@/core/immunization";
+import { IMMUNIZATION_SCHEDULE, doseDate, calculateImmunizationSchedule, type RecordedVaccineRow } from "@/core/immunization";
 
 describe("immunization.doseDate", () => {
     it("月龄推算：monthAge 0 = 出生日期；跨年正确", () => {
@@ -55,6 +55,52 @@ describe("immunization.IMMUNIZATION_SCHEDULE", () => {
         expect(has("麻腮风疫苗", 1, 8)).toBe(true);
         expect(has("百白破疫苗", 4, 18)).toBe(true);
         expect(has("白破疫苗", 1, 72)).toBe(true);
+    });
+});
+
+describe("immunization.calculateImmunizationSchedule (MOD-17 疫苗排期推算与比对)", () => {
+    it("正确推算应种、已种与逾期剂次", () => {
+        const birth = "2026-01-01";
+        const today = "2026-10-15"; // 宝宝当前 9 月龄
+        const recorded: RecordedVaccineRow[] = [
+            { vaccine_name: "乙肝疫苗", dose_no: 1, date: "2026-01-01" },
+            { vaccine_name: "卡介苗", dose_no: 1, date: "2026-01-01" },
+            { vaccine_name: "乙肝疫苗", dose_no: 2, date: "2026-02-05" },
+        ];
+
+        const res = calculateImmunizationSchedule(birth, "小宝", recorded, today);
+        expect(res).not.toBeNull();
+        expect(res?.totalDoses).toBe(IMMUNIZATION_SCHEDULE.length);
+        expect(res?.receivedCount).toBe(3);
+        expect(res?.overdueCount).toBeGreaterThan(5); // 脊灰、百白破等未登记且在 9 月龄前
+        expect(res?.upcomingCount).toBeGreaterThan(5); // 12月龄以后的针
+
+        // 验证已接种的第一剂
+        const dose1 = res?.schedule.find((d) => d.vaccine === "乙肝疫苗" && d.dose === 1);
+        expect(dose1?.status).toBe("received");
+        expect(dose1?.receivedDate).toBe("2026-01-01");
+
+        // 验证未来的剂次（6岁白破）
+        const dose6yr = res?.schedule.find((d) => d.vaccine === "白破疫苗" && d.dose === 1);
+        expect(dose6yr?.status).toBe("upcoming");
+    });
+
+    it("非法生日返回 null", () => {
+        expect(calculateImmunizationSchedule("invalid", "宝宝", [])).toBeNull();
+    });
+
+    it("空接种记录时正确推算儿童（C5d / 成员卡接入）的应种/逾期全量排期", () => {
+        const birth = "2026-06-01";
+        const today = "2026-10-15"; // 约 4 月龄
+        const res = calculateImmunizationSchedule(birth, "小明", [], today);
+        expect(res).not.toBeNull();
+        expect(res?.totalDoses).toBe(22);
+        expect(res?.receivedCount).toBe(0);
+        // 出生与2-3月龄等应种未种应计入 overdue
+        expect(res?.overdueCount).toBeGreaterThan(0);
+        const firstOverdue = res?.schedule.find((s) => s.status === "overdue");
+        expect(firstOverdue?.vaccine).toBe("乙肝疫苗");
+        expect(firstOverdue?.dose).toBe(1);
     });
 });
 

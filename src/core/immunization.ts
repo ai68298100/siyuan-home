@@ -5,6 +5,8 @@
  * 来源：国家卫健委《国家免疫规划疫苗儿童免疫程序表》（数据为公开政策信息）。
  */
 
+import { localDateKey } from "./hub/rule";
+
 export interface VaccineDose {
     /** 疫苗名 */
     vaccine: string;
@@ -51,4 +53,113 @@ export function doseDate(birthISO: string, d: VaccineDose): string {
     // 日溢出收敛到月末（如 1/31 + 1 月 → 2/28）
     const last = new Date(yy, mm, 0).getDate();
     return `${yy}-${String(mm).padStart(2, "0")}-${String(Math.min(day, last)).padStart(2, "0")}`;
+}
+
+export type ImmunizationDoseStatus = "received" | "overdue" | "upcoming";
+
+export interface ScheduledDoseItem {
+    vaccine: string;
+    dose: number;
+    monthAge: number;
+    targetDate: string;
+    note?: string;
+    status: ImmunizationDoseStatus;
+    receivedDate?: string;
+    matchedRowId?: string;
+}
+
+export interface ChildImmunizationSchedule {
+    childName: string;
+    birthISO: string;
+    totalDoses: number;
+    receivedCount: number;
+    overdueCount: number;
+    upcomingCount: number;
+    schedule: ScheduledDoseItem[];
+}
+
+export interface RecordedVaccineRow {
+    id?: string;
+    name?: string;
+    vaccine_name?: string;
+    dose_no?: number | string;
+    date?: string;
+    memberBlockId?: string;
+}
+
+/**
+ * 推算并比对儿童免疫规划接种全貌（应种、已种、逾期）
+ */
+export function calculateImmunizationSchedule(
+    birthISO: string,
+    childName: string,
+    recordedRows: RecordedVaccineRow[],
+    todayKey?: string,
+): ChildImmunizationSchedule | null {
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(birthISO)) return null;
+    const today = todayKey ?? localDateKey(new Date());
+
+    let receivedCount = 0;
+    let overdueCount = 0;
+    let upcomingCount = 0;
+
+    const schedule: ScheduledDoseItem[] = [];
+
+    for (const d of IMMUNIZATION_SCHEDULE) {
+        const targetDate = doseDate(birthISO, d);
+        let matched: RecordedVaccineRow | undefined;
+
+        for (const row of recordedRows) {
+            const vName = (row.vaccine_name ?? "").trim() || (row.name ?? "").trim();
+            const dNo = Number(row.dose_no);
+
+            if (
+                (vName === d.vaccine || vName.includes(d.vaccine) || d.vaccine.includes(vName)) &&
+                (Number.isFinite(dNo) && dNo > 0 ? dNo === d.dose : (row.name ?? "").includes(`第${d.dose}剂`) || (row.name ?? "").includes(String(d.dose)))
+            ) {
+                if (row.date && /^\d{4}-\d{2}-\d{2}$/.test(row.date)) {
+                    matched = row;
+                    break;
+                }
+            }
+        }
+
+        let status: ImmunizationDoseStatus = "upcoming";
+        let receivedDate: string | undefined;
+        let matchedRowId: string | undefined;
+
+        if (matched) {
+            status = "received";
+            receivedDate = matched.date;
+            matchedRowId = matched.id;
+            receivedCount++;
+        } else if (targetDate < today) {
+            status = "overdue";
+            overdueCount++;
+        } else {
+            status = "upcoming";
+            upcomingCount++;
+        }
+
+        schedule.push({
+            vaccine: d.vaccine,
+            dose: d.dose,
+            monthAge: d.monthAge,
+            targetDate,
+            note: d.note,
+            status,
+            receivedDate,
+            matchedRowId,
+        });
+    }
+
+    return {
+        childName,
+        birthISO,
+        totalDoses: IMMUNIZATION_SCHEDULE.length,
+        receivedCount,
+        overdueCount,
+        upcomingCount,
+        schedule,
+    };
 }

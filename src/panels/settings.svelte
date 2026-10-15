@@ -2,7 +2,10 @@
     import { showMessage, confirm, Dialog } from "siyuan";
     import { MODULE_GROUPS, modulesByGroup } from "@/core/modules";
     import { newMember, saveSettings, normalizeCheckinBindings } from "@/core/settings";
-    import type { HomeSettings, MemberRole, FamilyMember, CheckinBinding } from "@/types";
+    import type { ProvisioningReport } from "@/core/provisioner";
+    import type { HomeSettings, MemberRole, FamilyMember, CheckinBinding, ModuleGroupId } from "@/types";
+    import { formatLocalDateTime } from "@/core/date-display";
+    import UiIcon from "@/ui/icon.svelte";
 
     interface IHomePluginLike {
         i18n: Record<string, unknown>;
@@ -14,9 +17,10 @@
         /** 保存后广播到全部页签（H02）；force=设置变更不受去抖限制 */
         refreshHub?: (only?: string | string[], force?: boolean) => Promise<unknown>;
         /** C8b：新启用模块立即建库 */
-        ensureCoreLedgers?: () => Promise<void>;
+        ensureCoreLedgers?: () => Promise<ProvisioningReport>;
         /** UG03/DL07：导入前备份探测与恢复 */
         loadData?: (name: string) => Promise<unknown>;
+        saveData?: (name: string, data: unknown) => Promise<void>;
     }
 
     let { plugin, settings }: {
@@ -26,8 +30,18 @@
 
     // i18n 取值统一转 string（1.2.8 起 JSONValue）
     const t = (key: string) => String(plugin.i18n[key] ?? key);
+    function describeProvisioningIssues(report?: ProvisioningReport): string {
+        const issues = report?.issues ?? [];
+        if (issues.length === 0) return "";
+        const modules = issues.map(({ moduleId }) => t(`module.${moduleId}`)).join("、");
+        return t("settings.provisionPartial").replace("${modules}", modules);
+    }
 
-    let tab: "modules" | "members" | "reminders" | "about" = $state("modules");
+    type SettingsArea = "modules" | "members" | "reminders" | "data" | "about";
+    let area: SettingsArea = $state("modules");
+    let moduleGroup: ModuleGroupId = $state("people");
+    let reminderSection: "schedule" | "webhook" | "leads" | "checkin" = $state("schedule");
+    let dataSection: "migration" | "demo" | "ecosystem" | "shortcuts" = $state("migration");
     let saving = $state(false);
     // 33.4 编辑事务：draft 副本，保存才落盘（取消/关闭不污染 settings）。
     // 此处捕获初始快照是设计意图，抑制 svelte 的 locally-referenced 提示。
@@ -53,8 +67,18 @@
     let draftWebhookMode = $state<"bark" | "ntfy">(settings.webhookMode === "ntfy" ? "ntfy" : "bark");
     // svelte-ignore state_referenced_locally
     let draftWebhookUrl = $state(settings.webhookUrl ?? "");
+    // svelte-ignore state_referenced_locally
+    let draftHideAmounts = $state(settings.hideAmounts ?? false);
+    // svelte-ignore state_referenced_locally
+    let draftBridgeEnabled = $state(settings.bridgeEnabled ?? true);
     let testingWebhook = $state(false);
+    let rerunBusy = $state(false);
+    let diagnosticsBusy = $state<"backfill" | "duplicates" | "health" | "rebuild" | null>(null);
+    let exportingDiagnostics = $state(false);
+    let demoBusy = $state(false);
+    let demoAction = $state<"generate" | "clear" | null>(null);
     async function testWebhook() {
+        if (testingWebhook) return;
         testingWebhook = true;
         try {
             const { sendWebhook } = await import("@/core/webhook");
@@ -65,6 +89,8 @@
                 webhookMode: draftWebhookMode,
             } as HomeSettings, { title: t("hub.title"), body: t("settings.webhookTestBody") });
             showMessage(r === "ok" ? t("settings.webhookTestOk") : t("settings.webhookTestFail"), 3000, r === "ok" ? "info" : "error");
+        } catch (error) {
+            showMessage(`${t("settings.webhookTestFail")}${error instanceof Error ? ` (${error.message})` : ""}`, 5000, "error");
         } finally {
             testingWebhook = false;
         }
@@ -95,8 +121,10 @@
     const METRICS: CheckinBinding["metric"][] = ["count", "quantity", "duration"];
     let checkinItems: { id: string; name: string; kind: string }[] = $state([]);
     let checkinPresent = $state<boolean | null>(null); // null=探测中
+    let checkinProbe = $state(0);
 
     $effect(() => {
+        void checkinProbe;
         let alive = true;
         (async () => {
             try {
@@ -118,16 +146,33 @@
         return "count";
     }
     function addBinding() {
-        if (!checkinItems.length) return;
-        const it = checkinItems[0];
+        const pair = availableBindingPair;
+        if (!pair) {
+            showMessage(t(draftMembers.length ? "settings.checkinAllBound" : "settings.checkinNeedMember"), 3500, "info");
+            return;
+        }
+        const { item: it, member } = pair;
         draftBindings = [...draftBindings, {
             itemId: it.id, itemName: it.name,
-            memberId: draftMembers[0]?.id ?? "",
+            memberId: member.id,
             metric: defaultMetric(it.kind),
         }];
     }
+    const availableBindingPair = $derived.by(() => {
+        for (const item of checkinItems) {
+            const member = draftMembers.find((m) => !draftBindings.some((b) => b.itemId === item.id && b.memberId === m.id));
+            if (member) return { item, member };
+        }
+        return undefined;
+    });
     function removeBinding(i: number) {
-        draftBindings = draftBindings.filter((_, idx) => idx !== i);
+        const binding = draftBindings[i];
+        if (!binding) return;
+        confirm(
+            t("settings.bindingRemoveTitle"),
+            t("settings.bindingRemoveBody").replace("${item}", binding.itemName).replace("${member}", draftMembers.find((m) => m.id === binding.memberId)?.name?.trim() || t("members.name")),
+            () => { draftBindings = draftBindings.filter((_, idx) => idx !== i); },
+        );
     }
     function syncBindingItem(b: CheckinBinding) {
         const it = checkinItems.find((x) => x.id === b.itemId);
@@ -147,11 +192,46 @@
 
     // settings 是普通对象（属性写不触发响应）——保存落盘后 bump 一次，强迫 dirty 重评
     let savedTick = $state(0);
+    const settingHint = (zh: string, en: string) => /[\u3400-\u9fff]/.test(t("settings.importDone")) ? zh : en;
+
+    function cloneSettings(source: HomeSettings): HomeSettings {
+        return JSON.parse(JSON.stringify(source)) as HomeSettings;
+    }
+
+    function syncDraftFromSettings(source: HomeSettings) {
+        draftEnabled = [...source.enabledModules];
+        draftMembers = source.members.map((m) => ({ ...m }));
+        draftNotifyHour = source.notifyHour;
+        draftSilentFrom = source.silentFrom;
+        draftSilentTo = source.silentTo;
+        draftLeads = Object.fromEntries(Object.entries(source.leadOverrides ?? {}).map(([k, v]) => [k, String(v)]));
+        draftWebhookEnabled = source.webhookEnabled ?? false;
+        draftWebhookMode = source.webhookMode === "ntfy" ? "ntfy" : "bark";
+        draftWebhookUrl = source.webhookUrl ?? "";
+        draftHideAmounts = source.hideAmounts ?? false;
+        draftBridgeEnabled = source.bridgeEnabled ?? true;
+        draftBindings = (source.checkinBindings ?? []).map((b) => ({ ...b }));
+    }
+
+    async function persistReplacement(next: HomeSettings): Promise<void> {
+        const previous = cloneSettings(plugin.settings);
+        plugin.settings = next;
+        try {
+            await saveSettings(plugin as any, next);
+        } catch (error) {
+            plugin.settings = previous;
+            savedTick += 1;
+            throw Object.assign(error instanceof Error ? error : new Error(String(error)), { settingsPersistFailed: true });
+        }
+        syncDraftFromSettings(next);
+        savedTick += 1;
+        window.dispatchEvent(new CustomEvent("siyuan-home:settings-replaced", { detail: { plugin, settings: next } }));
+    }
 
     /** 草稿是否偏离已保存设置（footer 徽章；四种生效参数全部覆盖） */
     const dirty = $derived.by(() => {
         void savedTick;
-        const s = settings;
+        const s = plugin.settings ?? settings;
         const normModules = (ids: string[]) => [...new Set(ids)].sort();
         if (JSON.stringify(normModules(draftEnabled)) !== JSON.stringify(normModules(s.enabledModules))) return true;
         if (draftMembers.map(memberKey).join("|") !== s.members.map(memberKey).join("|")) return true;
@@ -160,6 +240,8 @@
         if (draftWebhookMode !== (s.webhookMode === "ntfy" ? "ntfy" : "bark")) return true;
         if (normWebhookUrl(draftWebhookUrl) !== (s.webhookUrl ?? "")) return true;
         if ((draftWebhookEnabled && normWebhookUrl(draftWebhookUrl) !== "") !== (s.webhookEnabled ?? false)) return true;
+        if (draftHideAmounts !== (s.hideAmounts ?? false)) return true;
+        if (draftBridgeEnabled !== (s.bridgeEnabled ?? true)) return true;
         if (JSON.stringify(normLeads(draftLeads)) !== JSON.stringify(s.leadOverrides ?? {})) return true;
         if (JSON.stringify(normalizeCheckinBindings(draftBindings)) !== JSON.stringify(s.checkinBindings ?? [])) return true;
         return false;
@@ -197,7 +279,9 @@
     }
 
     function removeMember(id: string) {
-        confirm(t("delete"), t("delete") + "?", () => {
+        const member = draftMembers.find((item) => item.id === id);
+        if (!member) return;
+        confirm(t("members.deleteTitle"), t("members.deleteBody").replace("${name}", member.name.trim() || t("members.name")), () => {
             draftMembers = draftMembers.filter((m) => m.id !== id);
         });
     }
@@ -206,6 +290,8 @@
     let importInput: HTMLInputElement | undefined = $state();
     // UG03/DL07：导入前自动备份当前设置，可一键恢复（导入链的数据安全闭环）
     let preImportBackupExists = $state(false);
+    let migrationBusy = $state(false);
+    let migrationAction = $state<"import" | "restore" | null>(null);
     $effect(() => {
         // 面板打开时探测一次（备份文件是否存在）
         plugin.loadData?.("settings.pre-import.json").then((v: unknown) => { preImportBackupExists = !!v; }).catch(() => undefined);
@@ -226,9 +312,11 @@
 
     // UG02：脱敏诊断包——确认框声明内容与残余风险，本地组装下载
     function exportDiagnostics() {
+        if (exportingDiagnostics) return;
         const diag = plugin.getDiagnostics?.();
         if (!diag) { showMessage(t("settings.diagExportNone"), 3000, "error"); return; }
         confirm(t("settings.diagExport"), t("settings.diagExportBody"), () => {
+            exportingDiagnostics = true;
             import("@/core/diagnostics").then(({ buildDiagnosticPackage }) => {
                 const payload = buildDiagnosticPackage({
                     diag,
@@ -243,12 +331,16 @@
                 a.click();
                 URL.revokeObjectURL(a.href);
                 showMessage(t("settings.diagExportDone"), 3000, "info");
+            }).catch((error) => {
+                showMessage(`${settingHint("诊断包导出失败", "Diagnostics export failed")}${error instanceof Error ? ` (${error.message})` : ""}`, 5000, "error");
+            }).finally(() => {
+                exportingDiagnostics = false;
             });
         });
     }
 
     // D06 收尾：同名歧义人工选择对话框——按候选摘要单选，保存写 avItemId（DOM 构建用户内容，不走 HTML 模板——19 组安全）
-    function openAmbiguityDialog(ambiguous: { member: string; candidates: { id: string; summary: string }[] }[]) {
+    function openAmbiguityDialog(ambiguous: { memberId: string; member: string; candidates: { id: string; summary: string }[] }[]) {
         const picks: Record<number, string> = {};
         const dlg = new Dialog({
             title: t("diag.ambigTitle"),
@@ -257,6 +349,7 @@
             width: "520px",
         });
         const body = dlg.element.querySelector("#lv-ambig-body") as HTMLElement;
+        let applyingAmbiguity = false;
         ambiguous.forEach((a, ai) => {
             const head = document.createElement("div");
             head.className = "ft__on-surface";
@@ -278,35 +371,208 @@
             }
         });
         (dlg.element.querySelector("#lv-ambig-cancel") as HTMLButtonElement).onclick = () => dlg.destroy();
-        (dlg.element.querySelector("#lv-ambig-ok") as HTMLButtonElement).onclick = async () => {
+        const ambiguityOk = dlg.element.querySelector("#lv-ambig-ok") as HTMLButtonElement;
+        ambiguityOk.onclick = async () => {
+            if (applyingAmbiguity) return;
+            applyingAmbiguity = true;
+            ambiguityOk.disabled = true;
+            const previous = cloneSettings(plugin.settings);
             let applied = 0;
-            ambiguous.forEach((a, ai) => {
-                const pick = picks[ai];
-                if (!pick) return;
-                const m = plugin.settings.members.find((x) => x.name === a.member);
-                if (m) { m.avItemId = pick; m.syncError = undefined; applied++; }
-            });
-            dlg.destroy();
-            if (applied > 0) {
-                await import("@/core/settings").then((m) => m.saveSettings(plugin as any, plugin.settings));
-                await plugin.refreshHub?.();
+            try {
+                ambiguous.forEach((a, ai) => {
+                    const pick = picks[ai];
+                    if (!pick) return;
+                    const m = plugin.settings.members.find((x) => x.id === a.memberId);
+                    if (m) {
+                        m.avItemId = pick;
+                        m.avRowCreatePending = undefined;
+                        m.syncError = undefined;
+                        applied++;
+                    }
+                });
+                dlg.destroy();
+                if (applied > 0) {
+                    await import("@/core/settings").then((m) => m.saveSettings(plugin as any, plugin.settings));
+                    try {
+                        await plugin.refreshHub?.(undefined, true);
+                    } catch (error) {
+                        showMessage(`${t("diag.ambigDone").replace("${n}", String(applied))} (${settingHint("刷新失败", "refresh failed")}: ${error instanceof Error ? error.message : String(error)})`, 6000, "error");
+                        return;
+                    }
+                }
+                showMessage(t("diag.ambigDone").replace("${n}", String(applied)), 3000, "info");
+            } catch (error) {
+                plugin.settings = previous;
+                showMessage(`${t("settings.saveFailed")}${error instanceof Error ? ` (${error.message})` : ""}`, 6000, "error");
+                dlg.destroy();
+            } finally {
+                applyingAmbiguity = false;
             }
-            showMessage(t("diag.ambigDone").replace("${n}", String(applied)), 3000, "info");
         };
     }
 
+    async function runBackfillMemberLinks() {
+        if (diagnosticsBusy) return;
+        diagnosticsBusy = "backfill";
+        const previous = cloneSettings(plugin.settings);
+        try {
+            const { backfillMemberLinks } = await import("@/core/members");
+            const res = await backfillMemberLinks(plugin as any, plugin.settings);
+            // D06：回填结果四态——唯一回填 / 同名歧义待人工 / 无匹配 / 失效关联已清除
+            showMessage(t("diag.backfillResult")
+                .replace("${n}", String(res.linked.length))
+                .replace("${amb}", String(res.ambiguous.length))
+                .replace("${stale}", String(res.stale.length)), 6000, "info");
+            // Backfill changes the settings-side avItemId mapping used by all
+            // providers to derive memberId. Refresh only when the mapping
+            // actually changed so overview/reminders pick up ownership now.
+            if (res.linked.length > 0 || res.stale.length > 0) {
+                // The mapping has already been persisted by backfillMemberLinks.
+                // A transient scan failure must not roll the in-memory settings
+                // back to a snapshot that disagrees with disk.
+                try {
+                    await plugin.refreshHub?.(undefined, true);
+                } catch (refreshError) {
+                    showMessage(`${settingHint("关联已保存，但提醒刷新失败", "Links saved, but reminder refresh failed")}${refreshError instanceof Error ? ` (${refreshError.message})` : ""}`, 6000, "error");
+                }
+            }
+            if (res.ambiguous.length > 0) openAmbiguityDialog(res.ambiguous);
+        } catch (error) {
+            plugin.settings = previous;
+            showMessage(`${settingHint("成员关联回填失败", "Member link backfill failed")}${error instanceof Error ? ` (${error.message})` : ""}`, 6000, "error");
+        } finally {
+            diagnosticsBusy = null;
+        }
+    }
+
+    async function runDuplicateCheck() {
+        if (diagnosticsBusy) return;
+        diagnosticsBusy = "duplicates";
+        try {
+            const { findDuplicateLedgers } = await import("@/core/provisioner");
+            const dups = await findDuplicateLedgers(plugin.settings);
+            showMessage(dups.length === 0 ? t("diag.dupNone") : t("diag.dupFound").replace("${n}", String(dups.length)) + ": " + dups.map((d) => d.hpath).join(", "), 6000, dups.length ? "error" : "info");
+        } catch (error) {
+            showMessage(`${settingHint("重复台账检测失败", "Duplicate ledger check failed")}${error instanceof Error ? ` (${error.message})` : ""}`, 6000, "error");
+        } finally {
+            diagnosticsBusy = null;
+        }
+    }
+
+    async function runDeepHealthCheck() {
+        if (diagnosticsBusy) return;
+        diagnosticsBusy = "health";
+        try {
+            const { runHealthCheck } = await import("@/core/health");
+            const report = await runHealthCheck(plugin.settings, plugin.schemaCatalog ?? {});
+            const bad = report.modules.filter((m) => !m.ok);
+            const detail = bad.map((m) => `${t(`module.${m.moduleId}`)}: ${m.error ?? t("diag.healthMissingCols").replace("${n}", String(m.missingColumns?.length ?? 0))}`).join("；");
+            showMessage(
+                (detail
+                    ? t("diag.healthSummaryBad").replace("${ok}", String(report.modules.length - bad.length)).replace("${total}", String(report.modules.length)).replace("${detail}", detail)
+                    : t("diag.healthSummary").replace("${total}", String(report.modules.length))),
+                7000, bad.length ? "error" : "info");
+        } catch (error) {
+            showMessage(`${settingHint("健康检查失败", "Health check failed")}${error instanceof Error ? ` (${error.message})` : ""}`, 6000, "error");
+        } finally {
+            diagnosticsBusy = null;
+        }
+    }
+
+    async function runRebuildAllLedgers() {
+        if (diagnosticsBusy) return;
+        diagnosticsBusy = "rebuild";
+        try {
+            if (!plugin.ensureCoreLedgers) {
+                showMessage(settingHint("插件未提供建库服务", "Provisioning service not available"), 6000, "error");
+                return;
+            }
+            const report = await plugin.ensureCoreLedgers();
+            try {
+                await plugin.refreshHub?.(undefined, true);
+            } catch (e) {
+                showMessage(t("ledger.rebuildRefreshFailed").replace("${msg}", e instanceof Error ? e.message : String(e)), 6000, "error");
+                return;
+            }
+            if (report.issues.length > 0) {
+                const modules = report.issues.map(({ moduleId }) => t(`module.${moduleId}`)).join(", ");
+                showMessage(t("ledger.rebuildPartial").replace("${modules}", modules), 7000, "error");
+            } else {
+                showMessage(t("diag.rebuildAllDone"), 4000, "info");
+            }
+        } catch (error) {
+            showMessage(`${t("ledger.rebuildFailed").replace("${msg}", error instanceof Error ? error.message : String(error))}`, 6000, "error");
+        } finally {
+            diagnosticsBusy = null;
+        }
+    }
+
+    async function rerunOnboarding() {
+        if (rerunBusy || saving || migrationBusy || demoBusy) return;
+        rerunBusy = true;
+        const previous = cloneSettings(plugin.settings);
+        try {
+            const next = { ...previous, onboarded: false };
+            await persistReplacement(next);
+            try {
+                await plugin.refreshHub?.(undefined, true);
+            } catch (error) {
+                // The setting is already persisted and broadcast; keep it rather
+                // than reverting disk and memory to two different states.
+                showMessage(`${settingHint("引导已重置，但提醒刷新失败", "Onboarding reset, but reminder refresh failed")} (${error instanceof Error ? error.message : String(error)})`, 6000, "error");
+                return;
+            }
+            showMessage(t("wiz.rerunHint"), 3000, "info");
+        } catch (error) {
+            // persistReplacement restores the in-memory snapshot when the write
+            // itself fails; retain the explicit assignment for non-standard test
+            // doubles that reject before entering its helper.
+            plugin.settings = previous;
+            showMessage(`${settingHint("重置引导失败", "Unable to reset onboarding")}${error instanceof Error ? ` (${error.message})` : ""}`, 6000, "error");
+        } finally {
+            rerunBusy = false;
+        }
+    }
+
     async function restorePreImport() {
+        if (migrationBusy || saving) return;
         confirm(t("settings.restoreTitle"), t("settings.restoreBody"), async () => {
+            if (migrationBusy || saving) return;
+            migrationBusy = true;
+            migrationAction = "restore";
             try {
                 const backup = await plugin.loadData?.("settings.pre-import.json");
-                if (!backup) { showMessage(t("settings.importBad"), 4000, "error"); return; }
-                plugin.settings = backup as HomeSettings;
-                await import("@/core/settings").then((m) => m.saveSettings(plugin as any, plugin.settings));
-                await plugin.ensureCoreLedgers?.();
-                await plugin.refreshHub?.();
-                showMessage(t("settings.restoreDone"), 3000, "info");
+                if (!backup || !Array.isArray((backup as any).enabledModules) || !Array.isArray((backup as any).members)
+                    || !(backup as any).dbRefs || typeof (backup as any).dbRefs !== "object") {
+                    throw new Error("invalid pre-import settings backup");
+                }
+                await persistReplacement(backup as HomeSettings);
+                let followupError: unknown;
+                let provisioningWarning = "";
+                try {
+                    provisioningWarning = describeProvisioningIssues(await plugin.ensureCoreLedgers?.());
+                    await plugin.refreshHub?.(undefined, true);
+                } catch (error) {
+                    followupError = error;
+                }
+                const warnings = [
+                    provisioningWarning,
+                    followupError ? `${settingHint("后续刷新失败", "follow-up refresh failed")}: ${followupError instanceof Error ? followupError.message : String(followupError)}` : "",
+                ].filter(Boolean);
+                showMessage(
+                    warnings.length > 0
+                        ? `${t("settings.restoreDone")}（${warnings.join("；")}）`
+                        : t("settings.restoreDone"),
+                    warnings.length > 0 ? 7000 : 3000,
+                    warnings.length > 0 ? "error" : "info",
+                );
             } catch (e) {
-                showMessage(t("settings.importBad"), 4000, "error");
+                const prefix = (e as Error & { settingsPersistFailed?: boolean }).settingsPersistFailed
+                    ? t("settings.saveFailed") : settingHint("恢复失败", "Restore failed");
+                showMessage(`${prefix}${e instanceof Error ? ` (${e.message})` : ""}`, 5000, "error");
+            } finally {
+                migrationBusy = false;
+                migrationAction = null;
             }
         });
     }
@@ -318,30 +584,63 @@
         try {
             const data = JSON.parse(await file.text());
             // 形状校验（33.2：坏文件拒绝导入，不覆盖当前设置）
-            if (!Array.isArray(data?.enabledModules) || !Array.isArray(data?.members) || typeof data?.dbRefs !== "object") {
+            if (!Array.isArray(data?.enabledModules) || !Array.isArray(data?.members) || !data?.dbRefs || typeof data.dbRefs !== "object") {
                 throw new Error("invalid settings shape");
             }
             confirm(t("settings.importTitle"), t("settings.importBody").replace("${file}", file.name), async () => {
-                // UG03/DL07：覆盖前自动备份当前设置（可经"恢复导入前设置"一键回滚）
+                if (migrationBusy || saving) return;
+                migrationBusy = true;
+                migrationAction = "import";
                 try {
-                    await (plugin as any).saveData?.("settings.pre-import.json", JSON.parse(JSON.stringify(plugin.settings)));
-                    preImportBackupExists = true;
-                } catch {
-                    // 备份失败不阻断导入（导出的 JSON 文件仍是用户侧备份）
+                    // UG03/DL07：覆盖前自动备份当前设置（可经"恢复导入前设置"一键回滚）
+                    let backupError: unknown;
+                    try {
+                        if (!plugin.saveData) throw new Error("settings backup storage unavailable");
+                        await plugin.saveData("settings.pre-import.json", cloneSettings(plugin.settings));
+                        preImportBackupExists = true;
+                    } catch (error) {
+                        backupError = error;
+                    }
+                    // 24 组/16 轮：导入归一化——未知模块剔除进报告、成员字段修复，不再静默丢弃
+                    const { normalizeImportedSettings } = await import("@/core/settings");
+                    const norm = normalizeImportedSettings(data);
+                    try {
+                        await persistReplacement(norm.settings);
+                    } catch (error) {
+                        throw Object.assign(error instanceof Error ? error : new Error(String(error)), { settingsPersistFailed: true });
+                    }
+                    let followupError: unknown;
+                    let provisioningWarning = "";
+                    try {
+                        provisioningWarning = describeProvisioningIssues(await plugin.ensureCoreLedgers?.());
+                        await plugin.refreshHub?.(undefined, true);
+                    } catch (error) {
+                        followupError = error;
+                    }
+                    const result = norm.droppedModules.length > 0 || norm.repairedMembers > 0
+                        ? t("settings.importNormalized")
+                            .replace("${m}", String(norm.droppedModules.length))
+                            .replace("${r}", String(norm.repairedMembers))
+                        : t("settings.importDone");
+                    const warnings: string[] = [];
+                    if (backupError) warnings.push(`${settingHint("导入前备份失败", "pre-import backup failed")}: ${backupError instanceof Error ? backupError.message : String(backupError)}`);
+                    if (provisioningWarning) warnings.push(provisioningWarning);
+                    if (followupError) warnings.push(`${settingHint("后续刷新失败", "follow-up refresh failed")}: ${followupError instanceof Error ? followupError.message : String(followupError)}`);
+                    showMessage(
+                        warnings.length > 0
+                            ? `${result} (${warnings.join("; ")})`
+                            : result,
+                        warnings.length > 0 ? 7000 : (norm.droppedModules.length || norm.repairedMembers ? 6000 : 3000),
+                        warnings.length > 0 ? "error" : "info",
+                    );
                 }
-                // 24 组/16 轮：导入归一化——未知模块剔除进报告、成员字段修复，不再静默丢弃
-                const { normalizeImportedSettings } = await import("@/core/settings");
-                const norm = normalizeImportedSettings(data);
-                plugin.settings = norm.settings;
-                await import("@/core/settings").then((m) => m.saveSettings(plugin as any, plugin.settings));
-                await plugin.ensureCoreLedgers?.();
-                await plugin.refreshHub?.();
-                if (norm.droppedModules.length > 0 || norm.repairedMembers > 0) {
-                    showMessage(t("settings.importNormalized")
-                        .replace("${m}", String(norm.droppedModules.length))
-                        .replace("${r}", String(norm.repairedMembers)), 6000, "info");
-                } else {
-                    showMessage(t("settings.importDone"), 3000, "info");
+                catch (err) {
+                    const prefix = (err as Error & { settingsPersistFailed?: boolean }).settingsPersistFailed
+                        ? t("settings.saveFailed") : t("settings.importBad");
+                    showMessage(`${prefix}${err instanceof Error ? ` (${err.message})` : ""}`, 6000, "error");
+                } finally {
+                    migrationBusy = false;
+                    migrationAction = null;
                 }
             });
         } catch (err) {
@@ -350,25 +649,48 @@
     }
 
     async function save() {
+        if (saving || migrationBusy) return;
         saving = true;
-        try {            const prevMembers = plugin.settings.members;
-            const prevModules = new Set(plugin.settings.enabledModules);
+        let persisted = false;
+        let provisioningWarning = "";
+        try {
+            const previous = cloneSettings(plugin.settings);
+            const prevMembers = previous.members;
+            const prevModules = new Set(previous.enabledModules);
+            const normalizedBindings = normalizeCheckinBindings(draftBindings);
+            const droppedBindingCount = Math.max(0, draftBindings.length - normalizedBindings.length);
             const modulesChanged = draftEnabled.length !== prevModules.size || draftEnabled.some((id) => !prevModules.has(id));
-            plugin.settings.enabledModules = [...draftEnabled];
-            plugin.settings.members = draftMembers.map((m) => ({ ...m, name: m.name.trim() || "?" }));
-            // C8c：提醒设置落盘（无效时段值忽略，保持 0-23 界内）；263 波起与脏检查共用 clampHour
-            plugin.settings.notifyHour = clampHour(draftNotifyHour, 8);
-            plugin.settings.silentFrom = clampHour(draftSilentFrom, 22);
-            plugin.settings.silentTo = clampHour(draftSilentTo, 8);
-            // 229 波：Webhook 落盘（URL 归一去尾斜杠/空白；空串=不推送）；263 波起与脏检查共用 normWebhookUrl
-            plugin.settings.webhookEnabled = draftWebhookEnabled && normWebhookUrl(draftWebhookUrl) !== "";
-            plugin.settings.webhookUrl = normWebhookUrl(draftWebhookUrl);
-            plugin.settings.webhookMode = draftWebhookMode;
-            // 263 波：与脏检查共用 normLeads
-            plugin.settings.leadOverrides = normLeads(draftLeads);
-            // EC09：打卡绑定落盘（清洗在 normalize——缺 id/metric 非法剔除、去重）
-            plugin.settings.checkinBindings = normalizeCheckinBindings(draftBindings);
-            await saveSettings(plugin as any, plugin.settings);
+            const next: HomeSettings = {
+                ...previous,
+                enabledModules: [...draftEnabled],
+                members: draftMembers.map((m) => ({ ...m, name: m.name.trim() || "?", sex: m.sex || undefined })),
+                // C8c：提醒设置落盘（无效时段值忽略，保持 0-23 界内）；263 波起与脏检查共用 clampHour
+                notifyHour: clampHour(draftNotifyHour, 8),
+                silentFrom: clampHour(draftSilentFrom, 22),
+                silentTo: clampHour(draftSilentTo, 8),
+                // 229 波：Webhook 落盘（URL 归一去尾斜杠/空白；空串=不推送）；263 波起与脏检查共用 normWebhookUrl
+                webhookEnabled: draftWebhookEnabled && normWebhookUrl(draftWebhookUrl) !== "",
+                webhookUrl: normWebhookUrl(draftWebhookUrl),
+                webhookMode: draftWebhookMode,
+                hideAmounts: draftHideAmounts,
+                bridgeEnabled: draftBridgeEnabled,
+                // 263 波：与脏检查共用 normLeads
+                leadOverrides: normLeads(draftLeads),
+                // EC09：打卡绑定落盘（清洗在 normalize——缺 id/metric 非法剔除、去重）
+                checkinBindings: normalizedBindings,
+            };
+            plugin.settings = next;
+            try {
+                await saveSettings(plugin as any, next);
+            } catch (error) {
+                plugin.settings = previous;
+                savedTick += 1;
+                throw error;
+            }
+            persisted = true;
+            syncDraftFromSettings(next);
+            savedTick += 1;
+
             // C8b：模块开关接线——新启用模块立即建库（禁用只隐藏保留数据）
             if (modulesChanged) {
                 // EC15：禁用模块时清理其 favorSyncs 运行态数据
@@ -376,48 +698,121 @@
                 if (disabledModules.length > 0 && plugin.runtime?.favorSyncs) {
                     for (const mid of disabledModules) delete plugin.runtime.favorSyncs[mid];
                 }
-                await plugin.ensureCoreLedgers?.();
+                provisioningWarning = describeProvisioningIssues(await plugin.ensureCoreLedgers?.());
             }
             // D05：设置页与成员页同走成员 DAL——差异同步到 members 台账行（新增建行/变更写回）
             const { syncMembersToAv } = await import("@/core/members");
-            const rep = await syncMembersToAv(plugin as any, plugin.settings, prevMembers);
+            const rep = await syncMembersToAv(plugin as any, next, prevMembers);
             // H02：设置变更（模块开关/成员）广播到全部页签（强制全量重扫——设置变更不受去抖限制）
             await plugin.refreshHub?.(undefined, true);
-            if (rep.failed.length > 0) {
-                showMessage(t("members.syncPartial").replace("${n}", String(rep.failed.length)), 5000, "error");
+            const warnings: string[] = [];
+            if (rep.failed.length > 0) warnings.push(t("members.syncPartial").replace("${n}", String(rep.failed.length)));
+            if (provisioningWarning) warnings.push(provisioningWarning);
+            if (droppedBindingCount > 0) warnings.push(t("settings.checkinCleaned").replace("${n}", String(droppedBindingCount)));
+            if (warnings.length > 0) {
+                showMessage(warnings.join("；"), 7000, "error");
             } else {
                 showMessage(t("saved"), 2000, "info");
             }
-            savedTick += 1; // 263 波：落盘完成后重评 dirty（settings 非响应式，见上）
         } catch (e) {
-            // §15/186 波：saveSettings 重试仍失败（或成员同步抛错）→ 显式上报，不静默假成功
-            showMessage(`${t("settings.saveFailed")}${e instanceof Error ? ` (${e.message})` : ""}`, 6000, "error");
+            // 配置落盘后，建库/成员同步/刷新失败不应伪报为“保存失败”。
+            const prefix = persisted
+                ? settingHint("设置已保存，但后续同步失败", "Settings saved, but follow-up sync failed")
+                : t("settings.saveFailed");
+            showMessage(`${prefix}${e instanceof Error ? ` (${e.message})` : ""}`, 6000, "error");
         } finally {
             saving = false;
         }
     }
+
+    async function generateDemo() {
+        if (demoBusy || saving || migrationBusy) return;
+        demoBusy = true;
+        demoAction = "generate";
+        try {
+            const { generateDemoData } = await import("@/core/demo");
+            const res = await generateDemoData(plugin as any, plugin.settings, plugin.schemaCatalog ?? {});
+            if (res.alreadyPresent) {
+                showMessage(t("settings.demoExists"), 4000, "info");
+                return;
+            }
+            let refreshError: unknown;
+            try { await plugin.refreshHub?.(undefined, true); }
+            catch (e) { refreshError = e; }
+            const details = [...res.errors.slice(0, 3)];
+            if (refreshError) details.push(`${settingHint("提醒刷新失败", "reminder refresh failed")}: ${refreshError instanceof Error ? refreshError.message : String(refreshError)}`);
+            const partial = res.errors.length > 0 || !!refreshError;
+            const summary = res.errors.length
+                ? t("settings.demoPartial").replace("${n}", String(res.errors.length))
+                : t("settings.demoDone").replace("${n}", String(res.created));
+            showMessage(details.length ? `${summary}: ${details.join("; ")}` : summary, partial ? 7000 : 5000, partial ? "error" : "info");
+        } catch (e) {
+            showMessage(t("settings.demoActionFailed").replace("${msg}", e instanceof Error ? e.message : String(e)), 6000, "error");
+        } finally {
+            demoBusy = false;
+            demoAction = null;
+        }
+    }
+
+    function clearDemo() {
+        if (demoBusy || saving || migrationBusy) return;
+        confirm(t("settings.demoClearTitle"), t("settings.demoClearBody"), async () => {
+            if (demoBusy || saving || migrationBusy) return;
+            demoBusy = true;
+            demoAction = "clear";
+            try {
+                const { clearDemoData } = await import("@/core/demo");
+                const res = await clearDemoData(plugin as any, plugin.settings);
+                let refreshError: unknown;
+                try { await plugin.refreshHub?.(undefined, true); }
+                catch (e) { refreshError = e; }
+                const details = [...res.errors.slice(0, 3)];
+                if (refreshError) details.push(`${settingHint("提醒刷新失败", "reminder refresh failed")}: ${refreshError instanceof Error ? refreshError.message : String(refreshError)}`);
+                const partial = res.errors.length > 0 || !!refreshError;
+                const summary = res.errors.length
+                    ? t("settings.demoClearPartial").replace("${n}", String(res.cleared)).replace("${m}", String(res.errors.length))
+                    : t("settings.demoClearDone").replace("${n}", String(res.cleared));
+                showMessage(details.length ? `${summary}: ${details.join("; ")}` : summary, partial ? 7000 : 6000, partial ? "error" : "info");
+            } catch (e) {
+                showMessage(t("settings.demoActionFailed").replace("${msg}", e instanceof Error ? e.message : String(e)), 6000, "error");
+            } finally {
+                demoBusy = false;
+                demoAction = null;
+            }
+        });
+    }
 </script>
 
 <div class="lv-home lv-settings">
-    <!-- 251 波（对齐原型设置屏）：左侧锚点导航 + 右侧分组卡片；b3-tab-bar 横排页签退役 -->
-    <nav class="lv-setnav" aria-label={t("settingsTitle")}>
-        <button class="lv-setnav__item {tab === 'modules' ? 'on' : ''}" aria-current={tab === 'modules' ? 'true' : undefined} onclick={() => (tab = "modules")}>🧩 {t("tabModules")}</button>
-        <button class="lv-setnav__item {tab === 'members' ? 'on' : ''}" aria-current={tab === 'members' ? 'true' : undefined} onclick={() => (tab = "members")}>👪 {t("tabMembers")}</button>
-        <button class="lv-setnav__item {tab === 'reminders' ? 'on' : ''}" aria-current={tab === 'reminders' ? 'true' : undefined} onclick={() => (tab = "reminders")}>⏰ {t("tabReminders")}</button>
-        <button class="lv-setnav__item {tab === 'about' ? 'on' : ''}" aria-current={tab === 'about' ? 'true' : undefined} onclick={() => (tab = "about")}>ℹ️ {t("tabAbout")}</button>
+    <!-- 左侧主分类；模块和提醒等复杂页面在右侧继续细分。 -->
+    <nav class="lv-setnav" aria-label={t("settingsTitle")} inert={saving || migrationBusy || demoBusy}>
+        <div class="lv-setnav__brand"><span class="lv-setnav__brand-mark" aria-hidden="true">⌂</span><div><b>{t("butler")}</b><span>{t("settingsTitle")}</span></div></div>
+        <div class="lv-setnav__label">{t("settingsTitle")}</div>
+        <button class="lv-setnav__item {area === 'modules' ? 'on' : ''}" aria-current={area === 'modules' ? 'true' : undefined} onclick={() => (area = "modules")}><span class="lv-setnav__icon" aria-hidden="true">▦</span>{t("tabModules")}</button>
+        <button class="lv-setnav__item {area === 'members' ? 'on' : ''}" aria-current={area === 'members' ? 'true' : undefined} onclick={() => (area = "members")}><span class="lv-setnav__icon" aria-hidden="true">♧</span>{t("tabMembers")}</button>
+        <button class="lv-setnav__item {area === 'reminders' ? 'on' : ''}" aria-current={area === 'reminders' ? 'true' : undefined} onclick={() => (area = "reminders")}><span class="lv-setnav__icon" aria-hidden="true">◷</span>{t("tabReminders")}</button>
+        <button class="lv-setnav__item {area === 'data' ? 'on' : ''}" aria-current={area === 'data' ? 'true' : undefined} onclick={() => (area = "data")}><span class="lv-setnav__icon" aria-hidden="true">▤</span>{t("settings.dataTitle")}</button>
+        <button class="lv-setnav__item {area === 'about' ? 'on' : ''}" aria-current={area === 'about' ? 'true' : undefined} onclick={() => (area = "about")}><span class="lv-setnav__icon" aria-hidden="true">ⓘ</span>{t("tabAbout")}</button>
     </nav>
 
-    <div class="lv-setpane">
-    {#if tab === "modules"}
-        <div class="lv-card lv-setcard lv-setcard--hint">{t("settings.modulesHint")}</div>
-        {#each MODULE_GROUPS as gid (gid)}
+    <div class="lv-setpane" aria-busy={saving || migrationBusy || demoBusy} inert={saving || migrationBusy || demoBusy}>
+    {#if area === "modules"}
+        <div class="lv-settings__pane-title">{t("tabModules")}</div>
+        <nav class="lv-settings__subnav" aria-label={t("settings.moduleCategory")}>
+            {#each MODULE_GROUPS as gid (gid)}
+                <button class="lv-setnav__item {moduleGroup === gid ? 'on' : ''}" aria-current={moduleGroup === gid ? 'true' : undefined} onclick={() => (moduleGroup = gid)}>{t(`group.${gid}`)}</button>
+            {/each}
+        </nav>
+        <div class="lv-settings__scroll" aria-label={t(`group.${moduleGroup}`)}>
+            <div class="lv-card lv-setcard lv-setcard--hint">{t("settings.modulesHint")}</div>
             <div class="lv-card lv-setcard">
-                <div class="lv-setcard__title">{t(`group.${gid}`)}</div>
-                {#each modulesByGroup(gid) as mod (mod.id)}
+                <div class="lv-setcard__title">{t(`group.${moduleGroup}`)}</div>
+                {#each modulesByGroup(moduleGroup) as mod (mod.id)}
                     <div class="fn__flex lv-settings__row">
                         <input
                             type="checkbox"
                             class="b3-switch"
+                            aria-label={t(`module.${mod.id}`)}
                             checked={enabledIds.has(mod.id)}
                             disabled={mod.alwaysOn}
                             onchange={() => toggleModule(mod.id, mod.alwaysOn)}
@@ -441,65 +836,102 @@
                     </div>
                 {/each}
             </div>
-        {/each}
-    {:else if tab === "members"}
+        </div>
+    {:else if area === "members"}
+        <div class="lv-settings__pane-title">{t("tabMembers")}</div>
+        <div class="lv-settings__scroll">
         <div class="lv-card lv-setcard">
             <div class="lv-setcard__hint">{t("settings.membersHint")}</div>
             {#if draftMembers.length === 0}
                 <div class="lv-setcard__hint ft__on-surface">{t("members.empty")}</div>
             {/if}
             {#each draftMembers as m, i (m.id)}
-                <div class="fn__flex lv-settings__row lv-settings__member">
-                    <input class="b3-text-field fn__size200" placeholder={t("members.name")} bind:value={draftMembers[i].name} />
-                    <select class="b3-select" bind:value={draftMembers[i].role}>
-                        {#each ROLES as r (r)}
-                            <option value={r}>{t(`role.${r}`)}</option>
-                        {/each}
-                    </select>
-                    <select class="b3-select" bind:value={draftMembers[i].sex} title={t("members.sex")}>
-                        <option value={undefined}>{t("members.sex.unknown")}</option>
-                        <option value="male">{t("members.sex.male")}</option>
-                        <option value="female">{t("members.sex.female")}</option>
-                    </select>
-                    <input class="b3-text-field" type="date" bind:value={draftMembers[i].birthday} title={t("members.birthday")} />
-                    <label class="fn__flex">
-                        <input type="checkbox" class="b3-switch" bind:checked={draftMembers[i].lunarBirthday} />
-                        <span>{t("members.lunar")}</span>
-                    </label>
-                    <span class="fn__flex-1"></span>
-                    <button class="b3-button b3-button--outline" onclick={() => removeMember(m.id)}>{t("delete")}</button>
-                </div>
+                <section class="lv-settings-member" aria-labelledby={`lv-settings-member-${m.id}`}>
+                    <div class="lv-settings-member__head">
+                        <h3 id={`lv-settings-member-${m.id}`}>
+                            <span class="lv-settings-member__number" aria-hidden="true">{i + 1}</span>
+                            <span>{m.name.trim() || t("members.name")}</span>
+                        </h3>
+                        <button class="b3-button b3-button--text lv-settings-member__delete" type="button"
+                            aria-label={`${t("delete")} ${m.name.trim() || t("members.name")}`} onclick={() => removeMember(m.id)}>
+                            {t("delete")}
+                        </button>
+                    </div>
+                    <div class="lv-settings-member__fields">
+                        <label class="lv-settings-member__field">
+                            <span>{t("members.name")}</span>
+                            <input class="b3-text-field" placeholder={t("members.name")} bind:value={draftMembers[i].name} />
+                        </label>
+                        <label class="lv-settings-member__field">
+                            <span>{t("members.role")}</span>
+                            <select class="b3-select" bind:value={draftMembers[i].role}>
+                                {#each ROLES as r (r)}
+                                    <option value={r}>{t(`role.${r}`)}</option>
+                                {/each}
+                            </select>
+                        </label>
+                        <label class="lv-settings-member__field">
+                            <span>{t("members.sex")}</span>
+                            <select class="b3-select" bind:value={draftMembers[i].sex}>
+                                <option value="">{t("members.sex.unknown")}</option>
+                                <option value="male">{t("members.sex.male")}</option>
+                                <option value="female">{t("members.sex.female")}</option>
+                            </select>
+                        </label>
+                        <label class="lv-settings-member__field">
+                            <span>{t("members.birthday")}</span>
+                            <input class="b3-text-field" type="date" bind:value={draftMembers[i].birthday} />
+                        </label>
+                        <label class="lv-settings-member__calendar">
+                            <span>{t("members.lunar")}</span>
+                            <input type="checkbox" class="b3-switch" bind:checked={draftMembers[i].lunarBirthday} />
+                        </label>
+                    </div>
+                </section>
             {/each}
-            <button class="b3-button b3-button--outline lv-setcard__action" onclick={addMember}>＋ {t("add")}</button>
+            <button class="b3-button b3-button--outline lv-setcard__action lv-settings-member__add" type="button" onclick={addMember}>
+                <UiIcon name="add" size={15} /> {t("add")}
+            </button>
         </div>
-    {:else if tab === "reminders"}
+        </div>
+    {:else if area === "reminders"}
+        <div class="lv-settings__pane-title">{t("tabReminders")}</div>
+        <nav class="lv-settings__subnav" aria-label={t("tabReminders")}>
+            <button class="lv-setnav__item {reminderSection === 'schedule' ? 'on' : ''}" aria-current={reminderSection === 'schedule' ? 'true' : undefined} onclick={() => (reminderSection = "schedule")}>{t("settings.reminderSchedule")}</button>
+            <button class="lv-setnav__item {reminderSection === 'webhook' ? 'on' : ''}" aria-current={reminderSection === 'webhook' ? 'true' : undefined} onclick={() => (reminderSection = "webhook")}>{t("settings.webhookTitle")}</button>
+            <button class="lv-setnav__item {reminderSection === 'leads' ? 'on' : ''}" aria-current={reminderSection === 'leads' ? 'true' : undefined} onclick={() => (reminderSection = "leads")}>{t("settings.leadsTitle")}</button>
+            <button class="lv-setnav__item {reminderSection === 'checkin' ? 'on' : ''}" aria-current={reminderSection === 'checkin' ? 'true' : undefined} onclick={() => (reminderSection = "checkin")}>{t("settings.checkinBindingsTitle")}</button>
+        </nav>
+        <div class="lv-settings__scroll">
+        {#if reminderSection === "schedule"}
         <div class="lv-card lv-setcard">
             <div class="lv-setcard__title">{t("tabReminders")}</div>
             <div class="lv-setcard__hint">{t("settings.remindersHint")}</div>
             <div class="fn__flex lv-settings__row">
                 <span style="min-width:180px">{t("settings.notifyHour")}</span>
-                <input class="b3-text-field" style="width:90px" type="number" min="0" max="23" bind:value={draftNotifyHour} />
+                <input class="b3-text-field" style="width:90px" type="number" min="0" max="23" aria-label={t("settings.notifyHour")} bind:value={draftNotifyHour} />
                 <span class="lv-caption fn__flex-1">{t("settings.notifyHourHint")}</span>
             </div>
             <div class="fn__flex lv-settings__row">
                 <span style="min-width:180px">{t("settings.silentHours")}</span>
-                <input class="b3-text-field" style="width:70px" type="number" min="0" max="23" bind:value={draftSilentFrom} />
+                <input class="b3-text-field" style="width:70px" type="number" min="0" max="23" aria-label={t("settings.silentFromLabel")} bind:value={draftSilentFrom} />
                 <span class="lv-caption" style="margin:0 6px">→</span>
-                <input class="b3-text-field" style="width:70px" type="number" min="0" max="23" bind:value={draftSilentTo} />
+                <input class="b3-text-field" style="width:70px" type="number" min="0" max="23" aria-label={t("settings.silentToLabel")} bind:value={draftSilentTo} />
                 <span class="lv-caption fn__flex-1">{t("settings.silentHoursHint")}</span>
             </div>
         </div>
+        {:else if reminderSection === "webhook"}
         <div class="lv-card lv-setcard">
             <div class="lv-setcard__title">{t("settings.webhookTitle")}</div>
             <div class="lv-setcard__hint">{t("settings.webhookHint")}</div>
             <div class="fn__flex lv-settings__row">
                 <span style="min-width:180px">{t("settings.webhookEnable")}</span>
-                <input type="checkbox" class="b3-switch" bind:checked={draftWebhookEnabled} />
+                <input type="checkbox" class="b3-switch" aria-label={t("settings.webhookEnable")} bind:checked={draftWebhookEnabled} />
                 <span class="lv-caption fn__flex-1"></span>
             </div>
             <div class="fn__flex lv-settings__row">
                 <span style="min-width:180px">{t("settings.webhookMode")}</span>
-                <select class="b3-select" bind:value={draftWebhookMode}>
+                <select class="b3-select" aria-label={t("settings.webhookMode")} bind:value={draftWebhookMode}>
                     <option value="bark">Bark</option>
                     <option value="ntfy">ntfy</option>
                 </select>
@@ -507,12 +939,13 @@
             </div>
             <div class="fn__flex lv-settings__row">
                 <span style="min-width:180px">{t("settings.webhookUrl")}</span>
-                <input class="b3-text-field fn__flex-1" style="min-width:0" bind:value={draftWebhookUrl}
+                <input class="b3-text-field fn__flex-1" style="min-width:0" aria-label={t("settings.webhookUrl")} bind:value={draftWebhookUrl}
                     placeholder="https://api.day.app/yourkey" />
             </div>
             <button class="b3-button b3-button--outline lv-setcard__action" disabled={testingWebhook || !draftWebhookUrl.trim()}
                 onclick={testWebhook}>{testingWebhook ? t("settings.webhookTesting") : t("settings.webhookTest")}</button>
         </div>
+        {:else if reminderSection === "leads"}
         <div class="lv-card lv-setcard">
             <div class="lv-setcard__title">{t("settings.leadsTitle")}</div>
             <div class="lv-setcard__hint">{t("settings.leadsHint")}</div>
@@ -525,19 +958,33 @@
                 <div class="fn__flex lv-settings__row" style={enabledIds.has(lr.moduleId) ? "" : "opacity:.55"}>
                     <span style="min-width:220px">{t(`module.${lr.moduleId}`)} · {t(`rule.${lr.ruleKey}`) !== `rule.${lr.ruleKey}` ? t(`rule.${lr.ruleKey}`) : lr.ruleKey}</span>
                     <input class="b3-text-field" style="width:90px" type="number" min="0" max="3650"
+                        aria-label={`${t(`module.${lr.moduleId}`)} · ${t(`rule.${lr.ruleKey}`) !== `rule.${lr.ruleKey}` ? t(`rule.${lr.ruleKey}`) : lr.ruleKey}`}
                         placeholder={String(lr.def)}
                         bind:value={draftLeads[lr.key]} />
                     <span class="lv-caption fn__flex-1">{t("settings.leadDefault").replace("${n}", String(lr.def))}{#if !enabledIds.has(lr.moduleId)} · {t("settings.leadDisabled")}{/if}</span>
+                    {#if (draftLeads[lr.key] ?? "").trim() !== ""}
+                        <button class="b3-button b3-button--text b3-button--small" style="padding:2px 8px;font-size:11.5px;color:var(--lv-tx-3)" title={t("settings.leadResetDefault")} onclick={() => (draftLeads[lr.key] = "")}>
+                            {t("settings.leadReset")}
+                        </button>
+                    {/if}
                 </div>
             {/each}
         </div>
+        {:else}
         <!-- EC09（D20）：打卡习惯 → 成员指标绑定（只读消费） -->
         <div class="lv-card lv-setcard">
             <div class="lv-setcard__title">{t("settings.checkinBindingsTitle")}</div>
             <div class="lv-setcard__hint">{t("settings.checkinBindingsHint")}</div>
             {#if checkinPresent === false}
                 <p class="lv-setcard__hint" style="color:var(--lv-warn)">{t("settings.checkinAbsent")}</p>
+            {:else if checkinPresent === null}
+                <p class="lv-setcard__hint" role="status">{t("settings.checkinLoading")}</p>
+                <button class="b3-button b3-button--outline lv-setcard__action" onclick={() => { checkinItems = []; checkinPresent = null; checkinProbe += 1; }}>{t("settings.checkinRetry")}</button>
             {:else if checkinPresent === true}
+                {#if draftMembers.length === 0}
+                    <p class="lv-setcard__hint" role="status">{t("settings.checkinNeedMember")}</p>
+                    <button class="b3-button b3-button--outline lv-setcard__action" onclick={() => (area = "members")}>{t("tabMembers")}</button>
+                {/if}
                 {#each draftBindings as b, i}
                     <div class="fn__flex lv-settings__row" style="gap:6px">
                         <select class="b3-select" style="width:auto" bind:value={b.memberId} aria-label={t("settings.metricMember")}>
@@ -550,94 +997,124 @@
                         <select class="b3-select" style="width:auto" bind:value={b.metric} aria-label={t("settings.metricKind")}>
                             {#each METRICS as mt (mt)}<option value={mt}>{t(`settings.metric.${mt}`)}</option>{/each}
                         </select>
-                        <button class="b3-button b3-button--text" title={t("delete")} onclick={() => removeBinding(i)}>✕</button>
+                        <button class="b3-button b3-button--text" title={t("delete")} aria-label={`${t("delete")} · ${b.itemName}`} onclick={() => removeBinding(i)}>✕</button>
                     </div>
                 {/each}
                 {#if draftBindings.length === 0}
                     <p class="lv-setcard__hint ft__on-surface">{t("settings.checkinEmpty")}</p>
                 {/if}
-                <button class="b3-button b3-button--outline lv-setcard__action" disabled={!checkinItems.length} onclick={addBinding}>＋ {t("settings.checkinAdd")}</button>
+                {#if checkinItems.length === 0}
+                    <p class="lv-setcard__hint" role="status">{t("settings.checkinNoItems")}</p>
+                {/if}
+                {#if checkinItems.length > 0 && draftMembers.length > 0 && !availableBindingPair}
+                    <p class="lv-setcard__hint" role="status">{t("settings.checkinAllBound")}</p>
+                {/if}
+                <button class="b3-button b3-button--outline lv-setcard__action" disabled={!availableBindingPair} onclick={addBinding}>＋ {t("settings.checkinAdd")}</button>
             {/if}
         </div>
+        {/if}
+        </div>
+    {:else if area === "data"}
+        <div class="lv-settings__pane-title">{t("settings.dataTitle")}</div>
+        <nav class="lv-settings__subnav" aria-label={t("settings.dataTitle")}>
+            <button class="lv-setnav__item {dataSection === 'migration' ? 'on' : ''}" aria-current={dataSection === 'migration' ? 'true' : undefined} onclick={() => (dataSection = "migration")}>{t("settings.migrateTitle")}</button>
+            <button class="lv-setnav__item {dataSection === 'demo' ? 'on' : ''}" aria-current={dataSection === 'demo' ? 'true' : undefined} onclick={() => (dataSection = "demo")}>{t("settings.demoTitle")}</button>
+            <button class="lv-setnav__item {dataSection === 'ecosystem' ? 'on' : ''}" aria-current={dataSection === 'ecosystem' ? 'true' : undefined} onclick={() => (dataSection = "ecosystem")}>{t("settings.ecoTitle")}</button>
+            <button class="lv-setnav__item {dataSection === 'shortcuts' ? 'on' : ''}" aria-current={dataSection === 'shortcuts' ? 'true' : undefined} onclick={() => (dataSection = "shortcuts")}>{t("faq.shortcuts")}</button>
+        </nav>
+        <div class="lv-settings__scroll">
+        {#if dataSection === "migration"}
+        <!-- 设置导出/导入（跨设备/重装迁移辅助） -->
+        <div class="lv-card lv-setcard">
+            <div class="lv-setcard__title">{t("settings.migrateTitle")}</div>
+            <div class="lv-setcard__hint" style="color:var(--lv-warn)">⚠ {t("settings.migratePrivacy")}</div>
+            <div class="lv-setcard__actions">
+                <button class="b3-button b3-button--outline" disabled={migrationBusy || saving} onclick={exportSettings}>{t("settings.export")}</button>
+                <button class="b3-button b3-button--outline" disabled={migrationBusy || saving} onclick={() => importInput?.click()}>{migrationAction === "import" ? t("ledger.saving") : t("settings.import")}</button>
+                <input type="file" accept="application/json,.json" style="display:none"
+                    bind:this={importInput} onchange={(e) => importSettings(e)} />
+                {#if preImportBackupExists}
+                    <button class="b3-button b3-button--outline" disabled={migrationBusy || saving} onclick={restorePreImport}>{migrationAction === "restore" ? t("ledger.saving") : t("settings.restoreBtn")}</button>
+                {/if}
+            </div>
+        </div>
+        {:else if dataSection === "demo"}
+        <!-- 示例数据一键生成/清除 -->
+        <div class="lv-card lv-setcard">
+            <div class="lv-setcard__title">{t("settings.demoTitle")}</div>
+            <div class="lv-setcard__hint">{t("settings.demoHint")}</div>
+            <div class="lv-setcard__actions">
+                <button class="b3-button b3-button--outline" disabled={demoBusy} aria-busy={demoBusy && demoAction === "generate"} onclick={generateDemo}>{demoAction === "generate" ? t("ledger.saving") : t("settings.demoGenerate")}</button>
+                <button class="b3-button b3-button--outline" disabled={demoBusy} aria-busy={demoBusy && demoAction === "clear"} onclick={clearDemo}>{demoAction === "clear" ? t("ledger.saving") : t("settings.demoClear")}</button>
+            </div>
+        </div>
+        {:else if dataSection === "ecosystem"}
+        <!-- 生态服务桥权限控制（RPC总开关） -->
+        <div class="lv-card lv-setcard">
+            <div class="lv-setcard__title">{t("settings.bridgeTitle")}</div>
+            <div class="lv-setcard__hint">{t("settings.bridgeHint")}</div>
+            <div class="fn__flex lv-settings__row" style="align-items:center;justify-content:space-between">
+                <span>{t("settings.bridgeEnabled")}</span>
+                <input type="checkbox" class="b3-switch" aria-label={t("settings.bridgeEnabled")} bind:checked={draftBridgeEnabled} />
+            </div>
+        </div>
+        <!-- 系列插件联动状态矩阵 -->
+        <div class="lv-card lv-setcard">
+            <div class="lv-setcard__title">{t("settings.ecoTitle")}</div>
+            <div class="lv-setcard__hint">{t("settings.ecoHint")}</div>
+            {#each [
+                { id: "qiandao", connected: true },
+                { id: "contacts", connected: true },
+                { id: "leiqie", connected: true },
+                { id: "exam", connected: true },
+                { id: "glean", connected: false },
+                { id: "flashcard", connected: false },
+            ] as eco (eco.id)}
+                <div class="fn__flex lv-settings__row" style="align-items:center">
+                    <span class="lv-setnav__icon" aria-hidden="true">◇</span>
+                    <span class="fn__flex-1">{t(`eco.${eco.id}`)}</span>
+                    <span class="lv-badge {eco.connected ? 'green' : 'gray'}">{eco.connected ? t("settings.ecoConnected") : t("settings.ecoPlanned")}</span>
+                </div>
+            {/each}
+        </div>
+        {:else}
+        <div class="lv-card lv-setcard">
+            <div class="lv-setcard__title">⌨ {t("faq.shortcuts")}</div>
+            <p class="lv-caption" style="margin:2px 0">· {t("openButler")}：{t("faq.topbarOrCommand")}</p>
+            <p class="lv-caption" style="margin:2px 0">· {t("faq.quickCapture")}：{t("faq.topbarBolt")}</p>
+        </div>
+        {/if}
+        </div>
     {:else}
+        {@const diag = plugin.getDiagnostics?.()}
+        <div class="lv-settings__pane-title">{t("tabAbout")}</div>
+        <div class="lv-settings__scroll">
+        <!-- PRIV-01 / §4 C8f：隐私模式金额遮蔽开关 -->
+        <div class="lv-card lv-setcard">
+            <div class="lv-setcard__title">🔒 {t("settings.hideAmounts")}</div>
+            <div class="lv-setcard__hint">{t("settings.hideAmountsHint")}</div>
+            <div class="fn__flex lv-settings__row" style="align-items:center;justify-content:space-between">
+                <span>{t("settings.hideAmounts")}</span>
+                <input type="checkbox" class="b3-switch" aria-label={t("settings.hideAmounts")} bind:checked={draftHideAmounts} />
+            </div>
+        </div>
         <div class="lv-card lv-setcard">
             <div class="lv-settings__about">
                 <p>{t("about.line1")}</p>
                 <p>{t("about.tagline")}</p>
                 <p class="ft__on-surface">{t("about.principles")}</p>
                 <button class="b3-button b3-button--outline lv-setcard__action"
-                    onclick={async () => {
-                        plugin.settings.onboarded = false;
-                        await import("@/core/settings").then((m) => m.saveSettings(plugin as any, plugin.settings));
-                        showMessage(t("wiz.rerunHint"), 3000, "info");
-                    }}>{t("wiz.rerun")}</button>
+                    disabled={rerunBusy || saving || migrationBusy || demoBusy}
+                    onclick={rerunOnboarding}>{rerunBusy ? t("ledger.saving") : t("wiz.rerun")}</button>
                 <!-- C8e：关于区仓库链接（SDK 无 open 导出，走浏览器新窗口） -->
                 <button class="b3-button b3-button--outline" style="margin-top:8px;margin-left:6px"
                     onclick={() => window.open("https://github.com/ai68298100/siyuan-home", "_blank")}>{t("about.repo")}</button>
             </div>
         </div>
-        <!-- 24 组：设置导出/导入（跨设备/重装迁移辅助） -->
-        <div class="lv-card lv-setcard">
-            <div class="lv-setcard__title">{t("settings.migrateTitle")}</div>
-            <div class="lv-setcard__hint" style="color:var(--lv-warn)">⚠ {t("settings.migratePrivacy")}</div>
-            <div class="lv-setcard__actions">
-                <button class="b3-button b3-button--outline" onclick={exportSettings}>{t("settings.export")}</button>
-                <button class="b3-button b3-button--outline" onclick={() => importInput?.click()}>{t("settings.import")}</button>
-                <input type="file" accept="application/json,.json" style="display:none"
-                    bind:this={importInput} onchange={(e) => importSettings(e)} />
-                {#if preImportBackupExists}
-                    <!-- UG03/DL07：导入前自动备份的回滚入口 -->
-                    <button class="b3-button b3-button--outline" onclick={restorePreImport}>{t("settings.restoreBtn")}</button>
-                {/if}
-            </div>
-        </div>
-        <!-- 24 组/CM07：示例数据一键生成/清除（新用户体验与截图；【示例】前缀可识别可回滚） -->
-        <div class="lv-card lv-setcard">
-            <div class="lv-setcard__title">{t("settings.demoTitle")}</div>
-            <div class="lv-setcard__hint">{t("settings.demoHint")}</div>
-            <div class="lv-setcard__actions">
-                <button class="b3-button b3-button--outline" onclick={async () => {
-                    const { generateDemoData } = await import("@/core/demo");
-                    const res = await generateDemoData(plugin as any, plugin.settings, plugin.schemaCatalog ?? {});
-                    // 268 波：回执先行——重扫（31 模块+千行规模可达分钟级）转后台执行，
-                    // 完成时 version 广播照常驱动各屏刷新；此前 await 阻塞让用户点按钮后分钟级无反馈
-                    showMessage(res.errors.length ? t("settings.demoPartial").replace("${n}", String(res.errors.length)) : t("settings.demoDone").replace("${n}", String(res.created)), 5000, res.errors.length ? "error" : "info");
-                    plugin.refreshHub?.().catch((e) => console.warn("[siyuan-home] demo rescan failed:", e));
-                }}>{t("settings.demoGenerate")}</button>
-                <button class="b3-button b3-button--outline" onclick={async () => {
-                    confirm(t("settings.demoClearTitle"), t("settings.demoClearBody"), async () => {
-                        const { clearDemoData } = await import("@/core/demo");
-                        const res = await clearDemoData(plugin as any, plugin.settings);
-                        await plugin.refreshHub?.();
-                        showMessage(res.errors.length
-                            ? t("settings.demoClearPartial").replace("${n}", String(res.cleared)).replace("${m}", String(res.errors.length))
-                            : t("settings.demoClearDone").replace("${n}", String(res.cleared)), 6000, res.errors.length ? "error" : "info");
-                    });
-                }}>{t("settings.demoClear")}</button>
-            </div>
-        </div>
-        <!-- C8d：生态分区占位（v0.3 接线；开关仅展示，不可用） -->
-        <div class="lv-card lv-setcard">
-            <div class="lv-setcard__title">{t("settings.ecoTitle")}</div>
-            <div class="lv-setcard__hint">{t("settings.ecoHint")}</div>
-            {#each ["qiandao", "contacts", "glean", "exam", "flashcard", "leiqie"] as eco (eco)}
-                <div class="fn__flex lv-settings__row">
-                    <input type="checkbox" class="b3-switch" disabled />
-                    <span class="fn__flex-1">{t(`eco.${eco}`)} <span class="lv-badge gray">{t("settings.ecoPlanned")}</span></span>
-                </div>
-            {/each}
-        </div>
-        <div class="lv-card lv-setcard">
-            <div class="lv-setcard__title">⌨ {t("faq.shortcuts")}</div>
-            <p class="lv-caption" style="margin:2px 0">· {t("openButler")}：{t("faq.topbarOrCommand")}</p>
-            <p class="lv-caption" style="margin:2px 0">· {t("faq.quickCapture")}：{t("faq.topbarBolt")}</p>
-        </div>
-        {#if tab === "about"}
-            {@const diag = plugin.getDiagnostics?.()}
             {#if diag}
                 <div class="lv-card lv-setcard">
                     <div class="lv-setcard__title">{t("diag.title")} · v{diag.version}</div>
-                    <p class="lv-caption" style="margin:2px 0 8px">{t("hub.scannedAt")} {diag.scannedAt ? new Date(diag.scannedAt).toLocaleString() : "—"}</p>
+                    <p class="lv-caption" style="margin:2px 0 8px">{t("hub.scannedAt")} {formatLocalDateTime(diag.scannedAt) ?? "—"}</p>
                     {#each diag.ledgers as l (l.id)}
                         <p class="lv-caption">
                             {t(`module.${l.id}`)}：
@@ -659,56 +1136,166 @@
                         {/each}
                     {/if}
                     <div class="lv-setcard__actions" style="margin-top:8px">
-                        <button class="b3-button b3-button--outline" onclick={exportDiagnostics}>{t("settings.diagExport")}</button>
+                        <button class="b3-button b3-button--outline" disabled={exportingDiagnostics || diagnosticsBusy !== null} onclick={exportDiagnostics}>{exportingDiagnostics ? t("ledger.saving") : t("settings.diagExport")}</button>
                         {#if (plugin.settings.members ?? []).some((m) => !m.avItemId || m.syncError)}
                             <button class="b3-button b3-button--outline"
-                                onclick={async () => {
-                                    const { backfillMemberLinks } = await import("@/core/members");
-                                    const res = await backfillMemberLinks(plugin as any, plugin.settings);
-                                    // D06：回填结果四态——唯一回填 / 同名歧义待人工 / 无匹配 / 失效关联已清除
-                                    showMessage(t("diag.backfillResult")
-                                        .replace("${n}", String(res.linked.length))
-                                        .replace("${amb}", String(res.ambiguous.length))
-                                        .replace("${stale}", String(res.stale.length)), 6000, "info");
-                                    if (res.ambiguous.length > 0) openAmbiguityDialog(res.ambiguous);
-                                }}>{t("diag.backfill")}</button>
+                                disabled={diagnosticsBusy !== null || exportingDiagnostics}
+                                aria-busy={diagnosticsBusy === "backfill"}
+                                onclick={runBackfillMemberLinks}>{diagnosticsBusy === "backfill" ? t("ledger.saving") : t("diag.backfill")}</button>
                         {/if}
                         <button class="b3-button b3-button--outline"
-                            onclick={async () => {
-                                const { findDuplicateLedgers } = await import("@/core/provisioner");
-                                const dups = await findDuplicateLedgers(plugin.settings);
-                                showMessage(dups.length === 0 ? t("diag.dupNone") : t("diag.dupFound").replace("${n}", String(dups.length)) + ": " + dups.map((d) => d.hpath).join(", "), 6000, dups.length ? "error" : "info");
-                            }}>{t("diag.dupCheck")}</button>
+                            disabled={diagnosticsBusy !== null || exportingDiagnostics}
+                            aria-busy={diagnosticsBusy === "duplicates"}
+                            onclick={runDuplicateCheck}>{diagnosticsBusy === "duplicates" ? t("ledger.saving") : t("diag.dupCheck")}</button>
                         <!-- D12 最小健康检查：实际读取每个启用模块，登记存在≠健康 -->
                         <button class="b3-button b3-button--outline"
-                            onclick={async () => {
-                                const { runHealthCheck } = await import("@/core/health");
-                                const report = await runHealthCheck(plugin.settings, plugin.schemaCatalog ?? {});
-                                const bad = report.modules.filter((m) => !m.ok);
-                                const detail = bad.map((m) => `${t(`module.${m.moduleId}`)}: ${m.error ?? t("diag.healthMissingCols").replace("${n}", String(m.missingColumns?.length ?? 0))}`).join("；");
-                                showMessage(
-                                    (detail
-                                        ? t("diag.healthSummaryBad").replace("${ok}", String(report.modules.length - bad.length)).replace("${total}", String(report.modules.length)).replace("${detail}", detail)
-                                        : t("diag.healthSummary").replace("${total}", String(report.modules.length))),
-                                    7000, bad.length ? "error" : "info");
-                            }}>{t("diag.health")}</button>
+                            disabled={diagnosticsBusy !== null || exportingDiagnostics}
+                            aria-busy={diagnosticsBusy === "health"}
+                            onclick={runDeepHealthCheck}>{diagnosticsBusy === "health" ? t("ledger.saving") : t("diag.health")}</button>
+                        <!-- §15 / 443：一键重建全部缺失台账 -->
+                        <button class="b3-button b3-button--outline"
+                            disabled={diagnosticsBusy !== null || exportingDiagnostics}
+                            aria-busy={diagnosticsBusy === "rebuild"}
+                            onclick={runRebuildAllLedgers}>{diagnosticsBusy === "rebuild" ? t("diag.rebuilding") : t("diag.rebuildAll")}</button>
                     </div>
                 </div>
             {/if}
-        {/if}
+        </div>
     {/if}
     </div>
 
     <div class="fn__flex lv-settings__footer">
-        {#if tab === "modules"}
-            <button class="b3-button b3-button--text" onclick={enableAll}>{t("enableAll")}</button>
-            <button class="b3-button b3-button--text" onclick={coreOnly}>{t("coreOnly")}</button>
+        {#if area === "modules"}
+            <button class="b3-button b3-button--text" disabled={saving || migrationBusy || demoBusy} onclick={enableAll}>{t("enableAll")}</button>
+            <button class="b3-button b3-button--text" disabled={saving || migrationBusy || demoBusy} onclick={coreOnly}>{t("coreOnly")}</button>
         {/if}
         <span class="fn__flex-1"></span>
         <!-- 263 波：未保存更改徽章（脏检查口径=落盘口径）——设置页有两种生效心智（草稿+保存），
              让"改了但还没保存"可见，不再靠猜 -->
         {#if dirty}<span class="lv-badge orange" role="status">● {t("settings.unsaved")}</span>{/if}
         <!-- 256 波：保存是设置视图唯一核心动作，升为主按钮（对齐原型"主按钮每视图 ≤1 个"） -->
-        <button class="lv-btn primary" disabled={saving} onclick={save}>{t("save")}</button>
+        <button class="lv-btn primary" disabled={saving || migrationBusy || demoBusy} onclick={save}>{saving || demoBusy ? t("ledger.saving") : t("save")}</button>
     </div>
 </div>
+
+<style>
+    .lv-settings-member {
+        padding: 16px;
+        margin-top: 12px;
+        border: 1px solid var(--lv-line);
+        border-radius: 14px;
+        background: var(--lv-surface);
+        min-width: 0;
+    }
+
+    .lv-settings-member__head {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+        margin-bottom: 14px;
+    }
+
+    .lv-settings-member__head h3 {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        min-width: 0;
+        margin: 0;
+        color: var(--lv-tx);
+        font-size: 13px;
+        font-weight: 600;
+    }
+
+    .lv-settings-member__head h3 > span:last-child {
+        overflow-wrap: anywhere;
+    }
+
+    .lv-settings-member__number {
+        display: grid;
+        place-items: center;
+        flex: none;
+        width: 24px;
+        height: 24px;
+        border-radius: 8px;
+        background: var(--lv-surface-2);
+        color: var(--lv-tx-3);
+        font-size: 11px;
+        font-variant-numeric: tabular-nums;
+    }
+
+    .lv-settings-member__delete {
+        flex: none;
+        display: inline-flex;
+        align-items: center;
+        gap: 5px;
+        min-height: 36px;
+        color: var(--lv-tx-3);
+    }
+
+    .lv-settings-member__delete:hover {
+        color: var(--lv-danger);
+        background: color-mix(in srgb, var(--lv-danger) 8%, var(--lv-surface));
+    }
+
+    .lv-settings-member__fields {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 14px 16px;
+    }
+
+    .lv-settings-member__field {
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+        min-width: 0;
+        color: var(--lv-tx-2);
+        font-size: 12px;
+    }
+
+    .lv-settings-member__field :is(input, select) {
+        width: 100%;
+        min-width: 0;
+        min-height: 40px;
+        box-sizing: border-box;
+    }
+
+    .lv-settings-member__calendar {
+        grid-column: 1 / -1;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+        min-height: 40px;
+        padding-top: 10px;
+        border-top: 1px solid var(--lv-line);
+        color: var(--lv-tx-2);
+        font-size: 12px;
+        cursor: pointer;
+    }
+
+    .lv-settings-member__calendar input { flex: none; }
+
+    .lv-settings-member__add {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        min-height: 40px;
+    }
+
+    @container lv-home (max-width: 480px) {
+        .lv-settings-member { padding: 12px; }
+        .lv-settings-member__fields { grid-template-columns: minmax(0, 1fr); gap: 12px; }
+        .lv-settings-member__field :is(input, select),
+        .lv-settings-member__delete,
+        .lv-settings-member__add { min-height: 44px; }
+    }
+
+    @media (max-width: 480px) {
+        .lv-settings-member { padding: 12px; }
+        .lv-settings-member__fields { grid-template-columns: minmax(0, 1fr); gap: 12px; }
+        .lv-settings-member__field :is(input, select),
+        .lv-settings-member__delete,
+        .lv-settings-member__add { min-height: 44px; }
+    }
+</style>

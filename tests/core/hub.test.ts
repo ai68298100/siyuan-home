@@ -4,9 +4,10 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { applyRuntime, defaultRuntime, type HubRuntime } from "@/core/hub/runtime";
 import { runScan } from "@/core/hub/scanner";
-import { CertsProvider, SchemaLedgerProvider } from "@/core/hub/providers";
+import { CertsProvider, SchemaLedgerProvider, VehiclesProvider } from "@/core/hub/providers";
 import { setTransport } from "@/core/siyuan";
-import { FAVORS_SCHEMA } from "@/core/schema";
+import { FAVORS_SCHEMA, VEHICLES_SCHEMA } from "@/core/schema";
+import type { RowLogs } from "@/core/rowlog";
 import type { DataProvider } from "@/core/hub/providers";
 import type { HomeSettings, Reminder } from "@/types";
 
@@ -239,5 +240,80 @@ describe("SchemaLedgerProvider favors 回礼（16 组/190 波：after kind + onl
         expect(out[0].dueDate).toBe("2026-10-01"); // 09-01 + 30 天 = TODAY
         expect(out[0].daysLeft).toBe(0);
         expect(out[0].level).toBe("soon");
+    });
+});
+
+describe("VehiclesProvider 车辆主表 + 维护流水提醒", () => {
+    afterEach(() => setTransport(null));
+
+    const AV = "av-vehicles-1";
+    const COLS = {
+        name: "k-name", member: "k-member", mileage: "k-mileage",
+        expiry: "k-expiry", inspection_due: "k-inspection", insurance_due: "k-insurance",
+        vehicle_tax_due: "k-tax", battery_due: "k-battery",
+    };
+    const value = (keyID: string, v: any) => ({ value: { keyID, ...v } });
+
+    it("复用一次主表读取并派生 nextDate 与已达到里程的逾期提醒", async () => {
+        let renders = 0;
+        setTransport(async (endpoint: string) => {
+            if (endpoint === "/api/av/renderAttributeView") {
+                renders++;
+                return {
+                    code: 0, msg: "", data: { view: {
+                        columns: Object.values(COLS).map((id) => ({ id, type: "text", name: id })),
+                        rowCount: 1,
+                        rows: [{ id: "vehicle-row", cells: [
+                            value(COLS.name, { type: "text", text: { content: "小蓝" } }),
+                            value(COLS.member, { type: "relation", relation: { blockIDs: ["member-av-row"] } }),
+                            value(COLS.mileage, { type: "number", number: { content: 10000, isNotEmpty: true } }),
+                            value(COLS.expiry, {}), value(COLS.inspection_due, {}), value(COLS.insurance_due, {}),
+                            value(COLS.vehicle_tax_due, {}), value(COLS.battery_due, {}),
+                        ] }],
+                    } },
+                };
+            }
+            throw new Error("unexpected endpoint " + endpoint);
+        });
+        const logs: RowLogs = {
+            [`${AV}|vehicle-row`]: {
+                maintenance: [{
+                    category: "routine", date: "2026-09-01", odometer: 9000,
+                    nextDate: "2026-10-20", nextOdometer: 10000, at: "2026-09-01T00:00:00Z",
+                }],
+            },
+        };
+        const p = new VehiclesProvider(VEHICLES_SCHEMA, {
+            settings: { ...settings(["vehicles"]), members: [{ id: "member-1", name: "张三", role: "self", avItemId: "member-av-row", createdAt: "2026-01-01" }] },
+            getDbRef: () => ({ avId: AV, columns: COLS }),
+            loadRowLogs: async () => logs,
+        });
+        const out = await p.collect(TODAY);
+        expect(renders).toBe(1);
+        expect(out).toEqual(expect.arrayContaining([
+            expect.objectContaining({ ruleKey: "maintenance_date", dueDate: "2026-10-20", daysLeft: 19, memberId: "member-1" }),
+            expect.objectContaining({ ruleKey: "maintenance_odometer", level: "overdue", daysLeft: -1, memberId: "member-1" }),
+        ]));
+    });
+
+    it("未达到 nextOdometer 且日期超出提前量时不生成维护提醒", async () => {
+        setTransport(async (endpoint: string) => {
+            if (endpoint === "/api/av/renderAttributeView") return {
+                code: 0, msg: "", data: { view: {
+                    columns: Object.values(COLS).map((id) => ({ id, type: "text", name: id })), rowCount: 1,
+                    rows: [{ id: "vehicle-row", cells: Object.values(COLS).map((id) =>
+                        id === COLS.name ? value(id, { type: "text", text: { content: "小蓝" } })
+                            : id === COLS.mileage ? value(id, { type: "number", number: { content: 9000, isNotEmpty: true } })
+                                : value(id, {})) }],
+                } },
+            };
+            throw new Error("unexpected endpoint " + endpoint);
+        });
+        const p = new VehiclesProvider(VEHICLES_SCHEMA, {
+            settings: settings(["vehicles"]), getDbRef: () => ({ avId: AV, columns: COLS }),
+            loadRowLogs: async () => ({ [`${AV}|vehicle-row`]: { maintenance: [{ category: "repair", date: "2026-09-01", odometer: 8000, nextDate: "2027-01-01", nextOdometer: 10000 }] } }),
+        });
+        const out = await p.collect(TODAY);
+        expect(out.filter((r) => r.ruleKey.startsWith("maintenance_"))).toEqual([]);
     });
 });

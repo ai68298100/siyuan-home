@@ -9,6 +9,8 @@ import type { HomeSettings, Reminder } from "./index";
 import type { HubRuntime, HandledEntry } from "@/core/hub/runtime";
 import type { ScanResult } from "@/core/hub/scanner";
 import type { ModuleSchema } from "@/core/schema";
+import type { ProvisioningReport } from "@/core/provisioner";
+import type { ActivityTarget } from "@/core/activity";
 
 export interface HomePluginLike extends Plugin {
     i18n: Record<string, JSONValue>;
@@ -24,7 +26,7 @@ export interface HomePluginLike extends Plugin {
     pendingScreen?: string;
 
     refreshHub(only?: string | string[], force?: boolean): Promise<ScanResult>;
-    ensureCoreLedgers(): Promise<void>;
+    ensureCoreLedgers(): Promise<ProvisioningReport>;
     showTab(): void;
     showTabDocs(docId?: string): void;
     openSetting(): void;
@@ -46,4 +48,13 @@ export interface HomePluginLike extends Plugin {
     toggleTodaySilent(): Promise<void>;
     /** 已挂载面板的页签直切（openRemindersScreen 已挂载路径用；面板卸载时由组件清空） */
     panelScreenSwitch?: (screen: string) => void;
+    /** 时间线点击后的仅内存一次性详情目标，由台账页在真实数据加载后消费。 */
+    pendingActivityTarget?: ActivityTarget;
+    openActivityTarget?: (target: Omit<ActivityTarget, "requestId">) => void;
+    /** 5秒底栏撤销条触发器（UIX-03） */
+    showUndo?: (options: {
+        message: string;
+        action: () => Promise<void> | void;
+        onDone?: () => void;
+    }) => void;
 }

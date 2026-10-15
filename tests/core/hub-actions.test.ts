@@ -12,7 +12,7 @@ import {
     applyRuntime, defaultRuntime, listHandled, purgeHandled, recordModuleHistory, type HubRuntime,
 } from "@/core/hub/runtime";
 import { runScan, deriveVisible } from "@/core/hub/scanner";
-import { snooze, mute, complete, restore, withRuntime, renew, updateMemo } from "@/core/hub/actions";
+import { snooze, mute, complete, restore, withRuntime, renew, updateMemo, addMemo } from "@/core/hub/actions";
 import { CertsProvider, leadFor } from "@/core/hub/providers";
 import { inSilentHours, dailyDigest, weeklyPreview, markWeeklyNotified, isoWeekKey } from "@/core/hub/notify";
 import { setTransport } from "@/core/siyuan";
@@ -65,6 +65,34 @@ describe("H01 运行态写串行化", () => {
         await withRuntime(plugin, () => { throw new Error("boom"); }).catch(() => undefined);
         await snooze(plugin, "a::certs.expiry", 1, TODAY);
         expect(JSON.parse(store["hub-runtime.json"]).snoozed["a::certs.expiry"]).toBe("2026-10-02");
+    });
+
+    it("运行态落盘失败 → 插件内存回滚到操作前快照", async () => {
+        const { plugin } = memoryPlugin();
+        plugin.runtime = defaultRuntime();
+        const before = JSON.stringify(plugin.runtime);
+        plugin.saveData = async () => { throw new Error("storage unavailable"); };
+        await expect(withRuntime(plugin, (rt) => { rt.muted["x::certs.expiry"] = true; })).rejects.toThrow("storage unavailable");
+        expect(JSON.stringify(plugin.runtime)).toBe(before);
+        expect(plugin.runtime.muted["x::certs.expiry"]).toBeUndefined();
+    });
+});
+
+describe("D1 备忘写入幂等与边界", () => {
+    it("相同标题/日期短时间重复提交只落一条", async () => {
+        const { plugin, store } = memoryPlugin();
+        await Promise.all([
+            addMemo(plugin, " 给老师打电话 ", "2026-10-10"),
+            addMemo(plugin, "给老师打电话", "2026-10-10"),
+        ]);
+        expect(JSON.parse(store["hub-runtime.json"]).memos).toHaveLength(1);
+    });
+
+    it("拒绝空标题、非法日期和不存在的日历日期", async () => {
+        const { plugin } = memoryPlugin();
+        await expect(addMemo(plugin, "  ", "2026-10-10")).rejects.toThrow("标题");
+        await expect(addMemo(plugin, "事项", "2026/10/10")).rejects.toThrow("日期");
+        await expect(addMemo(plugin, "事项", "2026-02-31")).rejects.toThrow("日期");
     });
 });
 
@@ -200,6 +228,17 @@ describe("H07 已处理视图数据", () => {
         const kinds = listHandled(rt, derived).map((h) => h.kind).sort();
         expect(kinds).toEqual(["done", "muted", "period", "year"]);
     });
+
+    it("缓存缺失时从提醒 ID 回推历史条目的模块", () => {
+        const rt: HubRuntime = {
+            ...defaultRuntime(),
+            muted: { "row-1::assets-real.expiry": true },
+            handledYear: { "row-2::members.birthday": 2026 },
+            handledUntil: { "row-3::contracts.expiry": "2026-10-20" },
+        };
+        const entries = listHandled(rt, []);
+        expect(entries.map((entry) => entry.moduleId).sort()).toEqual(["assets-real", "contracts", "members"]);
+    });
 });
 
 describe("H04 扫描失败保留模块快照", () => {
@@ -319,6 +358,21 @@ describe("H10 续期目标列分派", () => {
         await expect(renew(plugin, r, "2026-11-05", { avId: "av-certs", columns: { expiry: "k-expiry" } })).rejects.toThrow("kernel unavailable");
         expect(store["hub-runtime.json"]).toBeUndefined();
     });
+
+    it("运行态写失败 → 续期单元格回滚到原日期", async () => {
+        const written: any[] = [];
+        setTransport(async (endpoint: string, payload: any) => {
+            if (endpoint === "/api/av/setAttributeViewBlockAttr") { written.push(payload); return { code: 0, msg: "", data: null }; }
+            throw new Error("unexpected endpoint");
+        });
+        const { plugin } = memoryPlugin();
+        plugin.saveData = async () => { throw new Error("storage unavailable"); };
+        const r = rem("row5::certs.expiry", "2026-10-05", "lead");
+        await expect(renew(plugin, r, "2026-11-05", { avId: "av-certs", columns: { expiry: "k-expiry" } })).rejects.toThrow("storage unavailable");
+        expect(written).toHaveLength(2);
+        expect(written[0].value.date.content).toBe(new Date("2026-11-05T00:00:00").getTime());
+        expect(written[1].value.date.content).toBe(new Date("2026-10-05T00:00:00").getTime());
+    });
 });
 
 describe("H04 缺列报错 + H14 提前量校验", () => {
@@ -393,6 +447,16 @@ describe("H12 静默时段（摘要与逾期提示共用）", () => {
         const s = { ...settings(), silentFrom: 1, silentTo: 6 };
         expect(inSilentHours(s, undefined, at(3))).toBe(true);
         expect(inSilentHours(s, undefined, at(8))).toBe(false);
+    });
+
+    it("todaySilent 今日免打扰快捷开关生效：全天静默并覆盖正常时段", () => {
+        const s = settings();
+        const date = at(12); // 中午 12 点，本为非静默
+        expect(inSilentHours(s, undefined, date)).toBe(false);
+        expect(inSilentHours(s, { todaySilent: "2026-10-01" }, date)).toBe(true);
+        // 次日 10-02 不再受昨日今日免打扰影响
+        const nextDay = new Date(2026, 9, 2, 12, 0, 0);
+        expect(inSilentHours(s, { todaySilent: "2026-10-01" }, nextDay)).toBe(false);
     });
 
     it("摘要：静默时段不弹且不标记已发（结束后补发）", () => {

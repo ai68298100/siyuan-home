@@ -21,7 +21,7 @@ const rec = (item, pass, detail = "") => { results.push({ item, pass, detail });
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const P = "/data/storage/petal/siyuan-home";
 
-const browser = await chromium.launch({ channel: "msedge", headless: true });
+const browser = await chromium.launch({ channel: "chrome", headless: true });
 
 // ── 场景 A：settings.json 损坏
 {
