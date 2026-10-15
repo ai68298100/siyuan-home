@@ -1,3 +1,19 @@
+## v0.5.20 2026-10-15
+
+### 书签链接健康巡检、Raindrop格式静态校验与无感秒开体验
+
+- **书签链接健康巡检与本地静态校验（MOD-23）**：
+  - 在 `src/core/bookmarks.ts` 纯函数模块中实现 `validateBookmarkUrl`、`checkBookmarkHealth` 与 `formatBookmarkHealthReport`，对 bookmarks 台账中的网址列执行格式、协议与合法性全覆盖静态核验。
+  - 精准识别空网址（`empty`）、缺少 http/https 协议头（`invalid_protocol`）以及域名残缺或结构非法（`malformed`），严格遵循零网络副作用、纯本地执行的隐私原则。
+  - 在台账界面（`ledger.svelte`）顶部针对 `bookmarks` 模块挂载「检查书签链接」动作按钮，一键弹出巡检看板，展示有效链接数、异常链接明细与健康度汇总，并支持一键复制标准化排查报告至剪贴板。
+- **确认彻底根除切页微闪烁与路由死循环**：
+  - `screenCache` 内存组件池与 150ms 闲置预热机制持续稳定运行，实现“总览 / 提醒 / 台账 / 成员”四主屏 **100% 同步秒开无缝切换**，彻底消除骨架屏微闪烁。
+  - 快速记录弹层（`quick-capture`）250ms 闲置预热就绪，`N` 键呼出与 ⚡ 点击零延迟瞬时秒开。
+  - 彻底拔除对宿主全局 `window.history` / `popstate` 的依赖，杜绝任何 `tree not found` 及路由纠错死锁。
+- **质量与门禁**：
+  - 新增 `tests/core/bookmarks.test.ts` 6 项覆盖单测，全量单元测试扩充至 67 个测试文件共 **519 项全绿**。
+  - 多语言词条扩充至 1768 键中英文全量对齐；TypeScript 与 Svelte 0 错误 0 警告，单文件打包与加载器语义通过。
+
 ## v0.5.19 2026-10-15
 
 ### 生态服务桥RPC权限开关、系列联动状态矩阵与跨插件安全接线

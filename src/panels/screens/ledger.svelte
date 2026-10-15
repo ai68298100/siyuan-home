@@ -791,6 +791,85 @@
         renderDialogBody();
     }
 
+    // MOD-23 / line 510 书签链接健康巡检
+    function openBookmarksCheckDialog() {
+        const urlCol = ref?.columns?.url;
+        const nameCol = ref?.columns?.name;
+        if (!urlCol) {
+            showMessage(t("bookmarks.noUrlCol"), 4000, "info");
+            return;
+        }
+
+        import("@/core/bookmarks").then(({ checkBookmarkHealth, formatBookmarkHealthReport }) => {
+            const summary = checkBookmarkHealth(rows, { name: nameCol, url: urlCol });
+            const dlg = new Dialog({
+                title: t("bookmarks.dialogTitle"),
+                content: `
+                    <div class="b3-dialog__content fn__flex" style="flex-direction:column;gap:12px;max-height:65vh;overflow:auto;padding:16px 20px">
+                        <div class="fn__flex" style="align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px">
+                            <span style="font-size:13px;color:var(--lv-tx)"><b>${t("bookmarks.summaryTotal")}：${summary.totalCount}</b></span>
+                            <div class="fn__flex" style="gap:6px">
+                                <span class="lv-badge green">✓ ${t("bookmarks.summaryValid")} ${summary.validCount}</span>
+                                <span class="lv-badge ${summary.issueCount > 0 ? 'red' : 'gray'}">${summary.issueCount > 0 ? '!' : '✓'} ${t("bookmarks.summaryIssues")} ${summary.issueCount}</span>
+                            </div>
+                        </div>
+                        <div id="lv-bm-list" class="fn__flex" style="flex-direction:column;gap:6px;margin-top:6px"></div>
+                    </div>
+                    <div class="b3-dialog__action">
+                        <button class="b3-button b3-button--outline" id="lv-bm-copy">${t("bookmarks.copyReport")}</button>
+                        <button class="b3-button" id="lv-bm-close">${t("close")}</button>
+                    </div>
+                `,
+                width: "560px",
+            });
+
+            const listEl = dlg.element.querySelector("#lv-bm-list") as HTMLElement;
+            if (summary.issues.length === 0) {
+                listEl.innerHTML = `<div class="ft__on-surface" style="padding:16px 0;text-align:center;font-size:13px">✓ ${t("bookmarks.allHealthy")}</div>`;
+            } else {
+                for (const item of summary.issues) {
+                    const row = document.createElement("div");
+                    row.className = "lv-card";
+                    row.style.cssText = "padding:10px 14px;background:var(--lv-surface-2);border-radius:var(--lv-r-2);display:flex;align-items:center;justify-content:space-between;gap:10px";
+
+                    const left = document.createElement("div");
+                    left.style.cssText = "display:flex;flex-direction:column;gap:3px;min-width:0;flex:1";
+
+                    const title = document.createElement("div");
+                    title.style.cssText = "font-weight:600;font-size:12.5px;color:var(--lv-tx);overflow:hidden;text-overflow:ellipsis;white-space:nowrap";
+                    title.textContent = item.name;
+
+                    const reason = document.createElement("div");
+                    reason.style.cssText = "font-size:11.5px;color:var(--lv-tx-3);overflow:hidden;text-overflow:ellipsis;white-space:nowrap";
+                    reason.textContent = `${item.url || t("bookmarks.noUrl")} · ${item.reason}`;
+
+                    left.appendChild(title);
+                    left.appendChild(reason);
+
+                    const badge = document.createElement("span");
+                    badge.className = `lv-badge ${item.status === "empty" ? "yellow" : "red"}`;
+                    badge.textContent = t(`bookmarks.status_${item.status}`);
+
+                    row.appendChild(left);
+                    row.appendChild(badge);
+                    listEl.appendChild(row);
+                }
+            }
+
+            dlg.element.querySelector("#lv-bm-copy")?.addEventListener("click", async () => {
+                const text = formatBookmarkHealthReport(summary, (k) => t(k));
+                try {
+                    await navigator.clipboard.writeText(text);
+                    showMessage(t("bookmarks.copySuccess"), 3000, "info");
+                } catch {
+                    showMessage(t("bookmarks.copyFailed"), 4000, "error");
+                }
+            });
+
+            dlg.element.querySelector("#lv-bm-close")?.addEventListener("click", () => dlg.destroy());
+        });
+    }
+
     // MOD-18 / §11 行前清单证件自查与护照 6 个月黄金规则核验
     async function openTravelCertsCheckDialog(tripRow?: any) {
         const targetRow = tripRow ?? (filteredRows.length > 0 ? filteredRows[0] : null);
@@ -4549,6 +4628,7 @@
                 {#if active === "travel-plan"}<button class="b3-button b3-button--outline" onclick={() => openTravelCertsCheckDialog()}>{t("travel.checkButton")}</button>{/if}
                 {#if active === "favors"}<button class="b3-button b3-button--outline" onclick={openFavorsReportModal}>{t("favors.reportButton")}</button>{/if}
                 {#if active === "stock"}<button class="b3-button b3-button--outline" onclick={openShoppingList}>{t("ledger.shoppingList")}</button>{/if}
+                {#if active === "bookmarks"}<button class="b3-button b3-button--outline" onclick={openBookmarksCheckDialog}>{t("bookmarks.checkButton")}</button>{/if}
                 {#if active !== "members" && active !== "adhoc"}<button class="b3-button b3-button--outline" disabled={printing || exporting} onclick={openCsvImport}>{t("ledger.importCsv")}</button>{/if}
                 {#if ref?.columns?.member}<button class="b3-button b3-button--outline" title={t("ledger.batchReassignMemberTip")} onclick={openBatchReassignModal}>{t("ledger.batchReassignMember")}</button>{/if}
                 <button class="b3-button b3-button--outline" onclick={() => plugin.showTabDocs(ref?.docId)}>{t("ledger.openDoc")} →</button>
