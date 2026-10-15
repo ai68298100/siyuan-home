@@ -32,12 +32,17 @@
             t("capture.recoveryDiscardConfirm").replace("${module}", captureDraftLabel(draft.moduleId)),
             t("capture.recoveryDiscardBody"),
             async () => {
+                const previousDrafts = plugin.runtime.captureDrafts;
                 plugin.runtime.captureDrafts = removeCaptureDraft(plugin.runtime.captureDrafts, draft.id);
                 plugin.hubListeners.forEach((listener) => listener());
                 try {
                     await saveRuntime(plugin, plugin.runtime);
                     showMessage(t("capture.recoveryDiscarded"), 3000, "info");
                 } catch (error) {
+                    // Keep the recovery card truthful if the persistence write
+                    // fails; the draft must remain available after reload.
+                    plugin.runtime.captureDrafts = previousDrafts;
+                    plugin.hubListeners.forEach((listener) => listener());
                     showMessage(String(error), 5000, "error");
                 }
             },
