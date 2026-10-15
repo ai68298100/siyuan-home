@@ -63,7 +63,7 @@ This release introduces smart dual dates (plan date vs deadline), performance ca
 >
 > Family sharing depends on SiYuan's collaboration, permissions, sync and conflict behavior. Test with non-sensitive data before sharing; this plugin does not provide a separate permission system.
 >
-> Privacy & FAQ: [privacy statement](https://github.com/ai68298100/siyuan-home/blob/main/docs/privacy.md) · [FAQ](https://github.com/ai68298100/siyuan-home/blob/main/docs/FAQ.md)
+> Privacy & FAQ: [privacy statement](https://github.com/ai68298100/siyuan-home/blob/main/docs/privacy.en.md) · [FAQ](https://github.com/ai68298100/siyuan-home/blob/main/docs/FAQ.md)
 
 ## 🧩 Module Overview (6 groups, 31 modules)
 
@@ -147,7 +147,7 @@ pnpm test         # unit tests (509)
 
 | Category | Docs |
 |---|---|
-| Usage | [FAQ](https://github.com/ai68298100/siyuan-home/blob/main/docs/FAQ.md) · [Privacy](https://github.com/ai68298100/siyuan-home/blob/main/docs/privacy.md) · [Migration](https://github.com/ai68298100/siyuan-home/blob/main/docs/migration.md) · [Glossary](https://github.com/ai68298100/siyuan-home/blob/main/docs/glossary.en.md) |
+| Usage | [FAQ](https://github.com/ai68298100/siyuan-home/blob/main/docs/FAQ.md) · [Privacy](https://github.com/ai68298100/siyuan-home/blob/main/docs/privacy.en.md) · [Migration](https://github.com/ai68298100/siyuan-home/blob/main/docs/migration.md) · [Glossary](https://github.com/ai68298100/siyuan-home/blob/main/docs/glossary.en.md) |
 | Design | [01 Architecture](./docs/design/01-架构总览.md) · [02 Data model](./docs/design/02-数据模型与模块规格.md) · [03 Reminder hub](./docs/design/03-提醒中枢.md) · [07 Visual language](./docs/design/07-视觉设计语言.md) · [Index](./docs/design/00-index.md) |
 | Interactive prototype | [prototype/index.html](./prototype/index.html) (open in browser — dark/light themes, 7 screens incl. style guide) |
 
