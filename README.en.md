@@ -39,24 +39,25 @@ Certificates expire, medicine expires, insurance needs renewal, subscriptions au
 
 Image OCR uses the engine configured in SiYuan Settings → OCR. It runs only when requested and does not require automatic OCR to be enabled. AI OCR asks before each run because the image is sent to the selected AI service. Results are saved to SiYuan OCR text and included in search; re-running replaces the previous result. Encrypted notebook images and PDFs are not supported, and OCR text is never written into ledger fields automatically.
 
-## 🆕 What's new in v0.5.19
+## 🆕 What's new in v0.5.21
 
-This release introduces an RPC master permission toggle for the service bridge, provides live status indicators across the plugin family ecosystem, and completes cross-plugin permission integration while maintaining zero-flicker tab transitions.
+This emergency release fixes the SiYuan 3.8.x loop where the top-bar icon and page content repeatedly appear and disappear after enabling the plugin. Plugin tab state is now isolated from the host route lifecycle.
 
-- **Permissions**: Added master service bridge toggle `bridgeEnabled` in Settings → Data & Ecosystem, granting users complete sovereignty over external `window.LvHome` exposure with hot teardown/remount via broadcast events (ECO-01).
-- **Matrix**: Upgraded family plugin display to reflect real integration status: Check-in, Contacts, SpeedSwitch, and Exam display a green "Connected" badge; Glean and Flashcard display "Planned".
-- **Performance**: In-memory `screenCache` and 250ms quick-capture idle preheating continue to deliver 100% synchronous instant tab switches with zero skeleton flash.
-- **Validation**: 513 unit tests across 66 test suites, 1751 i18n keys aligned, 0 TypeScript/Svelte errors and warnings, production build and loader verification pass.
+- **Route isolation**: Plugin tabs no longer write to `window.history` or listen for `popstate`, preventing `tree not found` route correction loops.
+- **Stable restore**: The current plugin tab is kept in `sessionStorage`, so refresh restores the internal page without changing SiYuan's browser history.
+- **Less loading churn**: The initial scan starts after mount and `screenCache` is preheated to avoid alternating between rendered content and loading states.
+- **Regression guard**: Chrome isolated-kernel coverage checks repeated tab switches, refresh, history stability, single mounting, and `tree not found`/reactive-depth errors.
+- **Release gates**: TypeScript, Svelte, i18n, metadata, audit, unit tests, production build, loader semantics and package smoke are run before publishing.
 
-## 📦 Install (v0.5.19)
+## 📦 Install (v0.5.21)
 
 1. Download `package.zip` from [Releases](https://github.com/ai68298100/siyuan-home/releases/latest)
 2. SiYuan → Settings → Marketplace → Download → **Import** the zip
 3. Enable the plugin → complete the 2-step onboarding (household → module picks and provisioning)
 4. Press `Ctrl+Alt+H` anytime to open the hub
 
-> **Validation status:** core data paths have automated tests and isolated-kernel coverage. The v0.5.7 GitHub Release is available; Android WebView behavior remains host-specific validation. `icon.png` and `preview.png` were redesigned for v0.3.13 (brand-gradient tile + geometric mark; dark overview with sample data).
-> **Version note:** the tagged v0.5.19 package is the current GitHub release; local quality checks report 513 unit tests.
+> **Validation status:** core data paths have automated tests and isolated-kernel coverage. The v0.5.21 GitHub Release contains the flicker-loop fix; Android WebView behavior remains host-specific validation. `icon.png` and `preview.png` were redesigned for v0.3.13 (brand-gradient tile + geometric mark; dark overview with sample data).
+> **Version note:** the tagged v0.5.21 package is the current GitHub release; the exact unit-test count is recorded by the release workflow.
 >
 > Family sharing depends on SiYuan's collaboration, permissions, sync and conflict behavior. Test with non-sensitive data before sharing; this plugin does not provide a separate permission system.
 >
@@ -110,11 +111,11 @@ Full accounting · password vaults · official data integrations · real-time tr
 
 ## 🗺 Roadmap
 
-The v0.5.19 release is available on GitHub, with static isolated-kernel gates and Chrome walkthrough coverage for the main UI, mobile layouts, accessibility, recovery paths and performance. The next feature slice should optimize the five-minute path from a member to a first reminder and its source record. Pinyin search, webhooks, QR labels, AI and family collaboration remain an observation pool until host capability and user evidence are available.
+The v0.5.21 release is available on GitHub, with static isolated-kernel gates and Chrome tab-lifecycle coverage for the main UI. The next feature slice should optimize the five-minute path from a member to a first reminder and its source record. Recurring-payment summaries, the evidence center, inbox and health recovery come before pinyin search, webhooks, QR labels, AI and family collaboration.
 
 | Phase | Content |
 |---|---|
-| ✅ v0.5.19 (current) | Service bridge RPC permission toggle, live ecosystem status matrix, and cross-plugin integration; GitHub Release |
+| ✅ v0.5.21 (current) | SiYuan 3.8.x flicker and `tree not found` route-loop fix, stable tab restore, and regression gates; GitHub Release |
 | 🔜 Next | Task workbench, evidence center, inbox, health recovery |
 | 🔭 Later | Family collaboration, template packs, yearly family report, AI capabilities |
 
