@@ -51,6 +51,13 @@ const DOC_TITLE_PREFIX = "台账 · ";
 /** 思源 ID 形态（yyyyMMddHHmmss-xxxxxxx）：区分 dbRefs.notebook 里的 ID 与历史名称值（D07） */
 const SIYUAN_ID_RE = /^\d{14}-[0-9a-z]{7}$/;
 
+// The kernel can commit a notebook before its list endpoint/index observes it.
+// Keep this recovery window short and bounded: a create with an unknown result
+// must never be replayed, but it should get a chance to become visible before
+// the caller is told that recovery failed.
+const NOTEBOOK_RECOVERY_ATTEMPTS = 5;
+const NOTEBOOK_RECOVERY_DELAY_MS = 250;
+
 export function isSiYuanId(v: string | undefined): boolean {
     return !!v && SIYUAN_ID_RE.test(v);
 }
@@ -62,8 +69,14 @@ async function createNotebookWithRecovery(name: string): Promise<string> {
         if (!isWriteResultUnknown(error)) throw error;
         // The create request may have committed before its response was lost.
         // Re-read by exact name before reporting an unresolved result; never
-        // blindly submit a second create request.
-        const matches = (await listNotebooks()).filter((notebook) => notebook.name === name);
+        // blindly submit a second create request. The list endpoint can lag the
+        // create commit, so poll briefly before deciding the result is unknown.
+        let matches: Awaited<ReturnType<typeof listNotebooks>> = [];
+        for (let attempt = 0; attempt < NOTEBOOK_RECOVERY_ATTEMPTS; attempt++) {
+            if (attempt > 0) await new Promise((resolve) => setTimeout(resolve, NOTEBOOK_RECOVERY_DELAY_MS));
+            matches = (await listNotebooks()).filter((notebook) => notebook.name === name);
+            if (matches.length > 0) break;
+        }
         if (matches.length === 1) return matches[0].id;
         throw new KernelError("/api/notebook/createNotebook", -408,
             matches.length > 1 ? `notebook creation is ambiguous for "${name}"` : `notebook creation result is unknown for "${name}"`);
