@@ -474,6 +474,16 @@ describe("通知合并器（17 组防轰炸适配）", () => {
 describe("saveSettings 写入重试（§15/186 波）", () => {
     const settings = { enabledModules: ["certs"], members: [] } as any;
 
+    it("重复及并发的相同设置只写一次，实际变更仍持久化", async () => {
+        const writes: unknown[] = [];
+        const plugin = { saveData: async (_name: string, value: unknown) => { writes.push(value); } } as any;
+        await Promise.all([saveSettings(plugin, settings), saveSettings(plugin, settings)]);
+        await saveSettings(plugin, settings);
+        expect(writes).toHaveLength(1);
+        await saveSettings(plugin, { ...settings, hideAmounts: true });
+        expect(writes).toHaveLength(2);
+    });
+
     it("首次失败 → 重试一次成功（不抛错，共两次写入）", async () => {
         let calls = 0;
         const plugin = { saveData: async () => { calls++; if (calls === 1) throw new Error("busy"); } } as any;
@@ -486,6 +496,56 @@ describe("saveSettings 写入重试（§15/186 波）", () => {
         const plugin = { saveData: async () => { calls++; throw new Error("kernel gone"); } } as any;
         await expect(saveSettings(plugin, settings)).rejects.toThrow(/kernel gone/);
         expect(calls).toBe(2);
+    });
+});
+
+describe("跨前端数据变更只读恢复", () => {
+    it("空结果、404、读取异常和非法结构均保留旧状态所需的拒绝结果，且不回写", async () => {
+        let writes = 0;
+        for (const data of [
+            null, undefined, "", " \n ", "null",
+            { code: 404, msg: "not found", data: null },
+            JSON.stringify({ code: 404, msg: "not found", data: null }),
+            { code: 403, msg: "denied" }, JSON.stringify({ code: 500, msg: "busy" }),
+            [], 42, "[]", "true",
+        ]) {
+            const plugin = { loadData: async () => data, saveData: async () => { writes++; } } as any;
+            await expect(loadSettings(plugin, { readOnly: true })).rejects.toThrow();
+            await expect(loadRuntime(plugin, { readOnly: true })).rejects.toThrow();
+        }
+        for (const error of [new Error("ENOENT: file not found"), new Error("network disconnected")]) {
+            const plugin = { loadData: async () => { throw error; }, saveData: async () => { writes++; } } as any;
+            await expect(loadSettings(plugin, { readOnly: true })).rejects.toBe(error);
+            await expect(loadRuntime(plugin, { readOnly: true })).rejects.toBe(error);
+        }
+        expect(writes).toBe(0);
+    });
+
+    it("损坏设置和运行态不会写损坏标记或采用默认值", async () => {
+        let writes = 0;
+        const plugin = {
+            loadData: async () => "{incomplete sync",
+            saveData: async () => { writes++; },
+        } as any;
+        await expect(loadSettings(plugin, { readOnly: true })).rejects.toThrow(/non-JSON/);
+        await expect(loadRuntime(plugin, { readOnly: true })).rejects.toThrow(/non-JSON/);
+        expect(writes).toBe(0);
+    });
+
+    it("接收有效运行态后，未变更的界面保存不会回写形成广播循环", async () => {
+        let writes = 0;
+        const external = { ...defaultRuntime(), memos: [{ id: "shared", title: "另一前端", dueDate: "2026-10-16", createdAt: "2026-10-16T00:00:00Z" }] };
+        const plugin = {
+            loadData: async () => external,
+            saveData: async () => { writes++; },
+        } as any;
+        const runtime = await loadRuntime(plugin, { readOnly: true });
+        expect(runtime.memos[0].title).toBe("另一前端");
+        await saveRuntime(plugin, runtime);
+        expect(writes).toBe(0);
+        runtime.todaySilent = "2026-10-16";
+        await saveRuntime(plugin, runtime);
+        expect(writes).toBe(1);
     });
 });
 

@@ -39,32 +39,25 @@ Certificates expire, medicine expires, insurance needs renewal, subscriptions au
 
 Image OCR uses the engine configured in SiYuan Settings → OCR. It runs only when requested and does not require automatic OCR to be enabled. AI OCR asks before each run because the image is sent to the selected AI service. Results are saved to SiYuan OCR text and included in search; re-running replaces the previous result. Encrypted notebook images and PDFs are not supported, and OCR text is never written into ledger fields automatically.
 
-## 🆕 What's new in v0.5.22
+## 🆕 What's new in v0.5.23
 
-This release adds read-only payment and asset summaries on top of the SiYuan 3.8.x flicker-loop fix.
+This emergency release fixes repeated welcome notices, disappearing top-bar buttons and panel recreation caused by plugin storage changes across frontends.
 
-- **Highest recurring costs**: memberships and insurance are ranked by monthly-equivalent cost, with member filtering and source-row navigation.
-- **Asset category share**: physical-asset valuation now includes accessible category bars based on the existing ledger and valuation snapshots.
-- **Health recovery summary**: the overview surfaces scan errors, stale snapshots and capture drafts, with a direct link to Health & Recovery.
-- **Regression gates**: 534 unit tests, TypeScript/Svelte/i18n/meta/audit checks, production build, loader, smoke and Chrome isolated-kernel walkthroughs pass.
+- **Stable lifecycle**: implement SiYuan's data-change hook and update the existing instance instead of unloading and recreating it.
+- **No write echo**: incoming changes do not provision, persist a scan, show startup messages or write corruption markers; identical settings writes are skipped.
+- **Safe recovery**: incomplete external data keeps the last usable state, and callbacks finishing after unload cannot reactivate the UI.
+- **Regression gates**: real Chrome contexts check instance, toolbar and panel stability, repeated notices and storage writes; built-bundle lifecycle checks run in CI/Release.
+- **After updating**: close old browser frontends and fully restart SiYuan so all frontends load the fixed code.
 
-This emergency release fixes the SiYuan 3.8.x loop where the top-bar icon and page content repeatedly appear and disappear after enabling the plugin. Plugin tab state is now isolated from the host route lifecycle.
-
-- **Route isolation**: Plugin tabs no longer write to `window.history` or listen for `popstate`, preventing `tree not found` route correction loops.
-- **Stable restore**: The current plugin tab is kept in `sessionStorage`, so refresh restores the internal page without changing SiYuan's browser history.
-- **Less loading churn**: The initial scan starts after mount and `screenCache` is preheated to avoid alternating between rendered content and loading states.
-- **Regression guard**: Chrome isolated-kernel coverage checks repeated tab switches, refresh, history stability, single mounting, and `tree not found`/reactive-depth errors.
-- **Release gates**: TypeScript, Svelte, i18n, metadata, audit, unit tests, production build, loader semantics and package smoke are run before publishing.
-
-## 📦 Install (v0.5.22)
+## 📦 Install (v0.5.23)
 
 1. Download `package.zip` from [Releases](https://github.com/ai68298100/siyuan-home/releases/latest)
 2. SiYuan → Settings → Marketplace → Download → **Import** the zip
 3. Enable the plugin → complete the 2-step onboarding (household → module picks and provisioning)
 4. Press `Ctrl+Alt+H` anytime to open the hub
 
-> **Validation status:** core data paths have automated tests and isolated-kernel coverage. The v0.5.22 GitHub Release contains the recurring-payment ranking, asset-category summary and health-recovery entry; Android WebView behavior remains host-specific validation. `icon.png` and `preview.png` were redesigned for v0.3.13 (brand-gradient tile + geometric mark; dark overview with sample data).
-> **Version note:** the tagged v0.5.22 package is the current GitHub release; the exact unit-test count is recorded by the release workflow.
+> **Validation status:** core data paths have automated tests and isolated-kernel coverage. The v0.5.23 GitHub Release fixes the cross-frontend reload loop and retains recurring-payment, asset-category and recovery features; Android WebView behavior remains host-specific validation. `icon.png` and `preview.png` were redesigned for v0.3.13 (brand-gradient tile + geometric mark; dark overview with sample data).
+> **Version note:** the tagged v0.5.23 package is the current GitHub release; the exact unit-test count is recorded by the release workflow.
 >
 > Family sharing depends on SiYuan's collaboration, permissions, sync and conflict behavior. Test with non-sensitive data before sharing; this plugin does not provide a separate permission system.
 >
@@ -118,11 +111,11 @@ Full accounting · password vaults · official data integrations · real-time tr
 
 ## 🗺 Roadmap
 
-Lv Home manages important personal and family records, due responsibilities and follow-up in SiYuan. After v0.5.22, development proceeds through reliability, trustworthy records, a small end-to-end handling flow, and actionable responsibility summaries. Certificates, memberships, insurance and physical assets receive priority. Existing drafts, ledgers and history are reused; AI and ecosystem integrations support specific tasks. Family collaboration depends on permission and conflict validation. Pinyin search, webhooks and QR labels already have implementations.
+Lv Home manages important personal and family records, due responsibilities and follow-up in SiYuan. After v0.5.23, development proceeds through reliability, trustworthy records, a small end-to-end handling flow, and actionable responsibility summaries. Certificates, memberships, insurance and physical assets receive priority. Existing drafts, ledgers and history are reused; AI and ecosystem integrations support specific tasks. Family collaboration depends on permission and conflict validation. Pinyin search, webhooks and QR labels already have implementations.
 
 | Phase | Content |
 |---|---|
-| ✅ v0.5.22 (current) | Highest recurring costs, asset category share, health recovery summary, plus the SiYuan 3.8.x flicker and `tree not found` route-loop fix; GitHub Release |
+| ✅ v0.5.23 (current) | Cross-frontend data-change reload-loop fix, read-only updates and lifecycle regression gates; existing payment, asset and recovery features retained |
 | Reliability | Align CI/Release gates; regress the flicker incident; improve payment quality, health checks and business-history recovery |
 | First feature slice | One trustworthy certificate: capture, attachments/sources, verification date, draft recovery and source navigation |
 | Handling flow | Certificate renewal with materials, handler, next step, receipt and confirmed result; then evaluate renewal/warranty reuse |

@@ -11,6 +11,7 @@
  * - 延后过期的提醒按延后日距今分级（过期即 overdue），不再沿用原级别。
  */
 import type { Plugin } from "siyuan";
+import type { ReadDataOptions } from "../settings";
 import type { Reminder, ReminderKind, ReminderLevel } from "@/types";
 import { localDateKey } from "./rule";
 
@@ -400,9 +401,12 @@ export function deleteNamedView(views: HubNamedView[] | undefined, id: string): 
 }
 
 /** 旧缓存迁移（33.3）：缺字段补默认值；byModule/derived 为 H02/H04 新增。坏文件容错同 settings（15 组） */
-export async function loadRuntime(plugin: Plugin): Promise<HubRuntime> {
-    const { data } = await import("../settings").then((m) => m.loadDataSafe(plugin, RUNTIME_NAME));
-    if (!isPlainObject(data)) return defaultRuntime();
+export async function loadRuntime(plugin: Plugin, options: ReadDataOptions = {}): Promise<HubRuntime> {
+    const { data } = await import("../settings").then((m) => m.loadDataSafe(plugin, RUNTIME_NAME, options));
+    if (!isPlainObject(data)) {
+        if (options.readOnly) lastSerializedByPlugin.delete(plugin);
+        return defaultRuntime();
+    }
     const base = defaultRuntime();
     const optionalString = (key: string): string | undefined => typeof data[key] === "string" ? data[key] : undefined;
     const merged: HubRuntime = {
@@ -460,6 +464,7 @@ export async function loadRuntime(plugin: Plugin): Promise<HubRuntime> {
             .map((item) => ({ itemId: item.itemId as string, name: item.name as string, score: item.score as number })) : [];
         merged.lastCheckinSummary = { items, windowDays: data.lastCheckinSummary.windowDays, pulledAt: data.lastCheckinSummary.pulledAt };
     } else merged.lastCheckinSummary = undefined;
+    if (options.readOnly) lastSerializedByPlugin.set(plugin, JSON.stringify(merged));
     return merged;
 }
 

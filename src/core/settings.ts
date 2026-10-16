@@ -12,6 +12,10 @@ const SETTINGS_NAME = "settings.json";
 /** Settings dialogs and avatar/member editors can save concurrently.  Queue
  * snapshots per plugin so a slower first write cannot overwrite a newer one. */
 const settingsSaveChains = new WeakMap<object, Promise<unknown>>();
+const lastSettingsJson = new WeakMap<object, string>();
+
+/** Data-change notifications must never write back, including corruption markers. */
+export interface ReadDataOptions { readOnly?: boolean }
 
 export function defaultSettings(): HomeSettings {
     return {
@@ -46,29 +50,51 @@ function looksLikeKernelErrorEnvelope(o: Record<string, unknown>): boolean {
  *  2. 部分内核把存储内容以原始字符串返回而非解析对象——先尝试 JSON 解析，
  *     解析出对象即合法数据直接采用；非对象标量按缺失处理；
  *  3. 只有"解析失败的字符串内容"（真写坏）与未知异常才落损坏标记。 */
-export async function loadDataSafe(plugin: Plugin, name: string): Promise<{ data: any; corrupted: boolean; reason?: string }> {
+export async function loadDataSafe(plugin: Plugin, name: string, options: ReadDataOptions = {}): Promise<{ data: any; corrupted: boolean; reason?: string }> {
     try {
         const data = await plugin.loadData(name);
-        if (data === null || data === undefined) return { data: null, corrupted: false };
-        if (isPlainObject(data) && looksLikeKernelErrorEnvelope(data)) return { data: null, corrupted: false };
+        if (data === null || data === undefined) {
+            if (options.readOnly) throw new Error(`${name}: storage content unavailable`);
+            return { data: null, corrupted: false };
+        }
+        if (isPlainObject(data) && looksLikeKernelErrorEnvelope(data)) {
+            if (options.readOnly) throw new Error(`${name}: kernel response ${data.code}`);
+            return { data: null, corrupted: false };
+        }
         if (typeof data === "string") {
             const t = data.trim();
-            if (t === "") return { data: null, corrupted: false };
+            if (t === "") {
+                // loadData also returns an empty session-cache fallback after
+                // request failures. A live notification cannot prove deletion.
+                if (options.readOnly) throw new Error(`${name}: storage content unavailable`);
+                return { data: null, corrupted: false };
+            }
             try {
                 const parsed = JSON.parse(t);
-                if (isPlainObject(parsed) && looksLikeKernelErrorEnvelope(parsed)) return { data: null, corrupted: false };
+                if (isPlainObject(parsed) && looksLikeKernelErrorEnvelope(parsed)) {
+                    if (options.readOnly) throw new Error(`${name}: kernel response ${parsed.code}`);
+                    return { data: null, corrupted: false };
+                }
+                if (options.readOnly && !isPlainObject(parsed)) throw new Error(`${name}: invalid storage shape`);
                 return { data: isPlainObject(parsed) ? parsed : null, corrupted: false };
             } catch {
                 // 非法 JSON 字符串 = 文件真被写坏——保留标记（原始文件不动，留给思源备份）
                 const reason = "non-JSON string content";
+                if (options.readOnly) throw new Error(`${name}: ${reason}`);
                 await backupCorruptMarker(plugin, name, reason);
                 return { data: null, corrupted: true, reason };
             }
         }
-        if (!isPlainObject(data)) return { data: null, corrupted: false };
+        if (!isPlainObject(data)) {
+            if (options.readOnly) throw new Error(`${name}: invalid storage shape`);
+            return { data: null, corrupted: false };
+        }
         return { data, corrupted: false };
     } catch (e) {
         const msg = e instanceof Error ? e.message : String(e);
+        // During an in-place refresh, keep the last known state for every
+        // failed or inconclusive read, including a missing-file response.
+        if (options.readOnly) throw e;
         // 内核对缺失存储文件抛 not found 系错误——首次安装的正常路径，不是损坏
         if (/not found|no such|missing|enoent|不存在/i.test(msg)) return { data: null, corrupted: false };
         console.warn(`[siyuan-home] loadData(${name}) failed: ${msg}`);
@@ -165,13 +191,15 @@ function normalizeDbRefs(raw: unknown, fallback: HomeSettings["dbRefs"]): HomeSe
     return out;
 }
 
-export async function loadSettings(plugin: Plugin): Promise<HomeSettings> {
-    const { data, corrupted, reason } = await loadDataSafe(plugin, SETTINGS_NAME);
+export async function loadSettings(plugin: Plugin, options: ReadDataOptions = {}): Promise<HomeSettings> {
+    const { data, corrupted, reason } = await loadDataSafe(plugin, SETTINGS_NAME, options);
     const defaults = defaultSettings();
     if (!isPlainObject(data)) {
+        lastSettingsJson.delete(plugin);
         // corrupted=true 时保留标记供 onload 弹警告（269 波：原因串随标记透传，弹窗可就地诊断）
         return corrupted ? { ...defaults, corruptedSettings: reason ?? true } : defaults;
     }
+    lastSettingsJson.set(plugin, JSON.stringify(data));
     // 用户显式管理模块开关：已有 enabledModules 时完全尊重（含关闭默认模块）；
     // 新增模块的默认启用只走版本化迁移（33.1），运行时不强制回填。
     const known = new Set(BUILT_IN_MODULES.map((m) => m.id));
@@ -226,8 +254,10 @@ export async function saveSettings(plugin: Plugin, settings: HomeSettings): Prom
     // Capture before queueing: callers often mutate the live settings object
     // immediately after awaiting a panel action.
     const snapshot = JSON.parse(JSON.stringify(settings)) as HomeSettings;
+    const json = JSON.stringify(snapshot);
     const previous = settingsSaveChains.get(plugin) ?? Promise.resolve();
     const run = previous.then(async () => {
+        if (lastSettingsJson.get(plugin) === json) return;
         // §15：写入失败重试一次（瞬时内核忙/工作区切换等）；仍失败抛带原始信息的错误，由调用方上报
         try {
             await plugin.saveData(SETTINGS_NAME, snapshot);
@@ -239,6 +269,7 @@ export async function saveSettings(plugin: Plugin, settings: HomeSettings): Prom
                 throw new Error(`settings save failed after retry: ${e1 instanceof Error ? e1.message : String(e1)}`);
             }
         }
+        lastSettingsJson.set(plugin, json);
     });
     settingsSaveChains.set(plugin, run.catch(() => undefined));
     await run;

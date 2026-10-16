@@ -6,7 +6,7 @@ import TabPanel from "@/panels/tab-panel.svelte";
 import HomeSettingsPanel from "@/panels/settings.svelte";
 import { svelteDialog } from "@/libs/dialog";
 import { loadSettings, saveSettings } from "@/core/settings";
-import { loadRuntime, saveRuntime, purgeHandled, listHandled, type HubRuntime } from "@/core/hub/runtime";
+import { loadRuntime, saveRuntime, purgeHandled, listHandled, withRuntimeSaveLock, type HubRuntime } from "@/core/hub/runtime";
 import { runScan, deriveVisible, type ScanResult } from "@/core/hub/scanner";
 import type { PaymentSource } from "@/core/payment-summary";
 import { buildScanProviders } from "@/core/hub/registry";
@@ -34,6 +34,7 @@ export default class LvHomePlugin extends Plugin {
     runtime: HubRuntime;
     scan: ScanResult;
     private heartbeat: number | undefined;
+    private disposed = false;
     /** 所有延迟回调统一登记，确保卸载时没有匿名计时器继续访问插件实例。 */
     private readonly timeoutIds = new Set<number>();
     /** 统一处理内核鉴权失效，避免每个面板各自跳转或留下空白状态。 */
@@ -116,6 +117,7 @@ export default class LvHomePlugin extends Plugin {
     }
 
     async onload() {
+        this.disposed = false;
         const self = this;
         this.settings = await loadSettings(this);
         this.runtime = await loadRuntime(this);
@@ -487,6 +489,55 @@ export default class LvHomePlugin extends Plugin {
         } catch (e) {
             console.warn("[siyuan-home] initial provision/scan deferred:", e instanceof Error ? e.message : e);
         }
+    }
+
+    /** SiYuan otherwise reloads the entire plugin on storage changes. Startup
+     * writes in two frontends then continually reload each other. Consume the
+     * change in place: no provisioning, persistent scan, notifications or writes. */
+    async onDataChanged(_reason?: "sync" | "overwrite") {
+        if (this.disposed) return;
+        // Serialize adoption with local reminder actions so an older read cannot
+        // replace a runtime that a local action is still committing.
+        return withRuntimeSaveLock(this, async () => {
+            if (this.disposed) return;
+            ++this.scanSeq;
+            // loadData falls back to the host's session cache on a missing file.
+            // Clear these entries so deletion cannot resurrect an older snapshot.
+            if (this.data && typeof this.data === "object") {
+                delete this.data["settings.json"];
+                delete this.data["hub-runtime.json"];
+            }
+            try {
+                const [settings, runtime] = await Promise.all([
+                    loadSettings(this, { readOnly: true }),
+                    loadRuntime(this, { readOnly: true }),
+                ]);
+                if (this.disposed) return;
+                ++this.scanSeq;
+                this.settings = settings;
+                this.runtime = runtime;
+                const enabled = new Set(settings.enabledModules);
+                const derived = (runtime.cache?.derived ?? []).filter((r) => r.moduleId === "adhoc" || enabled.has(r.moduleId));
+                const { reminders, counts } = deriveVisible(derived, settings, runtime);
+                const errors = runtime.cache?.errors ?? [];
+                this.scan = {
+                    reminders, counts, derived, errors,
+                    scannedAt: runtime.scannedAt ?? "",
+                    stale: !runtime.scannedAt || errors.length > 0,
+                    byModule: Object.fromEntries(Object.entries(runtime.cache?.byModule ?? {}).filter(([id]) => enabled.has(id))),
+                    // This projection is process-local; keep its original snapshot
+                    // until the next normal scan rather than persisting on receipt.
+                    paymentSummary: this.scan?.paymentSummary,
+                };
+                this.updateStatusbar(reminders.filter((r) => r.daysLeft <= 0).length);
+                window.dispatchEvent(new CustomEvent("siyuan-home:settings-replaced", { detail: { plugin: this, settings } }));
+                this.hubListeners.forEach((listener) => listener());
+            } catch (error) {
+                // Keep the last usable state if a sync is incomplete or malformed.
+                // In particular, do not emit another popup or corruption-file write.
+                console.warn("[siyuan-home] data change read deferred:", error instanceof Error ? error.message : error);
+            }
+        });
     }
 
     /** members 先建（relation 目标），其余按需；幂等。启用模块才建库（P4）。
@@ -923,6 +974,7 @@ export default class LvHomePlugin extends Plugin {
     }
 
     onunload() {
+        this.disposed = true;
         if (this.heartbeat) window.clearInterval(this.heartbeat);
         this.heartbeat = undefined;
         for (const timer of this.timeoutIds) window.clearTimeout(timer);
