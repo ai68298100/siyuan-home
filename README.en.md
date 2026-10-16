@@ -118,13 +118,16 @@ Full accounting · password vaults · official data integrations · real-time tr
 
 ## 🗺 Roadmap
 
-The v0.5.22 release is available on GitHub, with static isolated-kernel gates and Chrome tab-lifecycle coverage for the main UI. Recurring-payment summaries for memberships and insurance now show monthly equivalents, upcoming 7/30-day amounts, data-quality hints, highest recurring costs and links back to source rows; physical assets also show category share. The next feature slice should optimize the five-minute path from a member to a first reminder and its source record, then prioritize the evidence center, inbox and valuation freshness before pinyin search, webhooks, QR labels, AI and family collaboration.
+Lv Home manages important personal and family records, due responsibilities and follow-up in SiYuan. After v0.5.22, development proceeds through reliability, trustworthy records, a small end-to-end handling flow, and actionable responsibility summaries. Certificates, memberships, insurance and physical assets receive priority. Existing drafts, ledgers and history are reused; AI and ecosystem integrations support specific tasks. Family collaboration depends on permission and conflict validation. Pinyin search, webhooks and QR labels already have implementations.
 
 | Phase | Content |
 |---|---|
 | ✅ v0.5.22 (current) | Highest recurring costs, asset category share, health recovery summary, plus the SiYuan 3.8.x flicker and `tree not found` route-loop fix; GitHub Release |
-| 🔜 Next | Task workbench, evidence center, inbox, health recovery |
-| 🔭 Later | Family collaboration, template packs, yearly family report, AI capabilities |
+| Reliability | Align CI/Release gates; regress the flicker incident; improve payment quality, health checks and business-history recovery |
+| First feature slice | One trustworthy certificate: capture, attachments/sources, verification date, draft recovery and source navigation |
+| Handling flow | Certificate renewal with materials, handler, next step, receipt and confirmed result; then evaluate renewal/warranty reuse |
+| Decisions and assistance | Responsibility summaries with scope and missing-data hints, richer existing member activity feeds, sourced AI drafts and one-way ecosystem handoffs |
+| Research | Family collaboration, template packs, custom modules and annual reports, selected by user benefit and maintenance cost |
 
 Full plan: [ROADMAP.md](./ROADMAP.md)
 
