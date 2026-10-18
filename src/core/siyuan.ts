@@ -874,6 +874,28 @@ export async function renderLedgerAll(avID: string, pageSize = 200, options?: Re
     const rows = [...first.rows];
     const seen = new Set(rows.map((r) => r.itemID));
     let page = 2;
+    // Small ledgers keep the original one-page-at-a-time behavior so an early
+    // short/empty page still stops immediately. Once the first page is full,
+    // bounded batches reduce round trips for large ledgers without changing
+    // page order or dedupe semantics.
+    const canBatch = pageSize > 0 && first.rows.length >= pageSize && first.rowCount > pageSize;
+    if (canBatch) {
+        while (rows.length < first.rowCount && page <= 100) {
+            const pageNumbers = Array.from({ length: Math.min(4, 101 - page) }, (_, i) => page + i);
+            const batch = await Promise.all(pageNumbers.map((pageNumber) => renderLedger(avID, pageSize, pageNumber, options)));
+            let stop = false;
+            for (const next of batch) {
+                if (next.rows.length === 0) { stop = true; break; }
+                for (const r of next.rows) {
+                    if (!seen.has(r.itemID)) { seen.add(r.itemID); rows.push(r); }
+                }
+                if (rows.length >= first.rowCount) { stop = true; break; }
+            }
+            page += pageNumbers.length;
+            if (stop) break;
+        }
+        return { columns: first.columns, rows, rowCount: first.rowCount, complete: rows.length >= first.rowCount };
+    }
     while (rows.length < first.rowCount && page <= 100) {
         const next = await renderLedger(avID, pageSize, page, options);
         if (next.rows.length === 0) break; // 翻页越界：内核已无更多行

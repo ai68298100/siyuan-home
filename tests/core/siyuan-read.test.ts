@@ -379,6 +379,28 @@ describe("renderLedgerAll 全量读取（N7/E13：render 接受 page/pageSize）
         expect(read.rows.map((r) => r.itemID)).toEqual(["r1", "r2", "r3"]); // r2 跨页重复只留一次
         expect(read.complete).toBe(true);
     });
+
+    it("首屏满页时按有界批次并发读取后续页，并按页序去重", async () => {
+        const seenPages: number[] = [];
+        handler = (endpoint, payload) => {
+            if (endpoint === "/api/av/renderAttributeView") {
+                const current = payload.page ?? 1;
+                seenPages.push(current);
+                const idsByPage: Record<number, string[]> = {
+                    1: ["r1", "r2"],
+                    2: ["r3", "r4"],
+                    3: ["r4", "r5"],
+                    4: ["r6"],
+                };
+                return { code: 0, msg: "", data: { view: { columns: [], rowCount: 6, rows: (idsByPage[current] ?? []).map(row) } } };
+            }
+            return { code: 0, msg: "", data: { rows: { values: [] } } };
+        };
+        const read = await renderLedgerAll("av-1", 2);
+        expect(read.rows.map((r) => r.itemID)).toEqual(["r1", "r2", "r3", "r4", "r5", "r6"]);
+        expect(read.complete).toBe(true);
+        expect(seenPages).toEqual([1, 2, 3, 4, 5]);
+    });
 });
 
 describe("addDetachedRow 身份确认（D02）", () => {
