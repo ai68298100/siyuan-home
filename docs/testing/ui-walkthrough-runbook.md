@@ -39,7 +39,7 @@ node scripts/ui-walkthrough/check-activity-navigation.mjs
 
 `shoot-tabs` 覆盖：总览/提醒/提醒-日历/台账/成员，逐页签输出 scrollWidth−clientWidth（≠0 即横向溢出）。
 
-`check-activity-navigation` 只在隔离靶场运行：通过 Chrome 在车辆详情暂存一条带唯一标记的加油流水，从总览活动流打开它，断言详情高亮原流水且没有打开新增表单；结束时恢复原有 `rowlogs.json`。
+`check-activity-navigation` 只在隔离靶场运行：脚本启动内核后从 `settings.json` 读取启用的车辆 AV，并通过 `renderAttributeView` 动态定位第一条车辆行；随后临时写入带唯一标记的加油流水，通过 Chrome 从总览活动流打开它，断言详情高亮原流水且没有打开新增表单，再验证筛选清除与折叠状态。结束时按原始字节恢复 `settings.json` 与 `rowlogs.json`；没有车辆台账行时输出结构化 skip。
 
 ## 扩展走查要点（按需手写，片段级）
 
