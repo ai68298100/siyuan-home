@@ -15,7 +15,9 @@ interface LvContactsSearch {
 }
 
 export function getContactsBridge(): LvContactsSearch | undefined {
-    return (window as { LvContacts?: LvContactsSearch }).LvContacts;
+    if (typeof window === "undefined") return undefined;
+    const w = window as unknown as Record<string, unknown>;
+    return (w.LvContacts || w.xiaolvContacts || w.siyuanContacts || w.lvContacts) as LvContactsSearch | undefined;
 }
 
 /** 打开选人对话框；选中回调收到快照串 `名称 [docId]` */

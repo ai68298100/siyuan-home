@@ -4604,12 +4604,13 @@
             btn.className = "b3-button b3-button--outline";
             btn.style.cssText = "margin-top:6px;font-size:12px";
             btn.textContent = synced ? t("ec15.again") : t("ec15.record");
-            btn.onclick = async () => {
-                const bridge = (window as { LvContacts?: {
-                    ensurePerson: (name: string) => Promise<{ docId: string; name: string; created: boolean }>;
-                    recordInteraction: (ids: readonly string[], meta?: { ref?: string; date?: string; note?: string }) => Promise<{ recorded: number }>;
-                } }).LvContacts;
-                if (!bridge?.ensurePerson || !bridge.recordInteraction) {
+	            btn.onclick = async () => {
+	                const w = (typeof window !== "undefined" ? window : {}) as Record<string, unknown>;
+	                const bridge = (w.LvContacts || w.xiaolvContacts || w.siyuanContacts || w.lvContacts) as {
+	                    ensurePerson: (name: string) => Promise<{ docId: string; name: string; created: boolean }>;
+	                    recordInteraction: (ids: readonly string[], meta?: { ref?: string; date?: string; note?: string }) => Promise<{ recorded: number }>;
+	                } | undefined;
+	                if (!bridge?.ensurePerson || !bridge.recordInteraction) {
                     showMessage(t("ledger.contactsMissing"), 5000, "info");
                     return;
                 }

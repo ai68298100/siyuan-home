@@ -1,8 +1,14 @@
 /**
- * 服务桥单测（EC03/v0.3）：capabilities/summary 计数/addMemo 转发与校验。
+ * 服务桥单测（EC03/v0.3 + Epoch 6）：capabilities/summary 计数/addMemo 转发与校验/多别名挂载与事件广播。
  */
 import { describe, it, expect } from "vitest";
-import { buildLvHomeBridge, mountLvHomeBridge, type BridgeHost } from "@/bridge/external-bridge";
+import {
+    buildLvHomeBridge,
+    mountLvHomeBridge,
+    LVHOME_API_ALIASES,
+    LVHOME_BRIDGE_PROTOCOL,
+    type BridgeHost,
+} from "@/bridge/external-bridge";
 import { defaultSettings } from "@/core/settings";
 
 function host(over: Partial<BridgeHost> = {}): BridgeHost {
@@ -20,17 +26,26 @@ function host(over: Partial<BridgeHost> = {}): BridgeHost {
         },
         showTab: () => undefined,
         openRemindersTab: () => undefined,
+        openModuleTab: () => undefined,
         addMemo: async () => undefined,
         onBridgeDisposed: () => undefined,
         ...over,
     };
 }
 
-describe("LvHome 服务桥（EC03/v0.3）", () => {
+describe("LvHome 服务桥（EC03/v0.3 + Epoch 6）", () => {
     it("capabilities 与 protocol 固定", () => {
         const api = buildLvHomeBridge(host());
-        expect(api.protocol).toBe(1);
-        expect(api.capabilities).toEqual(["whenReady", "openButler", "openReminders", "addMemo", "summary"]);
+        expect(api.protocol).toBe(LVHOME_BRIDGE_PROTOCOL);
+        expect(api.capabilities).toEqual([
+            "whenReady",
+            "openButler",
+            "openReminders",
+            "addMemo",
+            "summary",
+            "openModule",
+            "getOverview",
+        ]);
     });
 
     it("summary：overdue/soon/today 计数正确", () => {
@@ -47,29 +62,80 @@ describe("LvHome 服务桥（EC03/v0.3）", () => {
         expect(api.summary()).toMatchObject({ overdue: 0, soon: 0, today: 0 });
     });
 
-    it("openButler/openReminders 转发到宿主", () => {
+    it("getOverview：输出只读高层概览", () => {
+        const api = buildLvHomeBridge(host());
+        const overview = api.getOverview();
+        expect(overview.protocol).toBe(1);
+        expect(overview.remindersCount).toBe(5);
+        expect(overview.overdueCount).toBe(2);
+        expect(overview.todayCount).toBe(3);
+        expect(overview.scanStale).toBe(false);
+        expect(Array.isArray(overview.enabledModules)).toBe(true);
+        expect(overview.updatedAt).toBeTruthy();
+    });
+
+    it("openButler/openReminders/openModule 转发到宿主", () => {
         let butler = 0;
         let reminders = 0;
+        let moduleOpened = "";
         const api = buildLvHomeBridge(host({
             showTab: () => { butler++; },
             openRemindersTab: () => { reminders++; },
+            openModuleTab: (m) => { moduleOpened = m; },
         }));
         api.openButler();
         api.openReminders();
         expect(butler).toBe(1);
         expect(reminders).toBe(1);
+
+        expect(api.openModule("")).toBe(false);
+        expect(api.openModule("assets")).toBe(true);
+        expect(moduleOpened).toBe("assets");
     });
 
-    it("addMemo：空标题抛错；合法标题转发宿主", async () => {
+    it("addMemo：空标题抛错；合法标题转发宿主并派发事件", async () => {
         let memoTitle = "";
+        const events: any[] = [];
+        const originalDispatch = (globalThis as any).window?.dispatchEvent;
+        if ((globalThis as any).window) {
+            (globalThis as any).window.dispatchEvent = (e: any) => {
+                events.push(e);
+                return true;
+            };
+        }
         const api = buildLvHomeBridge(host({ addMemo: async (t) => { memoTitle = t; } }));
         await expect(api.addMemo("  ", "2026-10-10")).rejects.toThrow("标题");
         await api.addMemo("给老师打电话", "2026-10-10");
         expect(memoTitle).toBe("给老师打电话");
+        if ((globalThis as any).window) {
+            (globalThis as any).window.dispatchEvent = originalDispatch;
+        }
     });
 
     it("whenReady 恒 resolve true", async () => {
         expect(await buildLvHomeBridge(host()).whenReady()).toBe(true);
+    });
+
+    it("多别名挂载：挂载到 LvHome、siyuanHome、xiaolvHome、lvHome 四个命名空间", () => {
+        const previousWindow = (globalThis as any).window;
+        const mockWin: any = {};
+        (globalThis as any).window = mockWin;
+
+        let disposed = 0;
+        const unmount = mountLvHomeBridge(host({ onBridgeDisposed: () => { disposed++; } }));
+
+        for (const alias of LVHOME_API_ALIASES) {
+            expect(mockWin[alias]).toBeTruthy();
+            expect(mockWin[alias].protocol).toBe(1);
+        }
+
+        unmount();
+        for (const alias of LVHOME_API_ALIASES) {
+            expect(mockWin[alias]).toBeUndefined();
+        }
+        expect(disposed).toBe(1);
+
+        (globalThis as any).window = previousWindow;
     });
 
     it("disposer 只移除自己挂载的桥，避免旧实例误删新桥", () => {

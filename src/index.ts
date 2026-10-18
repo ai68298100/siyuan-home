@@ -56,6 +56,8 @@ export default class LvHomePlugin extends Plugin {
     private examStatsHandler?: (e: Event) => void;
     /** EC09/EC10：打卡集成事件监听（window CustomEvent） */
     private checkinEventHandler?: (e: Event) => void;
+    /** Epoch 6：小驴闪卡复习事件监听（window CustomEvent） */
+    private cardsReviewedHandler?: (e: Event) => void;
     /** 下次面板挂载的目标页签（状态栏/通知入口预选） */
     pendingScreen?: string;
     /** 已挂载面板的页签直切回调（tab-panel 挂载时注册、卸载时清空） */
@@ -315,6 +317,7 @@ export default class LvHomePlugin extends Plugin {
             get scan() { return self.scan; },
             showTab: () => self.showTab(),
             openRemindersTab: () => self.openRemindersScreen(),
+            openModuleTab: (m) => self.openModuleTab(m),
             addMemo: (title, due) => self.addMemo(title, due),
             onBridgeDisposed: () => { self.disposeLvHomeBridge = undefined; },
         });
@@ -334,6 +337,14 @@ export default class LvHomePlugin extends Plugin {
         };
         window.addEventListener("lv-exam:stats", this.examStatsHandler);
 
+        // Epoch 6：消费 lv-cards:reviewed 闪卡复习事件（更新家庭/成员学习活跃度）
+        this.cardsReviewedHandler = (e: Event) => {
+            const detail = (e as CustomEvent).detail as Record<string, unknown> | undefined;
+            if (!detail || typeof detail !== "object") return;
+            this.hubListeners.forEach((fn) => fn());
+        };
+        window.addEventListener("lv-cards:reviewed", this.cardsReviewedHandler);
+
         // EC09/EC10：打卡集成事件（checkin:*）→ 节流刷新健康模块卡打卡摘要
         this.checkinEventHandler = () => {
             // checkin 事件频繁（每次打卡触发）；60 秒节流后拉取强度摘要
@@ -351,7 +362,11 @@ export default class LvHomePlugin extends Plugin {
     /** EC09/EC10：拉取打卡强度摘要（只读；写入 runtime 供模块卡展示）[待实测] */
     private async pullCheckinSummary(): Promise<void> {
         try {
-            const checkin = (window as {siyuanCheckin?: {whenReady: () => Promise<boolean>; getStrengthSummary: (o?: {windowDays?: number}) => {items: {itemId: string; name: string; score: number}[]; windowDays: number}}}).siyuanCheckin;
+            const w = (typeof window !== "undefined" ? window : {}) as Record<string, unknown>;
+            const checkin = (w.siyuanCheckin || w.xiaolvCheckin || w.lvCheckin) as {
+                whenReady: () => Promise<boolean>;
+                getStrengthSummary: (o?: {windowDays?: number}) => {items: {itemId: string; name: string; score: number}[]; windowDays: number};
+            } | undefined;
             if (!checkin?.whenReady || !checkin.getStrengthSummary) return;
             const ready = await checkin.whenReady();
             if (!ready) return;
@@ -707,6 +722,13 @@ export default class LvHomePlugin extends Plugin {
         this.panelScreenSwitch?.("reminders");
     }
 
+    /** 导航并打开指定台账模块（如 "assets" | "members" | "medicine" | "vehicle" 等） */
+    openModuleTab(moduleId: string) {
+        this.pendingScreen = moduleId;
+        this.showTab();
+        this.panelScreenSwitch?.(moduleId);
+    }
+
     /** 移动前端顶栏入口（DEVICE-07）：petal addTopBar 在移动端不渲染，直接注入 #mobileTopBar；
      *  顶栏未就绪时 800ms 重试（参照 checkin ensureMobileTopBarButtonFor）。
      *  227 波实测两处坑：① 移动工具栏在插件 onload 之后异步重建，会吞掉先注入的按钮 → 启动后
@@ -904,6 +926,9 @@ export default class LvHomePlugin extends Plugin {
         // EC21：lv-exam:stats 监听移除
         if (this.examStatsHandler) window.removeEventListener("lv-exam:stats", this.examStatsHandler);
         this.examStatsHandler = undefined;
+        // Epoch 6：lv-cards:reviewed 闪卡复习事件移除
+        if (this.cardsReviewedHandler) window.removeEventListener("lv-cards:reviewed", this.cardsReviewedHandler);
+        this.cardsReviewedHandler = undefined;
         // EC09/EC10：打卡集成事件移除
         if (this.checkinEventHandler) {
             for (const evt of ["checkin:event-recorded", "checkin:event-deleted", "checkin:item-updated"]) {
