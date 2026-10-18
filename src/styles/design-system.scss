@@ -859,6 +859,21 @@
     .b3-button, .b3-select, .b3-text-field { border: 1px solid CanvasText; }
     .lv-avatar, .lv-mi, .lv-focus-icon, .t-blue { forced-color-adjust: none; }
   }
+  // 高对比度偏好（prefers-contrast: more）：增强文字、边框与焦点的可见度
+  @media (prefers-contrast: more) {
+    --lv-line: color-mix(in srgb, var(--b3-theme-on-background) 38%, transparent);
+    --lv-line-strong: var(--b3-theme-on-background);
+    --lv-tx-2: var(--b3-theme-on-background);
+    --lv-tx-3: var(--b3-theme-on-background);
+    .lv-card, .lv-mod, .lv-chip, .lv-badge, .lv-qbtn, .lv-focus-card, .lv-strip, .lv-rem,
+    .b3-button, .b3-select, .b3-text-field {
+      border: 1px solid var(--b3-theme-on-background);
+    }
+    :focus-visible {
+      outline: 3px solid var(--b3-theme-primary);
+      outline-offset: 2px;
+    }
+  }
   @media (max-width: 760px) {
     .lv-tabbar { margin-bottom: 14px; }
     .lv-hero { margin-top: var(--lv-space-4); padding: 20px; }
@@ -1216,6 +1231,10 @@
   .lv-tabs { border-color: transparent; }
   .lv-chip.on { border-color: var(--lv-accent-line); }
   .lv-rem:hover::before { box-shadow: none; }
+}
+
+:root[data-theme-mode="dark"] .lv-home {
+  color-scheme: dark;
 }
 
 // ── 18. 录入与设置细节收口（2026-10）──────────────────────

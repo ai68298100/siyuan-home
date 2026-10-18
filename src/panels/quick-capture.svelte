@@ -144,12 +144,24 @@
             else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus(); }
         }
     }
+    let triggerElement: HTMLElement | null = null;
     let focusWasOpen = false;
     $effect(() => {
         if (open && !focusWasOpen) {
             focusWasOpen = true;
-            void tick().then(() => nameEl?.focus());
+            triggerElement = document.activeElement as HTMLElement | null;
+            void tick().then(() => {
+                if (nameEl) nameEl.focus();
+                else {
+                    const first = document.querySelector<HTMLElement>(".lv-modal.open .lv-sheet button, .lv-modal.open .lv-sheet select");
+                    first?.focus();
+                }
+            });
         } else if (!open) {
+            if (focusWasOpen && triggerElement && typeof triggerElement.focus === "function") {
+                triggerElement.focus();
+                triggerElement = null;
+            }
             focusWasOpen = false;
         }
     });

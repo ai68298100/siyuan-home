@@ -278,7 +278,11 @@
         requestAnimationFrame(() => (navEl?.querySelector(`[data-s="${screens[next].id}"]`) as HTMLButtonElement | undefined)?.focus());
     }
     $effect(() => {
-        movePill(navEl?.querySelector(`[data-s="${screen}"]`) as HTMLElement | undefined);
+        const activeTab = navEl?.querySelector(`[data-s="${screen}"]`) as HTMLElement | undefined;
+        movePill(activeTab);
+        if (activeTab && typeof activeTab.scrollIntoView === "function") {
+            activeTab.scrollIntoView({ inline: "nearest", block: "nearest", behavior: "smooth" });
+        }
         // 254 波：窗口 resize 后重新测量（对齐原型的 resize 监听）——否则胶囊停在旧坐标、
         // 与当前页签错位
         const onResize = () => movePill(navEl?.querySelector(`[data-s="${screen}"]`) as HTMLElement | undefined);

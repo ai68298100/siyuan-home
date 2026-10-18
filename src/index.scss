@@ -503,6 +503,10 @@
     .b3-dialog__container { box-shadow: var(--lv-shadow-3); }
 }
 
+:root[data-theme-mode="dark"] :is(.b3-dialog:has([id^="lv-"]), .b3-dialog:has(.lv-home)) {
+    color-scheme: dark;
+}
+
 // 257 波：插件自建弹窗家族（body 层、无 .lv-home 作用域）内的辅助文字统一中性化——
 // ft__on-surface 在思源默认暗色主题下发蓝，与主面板的中性灰语言冲突。
 // 全部弹窗内容容器遵循 #lv-* id 约定，按清单收敛；新增弹窗记得把容器 id 加进来
