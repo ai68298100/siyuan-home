@@ -135,9 +135,30 @@ async function main() {
         await gotoTab(page, "总览");
         feed = page.locator(".lv-activity").first();
         await feed.scrollIntoViewIfNeeded();
-        await feed.locator('input[type="search"]').fill("no-such-activity");
+        for (let attempt = 0; attempt < 2; attempt++) {
+            const retry = feed.getByRole("button", { name: "重试" });
+            if (!(await retry.isVisible().catch(() => false))) break;
+            await retry.click();
+            await page.waitForTimeout(1200);
+        }
+        const searchInput = feed.locator('input[type="search"]');
+        await searchInput.fill("no-such-activity");
+        // The feed can be remounted while the detail dialog closes. Wait for
+        // the value to survive that render before looking for its empty-state
+        // action; otherwise a valid query can be replaced by the fresh draft.
+        await page.waitForFunction(() => document.querySelector('.lv-activity input[type="search"]')?.value === "no-such-activity", undefined, { timeout: 10000 });
         const clearFilters = feed.getByRole("button", { name: "清除筛选" });
-        await clearFilters.waitFor({ state: "visible", timeout: 10000 });
+        try {
+            await clearFilters.waitFor({ state: "visible", timeout: 10000 });
+        } catch (error) {
+            console.error(JSON.stringify({
+                activityCount: await page.locator(".lv-activity").count(),
+                feedText: (await feed.innerText().catch(() => "")).slice(0, 800),
+                searchValue: await searchInput.inputValue().catch(() => ""),
+                clearCount: await clearFilters.count(),
+            }));
+            throw error;
+        }
         await clearFilters.click();
         const restoredCount = await feed.locator(".lv-activity-row").count();
         await feed.getByRole("button", { name: "收起最近记录" }).click();
