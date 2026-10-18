@@ -120,6 +120,11 @@
             if (request !== screenLoadRequest) return;
             ScreenView = module.default as unknown as ScreenComponent;
             loadedScreen = target;
+            // Browser back/forward changes `screen` through popstate without
+            // going through gotoScreen. Re-apply restoration after the lazy
+            // component has mounted so its scroll owner and session state are
+            // available even when the import resolves after the first frame.
+            if (screen === target) restoreScroll(target);
         } catch (error) {
             if (request !== screenLoadRequest) return;
             loadedScreen = null;
@@ -145,6 +150,7 @@
             saveCurrentScroll();
             if (next !== "ledger") plugin.pendingActivityTarget = undefined;
             screen = next;
+            void loadScreen(next);
             restoreScroll(next);
         };
         window.addEventListener("popstate", onPopState);
@@ -369,7 +375,11 @@
                 {#if screenLoadError}
                     <div class="lv-card lv-empty" role="alert"><b>{t("error.unknown")}</b><span>{screenLoadError}</span><button class="b3-button b3-button--outline" onclick={() => void loadScreen(screen)}>{t("error.retry")}</button></div>
                 {:else if loadedScreen !== screen || !ScreenView}
-                    <div class="lv-card lv-screen-loading" role="status" aria-busy="true"><span class="lv-skel" style="width:42%;height:16px"></span><span class="lv-skel" style="width:78%;height:12px"></span><span class="lv-skel" style="width:64%;height:12px"></span></div>
+                    <div class="lv-card lv-screen-loading" role="status" aria-live="polite" aria-busy="true" aria-label={t("activity.loading")}>
+                        <span class="lv-skel" aria-hidden="true" style="width:42%;height:16px"></span>
+                        <span class="lv-skel" aria-hidden="true" style="width:78%;height:12px"></span>
+                        <span class="lv-skel" aria-hidden="true" style="width:64%;height:12px"></span>
+                    </div>
                 {:else}
                     <ScreenView {plugin} {t} {version} {initialScanError} onRetryScan={() => refreshInitialScan(true)} onCapture={(moduleId?: string) => openCapture(moduleId)} onGoto={(s: ScreenId) => gotoScreen(s)} />
                 {/if}

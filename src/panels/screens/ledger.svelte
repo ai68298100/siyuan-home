@@ -3660,7 +3660,8 @@
                 {#if active === "parenting"}<button class="b3-button b3-button--outline" onclick={openGrowthChart}>{t("ledger.growthChart")}</button>{/if}
                 {#if active === "stock"}<button class="b3-button b3-button--outline" onclick={openShoppingList}>{t("ledger.shoppingList")}</button>{/if}
                 {#if active !== "members" && active !== "adhoc"}<button class="b3-button b3-button--outline" disabled={printing || exporting} onclick={openCsvImport}>{t("ledger.importCsv")}</button>{/if}
-                <button class="b3-button b3-button--outline" onclick={() => plugin.showTabDocs(ref?.docId)}>{t("ledger.openDoc")} →</button>
+                <button class="b3-button b3-button--outline" disabled={!ref?.docId}
+                    onclick={() => plugin.showTabDocs(ref?.docId)}>{t("ledger.openDoc")} →</button>
             </div>
         </details>
     {/if}

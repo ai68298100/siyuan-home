@@ -68,10 +68,39 @@ describe("health.runHealthCheck", () => {
             }
             return { code: 0, msg: "", data: {} };
         };
-        const report = await runHealthCheck(settings, catalog);
+        const report = await runHealthCheck(settings, {
+            ...catalog,
+            certs: { columns: [{ key: "name" }, { key: "expiry" }] },
+        });
         const byId = Object.fromEntries(report.modules.map((m) => [m.moduleId, m]));
         expect(byId.certs.ok).toBe(true);
         expect(byId.certs.complete).toBe(true);
+    });
+
+    it("读取完整但 schema 列缺失 → 健康检查仍失败并摘要缺列", async () => {
+        handler = (endpoint) => {
+            if (endpoint === "/api/query/sql") return { code: 0, msg: "", data: [{ id: "d1" }] };
+            if (endpoint === "/api/av/renderAttributeView") {
+                return { code: 0, msg: "", data: { view: { columns: [], rowCount: 1, rows: [{ id: "r1", cells: [] }] } } };
+            }
+            return { code: 0, msg: "", data: {} };
+        };
+        const report = await runHealthCheck(
+            {
+                enabledModules: ["certs"],
+                dbRefs: { certs: { avId: "av-c", docId: "d1", columns: { name: "k1", expiry: "k2" } } },
+            } as any,
+            { certs: { columns: [{ key: "name" }, { key: "expiry" }, { key: "renewed_to" }] } },
+        );
+        const certs = report.modules[0];
+        expect(certs).toMatchObject({
+            moduleId: "certs",
+            ok: false,
+            rows: 1,
+            complete: true,
+            missingColumns: ["renewed_to"],
+        });
+        expect(certs.error).toContain("missing schema columns: renewed_to");
     });
 
     it("renderLedger 抛错 → 模块 error 项，不中断其余模块", async () => {

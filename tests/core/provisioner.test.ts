@@ -22,6 +22,7 @@ interface FakeState {
     avBlocks: { id: string; root_id: string; seed?: string }[];
     notebookCreated: string[];
     notebookResponseLostOnce: boolean;
+    notebookVisibilityDelay: number;
     notebookOpened: string[];
     docCreated: string[];
     docResponseLostOnce: boolean;
@@ -39,6 +40,7 @@ function fakeKernel() {
         avBlocks: [],
         notebookCreated: [],
         notebookResponseLostOnce: false,
+        notebookVisibilityDelay: 0,
         notebookOpened: [],
         docCreated: [],
         docResponseLostOnce: false,
@@ -51,6 +53,10 @@ function fakeKernel() {
     setTransport(async (endpoint, payload: any) => {
         switch (endpoint) {
             case "/api/notebook/lsNotebooks":
+                if (s.notebookVisibilityDelay > 0) {
+                    s.notebookVisibilityDelay--;
+                    return { code: 0, msg: "", data: { notebooks: [] } };
+                }
                 return { code: 0, msg: "", data: { notebooks: s.notebooks } };
             case "/api/notebook/createNotebook": {
                 s.notebookCreated.push(payload.name);
@@ -182,6 +188,15 @@ describe("ensureNotebook（D07）", () => {
     it("笔记本已创建但响应丢失 → 按名称回读唯一 ID，不重复创建", async () => {
         const s = fakeKernel();
         s.notebookResponseLostOnce = true;
+        await expect(ensureNotebook(undefined)).resolves.toMatch(/^2026010100000\d-new0001$/);
+        expect(s.notebookCreated).toEqual([DEFAULT_NOTEBOOK_NAME]);
+    });
+
+    it("创建已提交但列表索引延迟 → 短轮询后找回唯一 ID，不重复创建", async () => {
+        const s = fakeKernel();
+        s.notebookResponseLostOnce = true;
+        // The initial ensureNotebook read is current; only recovery reads lag.
+        s.notebookVisibilityDelay = 2;
         await expect(ensureNotebook(undefined)).resolves.toMatch(/^2026010100000\d-new0001$/);
         expect(s.notebookCreated).toEqual([DEFAULT_NOTEBOOK_NAME]);
     });

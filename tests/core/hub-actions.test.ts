@@ -301,6 +301,29 @@ describe("H04 扫描失败保留模块快照", () => {
         expect(res.counts.overdue).toBe(1);
     });
 
+    it("PF06：增量扫描保留范围外模块的旧错误；实扫成功后清除该模块错误", async () => {
+        const rt = defaultRuntime();
+        rt.cache = {
+            reminders: [], counts: { overdue: 0, soon: 0, lead: 0 },
+            errors: [{ moduleId: "members", message: "kernel down" }], derived: [],
+            byModule: {
+                certs: { reminders: [], at: "2026-09-30T00:00:00Z" },
+                members: { reminders: [rem("old::members.birthday", "2026-10-03", "soon", "anniversary", "members")], at: "2026-09-30T00:00:00Z" },
+            },
+        };
+        const certs: DataProvider = { moduleId: "certs", collect: async () => [rem("new::certs.expiry", "2026-10-20")] };
+        const members: DataProvider = { moduleId: "members", collect: async () => [rem("new::members.birthday", "2026-10-21", "lead", "anniversary", "members")] };
+
+        const partial = await runScan([certs, members], settings(), rt, new Date(2026, 9, 2), new Set(["certs"]));
+        expect(partial.stale).toBe(true);
+        expect(partial.errors).toEqual([{ moduleId: "members", message: "kernel down" }]);
+
+        rt.cache = { reminders: partial.reminders, counts: partial.counts, errors: partial.errors, derived: partial.derived, byModule: partial.byModule };
+        const recovered = await runScan([certs, members], settings(), rt, new Date(2026, 9, 3), new Set(["members"]));
+        expect(recovered.stale).toBe(false);
+        expect(recovered.errors).toEqual([]);
+    });
+
     it("deriveVisible：禁用模块过滤 + 忽略过滤 + 计数重算（H02 数据源）", async () => {
         const rt: HubRuntime = { ...defaultRuntime(), muted: { "a::certs.expiry": true } };
         const derived = [

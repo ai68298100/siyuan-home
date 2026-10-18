@@ -37,8 +37,9 @@ export async function runScan(
     const enabled = new Set(settings.enabledModules);
     const derivedByModule = new Map<string, Reminder[]>();
     const atByModule = new Map<string, string>();
-    const errors: { moduleId: string; message: string }[] = [];
+    const currentErrors: { moduleId: string; message: string }[] = [];
     const prevByModule = rt.cache?.byModule ?? {};
+    const prevErrors = rt.cache?.errors ?? [];
     const now = today.toISOString();
 
     await Promise.all(
@@ -58,7 +59,7 @@ export async function runScan(
                 derivedByModule.set(p.moduleId, await p.collect(today));
                 atByModule.set(p.moduleId, now);
             } catch (e) {
-                errors.push({ moduleId: p.moduleId, message: e instanceof Error ? e.message : String(e) });
+                currentErrors.push({ moduleId: p.moduleId, message: e instanceof Error ? e.message : String(e) });
                 // H04：失败模块保留旧提醒，数据时间也是旧的（不冒充新扫描）
                 const prev = prevByModule[p.moduleId];
                 if (prev) {
@@ -89,6 +90,17 @@ export async function runScan(
             };
         }
     }
+    // PF06 增量扫描只覆盖请求范围；范围外沿用旧快照时，也必须沿用该模块
+    // 上次的错误状态。否则一次局部成功会把仍然陈旧的模块误报成 fresh，
+    // 进而清掉总览中的“部分失败”提示。被本轮实际扫描的模块则以本轮结果为准，
+    // 成功即清除其旧错误，失败即由 currentErrors 替换。
+    const carriedErrors = only
+        ? prevErrors.filter((error) => !only.has(error.moduleId))
+        : [];
+    const errorsByModule = new Map<string, { moduleId: string; message: string }>();
+    for (const error of carriedErrors) errorsByModule.set(error.moduleId, error);
+    for (const error of currentErrors) errorsByModule.set(error.moduleId, error);
+    const errors = [...errorsByModule.values()];
     const derived = [...derivedByModule.values()].flat();
     const visible = applyRuntime(derived, rt, today);
     const counts = {
