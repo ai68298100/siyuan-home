@@ -856,9 +856,13 @@
   // 171 波（对齐原型质感，不低于）：forced-colors 降级——高对比模式下恢复边框轮廓，映射系统标准色彩
   @media (forced-colors: active) {
     --lv-accent: Highlight;
+    --lv-accent-strong: Highlight;
     --lv-accent-soft: transparent;
     --lv-accent-line: Highlight;
+    --lv-accent-glow: transparent;
+    --lv-accent-contrast: HighlightText;
     --lv-border: CanvasText;
+    --lv-border-strong: CanvasText;
     --lv-line: CanvasText;
     --lv-line-strong: CanvasText;
     --lv-tx: CanvasText;
@@ -867,38 +871,77 @@
     --lv-surface: Canvas;
     --lv-surface-2: Canvas;
     --lv-canvas: Canvas;
+    --lv-danger: CanvasText;
+    --lv-danger-soft: transparent;
+    --lv-warn: CanvasText;
+    --lv-warn-soft: transparent;
+    --lv-amber: CanvasText;
+    --lv-amber-soft: transparent;
+    --lv-ok: Highlight;
+    --lv-ok-soft: transparent;
     --lv-shadow-1: none;
     --lv-shadow-2: none;
     --lv-shadow-3: none;
 
+    --b3-theme-primary: Highlight;
+    --b3-theme-primary-light: transparent;
+    --b3-theme-on-primary: HighlightText;
+    --b3-theme-background: Canvas;
+    --b3-theme-surface: Canvas;
+    --b3-theme-surface-light: Canvas;
+    --b3-theme-on-background: CanvasText;
+    --b3-border-color: CanvasText;
+
     .lv-card, .lv-mod, .lv-chip, .lv-badge, .lv-qbtn, .lv-focus-card, .lv-strip, .lv-rem,
+    .lv-tabbar, .lv-hero, .lv-memo, .lv-person, .lv-start-guide, .lv-wiz__feature, .lv-wiz-flow,
+    .lv-empty, .lv-empty-compact, .lv-file, .lv-module-section__head, .lv-table tr.lv-row-link,
+    .lv-record-section, .lv-record-more, .lv-capture-context, .lv-vehicle-card,
+    .lv-settings, .lv-setcard, .lv-settings__row, .lv-settings__footer,
     .b3-button, .b3-select, .b3-text-field { border: 1px solid CanvasText; }
     .lv-modal .lv-sheet, .lv-drawer { border: 2px solid CanvasText; background: Canvas; }
     .lv-ledger-more__menu, .lv-rem .lv-rem-more-menu[data-open="true"] { border: 2px solid CanvasText; background: Canvas; }
     .lv-cal-cell { border: 1px solid CanvasText; }
     .lv-cal-cell.sel { outline: 2px solid Highlight; }
     .lv-cal-cell .d.today { outline: 2px solid CanvasText; background: Highlight; color: HighlightText; }
-    .lv-tabs__item.is-active, .lv-tabs__item[aria-selected="true"] { outline: 2px solid Highlight; color: HighlightText; background: Highlight; }
-    .lv-btn.primary, .b3-button--primary { background: Highlight; color: HighlightText; border: 1px solid Highlight; }
+    .lv-tabs__item.is-active, .lv-tabs__item[aria-selected="true"], .lv-tabs__item.on,
+    .lv-setnav__item.on, .lv-chip.on, .lv-rolechip.on, .lv-module-filter.on, [aria-selected="true"] {
+      outline: 2px solid Highlight !important; outline-offset: 1px; color: HighlightText !important; background: Highlight !important;
+    }
+    .lv-btn.primary, .b3-button--primary, .lv-hero-open {
+      background: Highlight !important; color: HighlightText !important; border: 1px solid Highlight !important;
+    }
     .lv-sw { border: 1px solid CanvasText; }
     .lv-sw.on { background: Highlight; outline: 1px solid CanvasText; }
-    :where(button, input, select, textarea):focus-visible { outline: 2px solid Highlight; outline-offset: 2px; }
-    .lv-avatar, .lv-mi, .lv-focus-icon, .t-blue, .lv-sev, .lv-badge, .lv-cal-cell .dots i, .lv-sw.on::after, .lv-start-guide__num, .lv-wiz-flow__num { forced-color-adjust: none; }
+    :where(button, a, input, select, textarea, [tabindex="0"]):focus-visible, :focus-visible {
+      outline: 2px solid Highlight !important; outline-color: Highlight !important; outline-offset: 2px;
+    }
+    .lv-avatar, .lv-miniava, .lv-mi, .lv-focus-icon, .t-blue, .t-green, .t-warn, .t-amber, .t-rose,
+    .lv-sev, .lv-badge, .lv-cal-cell .dots i, .lv-sw.on::after, .lv-start-guide__num, .lv-wiz-flow__num,
+    .lv-pulse, .lv-pulse::after, .lv-spark i, .lv-meter i, input[type="checkbox"].b3-switch,
+    input[type="checkbox"].b3-switch::after, svg { forced-color-adjust: none; }
   }
   // 高对比度偏好（prefers-contrast: more）：增强文字、边框与焦点的可见度
   @media (prefers-contrast: more) {
     --lv-line: color-mix(in srgb, var(--b3-theme-on-background) 38%, transparent);
     --lv-line-strong: var(--b3-theme-on-background);
+    --lv-border: var(--b3-theme-on-background);
+    --lv-border-strong: var(--b3-theme-on-background);
     --lv-tx-2: var(--b3-theme-on-background);
     --lv-tx-3: var(--b3-theme-on-background);
     .lv-card, .lv-mod, .lv-chip, .lv-badge, .lv-qbtn, .lv-focus-card, .lv-strip, .lv-rem,
     .lv-sheet, .lv-drawer, .lv-ledger-more__menu, .lv-table tr.lv-row-link, .lv-cal-cell,
+    .lv-tabbar, .lv-hero, .lv-memo, .lv-person, .lv-settings, .lv-setcard, .lv-settings__row,
     .b3-button, .b3-select, .b3-text-field, .lv-start-guide, .lv-wiz__feature {
       border: 1px solid var(--b3-theme-on-background);
     }
-    .lv-tabs__item.is-active { outline: 2px solid var(--b3-theme-primary); font-weight: 700; }
+    .lv-tabs__item.is-active, .lv-tabs__item.on, .lv-setnav__item.on {
+      outline: 2px solid var(--b3-theme-primary);
+      outline-offset: 1px;
+      font-weight: 700;
+    }
     .lv-cal-cell.sel { border: 2px solid var(--b3-theme-primary); }
     .lv-cal-cell .d.today { outline: 2px solid var(--b3-theme-on-background); }
+    :where(button, a, input, select, textarea, [tabindex="0"]):focus-visible,
     :focus-visible {
       outline: 3px solid var(--b3-theme-primary);
       outline-offset: 2px;
