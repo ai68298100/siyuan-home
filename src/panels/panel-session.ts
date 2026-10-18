@@ -1,9 +1,11 @@
 /** Ephemeral UI state scoped to a plugin instance; never persisted to notes or settings. */
 export type PluginScreen = "overview" | "reminders" | "ledger" | "members";
+export type TableDensity = "comfortable" | "compact";
 
 export interface PanelSessionState {
     scrollTop: Partial<Record<PluginScreen, number>>;
     ledgerSearch: string;
+    tableDensity?: TableDensity;
 }
 
 const sessions = new WeakMap<object, PanelSessionState>();

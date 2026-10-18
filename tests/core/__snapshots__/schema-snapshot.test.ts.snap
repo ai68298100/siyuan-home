@@ -1866,6 +1866,7 @@ exports[`31 模块 schema 契约快照（21 组） > 每个 schema 的结构快�
         "daily_chem",
         "paper",
         "medical_st",
+        "emergency_st",
         "other_st",
       ],
       "type": "select",
@@ -1913,6 +1914,13 @@ exports[`31 模块 schema 契约快照（21 组） > 每个 schema 的结构快�
       "key": "expiry",
       "kind": "oneoff",
       "leadDays": 30,
+    },
+  ],
+  "templates": [
+    {
+      "file": "stock/emergency-kit.tpl",
+      "key": "emergency_kit",
+      "nameKey": "tpl.emergencyKit",
     },
   ],
   "views": [

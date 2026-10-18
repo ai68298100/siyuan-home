@@ -1,12 +1,13 @@
 <script lang="ts">
     import type { Reminder, FamilyMember } from "@/types";
-    import { confirm, Menu, showMessage } from "siyuan";
+    import { confirm, Menu, showMessage, Dialog } from "siyuan";
     import { addMember, updateMember, removeMember } from "@/core/members";
     import { newSiYuanId, renderLedgerAll, setCell, uploadAsset } from "@/core/siyuan";
     import type { HomePluginLike } from "@/types/plugin";
     import { saveRuntime } from "@/core/hub/runtime";
     import { memberHue } from "@/core/format";
     import { openContactPicker, getContactsBridge } from "@/libs/contact-picker";
+    import { calculateRetirement } from "@/core/retirement";
     import UiIcon from "@/ui/icon.svelte";
     import ActivityFeed from "../activity-feed.svelte";
 
@@ -183,6 +184,7 @@
             const idx = members.findIndex((x) => x.id === m.id);
             menu.addItem({ label: t("members.moveUp"), disabled: reorderBusy || idx <= 0, click: () => move(m, -1) });
             menu.addItem({ label: t("members.moveDown"), disabled: reorderBusy || idx === members.length - 1, click: () => move(m, 1) });
+            menu.addItem({ label: t("members.reassignThis"), disabled: reassignBusy || members.length <= 1, click: () => openReassignDialog(m) });
             menu.addItem({ label: t("delete"), click: () => confirmRemove(m) });
             menu.open({ x, y });
         }, 0);
@@ -378,6 +380,78 @@
         });
     }
 
+let reassignBusy = $state(false);
+function openReassignDialog(fromMember?: FamilyMember) {
+    const activeMembers = members.filter((m) => m.avItemId);
+    if (activeMembers.length === 0) {
+        showMessage(t("members.reassignNoTargets"), 4000, "error");
+        return;
+    }
+    const fromOptions = [
+        `<option value="unassigned">${t("members.unassignedOrStale")}</option>`,
+        ...members.filter((m) => m.avItemId).map((m) => `<option value="${m.avItemId}" ${fromMember?.id === m.id ? "selected" : ""}>${m.name}（${t(`role.${m.role}`) !== `role.${m.role}` ? t(`role.${m.role}`) : m.role}）</option>`),
+    ].join("");
+    const toOptions = members
+        .filter((m) => m.avItemId && m.id !== fromMember?.id)
+        .map((m) => `<option value="${m.avItemId}">${m.name}（${t(`role.${m.role}`) !== `role.${m.role}` ? t(`role.${m.role}`) : m.role}）</option>`)
+        .join("");
+
+    const dlg = new Dialog({
+        title: t("members.reassignTitle"),
+        content: `<div class="b3-dialog__content" style="padding:16px;display:flex;flex-direction:column;gap:14px">
+            <p class="lv-caption" style="margin:0">${t("members.reassignIntro")}</p>
+            <label style="display:flex;flex-direction:column;gap:6px">
+                <span style="font-size:12px;color:var(--b3-theme-on-surface)">${t("members.reassignFrom")}</span>
+                <select class="b3-select" id="lv-reassign-from">${fromOptions}</select>
+            </label>
+            <label style="display:flex;flex-direction:column;gap:6px">
+                <span style="font-size:12px;color:var(--b3-theme-on-surface)">${t("members.reassignTo")}</span>
+                <select class="b3-select" id="lv-reassign-to">${toOptions}</select>
+            </label>
+        </div>
+        <div class="b3-dialog__action">
+            <button class="b3-button b3-button--cancel" id="lv-reassign-cancel">${t("cancel")}</button>
+            <button class="b3-button" id="lv-reassign-confirm">${t("save")}</button>
+        </div>`,
+        width: "440px",
+    });
+
+    (dlg.element.querySelector("#lv-reassign-cancel") as HTMLButtonElement).onclick = () => dlg.destroy();
+    (dlg.element.querySelector("#lv-reassign-confirm") as HTMLButtonElement).onclick = async function (this: HTMLButtonElement) {
+        const fromVal = (dlg.element.querySelector("#lv-reassign-from") as HTMLSelectElement).value;
+        const toVal = (dlg.element.querySelector("#lv-reassign-to") as HTMLSelectElement).value;
+        if (!toVal) {
+            showMessage(t("members.reassignSelectTo"), 3000, "error");
+            return;
+        }
+        if (fromVal === toVal) {
+            showMessage(t("members.reassignSameError"), 3000, "error");
+            return;
+        }
+        this.disabled = true;
+        dlg.destroy();
+        reassignBusy = true;
+        try {
+            const { reassignMemberRows } = await import("@/core/members");
+            const res = await reassignMemberRows(plugin as any, plugin.settings, {
+                fromAvItemId: fromVal === "unassigned" ? "unassigned" : fromVal,
+                toAvItemId: toVal,
+            });
+            if (res.updated > 0) {
+                const modNames = res.modules.map((m) => t(`module.${m}`) !== `module.${m}` ? t(`module.${m}`) : m).join("、");
+                showMessage(t("members.reassignDone").replace("${n}", String(res.updated)).replace("${modules}", modNames), 4000, "info");
+                await plugin.refreshHub(undefined, true);
+            } else {
+                showMessage(t("members.reassignZero"), 3000, "info");
+            }
+        } catch (e) {
+            showMessage(t("ledger.saveFailed").replace("${msg}", e instanceof Error ? e.message : String(e)), 6000, "error");
+        } finally {
+            reassignBusy = false;
+        }
+    };
+}
+
     let memberSaving = $state(false);
     let exportingVcf = $state(false);
     async function save() {
@@ -464,6 +538,9 @@
         {#if !editorOpen}<UiIcon name="add" size={15} />{/if}{editorOpen ? t("cancel") : t("add")}
     </button>
     <span class="fn__flex-1"></span>
+    <button class="b3-button b3-button--outline" onclick={() => openReassignDialog()} disabled={members.length === 0 || reassignBusy} aria-busy={reassignBusy}>
+        {reassignBusy ? t("ledger.saving") : t("members.reassign")}
+    </button>
     <button class="b3-button b3-button--outline" onclick={exportVcf} disabled={members.length === 0 || exportingVcf} aria-busy={exportingVcf}>
         {exportingVcf ? t("ledger.saving") : t("members.exportVcf")}
     </button>
@@ -593,6 +670,28 @@
                             <button class="b3-button b3-button--text" disabled={memberActionBusy.has(r.id)} aria-busy={memberActionBusy.has(r.id)} onclick={() => void runMemberAction(r.id, () => plugin.complete(r))}>{memberActionBusy.has(r.id) ? t("ledger.saving") : t("act.done")}</button>
                         </div>
                     {/each}
+                {/if}
+                {#if m.birthday}
+                    {@const ret = calculateRetirement({ birthday: m.birthday, sex: m.sex })}
+                    {#if ret}
+                        <div class="lv-member-retire-card" style="padding:10px 12px;background:var(--lv-surface-2);border-radius:8px;border:1px solid var(--lv-line);display:flex;flex-direction:column;gap:6px;font-size:12px;margin:4px 0">
+                            <div style="display:flex;align-items:center;justify-content:space-between">
+                                <span style="font-weight:600;color:var(--lv-tx)">{t("members.retirementTitle")}</span>
+                                {#if ret.isRetired}
+                                    <span class="lv-badge green">{t("members.retirementRetired")}</span>
+                                {:else}
+                                    <span class="lv-badge orange">{t("members.retirementDaysLeft").replace("${n}", String(ret.daysLeft))}</span>
+                                {/if}
+                            </div>
+                            <div style="display:flex;align-items:center;justify-content:space-between;color:var(--lv-tx-2);font-size:11.5px">
+                                <span>{t("members.retirementTarget")}: <b>{ret.targetRetireDate}</b> ({t("members.retirementAge").replace("${age}", String(ret.targetRetireAge))}{ret.delayedMonths > 0 ? ` · ${t("members.retirementDelay").replace("${n}", String(ret.delayedMonths))}` : ""})</span>
+                                <span>{t("members.retirementCareerProgress")}: {ret.careerProgressPercent}%</span>
+                            </div>
+                            <div style="height:4px;border-radius:2px;background:var(--lv-line);overflow:hidden;width:100%">
+                                <div style="height:100%;background:var(--lv-accent);width:{ret.careerProgressPercent}%;border-radius:2px;transition:width .3s ease"></div>
+                            </div>
+                        </div>
+                    {/if}
                 {/if}
                 <ActivityFeed {plugin} {t} {version} memberId={m.id} compact />
             </div>

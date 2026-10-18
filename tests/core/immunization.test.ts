@@ -2,7 +2,7 @@
  * 免疫程序表单测（第一百零四波）：剂量日期推算（月末收敛/跨年）、程序表不变式、非法输入。
  */
 import { describe, it, expect } from "vitest";
-import { IMMUNIZATION_SCHEDULE, doseDate } from "@/core/immunization";
+import { IMMUNIZATION_SCHEDULE, doseDate, calculateVaccineSchedule } from "@/core/immunization";
 
 describe("immunization.doseDate", () => {
     it("月龄推算：monthAge 0 = 出生日期；跨年正确", () => {
@@ -57,5 +57,57 @@ describe("immunization.IMMUNIZATION_SCHEDULE", () => {
         expect(has("白破疫苗", 1, 72)).toBe(true);
     });
 });
+
+describe("immunization.calculateVaccineSchedule（疫苗排期与履历测算）", () => {
+    it("准确推算应种、已种、近期应种与逾期四态及完成率", () => {
+        // 假设宝宝出生日期为 2026-06-01，测算日期为 2026-08-15（满2个月半）
+        const birthday = "2026-06-01";
+        const today = "2026-08-15";
+
+        const givenRecords = [
+            { id: "row-1", vaccineName: "乙肝疫苗", doseNo: 1, date: "2026-06-01", batch: "B123" },
+            { id: "row-2", vaccineName: "卡介苗", doseNo: 1, date: "2026-06-02" },
+            // 乙肝第2剂（应种日 2026-07-01）故意未种 -> 应该显示 overdue
+            // 脊灰第1剂（应种日 2026-08-01）也未种 -> overdue
+            // 脊灰第2剂（应种日 2026-09-01，距 08-15 为 17 天）-> due_soon (≤30天)
+            // 百白破第3剂（应种日 2026-11-01）-> upcoming
+        ];
+
+        const report = calculateVaccineSchedule(birthday, givenRecords, today);
+        expect(report).not.toBeNull();
+        expect(report?.totalDoses).toBe(IMMUNIZATION_SCHEDULE.length);
+        expect(report?.givenCount).toBe(2);
+        expect(report?.overdueCount).toBeGreaterThan(0);
+        expect(report?.dueSoonCount).toBeGreaterThan(0);
+        expect(report?.upcomingCount).toBeGreaterThan(0);
+        expect(report?.completionRate).toBe(Math.round((2 / IMMUNIZATION_SCHEDULE.length) * 100));
+
+        // 验证已接种项目
+        const hb1 = report?.items.find((it) => it.vaccine === "乙肝疫苗" && it.dose === 1);
+        expect(hb1?.status).toBe("given");
+        expect(hb1?.givenDate).toBe("2026-06-01");
+        expect(hb1?.batch).toBe("B123");
+
+        // 验证逾期项目（乙肝第2剂应种日为 2026-07-01，今天 08-15，已逾期）
+        const hb2 = report?.items.find((it) => it.vaccine === "乙肝疫苗" && it.dose === 2);
+        expect(hb2?.status).toBe("overdue");
+        expect(hb2?.targetDate).toBe("2026-07-01");
+
+        // 验证近期应种项目（脊灰第2剂应种日 2026-09-01，距今天17天）
+        const polio2 = report?.items.find((it) => it.vaccine === "脊灰灭活疫苗" && it.dose === 2);
+        expect(polio2?.status).toBe("due_soon");
+        expect(polio2?.targetDate).toBe("2026-09-01");
+
+        // 验证未来远期项目（白破 6岁加强）
+        const dt = report?.items.find((it) => it.vaccine === "白破疫苗" && it.dose === 1);
+        expect(dt?.status).toBe("upcoming");
+    });
+
+    it("非法生日返回 null", () => {
+        expect(calculateVaccineSchedule("bad-birth")).toBeNull();
+        expect(calculateVaccineSchedule("")).toBeNull();
+    });
+});
+
 
 interface VaccineLike { vaccine: string; dose: number; monthAge: number }

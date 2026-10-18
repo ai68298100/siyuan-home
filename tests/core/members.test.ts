@@ -6,6 +6,7 @@ import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { setTransport } from "@/core/siyuan";
 import {
     addMember, updateMember, reorderMembers, syncMembersToAv, backfillMemberLinks,
+    reassignMemberRows,
 } from "@/core/members";
 import { defaultSettings } from "@/core/settings";
 import type { HomeSettings, FamilyMember } from "@/types";
@@ -353,3 +354,64 @@ describe("backfillMemberLinks（D06）", () => {
         expect(st.members).toHaveLength(1);
     });
 });
+
+describe("reassignMemberRows（§15 成员批量改派）", () => {
+    it("将指定来源成员（或未指定成员）的台账行批量改派至目标成员", async () => {
+        const certRows = new Map<string, Record<string, any>>();
+        certRows.set("cert-1", { "col-member": { type: "relation", relation: { blockIDs: ["old-av-item"] } } });
+        certRows.set("cert-2", { "col-member": { type: "relation", relation: { blockIDs: ["other-av-item"] } } });
+        certRows.set("cert-3", { "col-member": { type: "relation", relation: { blockIDs: [] } } });
+
+        setTransport(async (endpoint: string, payload: any) => {
+            if (endpoint === "/api/av/renderAttributeView") {
+                return {
+                    code: 0, msg: "",
+                    data: {
+                        view: {
+                            columns: [{ id: "col-member" }],
+                            rowCount: certRows.size,
+                            rows: [...certRows.entries()].map(([id, cells]) => ({
+                                id,
+                                cells: Object.entries(cells).map(([keyID, value]) => ({ value: { keyID, ...value } })),
+                            })),
+                        },
+                    },
+                };
+            }
+            if (endpoint === "/api/av/setAttributeViewBlockAttr") {
+                certRows.get(payload.itemID)![payload.keyID] = payload.value;
+                return { code: 0, msg: "", data: null };
+            }
+            throw new Error("unexpected endpoint " + endpoint);
+        });
+
+        const { plugin } = memoryPlugin();
+        const st = settings([
+            member({ name: "原成员", id: "m-old", avItemId: "old-av-item" }),
+            member({ name: "目标成员", id: "m-new", avItemId: "new-av-item" }),
+            member({ name: "其他成员", id: "m-other", avItemId: "other-av-item" }),
+        ]);
+        st.enabledModules = ["certs"];
+        st.dbRefs.certs = { avId: "av-certs", columns: { member: "col-member" } };
+
+        // 改派旧成员 -> 新成员
+        const res = await reassignMemberRows(plugin, st, {
+            fromAvItemId: "old-av-item",
+            toAvItemId: "new-av-item",
+        });
+
+        expect(res.updated).toBe(1);
+        expect(res.modules).toEqual(["certs"]);
+        expect(certRows.get("cert-1")!["col-member"].relation.blockIDs).toEqual(["new-av-item"]);
+        expect(certRows.get("cert-2")!["col-member"].relation.blockIDs).toEqual(["other-av-item"]);
+
+        // 改派未指定成员 -> 新成员
+        const res2 = await reassignMemberRows(plugin, st, {
+            fromAvItemId: "unassigned",
+            toAvItemId: "new-av-item",
+        });
+        expect(res2.updated).toBe(1);
+        expect(certRows.get("cert-3")!["col-member"].relation.blockIDs).toEqual(["new-av-item"]);
+    });
+});
+

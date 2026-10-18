@@ -26,6 +26,16 @@ export interface AdhocMemo {
     doneAt?: string;
 }
 
+/** 命名视图配置（§17：筛选组合一键切换与跨会话持久化） */
+export interface ReminderNamedView {
+    id: string;
+    name: string;
+    filter?: string;
+    memberId?: string;
+    moduleId?: string;
+    dueWithin?: string;
+}
+
 /** 已处理记录（H07）：oneoff 完成动作的真实留痕，可恢复 */
 export interface HandledRecord {
     title: string;
@@ -58,6 +68,10 @@ export interface HubRuntime {
     /** 台账页排序偏好（17 组：列 key + 方向，跨会话记忆） */
     ledgerSortKey?: string;
     ledgerSortAsc?: boolean;
+    /** 命名视图列表（§17 命名视图切换，跨会话持久化） */
+    namedViews?: ReminderNamedView[];
+    /** 当前激活的命名视图 ID（可选） */
+    activeNamedViewId?: string;
     /** 上次扫描摘要缓存（通知与总览首屏直读，扫描失败时保留 stale 数据） */
     cache?: {
         reminders: Reminder[];
@@ -71,6 +85,8 @@ export interface HubRuntime {
     };
     /** 延后：提醒 id → 新到期日 */
     snoozed: Record<string, string>;
+    /** 计划处理日（§17/284波 双日期）：提醒 id → 计划处理日 (yyyy-MM-dd)；与客观 deadline 分离 */
+    planDates: Record<string, string>;
     /** 忽略：提醒 id → true（可在提醒页恢复） */
     muted: Record<string, boolean>;
     /** 周年类"今年已办"：提醒 id → 年份（当年隐藏，次年重现） */
@@ -108,7 +124,7 @@ export interface HubRuntime {
 }
 
 export function defaultRuntime(): HubRuntime {
-    return { schemaVersion: 1, snoozed: {}, muted: {}, handledYear: {}, handledUntil: {}, handled: {}, renewHistory: {}, memos: [] };
+    return { schemaVersion: 1, snoozed: {}, muted: {}, handledYear: {}, handledUntil: {}, handled: {}, renewHistory: {}, memos: [], namedViews: [], planDates: {} };
 }
 
 function isPlainObject(value: unknown): value is Record<string, any> {
@@ -166,6 +182,18 @@ function normalizeMemo(value: unknown): AdhocMemo | undefined {
         dueDate: value.dueDate,
         createdAt: value.createdAt,
         ...(typeof value.doneAt === "string" ? { doneAt: value.doneAt } : {}),
+    };
+}
+
+function normalizeNamedView(value: unknown): ReminderNamedView | undefined {
+    if (!isPlainObject(value) || typeof value.id !== "string" || !value.id.trim() || typeof value.name !== "string" || !value.name.trim()) return undefined;
+    return {
+        id: value.id.trim(),
+        name: value.name.trim(),
+        ...(typeof value.filter === "string" ? { filter: value.filter } : {}),
+        ...(typeof value.memberId === "string" ? { memberId: value.memberId } : {}),
+        ...(typeof value.moduleId === "string" ? { moduleId: value.moduleId } : {}),
+        ...(typeof value.dueWithin === "string" ? { dueWithin: value.dueWithin } : {}),
     };
 }
 
@@ -252,6 +280,7 @@ export async function loadRuntime(plugin: Plugin): Promise<HubRuntime> {
         ledgerSortAsc: typeof data.ledgerSortAsc === "boolean" ? data.ledgerSortAsc : undefined,
         cache: normalizeCache(data.cache),
         snoozed: stringRecord(data.snoozed),
+        planDates: stringRecord(data.planDates),
         muted: booleanRecord(data.muted),
         handledYear: numberRecord(data.handledYear),
         handledUntil: stringRecord(data.handledUntil),
@@ -259,6 +288,8 @@ export async function loadRuntime(plugin: Plugin): Promise<HubRuntime> {
         renewHistory: normalizeRenewHistory(data.renewHistory),
         memos: Array.isArray(data.memos) ? data.memos.map(normalizeMemo).filter((m): m is AdhocMemo => !!m) : [],
         pinnedMemoIds: Array.isArray(data.pinnedMemoIds) ? data.pinnedMemoIds.filter((id: unknown): id is string => typeof id === "string") : undefined,
+        namedViews: Array.isArray(data.namedViews) ? data.namedViews.map(normalizeNamedView).filter((v): v is ReminderNamedView => !!v) : [],
+        activeNamedViewId: optionalString("activeNamedViewId"),
         lastNotifiedDate: optionalString("lastNotifiedDate"),
         lastOverdueAlertDate: optionalString("lastOverdueAlertDate"),
         lastWeeklyDigest: optionalString("lastWeeklyDigest"),
@@ -356,7 +387,7 @@ export const HANDLED_KEEP_DAYS = 30;
 export function cleanupRowRuntimeData(rt: HubRuntime, rowId: string): boolean {
     let dirty = false;
     const prefix = `${rowId}::`;
-    for (const map of [rt.handled, rt.handledYear, rt.handledUntil, rt.snoozed]) {
+    for (const map of [rt.handled, rt.handledYear, rt.handledUntil, rt.snoozed, rt.planDates ?? {}]) {
         for (const key of Object.keys(map)) {
             if (key.startsWith(prefix)) { delete map[key]; dirty = true; }
         }
@@ -525,3 +556,109 @@ function parseLocal(ymd: string): number {
     const [y, m, d] = ymd.split("-").map(Number);
     return new Date(y, (m ?? 1) - 1, d ?? 1).getTime();
 }
+
+/**
+ * 保存或更新命名视图（§17 命名视图切换与跨会话持久化）
+ */
+export function saveNamedView(
+    runtime: HubRuntime,
+    view: Omit<ReminderNamedView, "id"> & { id?: string },
+): ReminderNamedView {
+    runtime.namedViews = runtime.namedViews ?? [];
+    const id = view.id || `view-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
+    const saved: ReminderNamedView = {
+        id,
+        name: view.name.trim(),
+        filter: view.filter,
+        memberId: view.memberId,
+        moduleId: view.moduleId,
+        dueWithin: view.dueWithin,
+    };
+    const index = runtime.namedViews.findIndex((v) => v.id === id);
+    if (index >= 0) {
+        runtime.namedViews[index] = saved;
+    } else {
+        runtime.namedViews.push(saved);
+    }
+    runtime.activeNamedViewId = id;
+    return saved;
+}
+
+/**
+ * 删除命名视图
+ */
+export function removeNamedView(runtime: HubRuntime, id: string): boolean {
+    if (!runtime.namedViews) return false;
+    const initialLen = runtime.namedViews.length;
+    runtime.namedViews = runtime.namedViews.filter((v) => v.id !== id);
+    if (runtime.activeNamedViewId === id) {
+        runtime.activeNamedViewId = undefined;
+    }
+    return runtime.namedViews.length < initialLen;
+}
+
+/**
+ * 应用命名视图到 runtime 筛选状态
+ */
+export function applyNamedView(runtime: HubRuntime, view: ReminderNamedView): void {
+    runtime.hubFilter = view.filter;
+    runtime.hubMemberId = view.memberId;
+    runtime.hubModuleId = view.moduleId;
+    runtime.hubDueWithin = view.dueWithin;
+    runtime.activeNamedViewId = view.id;
+}
+
+export interface ReminderPlanStatus {
+    hasPlan: boolean;
+    planDate?: string;
+    isOverdueDeadline: boolean;
+    isPlannedNow: boolean;
+    planDaysDiff?: number;
+}
+
+/** 设置提醒计划处理日（§17/284波 双日期模式） */
+export function setReminderPlanDate(runtime: HubRuntime, id: string, date: string): void {
+    runtime.planDates = runtime.planDates ?? {};
+    runtime.planDates[id] = date.trim();
+}
+
+/** 清除提醒计划处理日 */
+export function clearReminderPlanDate(runtime: HubRuntime, id: string): boolean {
+    if (!runtime.planDates || !runtime.planDates[id]) return false;
+    delete runtime.planDates[id];
+    return true;
+}
+
+/** 计算提醒的双日期状态与计划偏离度 */
+export function getReminderPlanStatus(
+    today: string,
+    dueDate: string,
+    planDate?: string,
+): ReminderPlanStatus {
+    const isOverdueDeadline = today > dueDate;
+    if (!planDate || !/^\d{4}-\d{2}-\d{2}$/.test(planDate)) {
+        return {
+            hasPlan: false,
+            isOverdueDeadline,
+            isPlannedNow: false,
+        };
+    }
+
+    const [ty, tm, td] = today.split("-").map(Number);
+    const [py, pm, pd] = planDate.split("-").map(Number);
+    const todayTime = new Date(ty, (tm ?? 1) - 1, td ?? 1).getTime();
+    const planTime = new Date(py, (pm ?? 1) - 1, pd ?? 1).getTime();
+    const planDaysDiff = Math.round((planTime - todayTime) / (24 * 60 * 60 * 1000));
+
+    const isPlannedNow = today >= planDate && !isOverdueDeadline;
+
+    return {
+        hasPlan: true,
+        planDate,
+        isOverdueDeadline,
+        isPlannedNow,
+        planDaysDiff,
+    };
+}
+
+

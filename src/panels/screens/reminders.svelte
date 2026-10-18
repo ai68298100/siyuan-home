@@ -3,7 +3,10 @@
     import { onDestroy } from "svelte";
     import { fade } from "svelte/transition";
     import type { HomePluginLike } from "@/types/plugin";
-    import { saveRuntime } from "@/core/hub/runtime";
+    import {
+        saveRuntime, saveNamedView, removeNamedView, applyNamedView, type ReminderNamedView,
+        setReminderPlanDate, clearReminderPlanDate, getReminderPlanStatus, type ReminderPlanStatus,
+    } from "@/core/hub/runtime";
     import { buildDisplay as display } from "@/core/hub/display";
     import { relativeDue, weekdayKey, localDateKey } from "@/core/hub/rule";
     import { addDetachedRow, setCell } from "@/core/siyuan";
@@ -13,8 +16,32 @@
     import UiIcon from "@/ui/icon.svelte";
     import { moduleUiIcon } from "@/ui/icons";
     import { memberHue } from "@/core/format";
-    import type { Reminder } from "@/types";
+    import type { Reminder, ReminderKind } from "@/types";
     let { plugin, t, version }: { plugin: HomePluginLike; t: (k: string) => string; version?: number } = $props();
+
+    // 就地展开摘要（§17）：不打开抽屉直接查看派生规则、所属模块与责任成员
+    let expandedReminders = $state(new Set<string>());
+    function toggleReminderExpand(id: string) {
+        const next = new Set(expandedReminders);
+        if (next.has(id)) next.delete(id);
+        else next.add(id);
+        expandedReminders = next;
+    }
+    function ruleText(ruleKey: string): string {
+        const key = `rule.${ruleKey}`;
+        const val = t(key);
+        return val === key ? ruleKey : val;
+    }
+    function kindText(kind?: ReminderKind): string {
+        if (!kind) return "";
+        const map: Record<string, string> = {
+            recurring: t("hub.kindRecurring"),
+            anniversary: t("hub.kindAnniversary"),
+            oneoff: t("hub.kindOneoff"),
+            after: t("hub.kindAfter"),
+        };
+        return map[kind] ?? kind;
+    }
 
     // version（H02）：hub 变更时递增，驱动派生重算（plugin.* 为普通对象引用）
     const all = $derived.by(() => {
@@ -34,6 +61,169 @@
     // C3a 时间窗：all=不限 / 0=今天 / 7 / 30（含逾期）
     // svelte-ignore state_referenced_locally
     let dueWithin = $state<string>(plugin.runtime.hubDueWithin ?? "all");
+
+    // 双日期模式（§17/284波 Things 3 印证）：计划处理日 (planDate) 与客观截止日 (deadline/dueDate) 分离
+    const planDates = $derived.by(() => {
+        void version;
+        return plugin.runtime.planDates ?? {};
+    });
+    const planStatusOf = (r: Reminder): ReminderPlanStatus =>
+        getReminderPlanStatus(localDateKey(new Date()), r.dueDate, planDates[r.id]);
+
+    function schedulePlanDialog(r: Reminder) {
+        const currentPlan = planDates[r.id] || "";
+        const todayKey = localDateKey(new Date());
+        const tomorrow = new Date();
+        tomorrow.setDate(tomorrow.getDate() + 1);
+        const tomorrowKey = localDateKey(tomorrow);
+
+        // 计算下周一
+        const nextMon = new Date();
+        const dayOfWeek = nextMon.getDay();
+        const daysUntilMon = ((1 + 7 - dayOfWeek) % 7) || 7;
+        nextMon.setDate(nextMon.getDate() + daysUntilMon);
+        const nextMonKey = localDateKey(nextMon);
+
+        const dlg = new Dialog({
+            title: t("hub.planScheduleTitle"),
+            content: `<div class="b3-dialog__content" style="padding:16px;display:flex;flex-direction:column;gap:12px">
+                <p class="lv-caption" style="margin:0">${t("hub.planScheduleIntro")}</p>
+                <div style="font-size:12px;color:var(--b3-theme-on-surface)">
+                    <b>${r.title}</b> · ${t("hub.summaryDue")}: ${r.dueDate}
+                </div>
+                <div style="display:flex;flex-wrap:wrap;gap:6px">
+                    <button class="b3-button b3-button--outline" id="lv-plan-preset-today" style="font-size:12px;padding:3px 8px">${t("hub.planPresetToday")}</button>
+                    <button class="b3-button b3-button--outline" id="lv-plan-preset-tomorrow" style="font-size:12px;padding:3px 8px">${t("hub.planPresetTomorrow")}</button>
+                    <button class="b3-button b3-button--outline" id="lv-plan-preset-nextmon" style="font-size:12px;padding:3px 8px">${t("hub.planPresetNextWeek")}</button>
+                </div>
+                <label style="display:flex;flex-direction:column;gap:6px">
+                    <span style="font-size:12px;color:var(--b3-theme-on-surface)">${t("hub.planDateLabel")}</span>
+                    <input class="b3-text-field" id="lv-plan-date-input" type="date" value="${currentPlan || todayKey}" style="width:100%" />
+                </label>
+            </div>
+            <div class="b3-dialog__action">
+                ${currentPlan ? `<button class="b3-button b3-button--text ft__error" id="lv-plan-clear" style="color:var(--b3-theme-error)">${t("hub.clearPlanDate")}</button>` : ""}
+                <span class="fn__flex-1"></span>
+                <button class="b3-button b3-button--cancel" id="lv-plan-cancel">${t("cancel")}</button>
+                <button class="b3-button" id="lv-plan-save">${t("save")}</button>
+            </div>`,
+            width: "420px",
+        });
+
+        const dateInput = dlg.element.querySelector("#lv-plan-date-input") as HTMLInputElement;
+        const setDate = (val: string) => { if (dateInput) dateInput.value = val; };
+
+        (dlg.element.querySelector("#lv-plan-preset-today") as HTMLButtonElement).onclick = () => setDate(todayKey);
+        (dlg.element.querySelector("#lv-plan-preset-tomorrow") as HTMLButtonElement).onclick = () => setDate(tomorrowKey);
+        (dlg.element.querySelector("#lv-plan-preset-nextmon") as HTMLButtonElement).onclick = () => setDate(nextMonKey);
+
+        const clearBtn = dlg.element.querySelector("#lv-plan-clear") as HTMLButtonElement | null;
+        if (clearBtn) {
+            clearBtn.onclick = async () => {
+                dlg.destroy();
+                clearReminderPlanDate(plugin.runtime, r.id);
+                try {
+                    await saveRuntime(plugin, plugin.runtime);
+                    showMessage(t("hub.planDateCleared"), 2500, "info");
+                    await plugin.refreshHub?.(undefined, true);
+                } catch (e) {
+                    showMessage(t("hub.filterSaveFailed").replace("${msg}", e instanceof Error ? e.message : String(e)), 5000, "error");
+                }
+            };
+        }
+
+        (dlg.element.querySelector("#lv-plan-cancel") as HTMLButtonElement).onclick = () => dlg.destroy();
+        (dlg.element.querySelector("#lv-plan-save") as HTMLButtonElement).onclick = async function (this: HTMLButtonElement) {
+            const chosenDate = dateInput?.value.trim();
+            if (!chosenDate) {
+                showMessage(t("hub.planScheduleIntro"), 3000, "error");
+                return;
+            }
+            this.disabled = true;
+            dlg.destroy();
+            setReminderPlanDate(plugin.runtime, r.id, chosenDate);
+            try {
+                await saveRuntime(plugin, plugin.runtime);
+                showMessage(t("hub.planDateSaved"), 2500, "info");
+                await plugin.refreshHub?.(undefined, true);
+            } catch (e) {
+                showMessage(t("hub.filterSaveFailed").replace("${msg}", e instanceof Error ? e.message : String(e)), 5000, "error");
+            }
+        };
+    }
+
+    // 命名视图（§17）：筛选组合一键保存与切换
+    const namedViews = $derived.by(() => {
+        void version;
+        return plugin.runtime.namedViews ?? [];
+    });
+    // svelte-ignore state_referenced_locally
+    let activeNamedViewId = $state<string | undefined>(plugin.runtime.activeNamedViewId);
+
+    function applyView(v: ReminderNamedView) {
+        applyNamedView(plugin.runtime, v);
+        filter = v.filter ?? "all";
+        filterMember = v.memberId;
+        filterModule = v.moduleId;
+        dueWithin = v.dueWithin ?? "all";
+        activeNamedViewId = v.id;
+        pruneSelection();
+        void persistFilter();
+    }
+
+    function promptSaveNamedView() {
+        const dlg = new Dialog({
+            title: t("hub.saveViewTitle"),
+            content: `<div class="b3-dialog__content" style="padding:16px;display:flex;flex-direction:column;gap:12px">
+                <p class="lv-caption" style="margin:0">${t("hub.saveViewIntro")}</p>
+                <input class="b3-text-field" id="lv-named-view-input" placeholder="${t("hub.saveViewPlaceholder")}" style="width:100%" />
+            </div>
+            <div class="b3-dialog__action">
+                <button class="b3-button b3-button--cancel" id="lv-named-view-cancel">${t("cancel")}</button>
+                <button class="b3-button" id="lv-named-view-save">${t("save")}</button>
+            </div>`,
+            width: "400px",
+        });
+        const input = dlg.element.querySelector("#lv-named-view-input") as HTMLInputElement;
+        requestAnimationFrame(() => input?.focus());
+        (dlg.element.querySelector("#lv-named-view-cancel") as HTMLButtonElement).onclick = () => dlg.destroy();
+        (dlg.element.querySelector("#lv-named-view-save") as HTMLButtonElement).onclick = async function (this: HTMLButtonElement) {
+            const nameVal = input?.value.trim();
+            if (!nameVal) {
+                showMessage(t("hub.saveViewEmptyName"), 3000, "error");
+                return;
+            }
+            this.disabled = true;
+            dlg.destroy();
+            const saved = saveNamedView(plugin.runtime, {
+                name: nameVal,
+                filter,
+                memberId: filterMember,
+                moduleId: filterModule,
+                dueWithin,
+            });
+            activeNamedViewId = saved.id;
+            try {
+                await saveRuntime(plugin, plugin.runtime);
+                showMessage(t("hub.namedViewSaved"), 2500, "info");
+            } catch (e) {
+                showMessage(t("hub.filterSaveFailed").replace("${msg}", e instanceof Error ? e.message : String(e)), 5000, "error");
+            }
+        };
+    }
+
+    function confirmDeleteNamedView(v: ReminderNamedView) {
+        confirm(t("hub.deleteViewTitle"), t("hub.deleteViewBody").replace("${name}", v.name), async () => {
+            removeNamedView(plugin.runtime, v.id);
+            if (activeNamedViewId === v.id) activeNamedViewId = undefined;
+            try {
+                await saveRuntime(plugin, plugin.runtime);
+                showMessage(t("hub.namedViewDeleted"), 2500, "info");
+            } catch (e) {
+                showMessage(t("hub.filterSaveFailed").replace("${msg}", e instanceof Error ? e.message : String(e)), 5000, "error");
+            }
+        });
+    }
     const memberOptions = $derived.by(() => {
         void version;
         return plugin.settings.members ?? [];
@@ -52,6 +242,7 @@
         plugin.runtime.hubMemberId = filterMember;
         plugin.runtime.hubModuleId = filterModule;
         plugin.runtime.hubDueWithin = dueWithin;
+        plugin.runtime.activeNamedViewId = activeNamedViewId;
         try {
             await saveRuntime(plugin, plugin.runtime);
         } catch (e) {
@@ -145,6 +336,7 @@
     });
     function changeFilter(value: string) {
         filter = value;
+        activeNamedViewId = undefined;
         if (value === "handled") clearSelection();
         pruneSelection();
         void persistFilter();
@@ -675,6 +867,7 @@
 </script>
 
 {#snippet remRow(r: Reminder)}
+    {@const plan = planStatusOf(r)}
     <!-- 261 波：完成/延后后行 150ms 淡出离场（瞬消失让用户怀疑误触；respects reduced-motion 由全局降级） -->
     <div class="lv-rem {r.level}" class:lv-rem--batch={batchMode && viewMode === "list" && filter !== "handled"} out:fade={{ duration: 150 }}>
     {#if batchMode && viewMode === "list" && filter !== "handled"}
@@ -684,7 +877,21 @@
         <!-- 259 波：图标砖收回中性（对齐原型 .rem .ic）——级别语义由色轨+右侧大字承载 -->
         <div class="lv-rem-ic" aria-hidden="true"><UiIcon name={moduleUiIcon(r.moduleId)} size={18} /></div>
         <div class="lv-rem-t" title={(r.autoRenew ? `${t("hub.autoRenew")} · ` : "") + r.dueDate}>
-            <b>{r.title}{r.ruleKey === "reciprocate" ? ` · ${t("rule.reciprocate")}` : ""}</b>
+            <b>
+                {r.title}{r.ruleKey === "reciprocate" ? ` · ${t("rule.reciprocate")}` : ""}
+                {#if plan.hasPlan}
+                    <span class="lv-plan-badge" class:is-planned-now={plan.isPlannedNow} title={`${t("hub.planDateLabel")}: ${plan.planDate}`}>
+                        🗓️ {plan.planDate}{#if plan.isPlannedNow} · 🎯 {t("hub.planActive")}{/if}
+                    </span>
+                {/if}
+                <button class="lv-rem-expand-btn" type="button"
+                    aria-expanded={expandedReminders.has(r.id)}
+                    aria-label={expandedReminders.has(r.id) ? t("hub.collapseSummary") : t("hub.expandSummary")}
+                    title={expandedReminders.has(r.id) ? t("hub.collapseSummary") : t("hub.expandSummary")}
+                    onclick={() => toggleReminderExpand(r.id)}>
+                    <span aria-hidden="true">{expandedReminders.has(r.id) ? "▴" : "▾"}</span>
+                </button>
+            </b>
             <!-- 249 波：meta 补模块名（对齐原型三段 meta）；262 波：成员微头像前置（"这是谁的事"） -->
             <span class="lv-num">{#if memberOf(r.memberId)}{@const member = memberOf(r.memberId)}<span class="lv-miniava" style="background:linear-gradient(135deg, hsl({memberHue(member.id)} 62% 52%), hsl({(memberHue(member.id) + 42) % 360} 62% 40%))" aria-hidden="true">{member.name.slice(0, 1)}</span>{/if}{r.moduleId !== "adhoc" ? (t(`module.${r.moduleId}`) !== `module.${r.moduleId}` ? t(`module.${r.moduleId}`) : r.moduleId) + " · " : ""}{r.dueDate}{#if !r.memberId} · {t("members.unassigned")}{/if}{r.lunar ? " 🌙" : ""}{r.autoRenew ? " 🔄" : ""}</span>
         </div>
@@ -706,6 +913,7 @@
                     {#if r.moduleId !== "adhoc" && plugin.settings.dbRefs[r.moduleId]?.docId}
                         <button class="b3-button b3-button--text" disabled={batchBusy} title={t("act.locate")} onclick={() => plugin.showTabDocs(plugin.settings.dbRefs[r.moduleId].docId)}>{t("act.locate")}</button>
                     {/if}
+                    <button class="b3-button b3-button--text" disabled={batchBusy || reminderBusy.has(r.id)} onclick={() => schedulePlanDialog(r)}>{plan.hasPlan ? t("hub.editPlanDate") : t("hub.setPlanDate")}</button>
                     <button class="b3-button b3-button--text" aria-haspopup="menu" disabled={batchBusy || reminderBusy.has(r.id)} aria-busy={reminderBusy.has(r.id)} onclick={(e) => snoozeMenu(r, e)}>{reminderBusy.has(r.id) ? t("ledger.saving") : `${t("act.snooze")} ▾`}</button>
                     <button class="b3-button b3-button--text" disabled={batchBusy || reminderBusy.has(r.id)} aria-busy={reminderBusy.has(r.id)} onclick={() => void runReminderAction(() => plugin.mute(r.id), r.id)}>{reminderBusy.has(r.id) ? t("ledger.saving") : t("act.mute")}</button>
                     {#if r.moduleId === "adhoc"}
@@ -723,6 +931,36 @@
                 </div>
             </div>
         </div>
+        {#if expandedReminders.has(r.id)}
+            <div class="lv-rem-summary" role="region" aria-label={t("hub.summary")}>
+                <div class="lv-rem-summary__item">
+                    <span class="label">{t("hub.summaryRule")}:</span>
+                    <span>{r.moduleId !== "adhoc" ? (t(`module.${r.moduleId}`) !== `module.${r.moduleId}` ? t(`module.${r.moduleId}`) : r.moduleId) + " · " : ""}{ruleText(r.ruleKey)}{r.kind ? `（${kindText(r.kind)}）` : ""}{r.lunar ? " · 🌙" : ""}{r.autoRenew ? " · 🔄" : ""}</span>
+                </div>
+                <div class="lv-rem-summary__item">
+                    <span class="label">{t("hub.summaryMember")}:</span>
+                    <span>{#if memberOf(r.memberId)}{@const member = memberOf(r.memberId)}{member.name}{member.role ? `（${member.role}）` : ""}{:else}{t("members.unassigned")}{/if}</span>
+                </div>
+                <div class="lv-rem-summary__item">
+                    <span class="label">{t("hub.summaryDue")}:</span>
+                    <span>{r.dueDate} · {relDue(r.daysLeft, r.dueDate)}</span>
+                </div>
+                {#if plan.hasPlan}
+                    <div class="lv-rem-summary__item">
+                        <span class="label">{t("hub.planDateLabel")}:</span>
+                        <span>{plan.planDate}{#if plan.isPlannedNow}（🎯 {t("hub.planActive")}）{/if}</span>
+                    </div>
+                {/if}
+                {#if r.moduleId !== "adhoc" && plugin.settings.dbRefs[r.moduleId]?.docId}
+                    <div class="lv-rem-summary__item">
+                        <button class="b3-button b3-button--text" style="padding:0 4px;font-size:12px;color:var(--lv-accent)"
+                            onclick={() => plugin.showTabDocs(plugin.settings.dbRefs[r.moduleId].docId)}>
+                            {t("act.locate")} →
+                        </button>
+                    </div>
+                {/if}
+            </div>
+        {/if}
     </div>
 {/snippet}
 
@@ -747,19 +985,19 @@
                 <option value="lead">{t("hub.filterLead")}</option>
                 <option value="handled">{t("hub.filterHandled")}</option>
             </select>
-            <select class="b3-select" aria-label={t("field.member")} value={filterMember ?? ""} disabled={batchBusy} onchange={(e) => { filterMember = (e.target as HTMLSelectElement).value || undefined; pruneSelection(); persistFilter(); }}>
+            <select class="b3-select" aria-label={t("field.member")} value={filterMember ?? ""} disabled={batchBusy} onchange={(e) => { filterMember = (e.target as HTMLSelectElement).value || undefined; activeNamedViewId = undefined; pruneSelection(); persistFilter(); }}>
                 <option value="">{t("field.member")}: {t("members.all")}</option>
                 {#each memberOptions as m (m.id)}
                     <option value={m.id}>{m.name}</option>
                 {/each}
             </select>
-            <select class="b3-select" aria-label={t("hub.filterAllModule")} value={filterModule ?? ""} disabled={batchBusy} onchange={(e) => { filterModule = (e.target as HTMLSelectElement).value || undefined; pruneSelection(); persistFilter(); }}>
+            <select class="b3-select" aria-label={t("hub.filterAllModule")} value={filterModule ?? ""} disabled={batchBusy} onchange={(e) => { filterModule = (e.target as HTMLSelectElement).value || undefined; activeNamedViewId = undefined; pruneSelection(); persistFilter(); }}>
                 <option value="">{t("hub.filterAllModule")}</option>
                 {#each moduleOptions as mid (mid)}
                     <option value={mid}>{mid === "adhoc" ? t("adhoc.name") : (t(`module.${mid}`) !== `module.${mid}` ? t(`module.${mid}`) : mid)}</option>
                 {/each}
             </select>
-            <select class="b3-select" aria-label={t("hub.dueAll")} value={dueWithin} disabled={batchBusy} onchange={(e) => { dueWithin = (e.target as HTMLSelectElement).value; pruneSelection(); persistFilter(); }}>
+            <select class="b3-select" aria-label={t("hub.dueAll")} value={dueWithin} disabled={batchBusy} onchange={(e) => { dueWithin = (e.target as HTMLSelectElement).value; activeNamedViewId = undefined; pruneSelection(); persistFilter(); }}>
                 <option value="all">{t("hub.dueAll")}</option>
                 <option value="0">{t("hub.dueToday")}</option>
                 <option value="7">{t("hub.due7")}</option>
@@ -767,10 +1005,34 @@
             </select>
             <!-- 243 波（收件箱分诊）：一键切片到备忘项集合（转行/完成/延后集中处理） -->
             <button class="b3-button b3-button--outline" class:is-filtered={filterModule === "adhoc"} disabled={batchBusy}
-                aria-pressed={filterModule === "adhoc"} onclick={() => { filterModule = filterModule === "adhoc" ? undefined : "adhoc"; persistFilter(); }}>
+                aria-pressed={filterModule === "adhoc"} onclick={() => { filterModule = filterModule === "adhoc" ? undefined : "adhoc"; activeNamedViewId = undefined; persistFilter(); }}>
                 {t("hub.triageChip")}{#if filterModule === "adhoc"} ✓{/if}
             </button>
         </div>
+        {#if !batchMode}
+            <div class="lv-named-views-bar" role="group" aria-label={t("hub.namedViews")}>
+                <span class="lv-caption" style="font-size:11.5px;color:var(--lv-tx-3)">{t("hub.namedViews")}:</span>
+                {#each namedViews as v (v.id)}
+                    <span class="lv-named-view-chip" class:is-active={activeNamedViewId === v.id}>
+                        <button type="button" class="lv-named-view-btn"
+                            onclick={() => applyView(v)}
+                            title={`${v.name} (${v.filter ?? "all"})`}>
+                            {v.name}
+                        </button>
+                        <button type="button" class="lv-named-view-del"
+                            onclick={(e) => { e.stopPropagation(); confirmDeleteNamedView(v); }}
+                            title={t("hub.deleteView")}>
+                            ×
+                        </button>
+                    </span>
+                {/each}
+                <button type="button" class="b3-button b3-button--text lv-save-view-btn"
+                    style="font-size:12px;padding:2px 8px;color:var(--lv-accent)"
+                    onclick={promptSaveNamedView}>
+                    ＋ {t("hub.saveCurrentView")}
+                </button>
+            </div>
+        {/if}
     </div>
     <div class="lv-card lv-hub-action-panel">
         <div class="lv-hub-panel-label">{t("view.list")}</div>

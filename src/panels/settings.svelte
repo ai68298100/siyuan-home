@@ -69,7 +69,7 @@
     let draftWebhookUrl = $state(settings.webhookUrl ?? "");
     let testingWebhook = $state(false);
     let rerunBusy = $state(false);
-    let diagnosticsBusy = $state<"backfill" | "duplicates" | "health" | null>(null);
+    let diagnosticsBusy = $state<"backfill" | "duplicates" | "health" | "rebuild" | null>(null);
     let exportingDiagnostics = $state(false);
     let demoBusy = $state(false);
     let demoAction = $state<"generate" | "clear" | null>(null);
@@ -466,6 +466,30 @@
                 7000, bad.length ? "error" : "info");
         } catch (error) {
             showMessage(`${settingHint("健康检查失败", "Health check failed")}${error instanceof Error ? ` (${error.message})` : ""}`, 6000, "error");
+        } finally {
+            diagnosticsBusy = null;
+        }
+    }
+
+    async function rebuildAllLedgers() {
+        if (diagnosticsBusy) return;
+        diagnosticsBusy = "rebuild";
+        try {
+            const report = await plugin.ensureCoreLedgers();
+            try {
+                await plugin.refreshHub?.(undefined, true);
+            } catch (error) {
+                showMessage(`${t("ledger.rebuildRefreshFailed").replace("${msg}", error instanceof Error ? error.message : String(error))}`, 6000, "error");
+                return;
+            }
+            if (report.issues.length > 0) {
+                const modules = report.issues.map(({ moduleId }) => t(`module.${moduleId}`)).join(", ");
+                showMessage(t("ledger.rebuildPartial").replace("${modules}", modules), 7000, "error");
+            } else {
+                showMessage(t("diag.rebuildAllDone"), 3000, "info");
+            }
+        } catch (error) {
+            showMessage(`${t("ledger.rebuildFailed").replace("${msg}", error instanceof Error ? error.message : String(error))}`, 6000, "error");
         } finally {
             diagnosticsBusy = null;
         }
@@ -1084,6 +1108,11 @@
                             disabled={diagnosticsBusy !== null || exportingDiagnostics}
                             aria-busy={diagnosticsBusy === "health"}
                             onclick={runDeepHealthCheck}>{diagnosticsBusy === "health" ? t("ledger.saving") : t("diag.health")}</button>
+                        <!-- §15 一键重建全部启用台账文档与视图 -->
+                        <button class="b3-button b3-button--outline"
+                            disabled={diagnosticsBusy !== null || exportingDiagnostics}
+                            aria-busy={diagnosticsBusy === "rebuild"}
+                            onclick={rebuildAllLedgers}>{diagnosticsBusy === "rebuild" ? t("ledger.saving") : t("diag.rebuildAll")}</button>
                     </div>
                 </div>
             {/if}

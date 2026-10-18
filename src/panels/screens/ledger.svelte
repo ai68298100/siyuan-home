@@ -28,7 +28,7 @@
     import { onDestroy } from "svelte";
     import UiIcon from "@/ui/icon.svelte";
     import { uiIcon } from "@/ui/icons";
-    import { panelSession } from "../panel-session";
+    import { panelSession, type TableDensity } from "../panel-session";
 
     let { plugin, t, version }: { plugin: HomePluginLike; t: (k: string) => string; version?: number } = $props();
 
@@ -85,8 +85,15 @@
     const RENDER_PAGE = 200;
     let renderLimit = $state(RENDER_PAGE);
     // 台账窗口化：数据仍完整保留在内存中，DOM 只保留视口附近的行。
-    // 通过固定的估算行高保留滚动轨道，避免 500+ 行一次性创建节点。
-    const VIRTUAL_ROW_HEIGHT = 48;
+    // 密度模式（§17）：舒适（48px）与紧凑（34px）两档，滚动轨道高度随密度自适应。
+    const VIRTUAL_ROW_HEIGHT_COMFORTABLE = 48;
+    const VIRTUAL_ROW_HEIGHT_COMPACT = 34;
+    let tableDensity = $state<TableDensity>(panelMemory.tableDensity ?? "comfortable");
+    let virtualRowHeight = $derived(tableDensity === "compact" ? VIRTUAL_ROW_HEIGHT_COMPACT : VIRTUAL_ROW_HEIGHT_COMFORTABLE);
+    function toggleDensity() {
+        tableDensity = tableDensity === "compact" ? "comfortable" : "compact";
+        panelMemory.tableDensity = tableDensity;
+    }
     const VIRTUAL_OVERSCAN = 8;
     let ledgerScrollTop = $state(0);
     let ledgerViewportHeight = $state(640);
@@ -166,8 +173,8 @@
         const tableTop = ledgerTableEl && virtualRoot
             ? ledgerTableEl.getBoundingClientRect().top - virtualRoot.getBoundingClientRect().top + virtualRoot.scrollTop
             : 0;
-        const first = Math.max(0, Math.floor((ledgerScrollTop - tableTop) / VIRTUAL_ROW_HEIGHT) - VIRTUAL_OVERSCAN);
-        const count = Math.ceil(ledgerViewportHeight / VIRTUAL_ROW_HEIGHT) + VIRTUAL_OVERSCAN * 2;
+        const first = Math.max(0, Math.floor((ledgerScrollTop - tableTop) / virtualRowHeight) - VIRTUAL_OVERSCAN);
+        const count = Math.ceil(ledgerViewportHeight / virtualRowHeight) + VIRTUAL_OVERSCAN * 2;
         return { start: Math.min(first, Math.max(0, total - count)), end: Math.min(total, first + count) };
     });
     const virtualRows = $derived(visibleRows.slice(virtualRange.start, virtualRange.end));
@@ -574,6 +581,272 @@
         });
     }
 
+    // Vaccine schedule (given, overdue, due soon, upcoming) for children in parenting records.
+    async function openVaccineScheduleModal() {
+        if (!ref?.avId || !ref.columns) return;
+        const allMembers = plugin.settings.members ?? [];
+        const children = allMembers.filter((m) => m.birthday && (m.role === "child" || !m.role));
+        const candidate = children.length > 0 ? children : allMembers.filter((m) => m.birthday);
+
+        if (candidate.length === 0) {
+            showMessage(t("ledger.vaccineNoBirthdayChild"), 4000, "info");
+            return;
+        }
+
+        try {
+            const all = await renderLedgerAll(ref.avId);
+            if (!all.complete) {
+                showMessage(t("ledger.loadIncomplete"), 5000, "error");
+                return;
+            }
+            const { calculateVaccineSchedule } = await import("@/core/immunization");
+            type GivenDose = import("@/core/immunization").GivenDoseRecord;
+            let selectedChildId = candidate[0].id;
+
+            const dlg = new Dialog({
+                title: t("ledger.vaccineSchedule"),
+                content: `<div class="b3-dialog__content" id="lv-vaccine-sched-body" style="max-height:65vh;overflow:auto;display:flex;flex-direction:column;gap:12px;padding:16px"></div>
+<div class="b3-dialog__action"><button class="b3-button" id="lv-vaccine-sched-close">${t("close")}</button></div>`,
+                width: "580px",
+            });
+            const body = dlg.element.querySelector("#lv-vaccine-sched-body") as HTMLElement;
+            (dlg.element.querySelector("#lv-vaccine-sched-close") as HTMLButtonElement).onclick = () => dlg.destroy();
+
+            const render = () => {
+                body.replaceChildren();
+                const child = allMembers.find((m) => m.id === selectedChildId) || candidate[0];
+                if (!child.birthday) return;
+
+                // 收集该孩子在 parenting 里的已接种记录
+                const givenRecords: GivenDose[] = [];
+                for (const r of all.rows) {
+                    const mBlock = ref.columns.member ? r.cells[ref.columns.member]?.relation?.blockIDs?.[0] : undefined;
+                    if (mBlock && child.avItemId && mBlock !== child.avItemId) continue;
+
+                    const vname = ref.columns.vaccine_name ? cellText(r.cells[ref.columns.vaccine_name]) : (ref.columns.name ? cellText(r.cells[ref.columns.name]) : "");
+                    const doseRaw = ref.columns.dose_no ? cellText(r.cells[ref.columns.dose_no]) : "";
+                    const dateVal = ref.columns.date ? cellText(r.cells[ref.columns.date]) : "";
+                    const batchVal = ref.columns.vaccine_batch ? cellText(r.cells[ref.columns.vaccine_batch]) : "";
+                    const siteVal = ref.columns.vaccine_site ? cellText(r.cells[ref.columns.vaccine_site]) : "";
+
+                    if (vname && vname !== "—") {
+                        givenRecords.push({
+                            id: r.itemID,
+                            vaccineName: vname,
+                            doseNo: Number(doseRaw) || undefined,
+                            date: dateVal !== "—" ? dateVal : undefined,
+                            batch: batchVal !== "—" ? batchVal : undefined,
+                            site: siteVal !== "—" ? siteVal : undefined,
+                        });
+                    }
+                }
+
+                const report = calculateVaccineSchedule(child.birthday, givenRecords);
+                if (!report) return;
+
+                // 顶部孩子切换（若多位孩子）与完成率
+                const topBar = document.createElement("div");
+                topBar.style.cssText = "display:flex;align-items:center;justify-content:space-between;gap:8px";
+                if (candidate.length > 1) {
+                    const sel = document.createElement("select");
+                    sel.className = "b3-select";
+                    sel.style.cssText = "font-size:12px;padding:3px 8px";
+                    for (const c of candidate) {
+                        const opt = document.createElement("option");
+                        opt.value = c.id;
+                        opt.textContent = `${c.name} (${c.birthday})`;
+                        if (c.id === selectedChildId) opt.selected = true;
+                        sel.appendChild(opt);
+                    }
+                    sel.onchange = () => { selectedChildId = sel.value; render(); };
+                    topBar.appendChild(sel);
+                } else {
+                    const nameSpan = document.createElement("b");
+                    nameSpan.style.cssText = "font-size:13px;color:var(--lv-tx)";
+                    nameSpan.textContent = `${child.name} · ${child.birthday}`;
+                    topBar.appendChild(nameSpan);
+                }
+                const rateSpan = document.createElement("span");
+                rateSpan.className = "lv-caption";
+                rateSpan.innerHTML = `${t("ledger.vaccineCompletionRate")}: <b class="lv-num" style="color:var(--lv-accent)">${report.completionRate}%</b>`;
+                topBar.appendChild(rateSpan);
+                body.appendChild(topBar);
+
+                // 进度条
+                const progressTrack = document.createElement("div");
+                progressTrack.style.cssText = "height:6px;border-radius:3px;background:var(--lv-line);overflow:hidden;width:100%";
+                progressTrack.innerHTML = `<div style="height:100%;background:var(--lv-accent);width:${report.completionRate}%;border-radius:3px"></div>`;
+                body.appendChild(progressTrack);
+
+                // 统计概览卡
+                const metrics = document.createElement("div");
+                metrics.style.cssText = "display:grid;grid-template-columns:repeat(4, 1fr);gap:8px";
+
+                const givenCard = document.createElement("div");
+                givenCard.style.cssText = "padding:8px 10px;background:var(--lv-surface-2);border-radius:6px;border:1px solid var(--lv-line);display:flex;flex-direction:column;gap:2px";
+                givenCard.innerHTML = `<span class="lv-caption">${t("ledger.vaccineGiven")}</span><b class="lv-num" style="color:var(--lv-accent);font-size:16px">${report.givenCount}</b>`;
+
+                const overdueCard = document.createElement("div");
+                overdueCard.style.cssText = "padding:8px 10px;background:var(--lv-surface-2);border-radius:6px;border:1px solid var(--lv-line);display:flex;flex-direction:column;gap:2px";
+                overdueCard.innerHTML = `<span class="lv-caption">${t("ledger.vaccineOverdue")}</span><b class="lv-num" style="color:var(--lv-danger);font-size:16px">${report.overdueCount}</b>`;
+
+                const dueSoonCard = document.createElement("div");
+                dueSoonCard.style.cssText = "padding:8px 10px;background:var(--lv-surface-2);border-radius:6px;border:1px solid var(--lv-line);display:flex;flex-direction:column;gap:2px";
+                dueSoonCard.innerHTML = `<span class="lv-caption">${t("ledger.vaccineDueSoon")}</span><b class="lv-num" style="color:var(--lv-warn);font-size:16px">${report.dueSoonCount}</b>`;
+
+                const upcomingCard = document.createElement("div");
+                upcomingCard.style.cssText = "padding:8px 10px;background:var(--lv-surface-2);border-radius:6px;border:1px solid var(--lv-line);display:flex;flex-direction:column;gap:2px";
+                upcomingCard.innerHTML = `<span class="lv-caption">${t("ledger.vaccineUpcoming")}</span><b class="lv-num" style="font-size:16px">${report.upcomingCount}</b>`;
+
+                metrics.append(givenCard, overdueCard, dueSoonCard, upcomingCard);
+                body.appendChild(metrics);
+
+                // 疫苗排期列表
+                const list = document.createElement("div");
+                list.style.cssText = "display:flex;flex-direction:column;gap:6px;margin-top:4px";
+
+                for (const it of report.items) {
+                    const itemEl = document.createElement("div");
+                    itemEl.style.cssText = "display:flex;align-items:center;justify-content:space-between;padding:8px 12px;background:var(--lv-surface-2);border-radius:6px;border:1px solid var(--lv-line);font-size:12.5px";
+
+                    const left = document.createElement("div");
+                    left.style.cssText = "display:flex;flex-direction:column;gap:2px;min-width:0;flex:1";
+
+                    const titleLine = document.createElement("div");
+                    titleLine.style.cssText = "display:flex;align-items:center;gap:6px";
+                    const nameSpan = document.createElement("b");
+                    nameSpan.style.cssText = "color:var(--lv-tx)";
+                    nameSpan.textContent = `${it.vaccine}（第 ${it.dose} 剂）`;
+
+                    const monthBadge = document.createElement("span");
+                    monthBadge.className = "lv-caption";
+                    monthBadge.style.cssText = "padding:1px 6px;border-radius:4px;background:var(--lv-surface);border:1px solid var(--lv-line)";
+                    monthBadge.textContent = it.monthAge === 0 ? "出生时" : `${it.monthAge}月龄`;
+
+                    titleLine.append(nameSpan, monthBadge);
+
+                    const metaSpan = document.createElement("span");
+                    metaSpan.className = "lv-caption";
+                    const metaParts = [`应种日: ${it.targetDate}`];
+                    if (it.note) metaParts.push(it.note);
+                    if (it.givenDate) metaParts.push(`实种日: ${it.givenDate}`);
+                    if (it.batch) metaParts.push(`批号: ${it.batch}`);
+                    metaSpan.textContent = metaParts.join(" · ");
+
+                    left.append(titleLine, metaSpan);
+
+                    const right = document.createElement("div");
+                    right.style.cssText = "display:flex;align-items:center;gap:6px;flex-shrink:0";
+
+                    const statusBadge = document.createElement("span");
+                    if (it.status === "given") {
+                        statusBadge.className = "lv-badge green";
+                        statusBadge.textContent = t("ledger.vaccineGiven");
+                    } else if (it.status === "overdue") {
+                        statusBadge.className = "lv-badge danger";
+                        statusBadge.textContent = t("ledger.vaccineOverdue");
+                    } else if (it.status === "due_soon") {
+                        statusBadge.className = "lv-badge orange";
+                        statusBadge.textContent = t("ledger.vaccineDueSoon");
+                    } else {
+                        statusBadge.className = "lv-badge gray";
+                        statusBadge.textContent = t("ledger.vaccineUpcoming");
+                    }
+                    right.appendChild(statusBadge);
+
+                    if (it.status !== "given") {
+                        const recordBtn = document.createElement("button");
+                        recordBtn.className = "b3-button b3-button--text";
+                        recordBtn.style.cssText = "font-size:11.5px;padding:0 4px;color:var(--lv-accent)";
+                        recordBtn.textContent = `＋ ${t("ledger.recordVaccineDose")}`;
+                        recordBtn.onclick = () => {
+                            const rdlg = new Dialog({
+                                title: `${t("ledger.recordVaccineTitle")} · ${it.vaccine}`,
+                                content: `<div class="b3-dialog__content" style="padding:16px;display:flex;flex-direction:column;gap:12px">
+                                    <label style="display:flex;flex-direction:column;gap:4px">
+                                        <span class="lv-caption">${t("field.date")}</span>
+                                        <input class="b3-text-field" id="lv-vrec-date" type="date" value="${it.targetDate}" style="width:100%" />
+                                    </label>
+                                    <label style="display:flex;flex-direction:column;gap:4px">
+                                        <span class="lv-caption">${t("field.vaccine_batch")}</span>
+                                        <input class="b3-text-field" id="lv-vrec-batch" placeholder="${t("field.vaccine_batch")}" style="width:100%" />
+                                    </label>
+                                    <label style="display:flex;flex-direction:column;gap:4px">
+                                        <span class="lv-caption">${t("field.vaccine_site")}</span>
+                                        <input class="b3-text-field" id="lv-vrec-site" placeholder="${t("field.vaccine_site")}" style="width:100%" />
+                                    </label>
+                                </div>
+                                <div class="b3-dialog__action">
+                                    <button class="b3-button b3-button--cancel" id="lv-vrec-cancel">${t("cancel")}</button>
+                                    <button class="b3-button" id="lv-vrec-save">${t("save")}</button>
+                                </div>`,
+                                width: "400px",
+                            });
+                            (rdlg.element.querySelector("#lv-vrec-cancel") as HTMLButtonElement).onclick = () => rdlg.destroy();
+                            (rdlg.element.querySelector("#lv-vrec-save") as HTMLButtonElement).onclick = async function (this: HTMLButtonElement) {
+                                const dateVal = (rdlg.element.querySelector("#lv-vrec-date") as HTMLInputElement)?.value.trim() || it.targetDate;
+                                const batchVal = (rdlg.element.querySelector("#lv-vrec-batch") as HTMLInputElement)?.value.trim();
+                                const siteVal = (rdlg.element.querySelector("#lv-vrec-site") as HTMLInputElement)?.value.trim();
+
+                                this.disabled = true;
+                                rdlg.destroy();
+                                try {
+                                    const { addDetachedRow, setCell } = await import("@/core/siyuan");
+                                    const rowId = await addDetachedRow(ref.avId!, it.vaccine);
+                                    if (ref.columns.category) {
+                                        await setCell(ref.avId!, ref.columns.category, rowId, { type: "select", select: { content: "vaccine_p" } });
+                                    }
+                                    if (ref.columns.date) {
+                                        await setCell(ref.avId!, ref.columns.date, rowId, { type: "date", date: { content: dateVal, isNotEmpty: true } });
+                                    }
+                                    if (ref.columns.vaccine_name) {
+                                        await setCell(ref.avId!, ref.columns.vaccine_name, rowId, { type: "text", text: { content: it.vaccine } });
+                                    }
+                                    if (ref.columns.dose_no) {
+                                        await setCell(ref.avId!, ref.columns.dose_no, rowId, { type: "number", number: { content: it.dose, isNotEmpty: true } });
+                                    }
+                                    if (ref.columns.vaccine_batch && batchVal) {
+                                        await setCell(ref.avId!, ref.columns.vaccine_batch, rowId, { type: "text", text: { content: batchVal } });
+                                    }
+                                    if (ref.columns.vaccine_site && siteVal) {
+                                        await setCell(ref.avId!, ref.columns.vaccine_site, rowId, { type: "text", text: { content: siteVal } });
+                                    }
+                                    if (ref.columns.member && child.avItemId) {
+                                        await setCell(ref.avId!, ref.columns.member, rowId, { type: "relation", relation: { blockIDs: [child.avItemId] } });
+                                    }
+                                    showMessage(t("ledger.recordVaccineSaved"), 3000, "info");
+                                    all.rows.push({
+                                        itemID: rowId,
+                                        cells: {
+                                            [ref.columns.vaccine_name]: { type: "text", text: { content: it.vaccine } },
+                                            [ref.columns.dose_no]: { type: "number", number: { content: it.dose } },
+                                            [ref.columns.date]: { type: "date", date: { content: dateVal } },
+                                            [ref.columns.category]: { type: "select", select: { content: "vaccine_p" } },
+                                        },
+                                    });
+                                    render();
+                                    await load();
+                                } catch (err) {
+                                    showMessage(t("ledger.saveFailed").replace("${msg}", err instanceof Error ? err.message : String(err)), 6000, "error");
+                                }
+                            };
+                        };
+                        right.appendChild(recordBtn);
+                    }
+
+                    itemEl.append(left, right);
+                    list.appendChild(itemEl);
+                }
+
+                body.appendChild(list);
+            };
+
+            render();
+        } catch (e) {
+            showMessage(t("ledger.logReadFailed") + " (" + (e instanceof Error ? e.message : String(e)) + ")", 6000, "error");
+        }
+    }
+
     async function rebuildLedger() {
         rebuilding = true;
         try {
@@ -665,6 +938,670 @@
         };
         } catch (e) {
             showMessage(t("ledger.shoppingFailed").replace("${msg}", e instanceof Error ? e.message : String(e)), 6000, "error");
+        }
+    }
+
+    // Favors annual summary report and relationship balance analysis.
+    async function openFavorsReport() {
+        if (!ref?.avId || !ref.columns) return;
+        try {
+            const all = await renderLedgerAll(ref.avId);
+            if (!all.complete) {
+                showMessage(t("ledger.loadIncomplete"), 5000, "error");
+                return;
+            }
+            const { buildFavorsReport, formatFavorsReportText } = await import("@/core/favors");
+            let selectedYear: number | "all" = new Date().getFullYear();
+
+            const dlg = new Dialog({
+                title: t("ledger.favorsReport"),
+                content: `<div class="b3-dialog__content" id="lv-favors-body" style="max-height:65vh;overflow:auto;display:flex;flex-direction:column;gap:12px;padding:16px"></div>
+<div class="b3-dialog__action"><button class="b3-button b3-button--cancel" id="lv-favors-close">${t("close")}</button><button class="b3-button" id="lv-favors-copy">${t("ledger.favorsCopyText")}</button></div>`,
+                width: "560px",
+            });
+            const body = dlg.element.querySelector("#lv-favors-body") as HTMLElement;
+
+            const render = () => {
+                body.replaceChildren();
+                const report = buildFavorsReport(all.rows, ref!.columns, selectedYear);
+
+                const toolbar = document.createElement("div");
+                toolbar.style.cssText = "display:flex;align-items:center;justify-content:space-between;gap:8px";
+
+                const yearSelect = document.createElement("select");
+                yearSelect.className = "b3-select";
+                yearSelect.style.cssText = "font-size:12px;padding:4px 8px";
+                const optAll = document.createElement("option");
+                optAll.value = "all";
+                optAll.textContent = t("ledger.favorsYearAll");
+                if (selectedYear === "all") optAll.selected = true;
+                yearSelect.appendChild(optAll);
+
+                for (const y of report.availableYears) {
+                    const opt = document.createElement("option");
+                    opt.value = String(y);
+                    opt.textContent = `${y} 年`;
+                    if (selectedYear === y) opt.selected = true;
+                    yearSelect.appendChild(opt);
+                }
+                yearSelect.onchange = () => {
+                    selectedYear = yearSelect.value === "all" ? "all" : Number(yearSelect.value);
+                    render();
+                };
+
+                const subSummary = document.createElement("span");
+                subSummary.className = "lv-caption";
+                subSummary.textContent = t("ledger.favorsCountRecords").replace("${n}", String(report.countIn + report.countOut));
+                toolbar.append(yearSelect, subSummary);
+                body.appendChild(toolbar);
+
+                if (report.countIn === 0 && report.countOut === 0) {
+                    const empty = document.createElement("div");
+                    empty.className = "lv-caption";
+                    empty.style.cssText = "text-align:center;padding:24px 0";
+                    empty.textContent = t("ledger.favorsEmpty");
+                    body.appendChild(empty);
+                    return;
+                }
+
+                const metrics = document.createElement("div");
+                metrics.style.cssText = "display:grid;grid-template-columns:repeat(3, 1fr);gap:10px";
+
+                const inCard = document.createElement("div");
+                inCard.style.cssText = "padding:12px;background:var(--lv-surface-2);border-radius:8px;border:1px solid var(--lv-line);display:flex;flex-direction:column;gap:4px";
+                inCard.innerHTML = `<span class="lv-caption">${t("ledger.favorsInTotal")}</span><b class="lv-num" style="color:var(--lv-accent);font-size:18px">¥${formatAmount(report.totalIn)}</b><span class="lv-caption">${report.countIn} 笔</span>`;
+
+                const outCard = document.createElement("div");
+                outCard.style.cssText = "padding:12px;background:var(--lv-surface-2);border-radius:8px;border:1px solid var(--lv-line);display:flex;flex-direction:column;gap:4px";
+                outCard.innerHTML = `<span class="lv-caption">${t("ledger.favorsOutTotal")}</span><b class="lv-num" style="color:var(--lv-warn);font-size:18px">¥${formatAmount(report.totalOut)}</b><span class="lv-caption">${report.countOut} 笔</span>`;
+
+                const netCard = document.createElement("div");
+                const netColor = report.netAmount >= 0 ? "var(--lv-accent)" : "var(--lv-danger)";
+                const netLabel = report.netAmount >= 0 ? t("ledger.favorsNetSurplus") : t("ledger.favorsNetDeficit");
+                netCard.style.cssText = "padding:12px;background:var(--lv-surface-2);border-radius:8px;border:1px solid var(--lv-line);display:flex;flex-direction:column;gap:4px";
+                netCard.innerHTML = `<span class="lv-caption">${t("ledger.favorsNetAmount")}</span><b class="lv-num" style="color:${netColor};font-size:18px">${report.netAmount >= 0 ? "+" : "-"}¥${formatAmount(Math.abs(report.netAmount))}</b><span class="lv-caption">${netLabel}</span>`;
+
+                metrics.append(inCard, outCard, netCard);
+                body.appendChild(metrics);
+
+                if (report.topPersons.length > 0) {
+                    const sec = document.createElement("div");
+                    sec.style.cssText = "margin-top:4px";
+                    sec.innerHTML = `<div class="ft__on-surface" style="font-weight:600;font-size:12.5px;margin-bottom:8px">${t("ledger.favorsTopPersons")}</div>`;
+                    const list = document.createElement("div");
+                    list.style.cssText = "display:flex;flex-direction:column;gap:6px";
+                    for (const p of report.topPersons) {
+                        const item = document.createElement("div");
+                        item.style.cssText = "display:flex;align-items:center;justify-content:space-between;padding:7px 12px;background:var(--lv-surface-2);border-radius:6px;border:1px solid var(--lv-line);font-size:12.5px";
+                        const left = document.createElement("span");
+                        left.style.cssText = "font-weight:500;color:var(--lv-tx)";
+                        left.textContent = p.person;
+                        const right = document.createElement("span");
+                        right.style.cssText = "font-size:12px";
+                        const pNetColor = p.net >= 0 ? "var(--lv-accent)" : "var(--lv-danger)";
+                        right.innerHTML = `收 ¥${formatAmount(p.inAmount)} · 送 ¥${formatAmount(p.outAmount)} · <b style="color:${pNetColor}">${p.net >= 0 ? "+" : "-"}¥${formatAmount(Math.abs(p.net))}</b>`;
+                        item.append(left, right);
+                        list.appendChild(item);
+                    }
+                    sec.appendChild(list);
+                    body.appendChild(sec);
+                }
+
+                if (report.categoryBreakdown.length > 0) {
+                    const sec = document.createElement("div");
+                    sec.style.cssText = "margin-top:4px";
+                    sec.innerHTML = `<div class="ft__on-surface" style="font-weight:600;font-size:12.5px;margin-bottom:8px">${t("ledger.favorsCategory")}</div>`;
+                    const list = document.createElement("div");
+                    list.style.cssText = "display:flex;flex-direction:column;gap:6px";
+                    for (const c of report.categoryBreakdown) {
+                        const item = document.createElement("div");
+                        item.style.cssText = "display:flex;align-items:center;justify-content:space-between;padding:6px 12px;background:var(--lv-surface-2);border-radius:6px;border:1px solid var(--lv-line);font-size:12px";
+                        const left = document.createElement("span");
+                        left.textContent = t(`field.category.opt.${c.category}`) !== `field.category.opt.${c.category}` ? t(`field.category.opt.${c.category}`) : c.category;
+                        const right = document.createElement("span");
+                        right.className = "lv-caption";
+                        right.textContent = `收 ¥${formatAmount(c.inAmount)} · 送 ¥${formatAmount(c.outAmount)} (${c.count} 笔)`;
+                        item.append(left, right);
+                        list.appendChild(item);
+                    }
+                    sec.appendChild(list);
+                    body.appendChild(sec);
+                }
+            };
+
+            render();
+
+            (dlg.element.querySelector("#lv-favors-close") as HTMLButtonElement).onclick = () => dlg.destroy();
+            (dlg.element.querySelector("#lv-favors-copy") as HTMLButtonElement).onclick = async () => {
+                const report = buildFavorsReport(all.rows, ref!.columns, selectedYear);
+                const text = formatFavorsReportText(report, (cat) => t(`field.category.opt.${cat}`) !== `field.category.opt.${cat}` ? t(`field.category.opt.${cat}`) : cat);
+                try {
+                    await navigator.clipboard.writeText(text);
+                    showMessage(t("ledger.favorsCopyDone"), 2500, "info");
+                } catch {
+                    showMessage(t("ledger.copyAsImageFail"), 4000, "error");
+                }
+            };
+        } catch (e) {
+            showMessage(t("ledger.logReadFailed") + " (" + (e instanceof Error ? e.message : String(e)) + ")", 6000, "error");
+        }
+    }
+
+    // Check validity of URLs in bookmarks ledger and highlight broken links.
+    async function openBookmarksCheck() {
+        if (!ref?.avId || !ref.columns?.url) return;
+        try {
+            const all = await renderLedgerAll(ref.avId);
+            if (!all.complete) {
+                showMessage(t("ledger.loadIncomplete"), 5000, "error");
+                return;
+            }
+
+            const dlg = new Dialog({
+                title: t("ledger.checkBookmarks"),
+                content: `<div class="b3-dialog__content" id="lv-bm-check-body" style="max-height:65vh;overflow:auto;display:flex;flex-direction:column;gap:12px;padding:16px">
+                    <div style="display:flex;align-items:center;gap:8px;padding:16px;justify-content:center">
+                        <span class="lv-caption">${t("ledger.bookmarksChecking").replace("${n}", String(all.rows.length))}</span>
+                    </div>
+                </div>
+<div class="b3-dialog__action"><button class="b3-button b3-button--cancel" id="lv-bm-check-close">${t("close")}</button><button class="b3-button" id="lv-bm-check-copy" disabled>${t("ledger.bookmarksCopyReport")}</button></div>`,
+                width: "560px",
+            });
+            const body = dlg.element.querySelector("#lv-bm-check-body") as HTMLElement;
+            const copyBtn = dlg.element.querySelector("#lv-bm-check-copy") as HTMLButtonElement;
+
+            (dlg.element.querySelector("#lv-bm-check-close") as HTMLButtonElement).onclick = () => dlg.destroy();
+
+            const { checkBookmarksHealth, formatBookmarkHealthReportText } = await import("@/core/bookmarks");
+            const report = await checkBookmarksHealth(all.rows, ref.columns);
+
+            body.replaceChildren();
+
+            if (report.total === 0) {
+                const empty = document.createElement("div");
+                empty.className = "lv-caption";
+                empty.style.cssText = "text-align:center;padding:24px 0";
+                empty.textContent = t("ledger.bookmarksNoLinks");
+                body.appendChild(empty);
+                return;
+            }
+
+            // 统计指标卡
+            const metrics = document.createElement("div");
+            metrics.style.cssText = "display:grid;grid-template-columns:repeat(3, 1fr);gap:10px";
+
+            const totalCard = document.createElement("div");
+            totalCard.style.cssText = "padding:12px;background:var(--lv-surface-2);border-radius:8px;border:1px solid var(--lv-line);display:flex;flex-direction:column;gap:4px";
+            totalCard.innerHTML = `<span class="lv-caption">${t("ledger.bookmarksTotal")}</span><b class="lv-num" style="font-size:18px">${report.total}</b>`;
+
+            const healthyCard = document.createElement("div");
+            healthyCard.style.cssText = "padding:12px;background:var(--lv-surface-2);border-radius:8px;border:1px solid var(--lv-line);display:flex;flex-direction:column;gap:4px";
+            healthyCard.innerHTML = `<span class="lv-caption">${t("ledger.bookmarksHealthy")}</span><b class="lv-num" style="color:var(--lv-accent);font-size:18px">${report.healthyCount}</b>`;
+
+            const brokenCard = document.createElement("div");
+            const brokenColor = report.brokenCount > 0 ? "var(--lv-danger)" : "var(--lv-tx-3)";
+            brokenCard.style.cssText = "padding:12px;background:var(--lv-surface-2);border-radius:8px;border:1px solid var(--lv-line);display:flex;flex-direction:column;gap:4px";
+            brokenCard.innerHTML = `<span class="lv-caption">${t("ledger.bookmarksBroken")}</span><b class="lv-num" style="color:${brokenColor};font-size:18px">${report.brokenCount}</b>`;
+
+            metrics.append(totalCard, healthyCard, brokenCard);
+            body.appendChild(metrics);
+
+            if (report.brokenCount === 0) {
+                const okMsg = document.createElement("div");
+                okMsg.style.cssText = "padding:14px;background:var(--lv-surface-2);border-radius:8px;border:1px solid var(--lv-accent);color:var(--lv-accent);text-align:center;font-size:13px";
+                okMsg.textContent = `✓ ${t("ledger.bookmarksAllHealthy")}`;
+                body.appendChild(okMsg);
+            } else {
+                copyBtn.disabled = false;
+                const sec = document.createElement("div");
+                sec.style.cssText = "margin-top:4px";
+                sec.innerHTML = `<div class="ft__on-surface" style="font-weight:600;font-size:12.5px;margin-bottom:8px">${t("ledger.bookmarksBrokenCount").replace("${n}", String(report.brokenCount))}</div>`;
+
+                const list = document.createElement("div");
+                list.style.cssText = "display:flex;flex-direction:column;gap:6px";
+
+                for (const item of report.brokenItems) {
+                    const rowEl = document.createElement("div");
+                    rowEl.style.cssText = "display:flex;align-items:center;justify-content:space-between;gap:8px;padding:8px 12px;background:var(--lv-surface-2);border-radius:6px;border:1px solid var(--lv-line);font-size:12px";
+
+                    const left = document.createElement("div");
+                    left.style.cssText = "display:flex;flex-direction:column;gap:2px;min-width:0;flex:1";
+
+                    const titleSpan = document.createElement("span");
+                    titleSpan.style.cssText = "font-weight:500;color:var(--lv-tx)";
+                    titleSpan.textContent = item.name;
+
+                    const urlSpan = document.createElement("span");
+                    urlSpan.className = "lv-caption";
+                    urlSpan.style.cssText = "overflow:hidden;text-overflow:ellipsis;white-space:nowrap";
+                    urlSpan.textContent = item.url || "（空链接）";
+
+                    left.append(titleSpan, urlSpan);
+
+                    const right = document.createElement("div");
+                    right.style.cssText = "display:flex;align-items:center;gap:6px;flex-shrink:0";
+
+                    const badge = document.createElement("span");
+                    badge.className = "lv-badge danger";
+                    badge.textContent = item.error ? item.error : (item.statusCode ? `HTTP ${item.statusCode}` : "失效");
+
+                    right.append(badge);
+
+                    if (item.url && (item.url.startsWith("http://") || item.url.startsWith("https://"))) {
+                        const testBtn = document.createElement("button");
+                        testBtn.className = "b3-button b3-button--text";
+                        testBtn.style.cssText = "font-size:11.5px;padding:0 4px;color:var(--lv-accent)";
+                        testBtn.textContent = t("ledger.bookmarksOpenTest");
+                        testBtn.onclick = () => window.open(item.url, "_blank");
+                        right.append(testBtn);
+                    }
+
+                    rowEl.append(left, right);
+                    list.appendChild(rowEl);
+                }
+
+                sec.appendChild(list);
+                body.appendChild(sec);
+            }
+
+            copyBtn.onclick = async () => {
+                const text = formatBookmarkHealthReportText(report);
+                try {
+                    await navigator.clipboard.writeText(text);
+                    showMessage(t("ledger.bookmarksReportCopied"), 2500, "info");
+                } catch {
+                    showMessage(t("ledger.copyAsImageFail"), 4000, "error");
+                }
+            };
+        } catch (e) {
+            showMessage(t("ledger.logReadFailed") + " (" + (e instanceof Error ? e.message : String(e)) + ")", 6000, "error");
+        }
+    }
+
+    // Calculate subscription expenses normalized to monthly and annual projections.
+    async function openSubscriptionStats() {
+        if (!ref?.avId || !ref.columns?.amount) return;
+        try {
+            const all = await renderLedgerAll(ref.avId);
+            if (!all.complete) {
+                showMessage(t("ledger.loadIncomplete"), 5000, "error");
+                return;
+            }
+            const { calculateSubscriptionStats } = await import("@/core/subscriptions");
+            const report = calculateSubscriptionStats(all.rows, ref.columns);
+
+            const dlg = new Dialog({
+                title: t("ledger.subscriptionStats"),
+                content: `<div class="b3-dialog__content" id="lv-sub-stats-body" style="max-height:65vh;overflow:auto;display:flex;flex-direction:column;gap:12px;padding:16px"></div>
+<div class="b3-dialog__action"><button class="b3-button b3-button--cancel" id="lv-sub-stats-close">${t("close")}</button><button class="b3-button" id="lv-sub-stats-copy">${t("ledger.subscriptionCopy")}</button></div>`,
+                width: "560px",
+            });
+            const body = dlg.element.querySelector("#lv-sub-stats-body") as HTMLElement;
+            const copyBtn = dlg.element.querySelector("#lv-sub-stats-copy") as HTMLButtonElement;
+
+            (dlg.element.querySelector("#lv-sub-stats-close") as HTMLButtonElement).onclick = () => dlg.destroy();
+
+            if (report.activeCount === 0) {
+                const empty = document.createElement("div");
+                empty.className = "lv-caption";
+                empty.style.cssText = "text-align:center;padding:24px 0";
+                empty.textContent = t("ledger.subscriptionEmpty");
+                body.appendChild(empty);
+                copyBtn.disabled = true;
+                return;
+            }
+
+            // 指标卡
+            const metrics = document.createElement("div");
+            metrics.style.cssText = "display:grid;grid-template-columns:repeat(3, 1fr);gap:10px";
+
+            const monthlyCard = document.createElement("div");
+            monthlyCard.style.cssText = "padding:12px;background:var(--lv-surface-2);border-radius:8px;border:1px solid var(--lv-line);display:flex;flex-direction:column;gap:4px";
+            monthlyCard.innerHTML = `<span class="lv-caption">${t("ledger.subscriptionMonthly")}</span><b class="lv-num" style="color:var(--lv-accent);font-size:18px">¥${formatAmount(report.totalMonthlyCost)}</b><span class="lv-caption">${t("ledger.subscriptionPerMonth")}</span>`;
+
+            const annualCard = document.createElement("div");
+            annualCard.style.cssText = "padding:12px;background:var(--lv-surface-2);border-radius:8px;border:1px solid var(--lv-line);display:flex;flex-direction:column;gap:4px";
+            annualCard.innerHTML = `<span class="lv-caption">${t("ledger.subscriptionAnnual")}</span><b class="lv-num" style="color:var(--lv-warn);font-size:18px">¥${formatAmount(report.totalAnnualCost)}</b><span class="lv-caption">${t("ledger.subscriptionPerYear")}</span>`;
+
+            const autoCard = document.createElement("div");
+            autoCard.style.cssText = "padding:12px;background:var(--lv-surface-2);border-radius:8px;border:1px solid var(--lv-line);display:flex;flex-direction:column;gap:4px";
+            autoCard.innerHTML = `<span class="lv-caption">${t("ledger.subscriptionAutoRenew")}</span><b class="lv-num" style="font-size:18px">${report.autoRenewRate}%</b><span class="lv-caption">${report.autoRenewCount} / ${report.activeCount} 项</span>`;
+
+            metrics.append(monthlyCard, annualCard, autoCard);
+            body.appendChild(metrics);
+
+            // 明细清单
+            const sec = document.createElement("div");
+            sec.style.cssText = "margin-top:4px";
+            sec.innerHTML = `<div class="ft__on-surface" style="font-weight:600;font-size:12.5px;margin-bottom:8px">${t("ledger.subscriptionCount").replace("${n}", String(report.activeCount))}</div>`;
+
+            const list = document.createElement("div");
+            list.style.cssText = "display:flex;flex-direction:column;gap:6px";
+
+            for (const it of report.items) {
+                const itemEl = document.createElement("div");
+                itemEl.style.cssText = "display:flex;align-items:center;justify-content:space-between;padding:8px 12px;background:var(--lv-surface-2);border-radius:6px;border:1px solid var(--lv-line);font-size:12.5px";
+
+                const left = document.createElement("div");
+                left.style.cssText = "display:flex;flex-direction:column;gap:2px;min-width:0;flex:1";
+
+                const nameLine = document.createElement("div");
+                nameLine.style.cssText = "display:flex;align-items:center;gap:6px";
+                const nameSpan = document.createElement("b");
+                nameSpan.style.cssText = "color:var(--lv-tx)";
+                nameSpan.textContent = it.name;
+                nameLine.appendChild(nameSpan);
+
+                if (it.autoRenew) {
+                    const renewBadge = document.createElement("span");
+                    renewBadge.className = "lv-badge green";
+                    renewBadge.textContent = "🔄 自动续费";
+                    nameLine.appendChild(renewBadge);
+                }
+                if (it.seatRole === "member") {
+                    const seatBadge = document.createElement("span");
+                    seatBadge.className = "lv-badge gray";
+                    seatBadge.textContent = "车位";
+                    nameLine.appendChild(seatBadge);
+                }
+
+                const metaSpan = document.createElement("span");
+                metaSpan.className = "lv-caption";
+                const parts = [`原价: ¥${formatAmount(it.rawAmount)} / ${t(`field.cycle.opt.${it.cycle}`) !== `field.cycle.opt.${it.cycle}` ? t(`field.cycle.opt.${it.cycle}`) : it.cycle}`];
+                if (it.nextPay) parts.push(`下次支付: ${it.nextPay}`);
+                metaSpan.textContent = parts.join(" · ");
+
+                left.append(nameLine, metaSpan);
+
+                const right = document.createElement("div");
+                right.style.cssText = "text-align:right;flex-shrink:0";
+                right.innerHTML = `<div><b class="lv-num" style="color:var(--lv-accent)">¥${formatAmount(it.monthlyCost)}</b> <span class="lv-caption">/月</span></div><div class="lv-caption">年化 ¥${formatAmount(it.annualCost)}</div>`;
+
+                itemEl.append(left, right);
+                list.appendChild(itemEl);
+            }
+
+            sec.appendChild(list);
+            body.appendChild(sec);
+
+            copyBtn.onclick = async () => {
+                const lines = [
+                    `【会员与订阅支出折算报告】`,
+                    `· 有效服务：${report.activeCount} 项`,
+                    `· 月均折算开销：¥${formatAmount(report.totalMonthlyCost)}`,
+                    `· 年化总支出：¥${formatAmount(report.totalAnnualCost)}`,
+                    `· 自动续费比例：${report.autoRenewRate}% (${report.autoRenewCount} 项)`,
+                    `---------------------------`,
+                    `【订阅明细（按年化开销排序）】`,
+                    ...report.items.map((it) => `· ${it.name}：月均 ¥${formatAmount(it.monthlyCost)} · 年化 ¥${formatAmount(it.annualCost)} (原价 ¥${formatAmount(it.rawAmount)}/${it.cycle}${it.autoRenew ? " · 自动续费" : ""})`),
+                ];
+                try {
+                    await navigator.clipboard.writeText(lines.join("\n"));
+                    showMessage(t("ledger.subscriptionCopied"), 2500, "info");
+                } catch {
+                    showMessage(t("ledger.copyAsImageFail"), 4000, "error");
+                }
+            };
+        } catch (e) {
+            showMessage(t("ledger.logReadFailed") + " (" + (e instanceof Error ? e.message : String(e)) + ")", 6000, "error");
+        }
+    }
+
+    // Asset valuation report summarizing initial costs and current appraised values.
+    async function openAssetValuationModal() {
+        if (!ref?.avId || !ref.columns?.amount) return;
+        try {
+            const all = await renderLedgerAll(ref.avId);
+            if (!all.complete) {
+                showMessage(t("ledger.loadIncomplete"), 5000, "error");
+                return;
+            }
+            const { loadRowLogs } = await import("@/core/rowlog");
+            const logs = await loadRowLogs(plugin as any);
+            const { calculateAssetValuationStats } = await import("@/core/valuation");
+            const report = calculateAssetValuationStats(all.rows, ref.columns, logs, ref.avId);
+
+            const dlg = new Dialog({
+                title: t("ledger.assetValuationReport"),
+                content: `<div class="b3-dialog__content" id="lv-asset-val-body" style="max-height:65vh;overflow:auto;display:flex;flex-direction:column;gap:12px;padding:16px"></div>
+<div class="b3-dialog__action"><button class="b3-button b3-button--cancel" id="lv-asset-val-close">${t("close")}</button><button class="b3-button" id="lv-asset-val-copy">${t("ledger.assetValuationCopy")}</button></div>`,
+                width: "560px",
+            });
+            const body = dlg.element.querySelector("#lv-asset-val-body") as HTMLElement;
+            const copyBtn = dlg.element.querySelector("#lv-asset-val-copy") as HTMLButtonElement;
+
+            (dlg.element.querySelector("#lv-asset-val-close") as HTMLButtonElement).onclick = () => dlg.destroy();
+
+            if (report.activeItems === 0) {
+                const empty = document.createElement("div");
+                empty.className = "lv-caption";
+                empty.style.cssText = "text-align:center;padding:24px 0";
+                empty.textContent = t("ledger.assetValuationEmpty");
+                body.appendChild(empty);
+                copyBtn.disabled = true;
+                return;
+            }
+
+            // 指标卡
+            const metrics = document.createElement("div");
+            metrics.style.cssText = "display:grid;grid-template-columns:repeat(3, 1fr);gap:10px";
+
+            const initCard = document.createElement("div");
+            initCard.style.cssText = "padding:12px;background:var(--lv-surface-2);border-radius:8px;border:1px solid var(--lv-line);display:flex;flex-direction:column;gap:4px";
+            initCard.innerHTML = `<span class="lv-caption">${t("ledger.assetInitialCost")}</span><b class="lv-num" style="font-size:18px">¥${formatAmount(report.totalInitialCost)}</b><span class="lv-caption">${report.activeItems} 件在役</span>`;
+
+            const valCard = document.createElement("div");
+            valCard.style.cssText = "padding:12px;background:var(--lv-surface-2);border-radius:8px;border:1px solid var(--lv-line);display:flex;flex-direction:column;gap:4px";
+            valCard.innerHTML = `<span class="lv-caption">${t("ledger.assetCurrentValuation")}</span><b class="lv-num" style="color:var(--lv-accent);font-size:18px">¥${formatAmount(report.totalCurrentValuation)}</b><span class="lv-caption">最新总估值</span>`;
+
+            const deltaCard = document.createElement("div");
+            const deltaColor = report.netValuationChange >= 0 ? "var(--lv-accent)" : "var(--lv-warn)";
+            deltaCard.style.cssText = "padding:12px;background:var(--lv-surface-2);border-radius:8px;border:1px solid var(--lv-line);display:flex;flex-direction:column;gap:4px";
+            deltaCard.innerHTML = `<span class="lv-caption">${t("ledger.assetNetChange")}</span><b class="lv-num" style="color:${deltaColor};font-size:18px">${report.netValuationChange >= 0 ? "+" : "-"}¥${formatAmount(Math.abs(report.netValuationChange))}</b><span class="lv-caption">${report.overallChangeRate >= 0 ? "+" : ""}${report.overallChangeRate}%</span>`;
+
+            metrics.append(initCard, valCard, deltaCard);
+            body.appendChild(metrics);
+
+            // TOP 资产列表
+            if (report.topValuedItems.length > 0) {
+                const sec = document.createElement("div");
+                sec.style.cssText = "margin-top:4px";
+                sec.innerHTML = `<div class="ft__on-surface" style="font-weight:600;font-size:12.5px;margin-bottom:8px">${t("ledger.assetTopValued")}</div>`;
+                const list = document.createElement("div");
+                list.style.cssText = "display:flex;flex-direction:column;gap:6px";
+
+                for (const it of report.topValuedItems) {
+                    const rowEl = document.createElement("div");
+                    rowEl.style.cssText = "display:flex;align-items:center;justify-content:space-between;padding:8px 12px;background:var(--lv-surface-2);border-radius:6px;border:1px solid var(--lv-line);font-size:12.5px";
+
+                    const left = document.createElement("div");
+                    left.style.cssText = "display:flex;flex-direction:column;gap:2px;min-width:0;flex:1";
+
+                    const nameSpan = document.createElement("b");
+                    nameSpan.style.cssText = "color:var(--lv-tx)";
+                    nameSpan.textContent = it.name;
+
+                    const metaSpan = document.createElement("span");
+                    metaSpan.className = "lv-caption";
+                    metaSpan.textContent = `原价: ¥${formatAmount(it.purchaseAmount)}${it.location ? ` · 位置: ${it.location}` : ""}${it.hasValuationLog ? ` · 估值日: ${it.latestValuationDate}` : ""}`;
+
+                    left.append(nameSpan, metaSpan);
+
+                    const right = document.createElement("div");
+                    right.style.cssText = "text-align:right;flex-shrink:0";
+                    const chgColor = it.valueDelta >= 0 ? "var(--lv-accent)" : "var(--lv-warn)";
+                    right.innerHTML = `<div><b class="lv-num" style="font-size:14px;color:var(--lv-accent)">¥${formatAmount(it.currentValue)}</b></div><div class="lv-caption" style="color:${chgColor}">${it.valueDelta >= 0 ? "+" : "-"}¥${formatAmount(Math.abs(it.valueDelta))} (${it.valueChangeRate >= 0 ? "+" : ""}${it.valueChangeRate}%)</div>`;
+
+                    rowEl.append(left, right);
+                    list.appendChild(rowEl);
+                }
+                sec.appendChild(list);
+                body.appendChild(sec);
+            }
+
+            copyBtn.onclick = async () => {
+                const lines = [
+                    `【实物资产估值与净值报告】`,
+                    `· 在役资产：${report.activeItems} 件`,
+                    `· 初始总成本：¥${formatAmount(report.totalInitialCost)}`,
+                    `· 当前总估值：¥${formatAmount(report.totalCurrentValuation)}`,
+                    `· 资产净变动：${report.netValuationChange >= 0 ? "+" : "-"}¥${formatAmount(Math.abs(report.netValuationChange))} (${report.overallChangeRate >= 0 ? "+" : ""}${report.overallChangeRate}% )`,
+                    `---------------------------`,
+                    `【高价值资产 TOP】`,
+                    ...report.topValuedItems.map((it) => `· ${it.name}：当前估值 ¥${formatAmount(it.currentValue)} (初始 ¥${formatAmount(it.purchaseAmount)}${it.valueDelta !== 0 ? `，变动 ${it.valueDelta >= 0 ? "+" : "-"}¥${formatAmount(Math.abs(it.valueDelta))}` : ""})`),
+                ];
+                try {
+                    await navigator.clipboard.writeText(lines.join("\n"));
+                    showMessage(t("ledger.assetValuationCopied"), 2500, "info");
+                } catch {
+                    showMessage(t("ledger.copyAsImageFail"), 4000, "error");
+                }
+            };
+        } catch (e) {
+            showMessage(t("ledger.logReadFailed") + " (" + (e instanceof Error ? e.message : String(e)) + ")", 6000, "error");
+        }
+    }
+
+    // Media reading/viewing annual report and status analysis.
+    async function openMediaReport() {
+        if (!ref?.avId || !ref.columns) return;
+        try {
+            const all = await renderLedgerAll(ref.avId);
+            if (!all.complete) {
+                showMessage(t("ledger.loadIncomplete"), 5000, "error");
+                return;
+            }
+            const { calculateMediaReport, formatMediaReportText } = await import("@/core/media");
+            let selectedYear: number | "all" = new Date().getFullYear();
+
+            const dlg = new Dialog({
+                title: t("ledger.mediaReport"),
+                content: `<div class="b3-dialog__content" id="lv-media-report-body" style="max-height:65vh;overflow:auto;display:flex;flex-direction:column;gap:12px;padding:16px"></div>
+<div class="b3-dialog__action"><button class="b3-button b3-button--cancel" id="lv-media-report-close">${t("close")}</button><button class="b3-button" id="lv-media-report-copy">${t("ledger.mediaCopy")}</button></div>`,
+                width: "560px",
+            });
+            const body = dlg.element.querySelector("#lv-media-report-body") as HTMLElement;
+            const copyBtn = dlg.element.querySelector("#lv-media-report-copy") as HTMLButtonElement;
+
+            (dlg.element.querySelector("#lv-media-report-close") as HTMLButtonElement).onclick = () => dlg.destroy();
+
+            const render = () => {
+                body.replaceChildren();
+                const report = calculateMediaReport(all.rows, ref!.columns, selectedYear);
+
+                const toolbar = document.createElement("div");
+                toolbar.style.cssText = "display:flex;align-items:center;justify-content:space-between;gap:8px";
+
+                const yearSelect = document.createElement("select");
+                yearSelect.className = "b3-select";
+                yearSelect.style.cssText = "font-size:12px;padding:4px 8px";
+                const optAll = document.createElement("option");
+                optAll.value = "all";
+                optAll.textContent = t("ledger.mediaYearAll");
+                if (selectedYear === "all") optAll.selected = true;
+                yearSelect.appendChild(optAll);
+
+                for (const y of report.availableYears) {
+                    const opt = document.createElement("option");
+                    opt.value = String(y);
+                    opt.textContent = `${y} 年`;
+                    if (selectedYear === y) opt.selected = true;
+                    yearSelect.appendChild(opt);
+                }
+                yearSelect.onchange = () => {
+                    selectedYear = yearSelect.value === "all" ? "all" : Number(yearSelect.value);
+                    render();
+                };
+
+                const subSummary = document.createElement("span");
+                subSummary.className = "lv-caption";
+                subSummary.textContent = `${t("ledger.favorsCountRecords").replace("${n}", String(report.totalCount))}`;
+                toolbar.append(yearSelect, subSummary);
+                body.appendChild(toolbar);
+
+                if (report.totalCount === 0) {
+                    const empty = document.createElement("div");
+                    empty.className = "lv-caption";
+                    empty.style.cssText = "text-align:center;padding:24px 0";
+                    empty.textContent = t("ledger.mediaEmpty");
+                    body.appendChild(empty);
+                    return;
+                }
+
+                // 指标卡
+                const metrics = document.createElement("div");
+                metrics.style.cssText = "display:grid;grid-template-columns:repeat(4, 1fr);gap:8px";
+
+                const doneCard = document.createElement("div");
+                doneCard.style.cssText = "padding:10px;background:var(--lv-surface-2);border-radius:8px;border:1px solid var(--lv-line);display:flex;flex-direction:column;gap:3px";
+                doneCard.innerHTML = `<span class="lv-caption">${t("ledger.mediaDone")}</span><b class="lv-num" style="color:var(--lv-accent);font-size:16px">${report.doneCount}</b><span class="lv-caption">${t("ledger.mediaCompletionRate")} ${report.completionRate}%</span>`;
+
+                const consumingCard = document.createElement("div");
+                consumingCard.style.cssText = "padding:10px;background:var(--lv-surface-2);border-radius:8px;border:1px solid var(--lv-line);display:flex;flex-direction:column;gap:3px";
+                consumingCard.innerHTML = `<span class="lv-caption">${t("ledger.mediaConsuming")}</span><b class="lv-num" style="color:var(--lv-warn);font-size:16px">${report.consumingCount}</b><span class="lv-caption">进行中</span>`;
+
+                const ratingCard = document.createElement("div");
+                ratingCard.style.cssText = "padding:10px;background:var(--lv-surface-2);border-radius:8px;border:1px solid var(--lv-line);display:flex;flex-direction:column;gap:3px";
+                ratingCard.innerHTML = `<span class="lv-caption">${t("ledger.mediaRatingAvg")}</span><b class="lv-num" style="color:var(--lv-amber);font-size:16px">${report.averageRating !== undefined ? report.averageRating + "★" : "—"}</b><span class="lv-caption">${report.ratedCount} 部有评分</span>`;
+
+                const wishCard = document.createElement("div");
+                wishCard.style.cssText = "padding:10px;background:var(--lv-surface-2);border-radius:8px;border:1px solid var(--lv-line);display:flex;flex-direction:column;gap:3px";
+                wishCard.innerHTML = `<span class="lv-caption">${t("ledger.mediaWishlist")}</span><b class="lv-num" style="font-size:16px">${report.wishlistCount}</b><span class="lv-caption">待看待读</span>`;
+
+                metrics.append(doneCard, consumingCard, ratingCard, wishCard);
+                body.appendChild(metrics);
+
+                // 分类明细
+                if (report.categoryBreakdown.length > 0) {
+                    const sec = document.createElement("div");
+                    sec.style.cssText = "margin-top:4px";
+                    sec.innerHTML = `<div class="ft__on-surface" style="font-weight:600;font-size:12.5px;margin-bottom:8px">${t("ledger.mediaCategories")}</div>`;
+                    const list = document.createElement("div");
+                    list.style.cssText = "display:grid;grid-template-columns:repeat(auto-fit, minmax(150px, 1fr));gap:6px";
+                    for (const c of report.categoryBreakdown) {
+                        const item = document.createElement("div");
+                        item.style.cssText = "padding:6px 10px;background:var(--lv-surface-2);border-radius:6px;border:1px solid var(--lv-line);font-size:12px;display:flex;justify-content:space-between;align-items:center";
+                        const cname = t(`field.category.opt.${c.category}`) !== `field.category.opt.${c.category}` ? t(`field.category.opt.${c.category}`) : c.category;
+                        item.innerHTML = `<span style="font-weight:500;color:var(--lv-tx)">${cname}</span><span class="lv-caption">已完结 ${c.done} / ${c.total}${c.averageRating !== undefined ? ` · ${c.averageRating}★` : ""}</span>`;
+                        list.appendChild(item);
+                    }
+                    sec.appendChild(list);
+                    body.appendChild(sec);
+                }
+
+                // 高分作品 TOP
+                if (report.topRatedItems.length > 0) {
+                    const sec = document.createElement("div");
+                    sec.style.cssText = "margin-top:4px";
+                    sec.innerHTML = `<div class="ft__on-surface" style="font-weight:600;font-size:12.5px;margin-bottom:8px">${t("ledger.mediaTopRated")}</div>`;
+                    const list = document.createElement("div");
+                    list.style.cssText = "display:flex;flex-direction:column;gap:6px";
+                    for (const it of report.topRatedItems) {
+                        const item = document.createElement("div");
+                        item.style.cssText = "display:flex;align-items:center;justify-content:space-between;padding:7px 12px;background:var(--lv-surface-2);border-radius:6px;border:1px solid var(--lv-line);font-size:12.5px";
+                        const cname = t(`field.category.opt.${it.category}`) !== `field.category.opt.${it.category}` ? t(`field.category.opt.${it.category}`) : it.category;
+                        item.innerHTML = `<span style="font-weight:500;color:var(--lv-tx)">${it.name} <span class="lv-caption" style="font-size:11.5px">(${cname})</span></span><span class="lv-num" style="color:var(--lv-amber);font-size:13px;font-weight:600">${it.rating} ★${it.date ? `<span class="lv-caption" style="font-size:11px;font-weight:normal"> · ${it.date}</span>` : ""}</span>`;
+                        list.appendChild(item);
+                    }
+                    sec.appendChild(list);
+                    body.appendChild(sec);
+                }
+            };
+
+            render();
+
+            copyBtn.onclick = async () => {
+                const report = calculateMediaReport(all.rows, ref!.columns, selectedYear);
+                const text = formatMediaReportText(report, (cat) => t(`field.category.opt.${cat}`) !== `field.category.opt.${cat}` ? t(`field.category.opt.${cat}`) : cat);
+                try {
+                    await navigator.clipboard.writeText(text);
+                    showMessage(t("ledger.mediaCopied"), 2500, "info");
+                } catch {
+                    showMessage(t("ledger.copyAsImageFail"), 4000, "error");
+                }
+            };
+        } catch (e) {
+            showMessage(t("ledger.logReadFailed") + " (" + (e instanceof Error ? e.message : String(e)) + ")", 6000, "error");
         }
     }
 
@@ -1293,7 +2230,7 @@
         const dlg = new Dialog({
             title: detailTitle,
             content: `<div class="b3-dialog__content b3-dialog__content--wrap" id="lv-detail-body" style="max-height:60vh;overflow:auto"></div>
-<div class="b3-dialog__action lv-detail-actions"><button class="b3-button b3-button--text ft__error" id="lv-detail-del" style="color:var(--b3-theme-error)">${t("delete")}</button><span class="fn__flex-1"></span><details class="lv-detail-more"><summary class="b3-button b3-button--outline">${t("ledger.detailMore")}</summary><div class="lv-detail-more-menu"><button class="b3-button b3-button--cancel" id="lv-detail-card-copy">${t("ledger.copyAsImage")}</button><button class="b3-button b3-button--cancel" id="lv-detail-card-png">${t("ledger.downloadPng")}</button><button class="b3-button b3-button--cancel" id="lv-detail-card-text">${t("ledger.copyAsText")}</button><button class="b3-button b3-button--cancel" id="lv-detail-open">${t("ledger.openDoc")} →</button></div></details><button class="b3-button b3-button--cancel" id="lv-detail-close">${t("close")}</button><button class="b3-button" id="lv-detail-edit">${t("ledger.detailEditAll")}</button></div>`,
+<div class="b3-dialog__action lv-detail-actions"><button class="b3-button b3-button--text ft__error" id="lv-detail-del" style="color:var(--b3-theme-error)">${t("delete")}</button><span class="fn__flex-1"></span><details class="lv-detail-more"><summary class="b3-button b3-button--outline">${t("ledger.detailMore")}</summary><div class="lv-detail-more-menu"><button class="b3-button b3-button--cancel" id="lv-detail-card-copy">${t("ledger.copyAsImage")}</button><button class="b3-button b3-button--cancel" id="lv-detail-card-png">${t("ledger.downloadPng")}</button><button class="b3-button b3-button--cancel" id="lv-detail-card-text">${t("ledger.copyAsText")}</button><button class="b3-button b3-button--cancel" id="lv-detail-card-masked-text">${t("ledger.copyAsMaskedText")}</button><button class="b3-button b3-button--cancel" id="lv-detail-open">${t("ledger.openDoc")} →</button></div></details><button class="b3-button b3-button--cancel" id="lv-detail-close">${t("close")}</button><button class="b3-button" id="lv-detail-edit">${t("ledger.detailEditAll")}</button></div>`,
             width: "520px",
         });
         const body = dlg.element.querySelector("#lv-detail-body") as HTMLElement;
@@ -1758,7 +2695,7 @@
             }
         }
         // View mode includes key/value rows, history, and attachments.
-        let cardRows: { label: string; value: string }[] = [];
+        let cardRows: { key?: string; label: string; value: string }[] = [];
         function buildView() {
             body.innerHTML = "";
             cardRows = [];
@@ -1872,7 +2809,7 @@
             }
                 line.append(v);
                 body.appendChild(line);
-                cardRows.push({ label: colLabel(col), value: v.classList.contains("is-empty") ? "—" : String(v.textContent) });
+                cardRows.push({ key: col.key, label: colLabel(col), value: v.classList.contains("is-empty") ? "—" : String(v.textContent) });
             }
             // Append user-created columns outside the schema as a read-only section.
             const schemaKeyIDs = new Set(Object.values<string>(ref!.columns));
@@ -1913,6 +2850,7 @@
                     }
                     line.append(v);
                     body.appendChild(line);
+                    cardRows.push({ label: String(c.name), value: cellText(row.cells[c.id]) });
                 }
             }
         // Shared row-log timeline section; deletion cleanup is handled with the row.
@@ -2785,6 +3723,226 @@
                     remove: async (e) => { await rl.updateRowLogs(plugin as any, (current) => rl.removeMeterReading(current, ref!.avId!, row.itemID, e.date)); },
                     format: (e: any) => `${e.date} · ${e.reading}${typeof e.usage === "number" ? ` (${e.usage})` : ""}`,
                 });
+
+                // §16 房屋保修期与关联合同只读联动核对
+                const contractsRef = plugin.settings.dbRefs?.contracts;
+                if (contractsRef?.avId && contractsRef?.columns) {
+                    const houseWarrantySection = document.createElement("div");
+                    houseWarrantySection.className = "lv-detail-section";
+                    houseWarrantySection.style.cssText = "margin-top:14px;padding-top:10px;border-top:1px solid var(--b3-border-color)";
+
+                    const head = document.createElement("div");
+                    head.style.cssText = "display:flex;align-items:center;justify-content:space-between;margin-bottom:8px";
+                    const title = document.createElement("span");
+                    title.className = "ft__on-surface";
+                    title.style.cssText = "font-weight:600;font-size:12px";
+                    title.textContent = t("ledger.houseContractsTitle");
+                    head.append(title);
+                    if (contractsRef.docId) {
+                        const openAll = document.createElement("button");
+                        openAll.className = "b3-button b3-button--text";
+                        openAll.style.cssText = "font-size:11.5px;padding:0 4px;color:var(--lv-accent)";
+                        openAll.textContent = t("ledger.houseContractsOpenAll");
+                        openAll.onclick = () => plugin.showTabDocs(contractsRef.docId);
+                        head.append(openAll);
+                    }
+                    houseWarrantySection.append(head);
+
+                    const contentWrap = document.createElement("div");
+                    contentWrap.style.cssText = "font-size:12.5px;display:flex;flex-direction:column;gap:6px";
+                    contentWrap.innerHTML = `<span class="lv-caption">${t("ledger.loading")}</span>`;
+                    houseWarrantySection.append(contentWrap);
+                    body.appendChild(houseWarrantySection);
+
+                    void (async () => {
+                        try {
+                            const contractAll = await renderLedgerAll(contractsRef.avId!);
+                            const { matchHouseContracts } = await import("@/core/contracts");
+                            const matched = matchHouseContracts(row, ref!.columns, contractAll.rows, contractsRef.columns);
+                            contentWrap.replaceChildren();
+                            if (matched.length === 0) {
+                                const empty = document.createElement("span");
+                                empty.className = "lv-caption";
+                                empty.textContent = t("ledger.houseContractsEmpty");
+                                contentWrap.append(empty);
+                                return;
+                            }
+                            for (const m of matched) {
+                                const line = document.createElement("div");
+                                line.style.cssText = "display:flex;align-items:center;gap:8px;padding:6px 10px;background:var(--lv-surface-2);border-radius:6px;border:1px solid var(--lv-line)";
+                                const nameSpan = document.createElement("b");
+                                nameSpan.style.cssText = "font-size:12.5px;color:var(--lv-tx)";
+                                nameSpan.textContent = m.title;
+
+                                const badge = document.createElement("span");
+                                if (m.warrantyStatus === "valid") {
+                                    badge.className = "lv-badge green";
+                                    badge.textContent = t("ledger.warrantyValid");
+                                } else if (m.warrantyStatus === "expiring") {
+                                    badge.className = "lv-badge orange";
+                                    badge.textContent = t("ledger.warrantyExpiring");
+                                } else if (m.warrantyStatus === "expired") {
+                                    badge.className = "lv-badge gray";
+                                    badge.textContent = t("ledger.warrantyExpired");
+                                } else {
+                                    badge.className = "lv-badge gray";
+                                    badge.textContent = t("ledger.warrantyUnknown");
+                                }
+
+                                const metaSpan = document.createElement("span");
+                                metaSpan.className = "lv-caption";
+                                metaSpan.style.cssText = "margin-left:auto;font-size:11.5px";
+                                const parts = [];
+                                if (m.party || m.contact) parts.push(m.party || m.contact);
+                                if (m.expiry) parts.push(m.daysLeft !== undefined && m.daysLeft >= 0 ? `${m.expiry} (${m.daysLeft}d)` : m.expiry);
+                                metaSpan.textContent = parts.join(" · ");
+
+                                line.append(nameSpan, badge, metaSpan);
+                                contentWrap.append(line);
+                            }
+                        } catch (err) {
+                            contentWrap.innerHTML = `<span class="lv-caption" style="color:var(--lv-danger)">${t("ledger.houseContractsFailed")}</span>`;
+                        }
+                    })();
+                }
+            } else if (active === "food") {
+                const foodName = (ref?.columns?.name && cellText(row.cells[ref.columns.name])) || "";
+                const ingredientsRaw = (ref?.columns?.ingredients && cellText(row.cells[ref.columns.ingredients])) || "";
+                if (foodName || (ingredientsRaw && ingredientsRaw !== "—")) {
+                    const foodDietarySection = document.createElement("div");
+                    foodDietarySection.className = "lv-detail-section";
+                    foodDietarySection.style.cssText = "margin-top:14px;padding-top:10px;border-top:1px solid var(--b3-border-color)";
+
+                    const head = document.createElement("div");
+                    head.style.cssText = "display:flex;align-items:center;justify-content:space-between;margin-bottom:8px";
+                    const title = document.createElement("span");
+                    title.className = "ft__on-surface";
+                    title.style.cssText = "font-weight:600;font-size:12px";
+                    title.textContent = t("ledger.foodDietaryTitle");
+                    head.append(title);
+                    foodDietarySection.append(head);
+
+                    const contentWrap = document.createElement("div");
+                    contentWrap.style.cssText = "font-size:12.5px;display:flex;flex-direction:column;gap:6px";
+                    foodDietarySection.append(contentWrap);
+                    body.appendChild(foodDietarySection);
+
+                    void (async () => {
+                        const healthRef = plugin.settings.dbRefs?.health;
+                        let healthRows: any[] | undefined;
+                        if (healthRef?.avId) {
+                            try {
+                                const healthAll = await renderLedgerAll(healthRef.avId);
+                                healthRows = healthAll.rows;
+                            } catch {
+                                // 静默降级
+                            }
+                        }
+                        const { matchFoodDietaryConflicts, formatShoppingIngredientsText } = await import("@/core/food");
+                        const check = matchFoodDietaryConflicts(
+                            foodName,
+                            ingredientsRaw !== "—" ? ingredientsRaw : "",
+                            plugin.settings.members ?? [],
+                            healthRows,
+                            healthRef?.columns,
+                        );
+
+                        contentWrap.replaceChildren();
+
+                        if (check.isSafe) {
+                            const safeBadge = document.createElement("div");
+                            safeBadge.style.cssText = "padding:8px 12px;background:var(--lv-surface-2);border-radius:6px;border:1px solid var(--lv-accent);color:var(--lv-accent);font-size:12px";
+                            safeBadge.textContent = `✓ ${t("ledger.foodDietarySafe")}`;
+                            contentWrap.append(safeBadge);
+                        } else {
+                            for (const c of check.conflicts) {
+                                const alertEl = document.createElement("div");
+                                if (c.type === "allergy") {
+                                    alertEl.style.cssText = "display:flex;align-items:center;gap:6px;padding:6px 10px;background:color-mix(in srgb, var(--lv-danger) 10%, var(--lv-surface));border-radius:6px;border:1px solid var(--lv-danger);color:var(--lv-danger);font-size:12px";
+                                    alertEl.innerHTML = `<span>🚨 <b>${c.memberName}</b>：${t("ledger.foodAllergyAlert").replace("${member}", c.memberName).replace("${item}", c.matchedItem)}${c.detail ? ` (${c.detail})` : ""}</span>`;
+                                } else {
+                                    alertEl.style.cssText = "display:flex;align-items:center;gap:6px;padding:6px 10px;background:var(--lv-surface-2);border-radius:6px;border:1px solid var(--lv-line);color:var(--lv-warn);font-size:12px";
+                                    alertEl.innerHTML = `<span>⚠️ <b>${c.memberName}</b>：${t("ledger.foodDislikeAlert").replace("${member}", c.memberName).replace("${item}", c.matchedItem)}</span>`;
+                                }
+                                contentWrap.append(alertEl);
+                            }
+                        }
+
+                        if (check.parsedIngredients.length > 0) {
+                            const actionRow = document.createElement("div");
+                            actionRow.style.cssText = "display:flex;align-items:center;justify-content:flex-end;margin-top:4px";
+                            const copyIngBtn = document.createElement("button");
+                            copyIngBtn.className = "b3-button b3-button--outline";
+                            copyIngBtn.style.cssText = "font-size:12px;padding:3px 8px";
+                            copyIngBtn.textContent = `＋ ${t("ledger.foodCopyIngredients")}`;
+                            copyIngBtn.onclick = async () => {
+                                const text = formatShoppingIngredientsText(foodName, check.parsedIngredients);
+                                try {
+                                    await navigator.clipboard.writeText(text);
+                                    showMessage(t("ledger.foodIngredientsCopied"), 2500, "info");
+                                } catch {
+                                    showMessage(t("ledger.copyAsImageFail"), 4000, "error");
+                                }
+                            };
+                            actionRow.append(copyIngBtn);
+                            contentWrap.append(actionRow);
+                        }
+                    })();
+                }
+            } else if (active === "schooling") {
+                const catVal = ref?.columns?.category ? cellText(row.cells[ref.columns.category]) : "";
+                const enrollRaw = ref?.columns?.enroll_year ? cellText(row.cells[ref.columns.enroll_year]) : "";
+                const enrollYear = Number(enrollRaw);
+                const statusVal = ref?.columns?.status ? cellText(row.cells[ref.columns.status]) : "enrolled";
+
+                if (catVal && Number.isFinite(enrollYear) && enrollYear >= 1980) {
+                    const schoolStageSection = document.createElement("div");
+                    schoolStageSection.className = "lv-detail-section";
+                    schoolStageSection.style.cssText = "margin-top:14px;padding-top:10px;border-top:1px solid var(--b3-border-color)";
+
+                    const head = document.createElement("div");
+                    head.style.cssText = "display:flex;align-items:center;justify-content:space-between;margin-bottom:8px";
+                    const title = document.createElement("span");
+                    title.className = "ft__on-surface";
+                    title.style.cssText = "font-weight:600;font-size:12px";
+                    title.textContent = t("ledger.schoolingStageTitle");
+                    head.append(title);
+                    schoolStageSection.append(head);
+
+                    const contentWrap = document.createElement("div");
+                    contentWrap.style.cssText = "padding:10px 12px;background:var(--lv-surface-2);border-radius:8px;border:1px solid var(--lv-line);display:flex;flex-direction:column;gap:6px;font-size:12px";
+                    schoolStageSection.append(contentWrap);
+                    body.appendChild(schoolStageSection);
+
+                    void (async () => {
+                        const { calculateSchoolingStage } = await import("@/core/schooling");
+                        const stage = calculateSchoolingStage({
+                            category: catVal,
+                            enrollYear,
+                            status: statusVal,
+                        });
+
+                        if (stage) {
+                            const badgeCls = stage.isGraduated ? "green" : stage.daysUntilGraduation <= 100 ? "orange" : "blue";
+                            const badgeText = stage.isGraduated
+                                ? t("ledger.schoolingGraduated")
+                                : t("ledger.schoolingDaysUntil").replace("${n}", String(stage.daysUntilGraduation));
+
+                            contentWrap.innerHTML = `
+                                <div style="display:flex;align-items:center;justify-content:space-between">
+                                  <span><b>${stage.currentGradeLabel}</b> · ${stage.transitionEventLabel}</span>
+                                  <span class="lv-badge ${badgeCls}">${badgeText}</span>
+                                </div>
+                                <div style="display:flex;align-items:center;justify-content:space-between;color:var(--lv-tx-2);font-size:11.5px">
+                                  <span>${t("ledger.schoolingGraduationDate")}: ${stage.graduationDate} (${stage.stageTotalYears} 年制)</span>
+                                  <span>${t("ledger.schoolingProgress")}: ${stage.stageProgressPercent}%</span>
+                                </div>
+                                <div style="height:4px;border-radius:2px;background:var(--lv-line);overflow:hidden;width:100%">
+                                  <div style="height:100%;background:var(--lv-accent);width:${stage.stageProgressPercent}%;border-radius:2px"></div>
+                                </div>`;
+                        }
+                    })();
+                }
             } else if (active === "travel-plan") {
                 // Certificate checks are appended and deduplicated by the row-log helper.
                 await addRowLogSection({
@@ -2820,6 +3978,186 @@
                     remove: async (e) => { await rl.updateRowLogs(plugin as any, (current) => rl.removeEntry(current, ref!.avId!, row.itemID, "loans", e)); },
                     format: (e) => `${e.date} · ${t("ledger.loanTo")} ${e.to}${e.back ? ` · ${e.back} ${t("ledger.loanReturned")}` : ` · ${t("ledger.loanOut")}`}`,
                 });
+            } else if (active === "parenting") {
+                const catVal = ref?.columns?.category ? cellText(row.cells[ref.columns.category]) : "";
+                // 仅辅食/喂养类记录接入 3 天排敏观察期与健康过敏史联动
+                if (catVal === "feeding" || catVal === t("field.category.opt.feeding")) {
+                    const dateVal = ref?.columns?.date ? cellText(row.cells[ref.columns.date]) : "";
+                    const foodName = (ref?.columns?.name && cellText(row.cells[ref.columns.name])) || "";
+                    const memberBlockId = ref?.columns?.member ? row.cells[ref.columns.member]?.relation?.blockIDs?.[0] : undefined;
+
+                    const feedingSection = document.createElement("div");
+                    feedingSection.className = "lv-detail-section";
+                    feedingSection.style.cssText = "margin-top:14px;padding-top:10px;border-top:1px solid var(--b3-border-color)";
+
+                    const head = document.createElement("div");
+                    head.style.cssText = "display:flex;align-items:center;justify-content:space-between;margin-bottom:8px";
+                    const title = document.createElement("span");
+                    title.className = "ft__on-surface";
+                    title.style.cssText = "font-weight:600;font-size:12px";
+                    title.textContent = t("ledger.feedingObserveTitle");
+                    head.append(title);
+                    feedingSection.append(head);
+
+                    const contentWrap = document.createElement("div");
+                    contentWrap.style.cssText = "font-size:12.5px;display:flex;flex-direction:column;gap:8px";
+                    feedingSection.append(contentWrap);
+                    body.appendChild(feedingSection);
+
+                    void (async () => {
+                        const { evaluateFeedingObservation, findMemberAllergies, checkAllergyConflict } = await import("@/core/feeding");
+                        const obs = evaluateFeedingObservation(dateVal);
+
+                        // 1. 观察期状态条
+                        if (obs) {
+                            const statusLine = document.createElement("div");
+                            statusLine.style.cssText = "display:flex;align-items:center;gap:8px;padding:6px 10px;background:var(--lv-surface-2);border-radius:6px;border:1px solid var(--lv-line)";
+                            const badge = document.createElement("span");
+                            if (obs.status === "observing") {
+                                badge.className = "lv-badge orange";
+                                badge.textContent = obs.dayProgressText;
+                            } else if (obs.status === "completed") {
+                                badge.className = "lv-badge green";
+                                badge.textContent = t("ledger.feedingObserveDone");
+                            } else {
+                                badge.className = "lv-badge gray";
+                                badge.textContent = obs.dayProgressText;
+                            }
+                            const timeText = document.createElement("span");
+                            timeText.className = "lv-caption";
+                            timeText.style.cssText = "margin-left:auto;font-size:11.5px";
+                            timeText.textContent = `${t("ledger.feedingObserveUntil")}: ${obs.observeUntil}`;
+                            statusLine.append(badge, timeText);
+                            contentWrap.append(statusLine);
+                        }
+
+                        // 2. 健康库过敏史核对
+                        const healthRef = plugin.settings.dbRefs?.health;
+                        if (healthRef?.avId && healthRef?.columns) {
+                            try {
+                                const healthAll = await renderLedgerAll(healthRef.avId);
+                                const allergies = findMemberAllergies(memberBlockId, healthAll.rows, healthRef.columns);
+                                const conflict = checkAllergyConflict(foodName, allergies);
+
+                                if (conflict) {
+                                    const alertLine = document.createElement("div");
+                                    alertLine.style.cssText = "display:flex;align-items:center;gap:8px;padding:6px 10px;background:color-mix(in srgb, var(--lv-danger) 10%, var(--lv-surface));border-radius:6px;border:1px solid var(--lv-danger);color:var(--lv-danger);font-size:12px";
+                                    alertLine.innerHTML = `<span>⚠️ ${t("ledger.feedingAllergyConflict").replace("${food}", conflict.name)}${conflict.reaction ? `（${conflict.reaction}）` : ""}</span>`;
+                                    contentWrap.append(alertLine);
+                                }
+                            } catch (e) {
+                                // 静默降级
+                            }
+                        }
+
+                        // 3. 标记过敏并存入健康过敏史动作入口
+                        if (healthRef?.avId && healthRef?.columns) {
+                            const actionRow = document.createElement("div");
+                            actionRow.style.cssText = "display:flex;align-items:center;justify-content:flex-end;margin-top:2px";
+                            const addAllergyBtn = document.createElement("button");
+                            addAllergyBtn.className = "b3-button b3-button--outline";
+                            addAllergyBtn.style.cssText = "font-size:12px;padding:3px 8px";
+                            addAllergyBtn.textContent = `＋ ${t("ledger.recordAllergyToHealth")}`;
+                            addAllergyBtn.onclick = () => {
+                                const adlg = new Dialog({
+                                    title: t("ledger.recordAllergyTitle"),
+                                    content: `<div class="b3-dialog__content" style="padding:16px;display:flex;flex-direction:column;gap:12px">
+                                        <p class="lv-caption" style="margin:0">${t("ledger.recordAllergyIntro").replace("${food}", foodName)}</p>
+                                        <input class="b3-text-field" id="lv-allergy-reaction" placeholder="${t("ledger.recordAllergyReactionPlaceholder")}" style="width:100%" />
+                                    </div>
+                                    <div class="b3-dialog__action">
+                                        <button class="b3-button b3-button--cancel" id="lv-allergy-cancel">${t("cancel")}</button>
+                                        <button class="b3-button" id="lv-allergy-save">${t("save")}</button>
+                                    </div>`,
+                                    width: "420px",
+                                });
+                                const rxInput = adlg.element.querySelector("#lv-allergy-reaction") as HTMLInputElement;
+                                requestAnimationFrame(() => rxInput?.focus());
+                                (adlg.element.querySelector("#lv-allergy-cancel") as HTMLButtonElement).onclick = () => adlg.destroy();
+                                (adlg.element.querySelector("#lv-allergy-save") as HTMLButtonElement).onclick = async function (this: HTMLButtonElement) {
+                                    this.disabled = true;
+                                    const reactionVal = rxInput?.value.trim() || "";
+                                    adlg.destroy();
+                                    try {
+                                        const { addDetachedRow, setCell } = await import("@/core/siyuan");
+                                        const rowId = await addDetachedRow(healthRef.avId!, foodName);
+                                        if (healthRef.columns.category) {
+                                            await setCell(healthRef.avId!, healthRef.columns.category, rowId, {
+                                                type: "select", select: { content: "allergy" },
+                                            });
+                                        }
+                                        if (healthRef.columns.diagnosis && reactionVal) {
+                                            await setCell(healthRef.avId!, healthRef.columns.diagnosis, rowId, {
+                                                type: "text", text: { content: reactionVal },
+                                            });
+                                        }
+                                        if (healthRef.columns.date && dateVal) {
+                                            await setCell(healthRef.avId!, healthRef.columns.date, rowId, {
+                                                type: "date", date: { content: dateVal, isNotEmpty: true },
+                                            });
+                                        }
+                                        if (healthRef.columns.member && memberBlockId) {
+                                            await setCell(healthRef.avId!, healthRef.columns.member, rowId, {
+                                                type: "relation", relation: { blockIDs: [memberBlockId] },
+                                            });
+                                        }
+                                        showMessage(t("ledger.recordAllergySaved"), 3500, "info");
+                                    } catch (err) {
+                                        showMessage(t("ledger.saveFailed").replace("${msg}", err instanceof Error ? err.message : String(err)), 6000, "error");
+                                    }
+                                };
+                            };
+                            actionRow.append(addAllergyBtn);
+                            contentWrap.append(actionRow);
+                        }
+                    })();
+                }
+            } else if (active === "social") {
+                const memberBlockId = ref?.columns?.member ? row.cells[ref.columns.member]?.relation?.blockIDs?.[0] : undefined;
+                const member = memberBlockId ? (plugin.settings.members ?? []).find((m) => m.avItemId === memberBlockId) : undefined;
+                if (member?.birthday) {
+                    const socialRetireSection = document.createElement("div");
+                    socialRetireSection.className = "lv-detail-section";
+                    socialRetireSection.style.cssText = "margin-top:14px;padding-top:10px;border-top:1px solid var(--b3-border-color)";
+
+                    const head = document.createElement("div");
+                    head.style.cssText = "display:flex;align-items:center;justify-content:space-between;margin-bottom:8px";
+                    const title = document.createElement("span");
+                    title.className = "ft__on-surface";
+                    title.style.cssText = "font-weight:600;font-size:12px";
+                    title.textContent = `${t("members.retirementTitle")} · ${member.name}`;
+                    head.append(title);
+                    socialRetireSection.append(head);
+
+                    const contentWrap = document.createElement("div");
+                    contentWrap.style.cssText = "padding:10px 12px;background:var(--lv-surface-2);border-radius:8px;border:1px solid var(--lv-line);display:flex;flex-direction:column;gap:6px;font-size:12px";
+                    socialRetireSection.append(contentWrap);
+                    body.appendChild(socialRetireSection);
+
+                    void (async () => {
+                        const { calculateRetirement } = await import("@/core/retirement");
+                        const ret = calculateRetirement({ birthday: member.birthday, sex: member.sex });
+                        if (ret) {
+                            const delayText = ret.delayedMonths > 0 ? ` · ${t("members.retirementDelay").replace("${n}", String(ret.delayedMonths))}` : "";
+                            const daysBadge = ret.isRetired
+                                ? `<span class="lv-badge green">${t("members.retirementRetired")}</span>`
+                                : `<span class="lv-badge orange">${t("members.retirementDaysLeft").replace("${n}", String(ret.daysLeft))}</span>`;
+
+                            contentWrap.innerHTML = `
+                                <div style="display:flex;align-items:center;justify-content:space-between">
+                                    <span>${t("members.retirementTarget")}: <b>${ret.targetRetireDate}</b> (${t("members.retirementAge").replace("${age}", String(ret.targetRetireAge))}${delayText})</span>
+                                    ${daysBadge}
+                                </div>
+                                <div style="display:flex;align-items:center;justify-content:space-between;color:var(--lv-tx-2);font-size:11.5px">
+                                    <span>${t("members.retirementCareerProgress")}</span>
+                                    <span>${ret.careerProgressPercent}%</span>
+                                </div>
+                                <div style="height:4px;border-radius:2px;background:var(--lv-line);overflow:hidden;width:100%">
+                                    <div style="height:100%;background:var(--lv-accent);width:${ret.careerProgressPercent}%;border-radius:2px"></div>
+                                </div>`;
+                        }
+                    })();
+                }
             }
         })().catch((error) => {
             if (active === "vehicles") {
@@ -3041,6 +4379,128 @@
             body.appendChild(btn);
         }
         addStockInButton();
+
+        // Link shopping delivered purchases to assets-real records.
+        function addShoppingToAssetButton() {
+            if (active !== "shopping") return;
+            const assetsRef = plugin.settings.dbRefs?.["assets-real"];
+            if (!assetsRef?.avId || !assetsRef.columns) return;
+            const name = String(cellText(row.cells[ref!.columns.name]));
+            if (!name || name === "—") return;
+
+            const btn = document.createElement("button");
+            btn.className = "b3-button b3-button--outline";
+            btn.style.cssText = "margin-top:8px;margin-left:6px;font-size:12px";
+            btn.textContent = t("ledger.shoppingToAsset");
+
+            let busy = false;
+            btn.onclick = async () => {
+                if (busy) return;
+                busy = true;
+                btn.disabled = true;
+                try {
+                    const { mapShoppingToAssetReal } = await import("@/core/valuation");
+                    const draft = mapShoppingToAssetReal(row, ref!.columns);
+
+                    const catOptions = [
+                        { val: "digital", label: "数码电子" },
+                        { val: "appliance", label: "家用电器" },
+                        { val: "furniture", label: "家具家居" },
+                        { val: "apparel", label: "服饰箱包" },
+                        { val: "collection", label: "潮玩收藏" },
+                        { val: "sports", label: "运动户外" },
+                        { val: "other_ar", label: "其他资产" },
+                    ].map((c) => `<option value="${c.val}" ${c.val === draft.suggestedCategory ? "selected" : ""}>${c.label}</option>`).join("");
+
+                    const dlg = new Dialog({
+                        title: t("ledger.shoppingToAssetTitle"),
+                        content: `<div class="b3-dialog__content" style="padding:16px;display:flex;flex-direction:column;gap:12px">
+                            <p class="lv-caption" style="margin:0">${t("ledger.shoppingToAssetIntro")}</p>
+                            <label style="display:flex;flex-direction:column;gap:4px">
+                                <span class="lv-caption">${t("field.name")}</span>
+                                <input class="b3-text-field" id="lv-s2a-name" value="${draft.name}" style="width:100%" />
+                            </label>
+                            <label style="display:flex;flex-direction:column;gap:4px">
+                                <span class="lv-caption">${t("field.category")}</span>
+                                <select class="b3-select" id="lv-s2a-cat" style="width:100%">${catOptions}</select>
+                            </label>
+                            <label style="display:flex;flex-direction:column;gap:4px">
+                                <span class="lv-caption">${t("field.amount")}</span>
+                                <input class="b3-text-field" id="lv-s2a-amount" type="number" value="${draft.amount ?? ""}" style="width:100%" />
+                            </label>
+                        </div>
+                        <div class="b3-dialog__action">
+                            <button class="b3-button b3-button--cancel" id="lv-s2a-cancel">${t("cancel")}</button>
+                            <button class="b3-button" id="lv-s2a-save">${t("save")}</button>
+                        </div>`,
+                        width: "420px",
+                    });
+
+                    (dlg.element.querySelector("#lv-s2a-cancel") as HTMLButtonElement).onclick = () => {
+                        dlg.destroy();
+                        busy = false;
+                        btn.disabled = false;
+                    };
+
+                    (dlg.element.querySelector("#lv-s2a-save") as HTMLButtonElement).onclick = async function (this: HTMLButtonElement) {
+                        const nameVal = (dlg.element.querySelector("#lv-s2a-name") as HTMLInputElement)?.value.trim() || draft.name;
+                        const catVal = (dlg.element.querySelector("#lv-s2a-cat") as HTMLSelectElement)?.value || draft.suggestedCategory;
+                        const amtVal = Number((dlg.element.querySelector("#lv-s2a-amount") as HTMLInputElement)?.value) || draft.amount;
+
+                        this.disabled = true;
+                        dlg.destroy();
+                        try {
+                            const { addDetachedRow, setCell } = await import("@/core/siyuan");
+                            const rowId = await addDetachedRow(assetsRef.avId!, nameVal);
+                            if (assetsRef.columns.category) {
+                                await setCell(assetsRef.avId!, assetsRef.columns.category, rowId, {
+                                    type: "select", select: { content: catVal },
+                                });
+                            }
+                            if (assetsRef.columns.amount && typeof amtVal === "number" && Number.isFinite(amtVal)) {
+                                await setCell(assetsRef.avId!, assetsRef.columns.amount, rowId, {
+                                    type: "number", number: { content: amtVal, isNotEmpty: true },
+                                });
+                            }
+                            if (assetsRef.columns.date && draft.date) {
+                                await setCell(assetsRef.avId!, assetsRef.columns.date, rowId, {
+                                    type: "date", date: { content: draft.date, isNotEmpty: true },
+                                });
+                            }
+                            if (assetsRef.columns.channel && draft.channel) {
+                                await setCell(assetsRef.avId!, assetsRef.columns.channel, rowId, {
+                                    type: "text", text: { content: draft.channel },
+                                });
+                            }
+                            if (assetsRef.columns.member && draft.memberId) {
+                                await setCell(assetsRef.avId!, assetsRef.columns.member, rowId, {
+                                    type: "relation", relation: { blockIDs: [draft.memberId] },
+                                });
+                            }
+                            if (assetsRef.columns.note) {
+                                const noteContent = draft.note ? `${draft.note} (来自购物记录)` : "来自购物记录";
+                                await setCell(assetsRef.avId!, assetsRef.columns.note, rowId, {
+                                    type: "text", text: { content: noteContent },
+                                });
+                            }
+                            showMessage(t("ledger.shoppingToAssetDone").replace("${name}", nameVal), 3500, "info");
+                            btn.textContent = `✓ ${t("ledger.shoppingToAssetDoneShort")}`;
+                            btn.disabled = true;
+                        } catch (err) {
+                            showMessage(t("ledger.saveFailed").replace("${msg}", err instanceof Error ? err.message : String(err)), 6000, "error");
+                            busy = false;
+                            btn.disabled = false;
+                        }
+                    };
+                } catch (e) {
+                    showMessage(t("ledger.logReadFailed") + " (" + (e instanceof Error ? e.message : String(e)) + ")", 6000, "error");
+                    busy = false;
+                    btn.disabled = false;
+                }
+            };
+            body.appendChild(btn);
+        }
+        addShoppingToAssetButton();
 
         // Certificate renewal chains show both forward and reverse relations.
         function addRenewChainSection() {
@@ -3376,6 +4836,17 @@
                 showMessage(t("ledger.copyAsImageFail") + ` (${e instanceof Error ? e.message : String(e)})`, 5000, "error");
             }
         };
+        // Copy the detail card as masked label/value text.
+        (dlg.element.querySelector("#lv-detail-card-masked-text") as HTMLButtonElement).onclick = async () => {
+            const { formatMaskedRecordText } = await import("@/core/format");
+            const text = formatMaskedRecordText(cardTitle, cardRows);
+            try {
+                await navigator.clipboard.writeText(text);
+                showMessage(t("ledger.copyAsMaskedTextOk"), 2500, "info");
+            } catch (e) {
+                showMessage(t("ledger.copyAsImageFail") + ` (${e instanceof Error ? e.message : String(e)})`, 5000, "error");
+            }
+        };
         // Row deletion is explicit and confirmed before mutation.
         (dlg.element.querySelector("#lv-detail-del") as HTMLButtonElement).onclick = () => {
             confirm(t("ledger.delTitle"), t("ledger.delBody").replace("${name}", cellText(row.cells[ref.columns.name])), async () => {
@@ -3648,6 +5119,12 @@
     {:else}
         <input class="b3-text-field" style="width:150px" type="search" placeholder={t("ledger.search")}
             bind:value={searchText} oninput={(event) => { panelMemory.ledgerSearch = event.currentTarget.value; }} title={t("ledger.search")} />
+        <button class="b3-button b3-button--outline lv-density-btn"
+            title={tableDensity === "compact" ? t("ledger.densityComfortable") : t("ledger.densityCompact")}
+            aria-label={tableDensity === "compact" ? t("ledger.densityComfortable") : t("ledger.densityCompact")}
+            onclick={toggleDensity}>
+            {tableDensity === "compact" ? t("ledger.densityComfortable") : t("ledger.densityCompact")}
+        </button>
         <button class="lv-btn primary" onclick={openNewRecord} disabled={rebuilding}>＋ {t("ledger.newRecord")}</button>
         <details class="lv-ledger-more">
             <summary class="b3-button b3-button--outline">{t("ledger.moreActions")}</summary>
@@ -3657,8 +5134,16 @@
                 <button class="b3-button b3-button--outline" title={t("ledger.printLabels")}
                     disabled={filteredRows.length === 0 || printing || exporting} aria-busy={printing} onclick={printLabels}>{printing ? t("ledger.saving") : t("ledger.printLabels")}</button>
                 {#if active === "vehicles"}<button class="b3-button b3-button--outline" onclick={openEnergyDashboard}>{t("fuel.dashboardButton")}</button>{/if}
-                {#if active === "parenting"}<button class="b3-button b3-button--outline" onclick={openGrowthChart}>{t("ledger.growthChart")}</button>{/if}
+                {#if active === "parenting"}
+                    <button class="b3-button b3-button--outline" onclick={openGrowthChart}>{t("ledger.growthChart")}</button>
+                    <button class="b3-button b3-button--outline" onclick={openVaccineScheduleModal}>{t("ledger.vaccineSchedule")}</button>
+                {/if}
                 {#if active === "stock"}<button class="b3-button b3-button--outline" onclick={openShoppingList}>{t("ledger.shoppingList")}</button>{/if}
+                {#if active === "favors"}<button class="b3-button b3-button--outline" onclick={openFavorsReport}>{t("ledger.favorsReport")}</button>{/if}
+                {#if active === "bookmarks"}<button class="b3-button b3-button--outline" onclick={openBookmarksCheck}>{t("ledger.checkBookmarks")}</button>{/if}
+                {#if active === "memberships"}<button class="b3-button b3-button--outline" onclick={openSubscriptionStats}>{t("ledger.subscriptionStats")}</button>{/if}
+                {#if active === "assets-real"}<button class="b3-button b3-button--outline" onclick={openAssetValuationModal}>{t("ledger.assetValuationReport")}</button>{/if}
+                {#if active === "media"}<button class="b3-button b3-button--outline" onclick={openMediaReport}>{t("ledger.mediaReport")}</button>{/if}
                 {#if active !== "members" && active !== "adhoc"}<button class="b3-button b3-button--outline" disabled={printing || exporting} onclick={openCsvImport}>{t("ledger.importCsv")}</button>{/if}
                 <button class="b3-button b3-button--outline" disabled={!ref?.docId}
                     onclick={() => plugin.showTabDocs(ref?.docId)}>{t("ledger.openDoc")} →</button>
@@ -3942,7 +5427,7 @@
         {/if}
     </div>
 {:else}
-    <div class="lv-card lv-table-wrap lv-table" style="margin-top:12px">
+    <div class="lv-card lv-table-wrap lv-table" class:lv-table--compact={tableDensity === "compact"} style="margin-top:12px">
         <table bind:this={ledgerTableEl}>
             <thead><tr>
                 <!-- Severity indicator column. -->
@@ -3958,7 +5443,7 @@
             </tr></thead>
             <tbody>
                 {#if virtualRange.start > 0}
-                    <tr class="lv-virtual-spacer" aria-hidden="true"><td colspan={tableKeys.length + 1} style={`height:${virtualRange.start * VIRTUAL_ROW_HEIGHT}px`}></td></tr>
+                    <tr class="lv-virtual-spacer" aria-hidden="true"><td colspan={tableKeys.length + 1} style={`height:${virtualRange.start * virtualRowHeight}px`}></td></tr>
                 {/if}
                 {#each virtualRows as r (r.itemID)}
                     {@const tone = ledgerTone(r)}
@@ -3979,7 +5464,7 @@
                     </tr>
                 {/each}
                 {#if virtualRange.end < visibleRows.length}
-                    <tr class="lv-virtual-spacer" aria-hidden="true"><td colspan={tableKeys.length + 1} style={`height:${(visibleRows.length - virtualRange.end) * VIRTUAL_ROW_HEIGHT}px`}></td></tr>
+                    <tr class="lv-virtual-spacer" aria-hidden="true"><td colspan={tableKeys.length + 1} style={`height:${(visibleRows.length - virtualRange.end) * virtualRowHeight}px`}></td></tr>
                 {/if}
                 {#if filteredRows.length > visibleRows.length}
                     <!-- Progressive rendering load-more row. -->

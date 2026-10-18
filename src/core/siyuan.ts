@@ -835,7 +835,7 @@ export interface LedgerRead {
     columns: any[];
     rows: AvRow[];
     rowCount: number;
-    /** true = 一次 render 全量返回；false = 返回行数 < rowCount（D01：调用方必须进诊断/报错，不得当空成功） */
+    /** true = 唯一行数已达到 rowCount；false = 读取不完整（D01：调用方必须进诊断/报错，不得当空成功） */
     complete: boolean;
 }
 
@@ -852,18 +852,36 @@ export async function renderLedger(avID: string, pageSize?: number, page?: numbe
         ? { ...options, latestKey: `${options.latestKey}:page:${page ?? 1}` }
         : options;
     const d = await post<any>("/api/av/renderAttributeView", payload, pageOptions);
-    const view = d?.view ?? {};
-    const cols: any[] = view.columns ?? [];
-    const rows: AvRow[] = (view.rows ?? []).map((r: any) => {
+    const view = d?.view;
+    const malformed = (field: string): never => {
+        throw new KernelError("/api/av/renderAttributeView", -3, `malformed ledger response: ${field}`);
+    };
+    // A successful envelope is not proof of a successful read. In particular,
+    // a missing view must not erase scan state by masquerading as an empty AV.
+    if (!view || !Array.isArray(view.columns) || !Array.isArray(view.rows)) malformed("view.columns/view.rows");
+    const cols: any[] = view.columns;
+    const rowCount = view.rowCount ?? view.rows.length;
+    if (!Number.isSafeInteger(rowCount) || rowCount < 0) malformed("view.rowCount");
+    const rows: AvRow[] = [];
+    const seen = new Set<string>();
+    for (const r of view.rows) {
+        if (!r || typeof r.id !== "string" || !r.id.trim()) malformed("row.id");
+        const rawCells = r.cells ?? [];
+        if (!Array.isArray(rawCells)) malformed("row.cells");
         const cells: Record<string, any> = {};
-        (r.cells ?? []).forEach((c: any, i: number) => {
+        rawCells.forEach((c: any, i: number) => {
+            if (!c || typeof c !== "object") malformed("row.cells[]");
             const v = c.value ?? {};
             const key = v.keyID ?? cols[i]?.id;
             if (key) cells[key] = v;
         });
-        return { itemID: r.id, cells };
-    });
-    const rowCount = view.rowCount ?? rows.length;
+        // Count unique identities on the first page as well as later pages;
+        // duplicated rows otherwise make a partial read appear complete.
+        if (!seen.has(r.id)) {
+            seen.add(r.id);
+            rows.push({ itemID: r.id, cells });
+        }
+    }
     return { columns: cols, rows, rowCount, complete: rows.length >= rowCount };
 }
 

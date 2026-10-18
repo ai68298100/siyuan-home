@@ -303,6 +303,47 @@ describe("primaryRowItemIDs 分页（D01）", () => {
 });
 
 describe("renderLedger 完整性（D01）", () => {
+    it.each([
+        null,
+        {},
+        { view: null },
+        { view: {} },
+        { view: { columns: {}, rows: [] } },
+        { view: { columns: [], rows: {} } },
+        { view: { columns: [], rows: [null] } },
+        { view: { columns: [], rows: [{ cells: [] }] } },
+        { view: { columns: [], rows: [{ id: "", cells: [] }] } },
+        { view: { columns: [], rows: [{ id: "r1", cells: {} }] } },
+        { view: { columns: [], rows: [{ id: "r1", cells: [null] }] } },
+        ...[-1, 1.5, NaN, Infinity, "2"].map((rowCount) => ({ view: { columns: [], rows: [], rowCount } })),
+    ])("损坏的成功响应不得被当作空台账或抛出原始 TypeError：%j", async (data) => {
+        handler = () => ({ code: 0, msg: "", data });
+        await expect(renderLedger("av-1")).rejects.toMatchObject({
+            name: "KernelError", endpoint: "/api/av/renderAttributeView", code: -3,
+        });
+        expect(calls).toHaveLength(1);
+    });
+
+    it("保留无 rowCount 旧响应与按列位置回退的兼容性", async () => {
+        handler = () => ({ code: 0, msg: "", data: { view: {
+            columns: [{ id: "k1" }],
+            rows: [{ id: "r1", cells: [{ value: { type: "text", text: { content: "a" } } }] }],
+        } } });
+        const read = await renderLedger("av-1");
+        expect(read).toMatchObject({ rowCount: 1, complete: true });
+        expect(read.rows[0].cells.k1.text.content).toBe("a");
+    });
+
+    it("首屏重复行只计一次，不能提前宣告全量完成", async () => {
+        handler = () => ({ code: 0, msg: "", data: { view: {
+            columns: [], rowCount: 2,
+            rows: [{ id: "r1", cells: [] }, { id: "r1", cells: [] }],
+        } } });
+        const read = await renderLedger("av-1");
+        expect(read.rows.map((r) => r.itemID)).toEqual(["r1"]);
+        expect(read.complete).toBe(false);
+    });
+
     it("rows < rowCount → complete=false（调用方必须进诊断，不得当空成功）", async () => {
         handler = (endpoint) => {
             if (endpoint === "/api/av/renderAttributeView") {
@@ -332,6 +373,25 @@ describe("renderLedger 完整性（D01）", () => {
 
 describe("renderLedgerAll 全量读取（N7/E13：render 接受 page/pageSize）", () => {
     const row = (id: string) => ({ id, cells: [] });
+
+    it("首屏重复时仍翻页补齐唯一行，分页内部重复也不计入总数", async () => {
+        handler = (_endpoint, payload) => ({ code: 0, msg: "", data: { view: {
+            columns: [], rowCount: 3,
+            rows: (payload.page === 2 ? ["r2", "r2", "r3"] : ["r1", "r1", "r1"]).map(row),
+        } } });
+        const read = await renderLedgerAll("av-1", 3);
+        expect(read.rows.map((r) => r.itemID)).toEqual(["r1", "r2", "r3"]);
+        expect(read.complete).toBe(true);
+        expect(calls.map((call) => call.payload.page)).toEqual([undefined, 2]);
+    });
+
+    it("后续页损坏时整体失败，不以之前的部分数据冒充成功", async () => {
+        handler = (_endpoint, payload) => ({ code: 0, msg: "", data: payload.page
+            ? {}
+            : { view: { columns: [], rowCount: 2, rows: [row("r1")] } },
+        });
+        await expect(renderLedgerAll("av-1")).rejects.toMatchObject({ name: "KernelError", code: -3 });
+    });
 
     it("翻页累积 → rowCount 达成 complete=true 即停（不带多余翻页）；翻页带 page 参数", async () => {
         const pages: Record<number, string[]> = { 0: ["r1", "r2", "r3"], 2: ["r4", "r5"] };

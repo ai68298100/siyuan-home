@@ -530,7 +530,7 @@ export const FAVORS_SCHEMA: ModuleSchema = {
 export const STOCK_SCHEMA: ModuleSchema = {
     columns: [
         ...d("name", "member"),
-        { ...FIELD_DICT.category, options: ["food_st", "daily_chem", "paper", "medical_st", "other_st"] },
+        { ...FIELD_DICT.category, options: ["food_st", "daily_chem", "paper", "medical_st", "emergency_st", "other_st"] },
         ...d("expiry", "location", "note"),
         { key: "qty", type: "number", labelKey: "field.qty", min: 0, unitKey: "capture.unitCount" },
         { key: "low_stock_at", type: "number", labelKey: "field.low_stock_at", min: 0, unitKey: "capture.unitCount" },
@@ -541,6 +541,7 @@ export const STOCK_SCHEMA: ModuleSchema = {
         { key: "by_category", type: "table", groupBy: "category" },
         { key: "expiring", type: "table", sortBy: { key: "expiry", asc: true } },
     ],
+    templates: [{ key: "emergency_kit", nameKey: "tpl.emergencyKit", file: "stock/emergency-kit.tpl" }],
     reminders: [{ key: "expiry", field: "expiry", kind: "oneoff", leadDays: 30 }],
     // H15：囤货低库存（阈值逐行 low_stock_at）
     numericRules: [{ key: "low_stock", field: "qty", thresholdField: "low_stock_at" }],

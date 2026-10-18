@@ -29,6 +29,25 @@ const catalog = {
 };
 
 describe("health.runHealthCheck", () => {
+    it("成功响应缺少 view → 记录读取错误并继续检查其他模块", async () => {
+        handler = (endpoint, payload) => {
+            if (endpoint === "/api/query/sql") return { code: 0, msg: "", data: [{ id: "d1" }] };
+            if (endpoint === "/api/av/renderAttributeView") return {
+                code: 0, msg: "", data: payload.id === "av-c" ? {} : {
+                    view: { columns: [], rows: [], rowCount: 0 },
+                },
+            };
+            throw new Error(`unexpected endpoint: ${endpoint}`);
+        };
+        const report = await runHealthCheck(settings, catalog);
+        const byId = Object.fromEntries(report.modules.map((m) => [m.moduleId, m]));
+        expect(byId.certs).toMatchObject({ ok: false });
+        expect(byId.certs.error).toContain("malformed ledger response");
+        expect(byId.certs.complete).toBeUndefined();
+        expect(byId.health).toMatchObject({ ok: true, rows: 0, complete: true });
+        expect(report.modules).toHaveLength(3);
+    });
+
     it("五态：未建库 / 完整 / 不完整 / 缺列 / 读取异常", async () => {
         handler = (endpoint, payload) => {
             if (endpoint === "/api/query/sql") {

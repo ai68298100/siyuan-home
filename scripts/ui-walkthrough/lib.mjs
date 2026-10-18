@@ -49,21 +49,37 @@ export async function login(ctx) {
     }
     const page = await ctx.newPage();
     await page.goto(`${BASE}/check-auth`, { waitUntil: "domcontentloaded" });
-    await page.locator("input:visible").first().fill(process.env.TEST_WS_AUTH_CODE || "ui3pass1234");
-    await page.locator("button:visible").first().click();
-    await sleep(2500);
+    // The auth page also exposes a visible remember-me checkbox, and when the
+    // kernel has no lock screen the password panel is hidden altogether. Only
+    // fill and submit an actual editable auth field; otherwise keep the
+    // already-authorized session and avoid clicking the unrelated "exit"
+    // button.
+    const authInput = page.locator('input:not([type="checkbox"]):not([type="hidden"]):visible').first();
+    if (await authInput.count()) {
+        await authInput.fill(process.env.TEST_WS_AUTH_CODE || "ui3pass1234");
+        await page.locator("button:visible").first().click();
+        await sleep(2500);
+    }
     writeFileSync(COOKIE_FILE, JSON.stringify(await ctx.cookies()));
     await page.close();
 }
 
 /** 打开管家面板并跳过首启向导（幂等）。 */
 export async function openPanel(page) {
-    await page.evaluate(() => {
-        const tb = document.getElementById("toolbar");
-        const el = tb?.querySelector('[data-name="siyuan-home"]')
-            ?? Array.from(tb?.children ?? []).find((c) => (c.getAttribute("aria-label") || "").includes("小驴管家"));
-        el?.click();
-    });
+    // Reload can restore the plugin tab that was open before navigation. The
+    // toolbar button is a toggle, so clicking it unconditionally would close
+    // an already-mounted panel and make this helper non-idempotent. Only open
+    // the panel when no mounted host is present.
+    const alreadyOpen = await page.locator(".lv-home").count();
+    if (alreadyOpen === 0) {
+        await page.evaluate(() => {
+            const tb = document.getElementById("toolbar");
+            const el = tb?.querySelector('[data-name="siyuan-home"]')
+                ?? Array.from(tb?.children ?? []).find((c) => (c.getAttribute("aria-label") || "").includes("小驴管家"));
+            el?.click();
+        });
+    }
+    await page.locator(".lv-home").first().waitFor({ state: "visible", timeout: 20000 });
     await sleep(3500);
     await page.evaluate(() => {
         document.querySelectorAll(".b3-snackbar__close").forEach((b) => b.dispatchEvent(new MouseEvent("click", { bubbles: true })));

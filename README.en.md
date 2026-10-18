@@ -52,6 +52,9 @@ This release keeps the vehicle workspace and first-install fixes from v0.5.0, th
 
 For v0.5.1, the main screens and quick-capture form load on demand, long ledger tables use viewport windowing, and shared tokens now cover spacing, typography, controls, radii, shadows, layering and motion. Chrome measurements recorded about 148 ms to first visible panel, 67–119 ms tab switches, 55 ms first quick-capture open, and 0 px desktop overflow.
 
+- **Added**: table density toggle (comfortable 48px / compact 34px), copy record as masked text (IDs, phone, email masked), and rebuild all enabled ledgers in diagnostics.
+- **Added**: reminder card in-place summary expansion (rule, member, due date without opening drawer), and saved filter views with one-click switching and persistence.
+- **Added**: batch reassignment of ledger rows to members, linked warranty/contracts review in house drawer, and baby food 3-day observation timeline linked with health allergy records.
 - **Performance**: overview, reminders, ledger and members are loaded on demand; ledger tables use viewport windowing for long lists, while vehicle cards keep progressive image loading.
 - **Design system**: spacing, typography, control sizes, radii, shadows, z-index and motion durations now use shared tokens across light and dark themes.
 - **Measured**: Chrome walkthrough first visible panel about 148 ms, tab switches 67–119 ms, first quick-capture open about 55 ms, and 0 px desktop overflow.
@@ -63,7 +66,7 @@ For v0.5.1, the main screens and quick-capture form load on demand, long ledger 
 4. Press `Ctrl+Alt+H` anytime to open the hub
 
 > **Validation status:** core data paths have automated tests and isolated-kernel coverage. The v0.5.1 GitHub Release is available; Android WebView behavior remains host-specific validation. `icon.png` and `preview.png` were redesigned for v0.3.13 (brand-gradient tile + geometric mark; dark overview with sample data).
-> **Version note:** the tagged v0.5.1 package is the current GitHub release; local quality checks report 409 unit tests.
+> **Version note:** the tagged v0.5.1 package is the current GitHub release; local quality checks report 458 unit tests.
 >
 > Family sharing depends on SiYuan's collaboration, permissions, sync and conflict behavior. Test with non-sensitive data before sharing; this plugin does not provide a separate permission system.
 >
@@ -139,7 +142,7 @@ pnpm run dev      # dev (app + kernel watch)
 pnpm run build    # dist/ + package.zip
 pnpm run check    # 5-layer gate (types + svelte + i18n + meta + audit)
 pnpm run smoke    # release package and single-file loader smoke checks
-pnpm test         # unit tests (409)
+pnpm test         # unit tests (458)
 ```
 
 - Setup & conventions: [CONTRIBUTING.md](./CONTRIBUTING.md)

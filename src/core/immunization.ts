@@ -5,6 +5,8 @@
  * 来源：国家卫健委《国家免疫规划疫苗儿童免疫程序表》（数据为公开政策信息）。
  */
 
+import { localDateKey } from "./hub/rule";
+
 export interface VaccineDose {
     /** 疫苗名 */
     vaccine: string;
@@ -52,3 +54,136 @@ export function doseDate(birthISO: string, d: VaccineDose): string {
     const last = new Date(yy, mm, 0).getDate();
     return `${yy}-${String(mm).padStart(2, "0")}-${String(Math.min(day, last)).padStart(2, "0")}`;
 }
+
+export type VaccineDoseStatus = "given" | "overdue" | "due_soon" | "upcoming";
+
+export interface GivenDoseRecord {
+    id?: string;
+    vaccineName: string;
+    doseNo?: number;
+    date?: string;
+    batch?: string;
+    site?: string;
+}
+
+export interface ScheduledDoseItem {
+    key: string;
+    vaccine: string;
+    dose: number;
+    monthAge: number;
+    targetDate: string;
+    status: VaccineDoseStatus;
+    givenDate?: string;
+    rowId?: string;
+    batch?: string;
+    site?: string;
+    note?: string;
+    daysDiff: number;
+}
+
+export interface VaccineScheduleReport {
+    childBirthday: string;
+    totalDoses: number;
+    givenCount: number;
+    overdueCount: number;
+    dueSoonCount: number;
+    upcomingCount: number;
+    completionRate: number; // 0-100
+    items: ScheduledDoseItem[];
+}
+
+/**
+ * 测算儿童疫苗排期与接种履历（§16/§17 290波）：
+ * 依据儿童出生日期推算国家免疫规划标准剂次日期，
+ * 对比台账已接种记录，计算已种/逾期/近期/待种状态及完成率。
+ */
+export function calculateVaccineSchedule(
+    birthday: string,
+    givenRecords: GivenDoseRecord[] = [],
+    today: string = localDateKey(new Date()),
+    schedule: VaccineDose[] = IMMUNIZATION_SCHEDULE,
+): VaccineScheduleReport | null {
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(birthday)) return null;
+
+    const [ty, tm, td] = today.split("-").map(Number);
+    const todayTime = new Date(ty, (tm ?? 1) - 1, td ?? 1).getTime();
+
+    // 复制以匹配实种记录，避免单条记录多次消耗
+    const remainingGiven = [...givenRecords];
+
+    const items: ScheduledDoseItem[] = [];
+    let givenCount = 0;
+    let overdueCount = 0;
+    let dueSoonCount = 0;
+    let upcomingCount = 0;
+
+    for (const dose of schedule) {
+        const target = doseDate(birthday, dose);
+        const [dy, dm, dd] = target.split("-").map(Number);
+        const targetTime = new Date(dy, (dm ?? 1) - 1, dd ?? 1).getTime();
+        const daysDiff = Math.round((targetTime - todayTime) / (24 * 60 * 60 * 1000));
+
+        // 优先严格匹配疫苗名称与剂次
+        let matchedIndex = remainingGiven.findIndex((g) =>
+            g.vaccineName.trim() === dose.vaccine.trim() && (g.doseNo === dose.dose || !g.doseNo)
+        );
+        if (matchedIndex < 0) {
+            matchedIndex = remainingGiven.findIndex((g) => g.vaccineName.trim() === dose.vaccine.trim());
+        }
+
+        let status: VaccineDoseStatus;
+        let givenDate: string | undefined;
+        let rowId: string | undefined;
+        let batch: string | undefined;
+        let site: string | undefined;
+
+        if (matchedIndex >= 0) {
+            const matched = remainingGiven.splice(matchedIndex, 1)[0];
+            status = "given";
+            givenDate = matched.date;
+            rowId = matched.id;
+            batch = matched.batch;
+            site = matched.site;
+            givenCount++;
+        } else if (daysDiff < 0) {
+            status = "overdue";
+            overdueCount++;
+        } else if (daysDiff <= 30) {
+            status = "due_soon";
+            dueSoonCount++;
+        } else {
+            status = "upcoming";
+            upcomingCount++;
+        }
+
+        items.push({
+            key: `${dose.vaccine}-${dose.dose}-${dose.monthAge}`,
+            vaccine: dose.vaccine,
+            dose: dose.dose,
+            monthAge: dose.monthAge,
+            targetDate: target,
+            status,
+            givenDate,
+            rowId,
+            batch,
+            site,
+            note: dose.note,
+            daysDiff,
+        });
+    }
+
+    const totalDoses = schedule.length;
+    const completionRate = totalDoses > 0 ? Math.round((givenCount / totalDoses) * 100) : 0;
+
+    return {
+        childBirthday: birthday,
+        totalDoses,
+        givenCount,
+        overdueCount,
+        dueSoonCount,
+        upcomingCount,
+        completionRate,
+        items,
+    };
+}
+

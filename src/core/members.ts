@@ -448,3 +448,97 @@ export async function backfillMemberLinks(
     if (dirty) await saveSettings(plugin, settings);
     return result;
 }
+
+export interface ReassignOptions {
+    /** 来源成员的 avItemId；或者 "unassigned" / undefined 表示改派未指定成员或失效成员的行 */
+    fromAvItemId?: string | "unassigned";
+    /** 目标成员的 avItemId（必填） */
+    toAvItemId: string;
+    /** 限制改派的模块列表，不传则遍历全部已启用且带有 member 列的模块 */
+    moduleIds?: string[];
+}
+
+export interface ReassignResult {
+    /** 成功更新的行数 */
+    updated: number;
+    /** 涉及更新的模块 */
+    modules: string[];
+    /** 失败的行记录详情 */
+    failures: Array<{ moduleId: string; rowId: string; error: string }>;
+}
+
+/**
+ * 批量改派台账行的责任成员（§15 引用完整性）：
+ * 遍历启用模块，查找 relation 成员引用为 fromAvItemId（或悬空/未指定）的行，
+ * 将其 member relation 列值批量重定向至 toAvItemId。
+ */
+export async function reassignMemberRows(
+    plugin: Plugin,
+    settings: HomeSettings,
+    options: ReassignOptions,
+): Promise<ReassignResult> {
+    return enqueueMemberWrite(plugin, async () => {
+        const { fromAvItemId, toAvItemId, moduleIds } = options;
+        const result: ReassignResult = { updated: 0, modules: [], failures: [] };
+        if (!toAvItemId) return result;
+
+        const targetModules = moduleIds ?? settings.enabledModules;
+        const touchedModules = new Set<string>();
+
+        for (const moduleId of targetModules) {
+            if (moduleId === "members") continue;
+            const ref = settings.dbRefs[moduleId];
+            const memberKey = ref?.columns?.member;
+            if (!ref?.avId || !memberKey) continue;
+
+            try {
+                const all = await renderLedgerAll(ref.avId);
+                if (!all.rows || all.rows.length === 0) continue;
+
+                for (const row of all.rows) {
+                    const cell = row.cells[memberKey];
+                    const blockIDs: string[] | undefined = cell?.relation?.blockIDs;
+                    const currentBlockId = blockIDs && blockIDs.length > 0 ? blockIDs[0] : undefined;
+
+                    let matches = false;
+                    if (!fromAvItemId || fromAvItemId === "unassigned") {
+                        // 匹配未指定成员或当前关联块 ID 已不存在于有效成员中
+                        matches = !currentBlockId || !settings.members.some((m) => m.avItemId === currentBlockId);
+                    } else {
+                        matches = currentBlockId === fromAvItemId;
+                    }
+
+                    if (matches && currentBlockId !== toAvItemId) {
+                        try {
+                            await setCell(ref.avId, memberKey, row.itemID, {
+                                type: "relation",
+                                relation: { blockIDs: [toAvItemId] },
+                            }, {
+                                idempotencyKey: `reassign:${ref.avId}:${memberKey}:${row.itemID}:${toAvItemId}`,
+                                retries: 1,
+                            });
+                            result.updated++;
+                            touchedModules.add(moduleId);
+                        } catch (err) {
+                            result.failures.push({
+                                moduleId,
+                                rowId: row.itemID,
+                                error: err instanceof Error ? err.message : String(err),
+                            });
+                        }
+                    }
+                }
+            } catch (err) {
+                result.failures.push({
+                    moduleId,
+                    rowId: "",
+                    error: err instanceof Error ? err.message : String(err),
+                });
+            }
+        }
+
+        result.modules = Array.from(touchedModules);
+        return result;
+    });
+}
+
