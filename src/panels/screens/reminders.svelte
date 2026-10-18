@@ -678,7 +678,7 @@
     <!-- 261 波：完成/延后后行 150ms 淡出离场（瞬消失让用户怀疑误触；respects reduced-motion 由全局降级） -->
     <div class="lv-rem {r.level}" class:lv-rem--batch={batchMode && viewMode === "list" && filter !== "handled"} out:fade={{ duration: 150 }}>
     {#if batchMode && viewMode === "list" && filter !== "handled"}
-            <input type="checkbox" class="b3-checkbox" aria-label={t("hub.select")}
+            <input type="checkbox" class="b3-checkbox" aria-label={`${t("hub.select")}: ${r.title}`}
                 checked={selected.has(r.id)} disabled={batchBusy} onchange={() => toggleSelect(r.id)} style="flex-shrink:0" />
         {/if}
         <!-- 259 波：图标砖收回中性（对齐原型 .rem .ic）——级别语义由色轨+右侧大字承载 -->
@@ -695,9 +695,9 @@
         <div class="lv-rem-ops">
             <button class="b3-button b3-button--text" disabled={batchBusy || reminderBusy.has(r.id)} aria-busy={reminderBusy.has(r.id)} onclick={() => void runReminderAction(() => plugin.complete(r), r.id)}>{reminderBusy.has(r.id) ? t("ledger.saving") : t("act.done")}</button>
             <div class="lv-rem-more">
-                <button class="b3-button b3-button--text lv-rem-more-toggle" type="button" aria-expanded="false" aria-controls={`lv-rem-more-${r.id}`}
+                <button class="b3-button b3-button--text lv-rem-more-toggle" type="button" aria-expanded="false" aria-haspopup="true" aria-controls={`lv-rem-more-${r.id}`}
                     onclick={toggleMoreMenu}>{t("ledger.detailMore")} <span aria-hidden="true">⌄</span></button>
-                <div id={`lv-rem-more-${r.id}`} class="lv-rem-more-menu" role="group" aria-label={t("ledger.detailMore")} use:closeMoreOnMenuClick>
+                <div id={`lv-rem-more-${r.id}`} class="lv-rem-more-menu" role="group" aria-label={t("ledger.detailMore")} data-open="false" use:closeMoreOnMenuClick>
                     {#if ["certs", "insurance", "contracts"].includes(r.moduleId)}
                         <!-- 续保/换证/合同续约：新到期日写回规则 field 列（26.6 + 98 波：contracts 规则带 field=expiry 与
                              autoRenewField 升级路径，此前 🔄 决策提醒无"续"动作入口——漏项补齐） -->
