@@ -1,5 +1,5 @@
 # 小驴管家（Lv Home）· 项目待办总清单
-> **当前事实（2026-10-19）**：本地 `main` 为 v0.5.2，527 项单测、类型/Svelte/i18n/meta/audit/build/smoke/loader 全绿；Chrome 隔离宿主的浅色、暗色、移动、hover、页签 history（含台账搜索/滚动恢复）和活动流真实来源定位走查通过。活动流脚本会从隔离设置读取现有车辆台账行，临时注入唯一 rowlog 并在结束时恢复设置与流水文件；没有车辆台账夹具时仍结构化跳过。GitHub 最新公开 Release 为 v0.5.24，但与本地分支分叉，必须分别记录本地、公开发布和真实宿主状态。真实 Android WebView、独立窗口、兄弟插件、双端冲突和用户工作区验证待完成；`pnpm test:live` 缺少 `SIYUAN_TOKEN` 时阻断；集市发布继续暂缓。
+> **当前事实（2026-10-19）**：本地 `main` 为 v0.5.25，527 项单测、类型/Svelte/i18n/meta/audit/build/smoke/loader 全绿；Chrome 隔离宿主的浅色、暗色、移动、hover、页签 history（含台账搜索/滚动恢复）和活动流真实来源定位走查通过。活动流脚本会从隔离设置读取现有车辆台账行，临时注入唯一 rowlog 并在结束时恢复设置与流水文件；没有车辆台账夹具时仍结构化跳过。GitHub 最新公开 Release 为 v0.5.24，本次发版 v0.5.25 正式递增对齐。真实 Android WebView、独立窗口、兄弟插件、双端冲突和用户工作区验证待完成；`pnpm test:live` 缺少 `SIYUAN_TOKEN` 时阻断；集市发布继续暂缓。
 
 ## 第 224 波复审行动清单（当前唯一入口）
 
