@@ -91,9 +91,9 @@ export function filterGuestReminders(reminders: Reminder[], config: GuestModeCon
 /**
  * 遮蔽敏感字段值（金额显示为 ***，身份证号脱敏）
  */
-export function maskValueForGuest(value: any, fieldKey: string, config: GuestModeConfig): any {
+export function maskValueForGuest<T>(value: T, fieldKey: string, config: GuestModeConfig): T | string {
     if (!config.active) return value;
-    if (value === null || value === undefined || value === "") return value;
+    if (value === null || value === undefined || (value as unknown) === "") return value;
 
     // 1. 金额脱敏
     if (config.maskFinancials && FINANCIAL_FIELD_KEYS.includes(fieldKey)) {

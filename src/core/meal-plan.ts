@@ -4,6 +4,7 @@
  * 纯函数，无思源/DOM 强依赖，100% 可单元测试。
  */
 import type { AvRow } from "./siyuan";
+import type { AvCellLike } from "./avcell";
 
 export type DayOfWeek = "mon" | "tue" | "wed" | "thu" | "fri" | "sat" | "sun";
 export type MealType = "breakfast" | "lunch" | "dinner" | "snack";
@@ -147,11 +148,11 @@ export function aggregateMealPlanIngredients(plans: MealPlanDayItem[]): Aggregat
     return Array.from(map.values()).sort((a, b) => a.name.localeCompare(b.name, "zh-CN"));
 }
 
-function nameOfCell(v: any): string {
+function nameOfCell(v: AvCellLike | null | undefined): string {
     return String(v?.text?.content ?? v?.block?.content ?? "").trim();
 }
 
-function numOfCell(v: any): number | undefined {
+function numOfCell(v: AvCellLike | null | undefined): number | undefined {
     return v?.number?.isNotEmpty && typeof v.number.content === "number" ? v.number.content : undefined;
 }
 
@@ -328,15 +329,15 @@ export function mapDeficitsToShoppingRows(
 export interface MealPlanDialogOptions {
     allFoodRows: AvRow[];
     stockItems: StockItemInfo[];
-    ref: any;
-    plugin: any;
+    ref: { avId?: string; columns?: Record<string, string> };
+    plugin: { settings: { dbRefs?: Record<string, { avId?: string; columns?: Record<string, string> }> } };
     t: (k: string) => string;
-    DialogCls: any;
-    showMessageFn: any;
-    cellTextFn: (v: any, k?: string) => string;
+    DialogCls: new (options: { title: string; content: string; width?: string }) => { element: HTMLElement; destroy: () => void };
+    showMessageFn: (message: string, timeout?: number, type?: "info" | "error") => void;
+    cellTextFn: (v: AvCellLike | null | undefined, k?: string) => string;
     addDetachedRowFn: (avId: string, name: string) => Promise<string>;
-    setCellFn: (avId: string, colId: string, itemId: string, val: any) => Promise<any>;
-    cellValueFn: (type: string, val: any) => any;
+    setCellFn: (avId: string, colId: string, itemId: string, val: unknown) => Promise<unknown>;
+    cellValueFn: (type: string, val: unknown) => unknown;
 }
 
 export function openMealPlanDialog(options: MealPlanDialogOptions): void {

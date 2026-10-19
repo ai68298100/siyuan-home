@@ -4,7 +4,9 @@
  * 各档位用量拆分、预估费用账单、下一阶梯剩余余量与高能耗加价预警。
  * 纯函数，无思源/DOM 强依赖，100% 可单元测试。
  */
-import type { MeterEntry } from "./rowlog";
+import type { MeterEntry, RowLogs } from "./rowlog";
+import type { AvRow } from "./siyuan";
+import type { AvCellLike } from "./avcell";
 import { formatAmount } from "./format";
 
 export type UtilityType = "electricity" | "water" | "gas";
@@ -232,14 +234,14 @@ export function formatUtilityReportText(report: UtilityAnalysisReport): string {
 }
 
 export interface UtilityTiersDialogOptions {
-    allHouseRows: any[];
-    currentLogs: any;
-    ref: any;
+    allHouseRows: AvRow[];
+    currentLogs: RowLogs;
+    ref: { avId?: string; columns?: Record<string, string> };
     t: (k: string) => string;
-    DialogCls: any;
-    showMessageFn: any;
-    cellTextFn: (v: any, k?: string) => string;
-    getEntriesFn: <T>(logs: any, avId: string, rowId: string, kind: string) => T[];
+    DialogCls: new (options: { title: string; content: string; width?: string }) => { element: HTMLElement; destroy: () => void };
+    showMessageFn: (message: string, timeout?: number, type?: "info" | "error") => void;
+    cellTextFn: (v: AvCellLike | null | undefined, k?: string) => string;
+    getEntriesFn: <T>(logs: RowLogs, avId: string, rowId: string, kind: string) => T[];
 }
 
 export function openUtilityTiersDialog(options: UtilityTiersDialogOptions): void {

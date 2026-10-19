@@ -233,17 +233,17 @@ export function formatMediaReportText(
 }
 
 export interface MediaReportDialogOptions {
-    rows: any[];
-    columns: any;
+    rows: AvRow[];
+    columns: Record<string, string>;
     t: (k: string) => string;
-    DialogCls: any;
-    showMessageFn: any;
+    DialogCls: new (options: { title: string; content: string; width?: string }) => { element: HTMLElement; destroy: () => void };
+    showMessageFn: (message: string, timeout?: number, type?: "info" | "error") => void;
 }
 
 export function openMediaReportDialog(options: MediaReportDialogOptions): void {
     const { rows, columns, t, DialogCls, showMessageFn } = options;
 
-    let selectedYear = "all";
+    let selectedYear: number | "all" = "all";
 
     const dlg = new DialogCls({
         title: t("ledger.mediaReport"),
@@ -289,14 +289,14 @@ export function openMediaReportDialog(options: MediaReportDialogOptions): void {
 
         for (const y of initialReport.availableYears) {
             const opt = document.createElement("option");
-            opt.value = y;
+            opt.value = String(y);
             opt.textContent = `${y} 年`;
             if (selectedYear === y) opt.selected = true;
             sel.appendChild(opt);
         }
 
         sel.onchange = () => {
-            selectedYear = sel.value;
+            selectedYear = sel.value === "all" ? "all" : parseInt(sel.value, 10);
             render();
         };
 

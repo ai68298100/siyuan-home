@@ -5,6 +5,7 @@
  * 纯函数，无思源/DOM 强依赖，100% 可单元测试。
  */
 import type { AvRow } from "./siyuan";
+import type { AvCellLike } from "./avcell";
 
 export type SupplyStatus = "out_of_stock" | "critical" | "warning" | "sufficient" | "unknown";
 
@@ -41,15 +42,15 @@ export interface MedicineSupplyReport {
     items: MedicineSupplyItem[];
 }
 
-function cellText(v: any): string {
+function cellText(v: AvCellLike | null | undefined): string {
     return String(v?.text?.content ?? v?.block?.content ?? "").trim();
 }
 
-function cellNumber(v: any): number | undefined {
+function cellNumber(v: AvCellLike | null | undefined): number | undefined {
     return v?.number?.isNotEmpty && typeof v.number.content === "number" ? v.number.content : undefined;
 }
 
-function cellDate(v: any): string {
+function cellDate(v: AvCellLike | null | undefined): string {
     if (v?.date?.isNotEmpty && v.date.content) {
         const d = new Date(v.date.content);
         if (!isNaN(d.getTime())) {

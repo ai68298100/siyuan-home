@@ -5,6 +5,7 @@
  * 纯函数，无思源/DOM 强依赖，100% 可单元测试。
  */
 import { formatAmount } from "./format";
+import type { Reminder, DbRef } from "@/types";
 
 export type LifeDimension = "health_safety" | "finance_contracts" | "daily_efficiency" | "culture_growth";
 export type LifeScoreLevel = "excellent" | "good" | "fair" | "needs_attention";
@@ -248,13 +249,13 @@ export function formatLifeIndexReportText(report: FamilyLifeIndexReport): string
  * 从各个模块台账安全采集生活指数上下文数据
  */
 export async function collectFamilyLifeContext(
-    plugin: any,
-    reminders: any[],
+    plugin: { settings: { members?: unknown[]; dbRefs?: Record<string, DbRef> } },
+    reminders: Reminder[],
     today: string,
 ): Promise<FamilyLifeContext> {
     const memberCount = plugin.settings.members?.length ?? 0;
     const totalReminders = reminders.length;
-    const overdueReminders = reminders.filter((r: any) => r.level === "overdue").length;
+    const overdueReminders = reminders.filter((r) => r.level === "overdue").length;
 
     let medicineCount = 0;
     let expiredMedicineCount = 0;
@@ -266,7 +267,7 @@ export async function collectFamilyLifeContext(
 
     const { renderLedgerAll } = await import("./siyuan");
 
-    const readRows = async (ref: any) => {
+    const readRows = async (ref?: DbRef) => {
         if (!ref?.avId) return [];
         try {
             const res = await renderLedgerAll(ref.avId);
@@ -309,7 +310,7 @@ export async function collectFamilyLifeContext(
     const stockRows = await readRows(plugin.settings.dbRefs?.stock);
     const stockCat = plugin.settings.dbRefs?.stock?.columns?.category;
     if (stockCat) {
-        hasEmergencyKit = stockRows.some((r: any) => String(r.cells[stockCat]?.select?.content ?? "") === "emergency_st");
+        hasEmergencyKit = stockRows.some((r) => String(r.cells[stockCat]?.select?.content ?? "") === "emergency_st");
     }
 
     return {
@@ -332,8 +333,8 @@ export async function collectFamilyLifeContext(
 export function openLifeIndexDialog(
     report: FamilyLifeIndexReport,
     t: (k: string) => string,
-    DialogCls: any,
-    showMessageFn: any,
+    DialogCls: new (options: { title: string; content: string; width?: string }) => { element: HTMLElement; destroy: () => void },
+    showMessageFn: (message: string, timeout?: number, type?: "info" | "error") => void,
 ): void {
     const dlg = new DialogCls({
         title: t("overview.lifeIndexTitle"),

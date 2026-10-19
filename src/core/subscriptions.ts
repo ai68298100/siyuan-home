@@ -203,11 +203,11 @@ export function calculateSubscriptionStats(
 }
 
 export interface SubscriptionStatsDialogOptions {
-    rows: any[];
-    columns: any;
+    rows: AvRow[];
+    columns: Record<string, string>;
     t: (k: string) => string;
-    DialogCls: any;
-    showMessageFn: any;
+    DialogCls: new (options: { title: string; content: string; width?: string }) => { element: HTMLElement; destroy: () => void };
+    showMessageFn: (message: string, timeout?: number, type?: "info" | "error") => void;
 }
 
 export function openSubscriptionStatsDialog(options: SubscriptionStatsDialogOptions): void {
@@ -281,7 +281,7 @@ export function openSubscriptionStatsDialog(options: SubscriptionStatsDialogOpti
             `在用项: ${stats.activeCount} | 自动续费: ${stats.autoRenewCount} (${stats.autoRenewRate}%)`,
         ];
         for (const it of stats.items) {
-            lines.push(`· ${it.name}: ¥${it.rawAmount} (${it.cycleLabel}) -> 月均 ¥${formatAmount(it.monthlyCost)}`);
+            lines.push(`· ${it.name}: ¥${it.rawAmount} (${it.cycle}) -> 月均 ¥${formatAmount(it.monthlyCost)}`);
         }
         try {
             await navigator.clipboard.writeText(lines.join("\n"));

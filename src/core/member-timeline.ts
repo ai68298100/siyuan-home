@@ -5,6 +5,7 @@
  * 纯函数，无思源/DOM 强依赖，100% 可单元测试。
  */
 import type { AvRow } from "./siyuan";
+import type { AvCellLike } from "./avcell";
 import { formatAmount } from "./format";
 
 export type AssetModuleType = "certs" | "contracts";
@@ -40,19 +41,19 @@ export interface MemberTimelineReport {
     timeline: MemberTimelineNode[];
 }
 
-function cellText(v: any): string {
+function cellText(v: AvCellLike | null | undefined): string {
     return String(v?.text?.content ?? v?.block?.content ?? "").trim();
 }
 
-function cellNumber(v: any): number | undefined {
+function cellNumber(v: AvCellLike | null | undefined): number | undefined {
     return v?.number?.isNotEmpty && typeof v.number.content === "number" ? v.number.content : undefined;
 }
 
-function cellCheckbox(v: any): boolean {
+function cellCheckbox(v: AvCellLike | null | undefined): boolean {
     return !!v?.checkbox?.checked;
 }
 
-function cellDate(v: any): string {
+function cellDate(v: AvCellLike | null | undefined): string {
     if (v?.date?.isNotEmpty && v.date.content) {
         const d = new Date(v.date.content);
         if (!isNaN(d.getTime())) {
@@ -65,7 +66,7 @@ function cellDate(v: any): string {
     return String(v?.text?.content ?? "").trim();
 }
 
-function cellRelationBlockId(v: any): string | undefined {
+function cellRelationBlockId(v: AvCellLike | null | undefined): string | undefined {
     return v?.relation?.blockIDs?.[0];
 }
 

@@ -44,7 +44,7 @@ export function parseISO(str: string): Date {
     return new Date(str);
 }
 
-export function isValid(d: any): boolean {
+export function isValid(d: unknown): d is Date {
     return d instanceof Date && !isNaN(d.getTime());
 }
 
