@@ -231,3 +231,151 @@ export function formatMediaReportText(
 
     return lines.join("\n");
 }
+
+export interface MediaReportDialogOptions {
+    rows: any[];
+    columns: any;
+    t: (k: string) => string;
+    DialogCls: any;
+    showMessageFn: any;
+}
+
+export function openMediaReportDialog(options: MediaReportDialogOptions): void {
+    const { rows, columns, t, DialogCls, showMessageFn } = options;
+
+    let selectedYear = "all";
+
+    const dlg = new DialogCls({
+        title: t("ledger.mediaReport"),
+        content: `<div class="b3-dialog__content lv-dialog-scroll-body" id="lv-media-report-body"></div>
+<div class="b3-dialog__action"><button class="b3-button b3-button--cancel" id="lv-media-report-close">${t("close")}</button><button class="b3-button" id="lv-media-report-copy">${t("ledger.mediaCopy")}</button></div>`,
+        width: "560px",
+    });
+
+    const body = dlg.element.querySelector("#lv-media-report-body") as HTMLElement;
+    const copyBtn = dlg.element.querySelector("#lv-media-report-copy") as HTMLButtonElement;
+    (dlg.element.querySelector("#lv-media-report-close") as HTMLButtonElement).onclick = () => dlg.destroy();
+
+    const render = () => {
+        body.replaceChildren();
+
+        const initialReport = calculateMediaReport(rows, columns, "all");
+        if (initialReport.availableYears.length === 0 && rows.length === 0) {
+            const empty = document.createElement("div");
+            empty.className = "lv-caption";
+            empty.style.cssText = "text-align:center;padding:24px 0";
+            empty.textContent = t("ledger.mediaEmpty");
+            body.appendChild(empty);
+            copyBtn.disabled = true;
+            return;
+        }
+
+        const toolbar = document.createElement("div");
+        toolbar.style.cssText = "display:flex;align-items:center;justify-content:space-between;gap:8px";
+
+        const label = document.createElement("span");
+        label.className = "lv-caption";
+        label.textContent = t("ledger.mediaYearAll");
+
+        const sel = document.createElement("select");
+        sel.className = "b3-select";
+        sel.style.cssText = "width:200px;flex-shrink:0";
+
+        const optAll = document.createElement("option");
+        optAll.value = "all";
+        optAll.textContent = t("ledger.mediaYearAll");
+        if (selectedYear === "all") optAll.selected = true;
+        sel.appendChild(optAll);
+
+        for (const y of initialReport.availableYears) {
+            const opt = document.createElement("option");
+            opt.value = y;
+            opt.textContent = `${y} 年`;
+            if (selectedYear === y) opt.selected = true;
+            sel.appendChild(opt);
+        }
+
+        sel.onchange = () => {
+            selectedYear = sel.value;
+            render();
+        };
+
+        toolbar.append(label, sel);
+        body.appendChild(toolbar);
+
+        const report = calculateMediaReport(rows, columns, selectedYear);
+
+        // 指标卡
+        const metrics = document.createElement("div");
+        metrics.style.cssText = "display:grid;grid-template-columns:repeat(4, 1fr);gap:8px";
+
+        const makeBox = (cap: string, v: string | number, sub?: string) => {
+            const d = document.createElement("div");
+            d.className = "lv-metric-item";
+            d.innerHTML = `<span class="lv-caption">${cap}</span><b class="lv-num" style="font-size:16px">${v}</b>${sub ? `<span class="lv-caption">${sub}</span>` : ""}`;
+            return d;
+        };
+
+        metrics.append(
+            makeBox(t("ledger.mediaDone"), report.doneCount, `${t("ledger.mediaCompletionRate")} ${report.completionRate}%`),
+            makeBox(t("ledger.mediaConsuming"), report.consumingCount, "进行中"),
+            makeBox(t("ledger.mediaWishlist"), report.wishlistCount, "待看待读"),
+            makeBox(t("ledger.mediaRatingAvg"), report.averageRating !== undefined ? `${report.averageRating}★` : "—", `${report.ratedCount} 部有评分`),
+        );
+        body.appendChild(metrics);
+
+        // 分类明细
+        if (report.categoryBreakdown.length > 0) {
+            const sec = document.createElement("div");
+            sec.style.cssText = "display:flex;flex-direction:column;gap:6px";
+            sec.innerHTML = `<div class="ft__on-surface lv-section-title">${t("ledger.mediaCategories")}</div>`;
+
+            const list = document.createElement("div");
+            list.style.cssText = "display:grid;grid-template-columns:repeat(auto-fill, minmax(220px, 1fr));gap:8px";
+
+            for (const c of report.categoryBreakdown) {
+                const item = document.createElement("div");
+                item.className = "lv-metric-item";
+                item.style.cssText = "padding:6px 10px;font-size:12px";
+                const catLabel = t(`field.category.opt.${c.category}`) !== `field.category.opt.${c.category}` ? t(`field.category.opt.${c.category}`) : c.category;
+                const rText = c.averageRating !== undefined ? ` · 均分 ${c.averageRating}★` : "";
+                item.innerHTML = `<span style="font-weight:600">${catLabel}</span><span class="lv-caption">已完结 ${c.done} / 总计 ${c.total}${rText}</span>`;
+                list.appendChild(item);
+            }
+            sec.appendChild(list);
+            body.appendChild(sec);
+        }
+
+        // 高分作品 TOP
+        if (report.topRatedItems.length > 0) {
+            const sec = document.createElement("div");
+            sec.style.cssText = "display:flex;flex-direction:column;gap:6px";
+            sec.innerHTML = `<div class="ft__on-surface lv-section-title">${t("ledger.mediaTopRated")}</div>`;
+
+            for (const it of report.topRatedItems) {
+                const item = document.createElement("div");
+                item.className = "lv-metric-item";
+                item.style.cssText = "flex-direction:row;align-items:center;justify-content:space-between;padding:6px 10px;font-size:12px";
+                const catLabel = t(`field.category.opt.${it.category}`) !== `field.category.opt.${it.category}` ? t(`field.category.opt.${it.category}`) : it.category;
+                const dateStr = it.date ? ` · ${it.date}` : "";
+                item.innerHTML = `<span style="font-weight:500">${it.name} <span class="lv-caption">(${catLabel}${dateStr})</span></span><b class="lv-num" style="color:var(--lv-warn)">${it.rating}★</b>`;
+                sec.appendChild(item);
+            }
+            body.appendChild(sec);
+        }
+
+        copyBtn.disabled = false;
+        copyBtn.onclick = async () => {
+            const currentReport = calculateMediaReport(rows, columns, selectedYear);
+            const text = formatMediaReportText(currentReport, (cat) => t(`field.category.opt.${cat}`) !== `field.category.opt.${cat}` ? t(`field.category.opt.${cat}`) : cat);
+            try {
+                await navigator.clipboard.writeText(text);
+                showMessageFn(t("ledger.mediaCopied"), 2500, "info");
+            } catch {
+                showMessageFn(t("ledger.copyAsImageFail"), 4000, "error");
+            }
+        };
+    };
+
+    render();
+}

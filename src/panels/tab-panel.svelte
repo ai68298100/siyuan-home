@@ -250,6 +250,20 @@
         } catch { return undefined; }
     }
     let screen: ScreenId = $state(pendingScreen ?? historyScreen(history.state) ?? readLastScreen() ?? "overview");
+    // 297 波：家庭协作只读访客模式
+    const isGuestMode = $derived(!!plugin.runtime?.guestModeActive);
+    async function toggleGuestMode() {
+        const next = !plugin.runtime?.guestModeActive;
+        try {
+            plugin.runtime.guestModeActive = next;
+            const { saveRuntime } = await import("@/core/hub/runtime");
+            await saveRuntime(plugin, plugin.runtime);
+            version += 1;
+            showMessage(t(next ? "guest.modeActive" : "guest.modeInactive"), 3000, "info");
+        } catch {
+            showMessage(t("ledger.saveFailed"), 4000, "error");
+        }
+    }
     // 提醒页签待办红点（version 驱动重算，随扫描更新）
     const pendingTotal = $derived.by(() => {
         void version;
@@ -365,6 +379,7 @@
         </span>
         <!-- 267 波：⚡ 快速记录（原型 top-actions 主入口；268 波支持 N 键呼出） -->
         <div class="lv-tabbar-actions">
+            <button class="lv-iconbtn" class:orange={isGuestMode} aria-label={t("guest.modeToggle")} title={t("guest.modeToggle")} style={isGuestMode ? "color:var(--lv-warn)" : ""} onclick={toggleGuestMode}><UiIcon name="shield" size={16} /></button>
             <button class="lv-iconbtn" aria-label={t("capture.title")} title={`${t("capture.title")} (N)`} style="font-size:15px" onclick={(event) => openCapture(undefined, event)}><UiIcon name="bolt" size={16} /></button>
             <button class="lv-iconbtn" aria-label={t("tab.settings")} title={t("tab.settings")} style="font-size:15px" onclick={() => plugin.openSetting()}><UiIcon name="settings" size={16} /></button>
             {#if onMobileClose}
@@ -372,6 +387,18 @@
             {/if}
         </div>
     </header>
+
+    {#if isGuestMode}
+        <div class="lv-guest-banner" role="status" style="display:flex;align-items:center;justify-content:space-between;gap:12px;padding:8px 16px;background:var(--lv-surface-2);border-bottom:1px solid var(--lv-line);font-size:12px;color:var(--lv-tx)">
+            <div style="display:flex;align-items:center;gap:8px;min-width:0">
+                <span class="lv-badge orange" style="font-weight:600;flex-shrink:0">{t("guest.bannerTitle")}</span>
+                <span class="lv-caption" style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{t("guest.bannerDesc")}</span>
+            </div>
+            <button class="b3-button b3-button--text" style="font-size:12px;padding:2px 8px;flex-shrink:0" onclick={toggleGuestMode}>
+                {t("guest.exitMode")}
+            </button>
+        </div>
+    {/if}
 
     {#key screen}
         <div id={`lv-panel-${screen}`} class="lv-screen lv-anim" role="tabpanel" tabindex="0" aria-labelledby={`lv-tab-${screen}`}>

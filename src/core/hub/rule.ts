@@ -9,7 +9,45 @@
  * - recurring 滚动用月数差 O(1) 计算，月末由 addMonths 收敛到月末（不跨月漂移）；
  * - 日期序列化一律用本地时区（localDateKey），禁止 toISOString（UTC 偏移会偏一天）。
  */
-import { addDays, addMonths, addYears, differenceInCalendarDays, parseISO, isValid } from "date-fns";
+// 300波架构瘦身：以原生无依赖日期纯函数替换外部重型 date-fns，消除冗余依赖并守护 220KB 硬预算
+export function addDays(d: Date, amount: number): Date {
+    const res = new Date(d.getTime());
+    res.setDate(res.getDate() + amount);
+    return res;
+}
+
+export function addMonths(d: Date, amount: number): Date {
+    const res = new Date(d.getTime());
+    const desiredMonth = res.getMonth() + amount;
+    const date = res.getDate();
+    res.setMonth(desiredMonth, 1);
+    const daysInTarget = new Date(res.getFullYear(), res.getMonth() + 1, 0).getDate();
+    res.setDate(Math.min(date, daysInTarget));
+    return res;
+}
+
+export function addYears(d: Date, amount: number): Date {
+    return addMonths(d, amount * 12);
+}
+
+export function differenceInCalendarDays(d1: Date, d2: Date): number {
+    const u1 = new Date(d1.getFullYear(), d1.getMonth(), d1.getDate()).getTime();
+    const u2 = new Date(d2.getFullYear(), d2.getMonth(), d2.getDate()).getTime();
+    return Math.round((u1 - u2) / (24 * 3600 * 1000));
+}
+
+export function parseISO(str: string): Date {
+    if (/^\d{4}-\d{2}-\d{2}$/.test(str)) {
+        const p = str.split("-").map(Number);
+        return new Date(p[0], p[1] - 1, p[2]);
+    }
+    return new Date(str);
+}
+
+export function isValid(d: any): boolean {
+    return d instanceof Date && !isNaN(d.getTime());
+}
+
 import type { Reminder, ReminderRuleSpec, ReminderLevel } from "@/types";
 import { nextLunarAnniversary } from "./lunar-lazy";
 

@@ -98,9 +98,24 @@ export default defineConfig(buildTarget === "kernel" ? {
     },
 
     build: {
+        target: "es2022",
         outDir: outputDir,
         emptyOutDir: false,
-        minify: true,
+        minify: "terser",
+        terserOptions: {
+            compress: {
+                passes: 3,
+                drop_console: true,
+                drop_debugger: true,
+                pure_getters: true,
+            },
+            mangle: {
+                toplevel: true,
+            },
+            format: {
+                comments: false,
+            },
+        },
         sourcemap: isSrcmap ? "inline" : false,
 
         lib: {

@@ -8,7 +8,7 @@
     import { parseNaturalDate } from "@/core/dateparse";
     import { formatLocalDate, formatLocalTime } from "@/core/date-display";
     import { memberHue } from "@/core/format";
-    import { showMessage } from "siyuan";
+    import { showMessage, Dialog } from "siyuan";
     import { MODULE_GROUPS, getModule, moduleTone } from "@/core/modules";
     import UiIcon from "@/ui/icon.svelte";
     import ActivityFeed from "../activity-feed.svelte";
@@ -352,6 +352,18 @@
         run(target);
         return { update: run, destroy: () => cancelAnimationFrame(raf) };
     }
+
+    // 300波里程碑：家庭年度生活指数与幸福资产盘点
+    async function openLifeIndexModal() {
+        try {
+            const { collectFamilyLifeContext, calculateFamilyLifeIndex, openLifeIndexDialog } = await import("@/core/life-index");
+            const ctx = await collectFamilyLifeContext(plugin, allReminders, localDateKey(new Date()));
+            const report = calculateFamilyLifeIndex(ctx);
+            openLifeIndexDialog(report, t, Dialog, showMessage);
+        } catch (e) {
+            showMessage(t("ledger.logReadFailed") + " (" + (e instanceof Error ? e.message : String(e)) + ")", 5000, "error");
+        }
+    }
 </script>
 
 {#if !onboarded}
@@ -375,6 +387,7 @@
         </p>
         <div class="lv-hero-actions">
             <button class="b3-button lv-hero-open" onclick={() => onGoto("reminders")}><UiIcon name="clock" size={17} />{t("dash.heroOpen")}</button>
+            <button class="b3-button b3-button--outline lv-hero-life-index" onclick={openLifeIndexModal} style="display:inline-flex;align-items:center;gap:5px"><UiIcon name="shield" size={16} />{t("overview.lifeIndex")}</button>
             {#if onCapture}<button class="b3-button b3-button--outline lv-hero-capture" onclick={() => onCapture()}><UiIcon name="add" size={16} />{t("dash.quickRecord")}</button>{/if}
         </div>
         {#if monthlyDone > 0}<p><span class="lv-badge green">✓ {t("dash.monthlyDone").replace("${n}", monthlyDueTotal > 0 ? `${monthlyDone}/${monthlyDueTotal}` : String(monthlyDone))}</span></p>{/if}

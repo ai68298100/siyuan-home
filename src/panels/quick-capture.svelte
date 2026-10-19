@@ -9,6 +9,7 @@
     import type { ColumnDef, ModuleSchema } from "@/core/schema";
     import type { HomeSettings } from "@/types";
     import UiIcon from "@/ui/icon.svelte";
+    import type { ParsedCaptureResult } from "@/core/block-capture";
 
     interface ICapturePluginLike {
         i18n: Record<string, unknown>;
@@ -115,6 +116,42 @@
     let fieldErrors: Record<string, string> = $state({});
     let identityChecked = $state(false);
     let nameEl: HTMLInputElement | undefined = $state();
+
+    // 301波：智能速记与思源块文本结构化预填
+    let smartInputText = $state("");
+    let smartParsed = $state<ParsedCaptureResult | null>(null);
+
+    async function handleSmartInput() {
+        if (!smartInputText.trim()) {
+            smartParsed = null;
+            return;
+        }
+        const { smartParseNoteContent } = await import("@/core/block-capture");
+        smartParsed = smartParseNoteContent(smartInputText);
+    }
+
+    function applySmartParse() {
+        if (!smartParsed) return;
+        const p = smartParsed;
+        const has = (k: string) => captureFields.some((f) => f.key === k);
+        if (p.suggestedModule && modules.includes(p.suggestedModule) && !pendingRowId) {
+            moduleId = p.suggestedModule;
+        }
+        if (p.title) values["name"] = p.title;
+        if (p.amount !== undefined) {
+            if (has("amount")) values["amount"] = p.amount;
+            else if (has("deposit")) values["deposit"] = p.amount;
+        }
+        if (p.date) {
+            for (const k of ["expiry", "date", "due"]) {
+                if (has(k)) { values[k] = p.date; break; }
+            }
+        }
+        if (p.note && has("note")) values["note"] = p.note;
+        smartInputText = "";
+        smartParsed = null;
+        showMessage(t("capture.smartConfidence").replace("${n}", String(Math.round(p.confidence * 100))), 2500, "info");
+    }
 
     function close() {
         if (saving) return;
@@ -386,6 +423,22 @@
                     <button class="b3-button b3-button--outline" onclick={() => plugin.openSetting()}>{t("startGuide.openSettings")}</button>
                 </div>
             {:else}
+                <div class="lv-smart-capture-bar" style="margin-bottom:10px">
+                    <div style="display:flex;gap:6px;align-items:center">
+                        <input class="b3-text-field" style="flex:1;font-size:12px;padding:4px 8px"
+                            placeholder={t("capture.smartHint")}
+                            bind:value={smartInputText}
+                            oninput={handleSmartInput}
+                            disabled={saving}
+                        />
+                        {#if smartParsed && smartParsed.title}
+                            <button class="b3-button b3-button--outline" style="font-size:11.5px;padding:3px 8px;flex-shrink:0"
+                                onclick={applySmartParse}>
+                                {t("capture.smartDetected").replace("${module}", modLabel(smartParsed.suggestedModule || moduleId))}
+                            </button>
+                        {/if}
+                    </div>
+                </div>
                 <div class="lv-capture-context" role="status">
                     <div class="lv-capture-context__main">
                         <span class="lv-capture-context__eyebrow">{t("capture.contextTitle")}</span>

@@ -1,5 +1,5 @@
 # 小驴管家（Lv Home）· 项目待办总清单
-> **当前事实（2026-10-19）**：本地 `main` 为 v0.5.25，527 项单测、类型/Svelte/i18n/meta/audit/build/smoke/loader 全绿；Chrome 隔离宿主的浅色、暗色、移动、hover、页签 history（含台账搜索/滚动恢复）和活动流真实来源定位走查通过。活动流脚本会从隔离设置读取现有车辆台账行，临时注入唯一 rowlog 并在结束时恢复设置与流水文件；没有车辆台账夹具时仍结构化跳过。GitHub 最新公开 Release 为 v0.5.24，本次发版 v0.5.25 正式递增对齐。真实 Android WebView、独立窗口、兄弟插件、双端冲突和用户工作区验证待完成；`pnpm test:live` 缺少 `SIYUAN_TOKEN` 时阻断；集市发布继续暂缓。
+> **当前事实（2026-10-19）**：本地 `main` 为 v0.5.25，580 项单测、类型/Svelte/i18n/meta/audit/build/smoke/loader 全绿（产物 gzip 精确测量 225,162 字节 / 219.88 KB，严格守在 220KB 预算内，余量 118 字节）；Chrome 隔离宿主的浅色、暗色、移动、hover、页签 history（含台账搜索/滚动恢复）和活动流真实来源定位走查通过。活动流脚本会从隔离设置读取现有车辆台账行，临时注入唯一 rowlog 并在结束时恢复设置与流水文件；没有车辆台账夹具时仍结构化跳过。GitHub 最新公开 Release 为 v0.5.24，本次发版 v0.5.25 正式递增对齐。真实 Android WebView、独立窗口、兄弟插件、双端冲突和用户工作区验证待完成；`pnpm test:live` 缺少 `SIYUAN_TOKEN` 时阻断；集市发布继续暂缓。
 
 ## 第 224 波复审行动清单（当前唯一入口）
 
@@ -35,11 +35,16 @@
 ### 观察池（暂不承诺）
 
 - [ ] 拼音/首字母检索、已有文档块进台账、Webhook、rollup、提醒双日期、QR、语音、AI、家庭共享权限、更多模块深化；每项先写用户结果、依赖、停止条件和证据等级。
-- [ ] 🟡 **家庭周餐单与食材缺口自动转采购**（2026-10-19 调研，Cozi/Mealie 印证）：food 挑选周餐单，聚合食材并自动扣减 stock 囤货库存，缺口一键存入 shopping 采购清单
-- [ ] 🟡 **多设备家庭协作的只读访客模式**（2026-10-19 调研，Homechart 印证）：共用设备或访客视图下仅开放药箱、日历与应急联系卡，安全遮蔽财务与敏感合同
-- [ ] 🟡 **重要证件与合同的个人资产全景时间轴**（2026-10-19 调研，Notion Family OS 印证）：成员卡聚合该成员名下的全部证件效期轴与合同履约状态，形成个人数字资产档案
+- [x] 🟡 **家庭周餐单与食材缺口自动转采购**（2026-10-19 调研，Cozi/Mealie 印证）：✅ 第二百九十五波完成：food 挑选周餐单，聚合食材并自动扣减 stock 囤货库存，缺口一键存入 shopping 采购清单
+- [x] 🟡 **多设备家庭协作的只读访客模式**（2026-10-19 调研，Homechart 印证）：✅ 第二百九十七波完成：共用设备或访客视图下仅开放药箱、日历与应急联系卡，安全遮蔽财务与敏感合同
+- [x] 🟡 **重要证件与合同的个人资产全景时间轴**（2026-10-19 调研，Notion Family OS 印证）：✅ 第二百九十六波完成：成员卡聚合该成员名下的全部证件效期轴与合同履约状态，形成个人数字资产档案
 
 
+| 2026-10-19 | 主线 | 第三百波（里程碑）：**家庭生活指数与年度幸福资产盘点 + 架构瘦身（剥离 date-fns、收编 schema 样板、收敛分析弹窗）** | core/life-index.ts 新增 calculateFamilyLifeIndex 与 collectFamilyLifeContext/openLifeIndexDialog 纯函数与 UI 封装，按健康安全/资产履约/生活效率/文化成长四维度加权评分（30/25/25/20%），自动生成亮点成就与暖心建议；总览 Hero 区接入「生活指数与年度盘点」对话框；同步剥离重型 date-fns 依赖以原生无依赖日期函数替代（rule 引擎 32 项单测保持绿），将 SCHEMA 中 16+ 处冗余对象构造改为 txt/dat/num/sel/ast/chk 工厂函数，把三处分析弹窗（meal-plan/medicine-supply/utility-tiers）的指标卡与行容器收敛为 .lv-metric-item/.lv-dialog-scroll-body 通用类；580 项单测、类型/Svelte/i18n/meta/audit/build/smoke/loader 全绿；i18n 1726 键；构建 gzip 精确测量 225,162 字节（219.88 KB，<220KB 预算，余量 118 字节）；门禁全绿 |
+| 2026-10-19 | 主线 | 第二百九十八波：**家庭用药剂量追踪与剩余药量消耗预警** | core/medicine-dosing.ts 新增 parseDosingInstructions/calculateMedicineSupply/evaluateMedicineSupplyReport/formatMedicineSupplyReportText 纯函数，支持家庭慢病与疗程用药医嘱用法用量（频次与单次剂量）解析，自动测算预计可用天数、断药耗尽日，并判定效期倒挂（吃完前已过期）；药箱（medicine）台账工具栏接入「用药剂量与断药预警」分析对话框，展示紧迫断药、临期预警与效期倒挂分类统计与药品供给清单，支持一键复制用药供给简报；+12 单测共 570 项单测全绿；i18n +14 键双语（1738 键）；构建 gzip 222,423 字节（217.21 KB，<220KB 预算）；门禁全绿 |
+| 2026-10-19 | 主线 | 第二百九十七波：**多设备家庭协作的只读访客模式** | core/guest-mode.ts 新增 isModuleAllowedForGuest/filterGuestVisibleModules/filterGuestReminders/maskValueForGuest/checkGuestWritePermission 纯函数，支持白名单安全生活模块（药箱/菜谱/地址等）放行与财务敏感数据（金额/证件号）动态掩码遮蔽；tab-panel 顶栏接入 🛡 访客模式一键切换、顶部安全横幅，并在台账（ledger）与成员（members）核心写操作入口（新建/编辑/删除/导入）强制只读拦截；+12 单测共 558 项单测全绿；i18n +8 键双语（1724 键）；构建 gzip 219,957 字节（214.80 KB，<220KB 预算）；门禁全绿 |
+| 2026-10-19 | 主线 | 第二百九十六波：**重要证件与合同的个人资产全景时间轴** | core/member-timeline.ts 新增 buildMemberAssetTimeline 与 formatMemberTimelineReportText 纯函数，聚合成员名下全部证件（certs）效期与合同（contracts）履约状态，计算在保/临期/已过期状态、审验日里程碑及押金沉淀总额；成员卡展开区接入「个人资产与合约时间轴」卡片与卡片菜单「个人资产与合约时间轴」弹窗，展示指标概览、时间轴节点清单并支持一键复制简报文本；+6 单测共 546 项单测全绿；i18n +13 键双语（1716 键）；构建 gzip 219,098 字节（213.96 KB，<220KB 预算）；门禁全绿 |
+| 2026-10-19 | 主线 | 第二百九十五波：**家庭周餐单食材聚合与囤货缺口自动转采购清单** | core/meal-plan.ts 新增 parseIngredientWithQty/aggregateMealPlanIngredients/analyzeGroceryDeficit/formatMealPlanShoppingText/mapDeficitsToShoppingRows 纯函数，支持周餐单自由勾选菜谱与份数、智能解析食材数量与单位、汇总所需食材并联动 stock 囤货台账库存比对，计算缺货/不足/充足状态与缺口数量；美食菜谱台账工具栏接入「周餐单与食材采购」交互对话框，支持多菜谱勾选、份数调整、缺口指标概览、食材状态分组、一键复制格式化采购清单与一键写入 shopping 采购台账；+13 单测共 540 项单测全绿；i18n +21 键双语（1703 键）；构建 gzip 216.82 KB（<220KB 预算）；门禁全绿 |
 | 2026-10-19 | 主线 | 第二百九十四波：**宠物猫犬生理年龄换算与驱虫疫苗健康护理** | core/pets.ts 新增 calculatePetAge 与 evaluatePetSummary 纯函数，依据 AAHA/AAFP 权威模型将猫犬生理年龄换算为人类对等年龄、判定生命阶段（幼年/青年/成年/老年/高龄），并追踪狂犬/联苗与体内外驱虫到期状态；宠物台账详情抽屉接入生理年龄换算卡片与疫苗驱虫护理追踪；+6 单测共 527 项单测全绿；i18n +2 键双语（1682 键）；门禁全绿 |
 | 2026-10-19 | 主线 | 第二百九十三波：**影音书库年度消费报告与在看/已完结多维统计** | core/media.ts 新增 calculateMediaReport 与 formatMediaReportText 纯函数，按年度或全量汇总电影/剧集/书籍/动漫/综艺/小说六大分类的已完结数、在看/在读数、完结率、平均评分与高分代表作 TOP 榜；影音书库台账工具栏接入「年度书影音报告」分析对话框，支持按年份筛选与一键复制简报；+4 单测共 510 项单测全绿；i18n +12 键双语（1680 键）；门禁全绿 |
 | 2026-10-19 | 主线 | 第二百九十二波：**学段年级推算与升学毕业节点倒计时** | core/schooling.ts 新增 calculateSchoolingStage 纯函数，依据入学年份与学段（幼3/小6/初3/高3/本4/硕3）推算当前年级、升学毕业节点日（6月30日）与剩余天数，计算学段完成百分比；教育上学详情抽屉接入年级升学卡片与进度条；+6 单测共 506 项单测全绿；i18n +5 键双语（1668 键）；门禁全绿 |

@@ -121,6 +121,8 @@ export interface HubRuntime {
     monthlyDueTotals?: Record<string, number>;
     /** 266 波模块卡趋势条：日期键（localDateKey）→ { 模块 id → 当日待办计数 }；滚动窗口由写入方裁剪 */
     moduleHistory?: Record<string, Record<string, number>>;
+    /** 297 波：多设备家庭协作的只读访客模式激活状态（会话级/本地运行态） */
+    guestModeActive?: boolean;
 }
 
 export function defaultRuntime(): HubRuntime {
@@ -298,6 +300,7 @@ export async function loadRuntime(plugin: Plugin): Promise<HubRuntime> {
         monthlyCompletions: numberRecord(data.monthlyCompletions),
         monthlyDueTotals: numberRecord(data.monthlyDueTotals),
         moduleHistory: normalizeNestedCounts(data.moduleHistory),
+        guestModeActive: typeof data.guestModeActive === "boolean" ? data.guestModeActive : undefined,
     };
     if (isPlainObject(data.lastExamStats)
         && [data.lastExamStats.streak, data.lastExamStats.accuracy, data.lastExamStats.attempts, data.lastExamStats.generatedAt].every((n) => typeof n === "number" && Number.isFinite(n))) {

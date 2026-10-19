@@ -78,26 +78,36 @@ export interface NumericRuleSpec {
     thresholdField: string;
 }
 
+// ── 字段定义与声明工厂函数 ────────────────────────────────────
+
+const txt = (key: string): ColumnDef => ({ key, type: "text", labelKey: `field.${key}` });
+const dat = (key: string): ColumnDef => ({ key, type: "date", labelKey: `field.${key}` });
+const ast = (key: string): ColumnDef => ({ key, type: "mAsset", labelKey: `field.${key}` });
+const num = (key: string, extra?: Partial<ColumnDef>): ColumnDef => ({ key, type: "number", labelKey: `field.${key}`, ...extra });
+const sel = (key: string, options?: string[], def?: string): ColumnDef => ({ key, type: "select", labelKey: `field.${key}`, ...(options ? { options } : {}), ...(def ? { default: def } : {}) });
+const chk = (key: string): ColumnDef => ({ key, type: "checkbox", labelKey: `field.${key}` });
+const rem = (key: string, field: string, leadDays = 30, kind: "oneoff" | "recurring" | "anniversary" | "after" = "oneoff", extra?: Partial<ReminderRuleSpec>): ReminderRuleSpec => ({ key, field, kind, leadDays, ...extra });
+
 // ── 字段字典（02 §2）────────────────────────────────────────
 
 export const FIELD_DICT: Record<string, ColumnDef> = {
     name:          { key: "name", type: "text", required: true },
     member:        { key: "member", type: "relation", labelKey: "field.member" }, // → members 库（Spike R2 定案）
-    category:      { key: "category", type: "select", labelKey: "field.category" },
-    status:        { key: "status", type: "select", labelKey: "field.status" },
-    date:          { key: "date", type: "date", labelKey: "field.date" },
-    expiry:        { key: "expiry", type: "date", labelKey: "field.expiry" },
-    remind_before: { key: "remind_before", type: "number", labelKey: "field.remind_before" },
-    amount:        { key: "amount", type: "number", labelKey: "field.amount", min: 0, step: 0.01, unitKey: "capture.unitCny" },
-    cycle:         { key: "cycle", type: "select", labelKey: "field.cycle", options: ["day", "week", "month", "quarter", "year"] },
-    location:      { key: "location", type: "text", labelKey: "field.location" },
-    attachments:   { key: "attachments", type: "mAsset", labelKey: "field.attachments" },
+    category:      sel("category"),
+    status:        sel("status"),
+    date:          dat("date"),
+    expiry:        dat("expiry"),
+    remind_before: num("remind_before"),
+    amount:        num("amount", { min: 0, step: 0.01, unitKey: "capture.unitCny" }),
+    cycle:         sel("cycle", ["day", "week", "month", "quarter", "year"]),
+    location:      txt("location"),
+    attachments:   ast("attachments"),
     url:           { key: "url", type: "url", labelKey: "field.url" },
     /** EC13：外部联系人快照（人脉 docId），文本列存 `名称 [docId]`——快照可见可搜，不做跨插件 relation（v2 再议） */
-    contact:       { key: "contact", type: "text", labelKey: "field.contact" },
+    contact:       txt("contact"),
     tags:          { key: "tags", type: "mSelect", labelKey: "field.tags" },
-    note:          { key: "note", type: "text", labelKey: "field.note" },
-    due:           { key: "due", type: "date", labelKey: "field.due" }, // 中枢写回的下次发生日
+    note:          txt("note"),
+    due:           dat("due"), // 中枢写回的下次发生日
 };
 
 const d = (...keys: string[]): ColumnDef[] => keys.map((k) => FIELD_DICT[k]);
@@ -129,113 +139,113 @@ export interface CertificateProfile {
 
 const CERTIFICATE_PROFILE_COLUMNS: Record<CertificateCategory, readonly ColumnDef[]> = {
     id: [
-        { key: "x_cert_id_number", type: "text", labelKey: "field.x_cert_id_number" },
-        { key: "x_cert_id_address", type: "text", labelKey: "field.x_cert_id_address" },
-        { key: "x_cert_id_authority", type: "text", labelKey: "field.x_cert_id_authority" },
-        { key: "x_cert_id_gender", type: "select", labelKey: "field.x_cert_id_gender", options: ["male", "female"] },
-        { key: "x_cert_id_front", type: "mAsset", labelKey: "field.x_cert_id_front" },
-        { key: "x_cert_id_back", type: "mAsset", labelKey: "field.x_cert_id_back" },
+        txt("x_cert_id_number"),
+        txt("x_cert_id_address"),
+        txt("x_cert_id_authority"),
+        sel("x_cert_id_gender", ["male", "female"]),
+        ast("x_cert_id_front"),
+        ast("x_cert_id_back"),
     ],
     hukou: [
-        { key: "x_cert_hukou_location", type: "text", labelKey: "field.x_cert_hukou_location" },
-        { key: "x_cert_hukou_head_name", type: "text", labelKey: "field.x_cert_hukou_head_name" },
-        { key: "x_cert_hukou_scan", type: "mAsset", labelKey: "field.x_cert_hukou_scan" },
+        txt("x_cert_hukou_location"),
+        txt("x_cert_hukou_head_name"),
+        ast("x_cert_hukou_scan"),
     ],
     passport: [
-        { key: "x_cert_passport_name_pinyin", type: "text", labelKey: "field.x_cert_passport_name_pinyin" },
-        { key: "x_cert_passport_nationality", type: "text", labelKey: "field.x_cert_passport_nationality" },
-        { key: "x_cert_passport_birth_place", type: "text", labelKey: "field.x_cert_passport_birth_place" },
-        { key: "x_cert_passport_authority", type: "text", labelKey: "field.x_cert_passport_authority" },
-        { key: "x_cert_passport_scan", type: "mAsset", labelKey: "field.x_cert_passport_scan" },
+        txt("x_cert_passport_name_pinyin"),
+        txt("x_cert_passport_nationality"),
+        txt("x_cert_passport_birth_place"),
+        txt("x_cert_passport_authority"),
+        ast("x_cert_passport_scan"),
     ],
     visa: [
-        { key: "x_cert_visa_country", type: "text", labelKey: "field.x_cert_visa_country" },
-        { key: "x_cert_visa_type", type: "text", labelKey: "field.x_cert_visa_type" },
-        { key: "x_cert_visa_scan", type: "mAsset", labelKey: "field.x_cert_visa_scan" },
+        txt("x_cert_visa_country"),
+        txt("x_cert_visa_type"),
+        ast("x_cert_visa_scan"),
     ],
     permit: [
-        { key: "x_cert_permit_region", type: "text", labelKey: "field.x_cert_permit_region" },
-        { key: "x_cert_permit_endorsement", type: "text", labelKey: "field.x_cert_permit_endorsement" },
-        { key: "x_cert_permit_endorsement_expiry", type: "date", labelKey: "field.x_cert_permit_endorsement_expiry" },
-        { key: "x_cert_permit_scan", type: "mAsset", labelKey: "field.x_cert_permit_scan" },
+        txt("x_cert_permit_region"),
+        txt("x_cert_permit_endorsement"),
+        dat("x_cert_permit_endorsement_expiry"),
+        ast("x_cert_permit_scan"),
     ],
     hkmo_permit: [
-        { key: "x_cert_hkmo_region", type: "select", labelKey: "field.x_cert_hkmo_region", options: ["hong_kong", "macao"] },
-        { key: "x_cert_hkmo_endorsement", type: "text", labelKey: "field.x_cert_hkmo_endorsement" },
-        { key: "x_cert_hkmo_endorsement_expiry", type: "date", labelKey: "field.x_cert_hkmo_endorsement_expiry" },
-        { key: "x_cert_hkmo_scan", type: "mAsset", labelKey: "field.x_cert_hkmo_scan" },
+        sel("x_cert_hkmo_region", ["hong_kong", "macao"]),
+        txt("x_cert_hkmo_endorsement"),
+        dat("x_cert_hkmo_endorsement_expiry"),
+        ast("x_cert_hkmo_scan"),
     ],
     tw_permit: [
-        { key: "x_cert_tw_endorsement", type: "text", labelKey: "field.x_cert_tw_endorsement" },
-        { key: "x_cert_tw_endorsement_expiry", type: "date", labelKey: "field.x_cert_tw_endorsement_expiry" },
-        { key: "x_cert_tw_scan", type: "mAsset", labelKey: "field.x_cert_tw_scan" },
+        txt("x_cert_tw_endorsement"),
+        dat("x_cert_tw_endorsement_expiry"),
+        ast("x_cert_tw_scan"),
     ],
     /** Legacy value retained for rows created when this option meant a generic license. */
     license: [
-        { key: "x_cert_legacy_type", type: "text", labelKey: "field.x_cert_legacy_type" },
-        { key: "x_cert_legacy_issuer", type: "text", labelKey: "field.x_cert_legacy_issuer" },
-        { key: "x_cert_legacy_scan", type: "mAsset", labelKey: "field.x_cert_legacy_scan" },
+        txt("x_cert_legacy_type"),
+        txt("x_cert_legacy_issuer"),
+        ast("x_cert_legacy_scan"),
     ],
     driver_license: [
-        { key: "x_cert_driver_class", type: "text", labelKey: "field.x_cert_driver_class" },
-        { key: "x_cert_driver_authority", type: "text", labelKey: "field.x_cert_driver_authority" },
-        { key: "x_cert_driver_first_issue_date", type: "date", labelKey: "field.x_cert_driver_first_issue_date" },
-        { key: "x_cert_driver_review_due", type: "date", labelKey: "field.x_cert_driver_review_due" },
-        { key: "x_cert_driver_scan", type: "mAsset", labelKey: "field.x_cert_driver_scan" },
+        txt("x_cert_driver_class"),
+        txt("x_cert_driver_authority"),
+        dat("x_cert_driver_first_issue_date"),
+        dat("x_cert_driver_review_due"),
+        ast("x_cert_driver_scan"),
     ],
     vehicle_lic: [
-        { key: "x_cert_vehicle_plate", type: "text", labelKey: "field.x_cert_vehicle_plate" },
-        { key: "x_cert_vehicle_owner", type: "text", labelKey: "field.x_cert_vehicle_owner" },
-        { key: "x_cert_vehicle_scan", type: "mAsset", labelKey: "field.x_cert_vehicle_scan" },
+        txt("x_cert_vehicle_plate"),
+        txt("x_cert_vehicle_owner"),
+        ast("x_cert_vehicle_scan"),
     ],
     birth_cert: [
-        { key: "x_cert_birth_place", type: "text", labelKey: "field.x_cert_birth_place" },
-        { key: "x_cert_birth_registration_no_last4", type: "text", labelKey: "field.x_cert_birth_registration_no_last4" },
-        { key: "x_cert_birth_scan", type: "mAsset", labelKey: "field.x_cert_birth_scan" },
+        txt("x_cert_birth_place"),
+        txt("x_cert_birth_registration_no_last4"),
+        ast("x_cert_birth_scan"),
     ],
     vocational_qualification: [
-        { key: "x_cert_vocational_name", type: "text", labelKey: "field.x_cert_vocational_name" },
-        { key: "x_cert_vocational_level", type: "text", labelKey: "field.x_cert_vocational_level" },
-        { key: "x_cert_vocational_issuer", type: "text", labelKey: "field.x_cert_vocational_issuer" },
-        { key: "x_cert_vocational_registration_last4", type: "text", labelKey: "field.x_cert_vocational_registration_last4" },
-        { key: "x_cert_vocational_education_due", type: "date", labelKey: "field.x_cert_vocational_education_due" },
-        { key: "x_cert_vocational_scan", type: "mAsset", labelKey: "field.x_cert_vocational_scan" },
+        txt("x_cert_vocational_name"),
+        txt("x_cert_vocational_level"),
+        txt("x_cert_vocational_issuer"),
+        txt("x_cert_vocational_registration_last4"),
+        dat("x_cert_vocational_education_due"),
+        ast("x_cert_vocational_scan"),
     ],
     professional_qualification: [
-        { key: "x_cert_professional_name", type: "text", labelKey: "field.x_cert_professional_name" },
-        { key: "x_cert_professional_level", type: "text", labelKey: "field.x_cert_professional_level" },
-        { key: "x_cert_professional_issuer", type: "text", labelKey: "field.x_cert_professional_issuer" },
-        { key: "x_cert_professional_registration_last4", type: "text", labelKey: "field.x_cert_professional_registration_last4" },
-        { key: "x_cert_professional_education_due", type: "date", labelKey: "field.x_cert_professional_education_due" },
-        { key: "x_cert_professional_scan", type: "mAsset", labelKey: "field.x_cert_professional_scan" },
+        txt("x_cert_professional_name"),
+        txt("x_cert_professional_level"),
+        txt("x_cert_professional_issuer"),
+        txt("x_cert_professional_registration_last4"),
+        dat("x_cert_professional_education_due"),
+        ast("x_cert_professional_scan"),
     ],
     graduation_cert: [
-        { key: "x_cert_school", type: "text", labelKey: "field.x_cert_school" },
-        { key: "x_cert_major", type: "text", labelKey: "field.x_cert_major" },
-        { key: "x_cert_education_level", type: "text", labelKey: "field.x_cert_education_level" },
-        { key: "x_cert_admission_date", type: "date", labelKey: "field.x_cert_admission_date" },
-        { key: "x_cert_graduation_date", type: "date", labelKey: "field.x_cert_graduation_date" },
-        { key: "x_cert_graduation_no_last4", type: "text", labelKey: "field.x_cert_graduation_no_last4" },
-        { key: "x_cert_graduation_scan", type: "mAsset", labelKey: "field.x_cert_graduation_scan" },
+        txt("x_cert_school"),
+        txt("x_cert_major"),
+        txt("x_cert_education_level"),
+        dat("x_cert_admission_date"),
+        dat("x_cert_graduation_date"),
+        txt("x_cert_graduation_no_last4"),
+        ast("x_cert_graduation_scan"),
     ],
     degree_cert: [
-        { key: "x_cert_degree", type: "text", labelKey: "field.x_cert_degree" },
-        { key: "x_cert_degree_school", type: "text", labelKey: "field.x_cert_degree_school" },
-        { key: "x_cert_degree_award_date", type: "date", labelKey: "field.x_cert_degree_award_date" },
-        { key: "x_cert_degree_no_last4", type: "text", labelKey: "field.x_cert_degree_no_last4" },
-        { key: "x_cert_degree_scan", type: "mAsset", labelKey: "field.x_cert_degree_scan" },
+        txt("x_cert_degree"),
+        txt("x_cert_degree_school"),
+        dat("x_cert_degree_award_date"),
+        txt("x_cert_degree_no_last4"),
+        ast("x_cert_degree_scan"),
     ],
     professional_title: [
-        { key: "x_cert_title_level", type: "text", labelKey: "field.x_cert_title_level" },
-        { key: "x_cert_title_specialty", type: "text", labelKey: "field.x_cert_title_specialty" },
-        { key: "x_cert_title_issuer", type: "text", labelKey: "field.x_cert_title_issuer" },
-        { key: "x_cert_title_review_due", type: "date", labelKey: "field.x_cert_title_review_due" },
-        { key: "x_cert_title_scan", type: "mAsset", labelKey: "field.x_cert_title_scan" },
+        txt("x_cert_title_level"),
+        txt("x_cert_title_specialty"),
+        txt("x_cert_title_issuer"),
+        dat("x_cert_title_review_due"),
+        ast("x_cert_title_scan"),
     ],
     other: [
-        { key: "x_cert_other_type", type: "text", labelKey: "field.x_cert_other_type" },
-        { key: "x_cert_other_issuer", type: "text", labelKey: "field.x_cert_other_issuer" },
-        { key: "x_cert_other_scan", type: "mAsset", labelKey: "field.x_cert_other_scan" },
+        txt("x_cert_other_type"),
+        txt("x_cert_other_issuer"),
+        ast("x_cert_other_scan"),
     ],
 };
 
@@ -271,13 +281,12 @@ export function getCertificateReminderField(category: string | undefined): strin
 const CERT_PROFILE_COLUMNS: ColumnDef[] = Object.values(CERTIFICATE_PROFILE_COLUMNS).flatMap((columns) => [...columns]);
 
 const CERT_PRIVATE: ColumnDef[] = [
-    { key: "x_cert_holder_name", type: "text", labelKey: "field.x_cert_holder_name" },
-    { key: "holder_no", type: "text", labelKey: "field.holder_no" },      // 完整证件号码，界面默认脱敏展示
-    { key: "issue_date", type: "date", labelKey: "field.issue_date" },
-    { key: "x_cert_valid_from", type: "date", labelKey: "field.x_cert_valid_from" },
-    { key: "issuance_rule", type: "select", labelKey: "field.issuance_rule",
-      options: ["y6", "y10", "longterm", "endorsement"] },
-    { key: "store_place", type: "text", labelKey: "field.store_place" },
+    txt("x_cert_holder_name"),
+    txt("holder_no"), // 完整证件号码，界面默认脱敏展示
+    dat("issue_date"),
+    dat("x_cert_valid_from"),
+    sel("issuance_rule", ["y6", "y10", "longterm", "endorsement"]),
+    txt("store_place"),
 ];
 
 export const CERTS_SCHEMA: ModuleSchema = {
@@ -288,7 +297,7 @@ export const CERTS_SCHEMA: ModuleSchema = {
         ...d("date"),
         ...CERT_PRIVATE,
         ...d("expiry", "due", "remind_before", "location", "attachments", "note"),
-        { key: "copy_location", type: "text", labelKey: "field.copy_location" }, // 16 组：复印件/电子版存放位置
+        txt("copy_location"), // 16 组：复印件/电子版存放位置
         { key: "renewed_to", type: "relation", labelKey: "field.renewed_to" }, // 16 组：换证链——旧证行 → 新证行
         ...CERT_PROFILE_COLUMNS,
     ],
@@ -298,16 +307,16 @@ export const CERTS_SCHEMA: ModuleSchema = {
         { key: "expiring", type: "table", sortBy: { key: "expiry", asc: true } },
     ],
     reminders: [
-        { key: "expiry", field: "expiry", kind: "oneoff", leadDays: 90 },
+        rem("expiry", "expiry", 90),
         // 签注/下次审验日（港澳台通行证签注另计）——due 列已在 columns 中（契约 33.2）
-        { key: "endorsement", field: "due", kind: "oneoff", leadDays: 60 },
-        { key: "permit_endorsement", field: "x_cert_permit_endorsement_expiry", kind: "oneoff", leadDays: 60 },
-        { key: "hkmo_endorsement", field: "x_cert_hkmo_endorsement_expiry", kind: "oneoff", leadDays: 60 },
-        { key: "tw_endorsement", field: "x_cert_tw_endorsement_expiry", kind: "oneoff", leadDays: 60 },
-        { key: "driver_review", field: "x_cert_driver_review_due", kind: "oneoff", leadDays: 60 },
-        { key: "vocational_education", field: "x_cert_vocational_education_due", kind: "oneoff", leadDays: 60 },
-        { key: "professional_education", field: "x_cert_professional_education_due", kind: "oneoff", leadDays: 60 },
-        { key: "title_review", field: "x_cert_title_review_due", kind: "oneoff", leadDays: 60 },
+        rem("endorsement", "due", 60),
+        rem("permit_endorsement", "x_cert_permit_endorsement_expiry", 60),
+        rem("hkmo_endorsement", "x_cert_hkmo_endorsement_expiry", 60),
+        rem("tw_endorsement", "x_cert_tw_endorsement_expiry", 60),
+        rem("driver_review", "x_cert_driver_review_due", 60),
+        rem("vocational_education", "x_cert_vocational_education_due", 60),
+        rem("professional_education", "x_cert_professional_education_due", 60),
+        rem("title_review", "x_cert_title_review_due", 60),
     ],
 };
 
@@ -338,7 +347,7 @@ export const MEMBERS_SCHEMA: ModuleSchema = {
     views: [{ key: "by_role", type: "table", groupBy: "role" }],
     // 生日周年提醒由 members provider 声明（lunarField 指向 lunar 列）
     reminders: [
-        { key: "birthday", field: "birthday", kind: "anniversary", leadDays: 7, lunarField: "lunar" },
+        rem("birthday", "birthday", 7, "anniversary", { lunarField: "lunar" }),
     ],
 };
 
@@ -350,13 +359,13 @@ export const MEDICINE_SCHEMA: ModuleSchema = {
         { ...FIELD_DICT.category, options: ["rx", "otc", "external", "device", "supplement"] },
         { ...FIELD_DICT.status, options: ["inuse", "standby", "med_expired", "discarded"], default: "inuse" },
         ...d("expiry", "remind_before"),
-        { key: "stock_qty", type: "number", labelKey: "field.stock_qty", min: 0, unitKey: "capture.unitCount" },
-        { key: "low_stock_at", type: "number", labelKey: "field.low_stock_at", min: 0, unitKey: "capture.unitCount" },
+        num("stock_qty", { min: 0, unitKey: "capture.unitCount" }),
+        num("low_stock_at", { min: 0, unitKey: "capture.unitCount" }),
         ...d("location", "note"),
     ],
     capture: ["name", "category", "expiry", "stock_qty", "location"],
     views: [{ key: "expiring", type: "table", sortBy: { key: "expiry", asc: true } }],
-    reminders: [{ key: "expiry", field: "expiry", kind: "oneoff", leadDays: 30 }],
+    reminders: [rem("expiry", "expiry", 30)],
     // H15：低库存双规则之数值侧（效期侧由 expiry 规则承担；阈值逐行 low_stock_at）
     numericRules: [{ key: "low_stock", field: "stock_qty", thresholdField: "low_stock_at" }],
 };
@@ -367,19 +376,19 @@ export const MEMBERSHIPS_SCHEMA: ModuleSchema = {
         { ...FIELD_DICT.category, options: ["member_card", "prepaid", "subscription", "coupon", "points"] },
         { ...FIELD_DICT.status, options: ["active", "m_expired", "refunded"], default: "active" },
         ...d("expiry", "cycle", "amount", "note"),
-        { key: "next_pay", type: "date", labelKey: "field.next_pay" },
-        { key: "trial_end", type: "date", labelKey: "field.trial_end" },
-        { key: "auto_renew", type: "checkbox", labelKey: "field.auto_renew" },
-        { key: "credentials_note", type: "text", labelKey: "field.credentials_note" },
-        { key: "seat_role", type: "select", labelKey: "field.seat_role", options: ["holder", "member"], default: "holder" }, // 16 组：家庭共享账号主卡/成员位
+        dat("next_pay"),
+        dat("trial_end"),
+        chk("auto_renew"),
+        txt("credentials_note"),
+        sel("seat_role", ["holder", "member"], "holder"), // 16 组：家庭共享账号主卡/成员位
         { key: "cancel_guide", type: "url", labelKey: "field.cancel_guide" }, // 16 组：取消自动续费指引链接
     ],
     capture: ["name", "category", "amount", "cycle", "next_pay"],
     views: [{ key: "renewing", type: "table", sortBy: { key: "next_pay", asc: true } }],
     reminders: [
-        { key: "next_pay", field: "next_pay", kind: "recurring", leadDays: 14, cycleField: "cycle", autoRenewField: "auto_renew" },
-        { key: "trial_end", field: "trial_end", kind: "oneoff", leadDays: 3 },
-        { key: "expiry", field: "expiry", kind: "oneoff", leadDays: 14 },
+        rem("next_pay", "next_pay", 14, "recurring", { cycleField: "cycle", autoRenewField: "auto_renew" }),
+        rem("trial_end", "trial_end", 3),
+        rem("expiry", "expiry", 14),
     ],
 };
 
@@ -388,25 +397,25 @@ export const INSURANCE_SCHEMA: ModuleSchema = {
         ...d("name", "member"),
         { ...FIELD_DICT.category, options: ["health", "critical", "accident", "life", "vehicle", "property", "other_ins"] },
         { ...FIELD_DICT.status, options: ["in_force", "paying", "ins_expired", "surrendered"], default: "in_force" },
-        { key: "insurer", type: "text", labelKey: "field.insurer" },
-        { key: "contact", type: "text", labelKey: "field.contact" }, // EC13：对接人（人脉快照）
-        { key: "policy_no", type: "text", labelKey: "field.policy_no" },
-        { key: "premium", type: "number", labelKey: "field.premium" },
-        { key: "pay_cycle", type: "select", labelKey: "field.cycle", options: ["month", "quarter", "year"] },
-        { key: "next_pay", type: "date", labelKey: "field.next_pay" },
-        { key: "coverage", type: "number", labelKey: "field.coverage" },
+        txt("insurer"),
+        txt("contact"), // EC13：对接人（人脉快照）
+        txt("policy_no"),
+        num("premium"),
+        sel("pay_cycle", ["month", "quarter", "year"]),
+        dat("next_pay"),
+        num("coverage"),
         // 16 组：理赔记录状态机（报案→材料→到账；无日期驱动，v1 仅记录）
-        { key: "claim_status", type: "select", labelKey: "field.claim_status", options: ["none", "filing", "docs", "paid"], default: "none" },
-        { key: "claim_date", type: "date", labelKey: "field.claim_date" },
-        { key: "claim_amount", type: "number", labelKey: "field.claim_amount" },
+        sel("claim_status", ["none", "filing", "docs", "paid"], "none"),
+        dat("claim_date"),
+        num("claim_amount"),
         ...d("expiry", "attachments", "note"),
     ],
     capture: ["name", "category", "insurer", "premium", "next_pay"],
     activity: { dateField: "claim_date", detailFields: ["claim_status", "claim_amount", "insurer"] },
     views: [{ key: "paying", type: "table", groupBy: "member" }],
     reminders: [
-        { key: "next_pay", field: "next_pay", kind: "recurring", leadDays: 30, cycleField: "pay_cycle" },
-        { key: "expiry", field: "expiry", kind: "oneoff", leadDays: 30 },
+        rem("next_pay", "next_pay", 30, "recurring", { cycleField: "pay_cycle" }),
+        rem("expiry", "expiry", 30),
     ],
 };
 
@@ -418,14 +427,14 @@ export const ASSETS_REAL_SCHEMA: ModuleSchema = {
         { ...FIELD_DICT.category, options: ["appliance", "furniture", "digital", "toy", "apparel", "jewelry", "collection", "sports", "other_ar"] },
         { ...FIELD_DICT.status, options: ["inuse", "idle", "lent", "repairing", "disposed"], default: "inuse" },
         ...d("date", "amount", "expiry", "location", "attachments", "tags", "note"),
-        { key: "brand_model", type: "text", labelKey: "field.brand_model" },
-        { key: "warranty_expiry", type: "date", labelKey: "field.warranty_expiry" },
-        { key: "channel", type: "text", labelKey: "field.channel" },
+        txt("brand_model"),
+        dat("warranty_expiry"),
+        txt("channel"),
     ],
     capture: ["name", "category", "amount", "date", "attachments"],
     activity: { dateField: "date", detailFields: ["category", "amount", "location"] },
     views: [{ key: "by_location", type: "table", groupBy: "location" }],
-    reminders: [{ key: "warranty", field: "warranty_expiry", kind: "oneoff", leadDays: 30 }],
+    reminders: [rem("warranty", "warranty_expiry", 30)],
 };
 
 export const HEALTH_SCHEMA: ModuleSchema = {
@@ -434,16 +443,16 @@ export const HEALTH_SCHEMA: ModuleSchema = {
         { ...FIELD_DICT.category, options: ["visit", "report", "vaccine", "medication", "allergy", "checkup"] },
         { ...FIELD_DICT.status, options: ["following", "closed"], default: "following" },
         ...d("date", "attachments", "note"),
-        { key: "hospital", type: "text", labelKey: "field.hospital" },
-        { key: "department", type: "text", labelKey: "field.department" },
-        { key: "diagnosis", type: "text", labelKey: "field.diagnosis" },
-        { key: "followup_date", type: "date", labelKey: "field.followup_date" },
+        txt("hospital"),
+        txt("department"),
+        txt("diagnosis"),
+        dat("followup_date"),
     ],
     capture: ["name", "member", "category", "date", "attachments"],
     activity: { dateField: "date", detailFields: ["category", "hospital", "department", "diagnosis"] },
     templates: [{ key: "checkup_plan", nameKey: "tpl.checkupPlan", file: "health/checkup-plan.tpl" }],
     views: [{ key: "by_member", type: "table", groupBy: "member" }],
-    reminders: [{ key: "followup", field: "followup_date", kind: "oneoff", leadDays: 7 }],
+    reminders: [rem("followup", "followup_date", 7)],
 };
 
 export const SHOPPING_SCHEMA: ModuleSchema = {
@@ -451,16 +460,16 @@ export const SHOPPING_SCHEMA: ModuleSchema = {
         ...d("name", "member"),
         { ...FIELD_DICT.category, options: ["daily", "digital", "apparel", "food_sh", "other_sh", "wish"] },
         ...d("date", "amount", "url", "note"),
-        { key: "channel", type: "text", labelKey: "field.channel" },
-        { key: "tracking_no", type: "text", labelKey: "field.tracking_no" },
-        { key: "pickup_code", type: "text", labelKey: "field.pickup_code" },
-        { key: "qty", type: "number", labelKey: "field.qty", min: 0, unitKey: "capture.unitCount" }, // 16 组：数量（购入→囤货联动用）
+        txt("channel"),
+        txt("tracking_no"),
+        txt("pickup_code"),
+        num("qty", { min: 0, unitKey: "capture.unitCount" }), // 16 组：数量（购入→囤货联动用）
         // 提案 A/210 波：愿望（wish 类别行）的目标金额——存钱流水在 rowlog deposits，进度在抽屉分区
-        { key: "target_amount", type: "number", labelKey: "field.target_amount" },
+        num("target_amount"),
         // 16 组：退货/退款记录
-        { key: "return_status", type: "select", labelKey: "field.return_status", options: ["none", "requested", "returned", "refunded"], default: "none" },
-        { key: "return_date", type: "date", labelKey: "field.return_date" },
-        { key: "refund_amount", type: "number", labelKey: "field.refund_amount" },
+        sel("return_status", ["none", "requested", "returned", "refunded"], "none"),
+        dat("return_date"),
+        num("refund_amount"),
     ],
     capture: ["name", "amount", "date", "channel"],
     activity: { dateField: "date", detailFields: ["category", "amount", "channel", "qty"] },
@@ -472,16 +481,16 @@ export const CONTRACTS_SCHEMA: ModuleSchema = {
         { ...FIELD_DICT.category, options: ["rent", "renovation", "purchase", "labor", "property_ct", "other_ct"] },
         { ...FIELD_DICT.status, options: ["ct_active", "ct_expired", "terminated"], default: "ct_active" },
         ...d("date", "expiry", "remind_before", "attachments", "note"),
-        { key: "party", type: "text", labelKey: "field.party" },
-        { key: "contact", type: "text", labelKey: "field.contact" }, // EC13：对接人（人脉快照）
-        { key: "deposit", type: "number", labelKey: "field.deposit" },
-        { key: "auto_renew", type: "checkbox", labelKey: "field.auto_renew" }, // 16 组：自动续约条款 → 到期升级为续约决策提醒
-        { key: "deposit_returned", type: "checkbox", labelKey: "field.deposit_returned" }, // 16 组：押金退还记录
-        { key: "deposit_return_date", type: "date", labelKey: "field.deposit_return_date" },
+        txt("party"),
+        txt("contact"), // EC13：对接人（人脉快照）
+        num("deposit"),
+        chk("auto_renew"), // 16 组：自动续约条款 → 到期升级为续约决策提醒
+        chk("deposit_returned"), // 16 组：押金退还记录
+        dat("deposit_return_date"),
     ],
     capture: ["name", "category", "expiry", "attachments"],
     activity: { dateField: "date", detailFields: ["category", "party", "deposit"] },
-    reminders: [{ key: "expiry", field: "expiry", kind: "oneoff", leadDays: 30, autoRenewField: "auto_renew" }],
+    reminders: [rem("expiry", "expiry", 30, "oneoff", { autoRenewField: "auto_renew" })],
 };
 
 export const EXAMS_SCHEMA: ModuleSchema = {
@@ -490,22 +499,22 @@ export const EXAMS_SCHEMA: ModuleSchema = {
         { ...FIELD_DICT.category, options: ["vocational", "title", "language", "academic", "other_ex"] },
         { ...FIELD_DICT.status, options: ["preparing", "passed", "ex_expired"], default: "preparing" },
         ...d("expiry", "attachments", "note"),
-        { key: "issuer", type: "text", labelKey: "field.issuer" },
-        { key: "contact", type: "text", labelKey: "field.contact" }, // EC13：对接人（人脉快照）
-        { key: "exam_date", type: "date", labelKey: "field.exam_date" },
+        txt("issuer"),
+        txt("contact"), // EC13：对接人（人脉快照）
+        dat("exam_date"),
     ],
     capture: ["name", "member", "exam_date", "expiry"],
     activity: { dateField: "exam_date", detailFields: ["category", "status", "issuer"] },
-    reminders: [{ key: "expiry", field: "expiry", kind: "oneoff", leadDays: 60 }],
+    reminders: [rem("expiry", "expiry", 60)],
 };
 
 export const ALLOWANCE_SCHEMA: ModuleSchema = {
     columns: [
         ...d("name", "member"),
         { ...FIELD_DICT.category, options: ["lucky", "allowance_al", "reward", "interest_al"] },
-        { key: "direction", type: "select", labelKey: "field.direction", options: ["in", "out"] },
+        sel("direction", ["in", "out"]),
         ...d("amount", "date", "note"),
-        { key: "source", type: "text", labelKey: "field.source" },
+        txt("source"),
     ],
     capture: ["name", "category", "amount", "direction", "date"],
     activity: { dateField: "date", detailFields: ["category", "direction", "amount", "source"] },
@@ -516,14 +525,14 @@ export const FAVORS_SCHEMA: ModuleSchema = {
     columns: [
         ...d("name"),
         { ...FIELD_DICT.category, options: ["wedding", "full_moon", "housewarming", "graduation", "birthday_fv", "other_fv"] },
-        { key: "direction", type: "select", labelKey: "field.direction", options: ["in", "out"] },
-        { key: "person", type: "text", labelKey: "field.person" },
+        sel("direction", ["in", "out"]),
+        txt("person"),
         ...d("amount", "date", "note"),
     ],
     capture: ["name", "direction", "person", "amount", "date"],
     activity: { dateField: "date", detailFields: ["category", "direction", "person", "amount"] },
     // 16 组/190 波：回礼提醒——收礼（direction=in）30 天后一次性（leadDays 0=到期当天起提醒）；提醒卡带「回礼」标记（rule.reciprocate）
-    reminders: [{ key: "reciprocate", field: "date", kind: "after", offsetDays: 30, leadDays: 0, onlyIf: { field: "direction", equals: "in" } }],
+    reminders: [rem("reciprocate", "date", 0, "after", { offsetDays: 30, onlyIf: { field: "direction", equals: "in" } })],
     views: [{ key: "by_person", type: "table", groupBy: "person" }],
 };
 
@@ -532,8 +541,8 @@ export const STOCK_SCHEMA: ModuleSchema = {
         ...d("name", "member"),
         { ...FIELD_DICT.category, options: ["food_st", "daily_chem", "paper", "medical_st", "emergency_st", "other_st"] },
         ...d("expiry", "location", "note"),
-        { key: "qty", type: "number", labelKey: "field.qty", min: 0, unitKey: "capture.unitCount" },
-        { key: "low_stock_at", type: "number", labelKey: "field.low_stock_at", min: 0, unitKey: "capture.unitCount" },
+        num("qty", { min: 0, unitKey: "capture.unitCount" }),
+        num("low_stock_at", { min: 0, unitKey: "capture.unitCount" }),
     ],
     capture: ["name", "qty", "low_stock_at", "expiry"],
     // 品类分区（Apple Reminders Grocery 印证，26.6）：囤货按品类自动归组
@@ -542,7 +551,7 @@ export const STOCK_SCHEMA: ModuleSchema = {
         { key: "expiring", type: "table", sortBy: { key: "expiry", asc: true } },
     ],
     templates: [{ key: "emergency_kit", nameKey: "tpl.emergencyKit", file: "stock/emergency-kit.tpl" }],
-    reminders: [{ key: "expiry", field: "expiry", kind: "oneoff", leadDays: 30 }],
+    reminders: [rem("expiry", "expiry", 30)],
     // H15：囤货低库存（阈值逐行 low_stock_at）
     numericRules: [{ key: "low_stock", field: "qty", thresholdField: "low_stock_at" }],
 };
@@ -552,12 +561,12 @@ export const CHORES_SCHEMA: ModuleSchema = {
         ...d("name", "member"),
         { ...FIELD_DICT.category, options: ["housework", "maintenance", "care", "other_ch"] },
         ...d("cycle", "due", "note"),
-        { key: "last_done", type: "date", labelKey: "field.last_done" },
+        dat("last_done"),
     ],
     capture: ["name", "member", "cycle", "due"],
     activity: { dateField: "last_done", detailFields: ["category"] },
     // v0.2：due 作为一次性提醒；周期写回（中枢重算）见 03 §5 recurring 完整版
-    reminders: [{ key: "due", field: "due", kind: "oneoff", leadDays: 7 }],
+    reminders: [rem("due", "due", 7)],
 };
 
 export const HOUSE_SCHEMA: ModuleSchema = {
@@ -565,11 +574,11 @@ export const HOUSE_SCHEMA: ModuleSchema = {
         ...d("name", "member"),
         { ...FIELD_DICT.category, options: ["payment", "maintenance_h", "anniversary", "emergency"] },
         ...d("cycle", "note"),
-        { key: "pay_day", type: "date", labelKey: "field.pay_day" },
-        { key: "lunar", type: "checkbox", labelKey: "field.lunar" },
+        dat("pay_day"),
+        chk("lunar"),
     ],
     capture: ["name", "category", "pay_day", "cycle"],
-    reminders: [{ key: "pay_day", field: "pay_day", kind: "anniversary", leadDays: 7, lunarField: "lunar" }],
+    reminders: [rem("pay_day", "pay_day", 7, "anniversary", { lunarField: "lunar" })],
 };
 
 // ── 最后一批轻模块（31/31 全覆盖）────────────────────────────
@@ -578,11 +587,11 @@ export const FOOD_SCHEMA: ModuleSchema = {
     columns: [
         ...d("name", "member"),
         { ...FIELD_DICT.category, options: ["home_cook", "restaurant", "takeout"] },
-        { key: "rating", type: "number", labelKey: "field.rating", min: 0, max: 5, step: 0.5 },
+        num("rating", { min: 0, max: 5, step: 0.5 }),
         ...d("date", "url", "note"),
-        { key: "dislike_safe", type: "checkbox", labelKey: "field.dislike_safe" },
+        chk("dislike_safe"),
         // grocy 印证（26.6）：食材摘要（换行分隔）——采购时可对照 stock 采购建议手动补货；自动联动留 v0.8
-        { key: "ingredients", type: "text", labelKey: "field.ingredients" },
+        txt("ingredients"),
     ],
     capture: ["name", "category", "rating", "date"],
     activity: { dateField: "date", detailFields: ["category", "rating"] },
@@ -592,7 +601,7 @@ export const ADDRESS_SCHEMA: ModuleSchema = {
     columns: [
         ...d("name", "member"),
         { ...FIELD_DICT.category, options: ["home", "shipping", "id_addr", "org"] },
-        { key: "address_full", type: "text", labelKey: "field.address_full" },
+        txt("address_full"),
         ...d("url", "note"),
     ],
     capture: ["name", "category", "address_full"],
@@ -612,7 +621,7 @@ export const SNIPPETS_SCHEMA: ModuleSchema = {
     columns: [
         ...d("name"),
         { ...FIELD_DICT.category, options: ["greeting", "address_sn", "intro", "reply", "other_sn"] },
-        { key: "content", type: "text", labelKey: "field.content" },
+        txt("content"),
         ...d("tags"),
     ],
     capture: ["name", "content"],
@@ -624,16 +633,16 @@ export const PARENTING_SCHEMA: ModuleSchema = {
         { ...FIELD_DICT.category, options: ["vaccine_p", "growth", "feeding", "milestone"] },
         // due 必备：next_visit 规则引用此列（缺列会令 requireReminderColumns 抛错——第六十五轮修复）
         ...d("date", "due", "attachments", "note"),
-        { key: "vaccine_name", type: "text", labelKey: "field.vaccine_name" },
-        { key: "dose_no", type: "number", labelKey: "field.dose_no" },
-        { key: "vaccine_batch", type: "text", labelKey: "field.vaccine_batch" }, // 16 组：接种追溯
-        { key: "vaccine_site", type: "text", labelKey: "field.vaccine_site" }, // 16 组：接种点
-        { key: "metric_type", type: "select", labelKey: "field.metric_type", options: ["height", "weight"], default: "height" }, // 生长曲线：指标类型
-        { key: "metric_value", type: "number", labelKey: "field.metric_value" },
+        txt("vaccine_name"),
+        num("dose_no"),
+        txt("vaccine_batch"), // 16 组：接种追溯
+        txt("vaccine_site"), // 16 组：接种点
+        sel("metric_type", ["height", "weight"], "height"), // 生长曲线：指标类型
+        num("metric_value"),
     ],
     capture: ["name", "member", "category", "date"],
     activity: { dateField: "date", detailFields: ["category", "vaccine_name", "dose_no", "metric_type", "metric_value"] },
-    reminders: [{ key: "next_visit", field: "due", kind: "oneoff", leadDays: 7 }],
+    reminders: [rem("next_visit", "due", 7)],
 };
 
 export const SCHOOLING_SCHEMA: ModuleSchema = {
@@ -641,20 +650,20 @@ export const SCHOOLING_SCHEMA: ModuleSchema = {
         ...d("name", "member"),
         { ...FIELD_DICT.category, options: ["kindergarten", "primary", "junior", "senior", "college", "grad_school", "extracurricular"] },
         { ...FIELD_DICT.status, options: ["applying", "enrolled", "graduated"], default: "applying" },
-        { key: "school", type: "text", labelKey: "field.school" },
-        { key: "grade", type: "text", labelKey: "field.grade" },
-        { key: "teacher", type: "text", labelKey: "field.teacher" },
-        { key: "contact", type: "text", labelKey: "field.contact" }, // EC13：对接人（人脉快照）
+        txt("school"),
+        txt("grade"),
+        txt("teacher"),
+        txt("contact"), // EC13：对接人（人脉快照）
         ...d("amount", "due", "note"),
-        { key: "enroll_year", type: "number", labelKey: "field.enroll_year" },
-        { key: "exam_date", type: "date", labelKey: "field.exam_date" }, // 16 组：考试/重要日程（exams 模块管备考，这里管校内日程）
+        num("enroll_year"),
+        dat("exam_date"), // 16 组：考试/重要日程（exams 模块管备考，这里管校内日程）
     ],
     capture: ["name", "school", "category", "amount", "due"],
     activity: { dateField: "exam_date", detailFields: ["school", "category", "status"] },
     templates: [{ key: "parent_meeting", nameKey: "tpl.parentMeeting", file: "schooling/parent-meeting.tpl" }],
     reminders: [
-        { key: "tuition", field: "due", kind: "oneoff", leadDays: 14 },
-        { key: "exam_date", field: "exam_date", kind: "oneoff", leadDays: 3 },
+        rem("tuition", "due", 14),
+        rem("exam_date", "exam_date", 3),
     ],
 };
 
@@ -663,15 +672,15 @@ export const SOCIAL_SCHEMA: ModuleSchema = {
         ...d("name", "member"),
         { ...FIELD_DICT.category, options: ["shebao", "gongjijin", "yibao", "resident_pension", "commercial_pension"] },
         ...d("note"),
-        { key: "account_no", type: "text", labelKey: "field.account_no" },
-        { key: "retire_check", type: "checkbox", labelKey: "field.retire_check" },
-        { key: "retire_age", type: "number", labelKey: "field.retire_age" },
-        { key: "balance_snapshot", type: "number", labelKey: "field.balance_snapshot" },
-        { key: "snapshot_date", type: "date", labelKey: "field.snapshot_date" },
-        { key: "base_adjust_date", type: "date", labelKey: "field.base_adjust_date" }, // 16 组：缴费基数年度调整
+        txt("account_no"),
+        chk("retire_check"),
+        num("retire_age"),
+        num("balance_snapshot"),
+        dat("snapshot_date"),
+        dat("base_adjust_date"), // 16 组：缴费基数年度调整
     ],
     capture: ["name", "member", "category", "account_no"],
-    reminders: [{ key: "base_adjust", field: "base_adjust_date", kind: "anniversary", leadDays: 14 }],
+    reminders: [rem("base_adjust", "base_adjust_date", 14, "anniversary")],
 };
 
 export const MEDIA_SCHEMA: ModuleSchema = {
@@ -679,14 +688,14 @@ export const MEDIA_SCHEMA: ModuleSchema = {
         ...d("name", "member"),
         { ...FIELD_DICT.category, options: ["movie", "tv", "variety", "book", "comic", "novel"] },
         { ...FIELD_DICT.status, options: ["wishlist", "consuming", "done", "dropped"], default: "wishlist" },
-        { key: "rating", type: "number", labelKey: "field.rating" },
-        { key: "progress", type: "text", labelKey: "field.progress" },
+        num("rating"),
+        txt("progress"),
         // 16 组/189 波：追更提醒——更新日手动登记，提醒中枢派生（oneoff，当天提醒）
-        { key: "next_update", type: "date", labelKey: "field.next_update" },
+        dat("next_update"),
         ...d("url", "date", "note"),
     ],
     capture: ["name", "category", "status", "next_update"],
-    reminders: [{ key: "next_update", field: "next_update", kind: "oneoff", leadDays: 0 }],
+    reminders: [rem("next_update", "next_update", 0)],
     // 海报墙（seerr 印证，26.6）：画廊视图以封面卡片呈现；思源 gallery 视图类型原生支持
     views: [
         { key: "wall", type: "gallery" },
@@ -697,53 +706,53 @@ export const MEDIA_SCHEMA: ModuleSchema = {
 export const PETS_SCHEMA: ModuleSchema = {
     columns: [
         ...d("name"),
-        { key: "species", type: "select", labelKey: "field.species", options: ["cat", "dog", "other_pet"] },
-        { key: "breed", type: "text", labelKey: "field.breed" },
-        { key: "vaccine_due", type: "date", labelKey: "field.vaccine_due" },
-        { key: "deworm_due", type: "date", labelKey: "field.deworm_due" },
+        sel("species", ["cat", "dog", "other_pet"]),
+        txt("breed"),
+        dat("vaccine_due"),
+        dat("deworm_due"),
         ...d("cycle"), // deworm recurring 的周期来源（缺失时规则按 oneoff 降级；旧库由补列续跑补齐）
         ...d("note"),
     ],
     capture: ["name", "species", "vaccine_due", "deworm_due", "cycle"],
     reminders: [
-        { key: "vaccine", field: "vaccine_due", kind: "oneoff", leadDays: 14 },
-        { key: "deworm", field: "deworm_due", kind: "recurring", leadDays: 7, cycleField: "cycle" },
+        rem("vaccine", "vaccine_due", 14),
+        rem("deworm", "deworm_due", 7, "recurring", { cycleField: "cycle" }),
     ],
 };
 
 export const VEHICLES_SCHEMA: ModuleSchema = {
     columns: [
         ...d("name", "member"),
-        { key: "plate", type: "text", labelKey: "field.plate" },
-        { key: "brand_model", type: "text", labelKey: "field.brand_model" },
-        { key: "vin", type: "text", labelKey: "field.vin" },
-        { key: "color", type: "text", labelKey: "field.color" },
-        { key: "energy_type", type: "select", labelKey: "field.energy_type", options: ["gasoline", "diesel", "hybrid", "electric", "other"], default: "gasoline" },
+        txt("plate"),
+        txt("brand_model"),
+        txt("vin"),
+        txt("color"),
+        sel("energy_type", ["gasoline", "diesel", "hybrid", "electric", "other"], "gasoline"),
         ...d("expiry", "note", "attachments"),
-        { key: "mileage", type: "number", labelKey: "field.mileage", min: 0, step: 1, unitKey: "capture.unitKm" },
-        { key: "purchase_date", type: "date", labelKey: "field.purchase_date" },
-        { key: "purchase_price", type: "number", labelKey: "field.purchase_price" },
-        { key: "current_value", type: "number", labelKey: "field.current_value" },
-        { key: "inspection_due", type: "date", labelKey: "field.inspection_due" },
-        { key: "insurance_company", type: "text", labelKey: "field.insurance_company" },
-        { key: "insurance_due", type: "date", labelKey: "field.insurance_due" },
-        { key: "vehicle_tax_due", type: "date", labelKey: "field.vehicle_tax_due" },
-        { key: "battery_capacity", type: "number", labelKey: "field.battery_capacity" },
+        num("mileage", { min: 0, step: 1, unitKey: "capture.unitKm" }),
+        dat("purchase_date"),
+        num("purchase_price"),
+        num("current_value"),
+        dat("inspection_due"),
+        txt("insurance_company"),
+        dat("insurance_due"),
+        dat("vehicle_tax_due"),
+        num("battery_capacity"),
         // 电池更换（grocy 印证：铅酸 1.5-2 年/锂 5-8 年——用户按实际记录下次更换日）
-        { key: "battery_due", type: "date", labelKey: "field.battery_due" },
+        dat("battery_due"),
         // 违章手动记录（12123 功能面：日期/地点/行为/罚款 摘要，多条例以换行分隔；官方数据不做对接）
-        { key: "violations", type: "text", labelKey: "field.violations" },
+        txt("violations"),
     ],
     // Keep the quick form within the schema contract's five-field limit.
     // The vehicle attachment is surfaced by the dedicated photo control.
     capture: ["name", "plate", "brand_model", "energy_type", "mileage"],
     activity: { dateField: "purchase_date", detailFields: ["plate", "brand_model", "energy_type", "mileage"] },
     reminders: [
-        { key: "expiry", field: "expiry", kind: "oneoff", leadDays: 30 },
-        { key: "inspection", field: "inspection_due", kind: "oneoff", leadDays: 30 },
-        { key: "insurance", field: "insurance_due", kind: "oneoff", leadDays: 30 },
-        { key: "vehicle_tax", field: "vehicle_tax_due", kind: "oneoff", leadDays: 30 },
-        { key: "battery", field: "battery_due", kind: "oneoff", leadDays: 30 },
+        rem("expiry", "expiry", 30),
+        rem("inspection", "inspection_due", 30),
+        rem("insurance", "insurance_due", 30),
+        rem("vehicle_tax", "vehicle_tax_due", 30),
+        rem("battery", "battery_due", 30),
     ],
 };
 
@@ -752,10 +761,10 @@ export const TRANSIT_SCHEMA: ModuleSchema = {
         ...d("name", "member"),
         { ...FIELD_DICT.category, options: ["etc", "transit_card", "monthly", "senior"] },
         ...d("expiry", "note"),
-        { key: "card_no", type: "text", labelKey: "field.card_no" },
+        txt("card_no"),
     ],
     capture: ["name", "category", "expiry"],
-    reminders: [{ key: "expiry", field: "expiry", kind: "oneoff", leadDays: 30 }],
+    reminders: [rem("expiry", "expiry", 30)],
 };
 
 export const TRAVEL_PLAN_SCHEMA: ModuleSchema = {
@@ -763,11 +772,11 @@ export const TRAVEL_PLAN_SCHEMA: ModuleSchema = {
         ...d("name", "member"),
         { ...FIELD_DICT.status, options: ["planning", "ongoing", "finished"], default: "planning" },
         ...d("date", "expiry", "amount", "note"),
-        { key: "destination", type: "text", labelKey: "field.destination" },
+        txt("destination"),
     ],
     capture: ["name", "destination", "date", "expiry"],
     activity: { dateField: "date", detailFields: ["destination", "status"] },
-    reminders: [{ key: "date", field: "date", kind: "oneoff", leadDays: 7 }],
+    reminders: [rem("date", "date", 7)],
 };
 
 export const TRAVEL_BOOKING_SCHEMA: ModuleSchema = {
@@ -775,7 +784,7 @@ export const TRAVEL_BOOKING_SCHEMA: ModuleSchema = {
         ...d("name"),
         { ...FIELD_DICT.category, options: ["flight", "hotel", "train", "ticket", "rental"] },
         ...d("date", "amount", "attachments", "note"),
-        { key: "order_no", type: "text", labelKey: "field.order_no" },
+        txt("order_no"),
     ],
     capture: ["name", "category", "date", "order_no"],
     activity: { dateField: "date", detailFields: ["category", "amount"] },
@@ -786,7 +795,7 @@ export const TRAVEL_PACKING_SCHEMA: ModuleSchema = {
         ...d("name"),
         { ...FIELD_DICT.status, options: ["draft", "packed"], default: "draft" },
         ...d("date", "note"),
-        { key: "checklist_doc", type: "text", labelKey: "field.checklist_doc" },
+        txt("checklist_doc"),
     ],
     capture: ["name", "date", "status"],
     activity: { dateField: "date", detailFields: ["status"] },
@@ -796,7 +805,7 @@ export const TRAVEL_LOG_SCHEMA: ModuleSchema = {
     columns: [
         ...d("name", "member"),
         ...d("date", "amount", "attachments", "note"),
-        { key: "cities", type: "text", labelKey: "field.cities" },
+        txt("cities"),
     ],
     capture: ["name", "date", "amount"],
     activity: { dateField: "date", detailFields: ["cities", "amount"] },
@@ -807,13 +816,13 @@ export const ASSETS_VIRTUAL_SCHEMA: ModuleSchema = {
         ...d("name", "member"),
         { ...FIELD_DICT.category, options: ["account", "domain", "game", "nft", "license", "other_v"] },
         ...d("expiry", "note"),
-        { key: "platform", type: "text", labelKey: "field.platform" },
-        { key: "account_name", type: "text", labelKey: "field.account_name" },
-        { key: "cred_loc", type: "text", labelKey: "field.cred_loc" },
-        { key: "inherit_note", type: "text", labelKey: "field.inherit_note" },
+        txt("platform"),
+        txt("account_name"),
+        txt("cred_loc"),
+        txt("inherit_note"),
     ],
     capture: ["name", "category", "platform", "account_name", "cred_loc"],
-    reminders: [{ key: "expiry", field: "expiry", kind: "oneoff", leadDays: 30 }],
+    reminders: [rem("expiry", "expiry", 30)],
 };
 
 // ── schema 契约校验（33.2 门禁）─────────────────────────────
