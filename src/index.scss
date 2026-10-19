@@ -977,6 +977,32 @@
             outline-color: Highlight !important;
             outline-offset: 2px;
         }
+
+        // 301 波：指标卡/子卡片/弹窗滚动体在强制色下的可读性兜底
+        // forced-colors 会丢弃盒阴影与背景色，仅保留 Canvas/CanvasText——用 1px 边框维持卡片轮廓
+        .lv-metric-item,
+        .lv-metric-lg,
+        .lv-subcard {
+            border: 1px solid CanvasText !important;
+            background: Canvas !important;
+            color: CanvasText !important;
+        }
+
+        // 状态徽章（缺货/不足/充足/证件/合同）必须保留语义色差——强制色下用系统高亮色族
+        .lv-badge {
+            border: 1px solid CanvasText !important;
+        }
+
+        .lv-badge.red,
+        .lv-badge.orange,
+        .lv-badge.yellow {
+            color: Highlight !important;
+            border-color: Highlight !important;
+        }
+
+        .lv-badge.green {
+            color: CanvasText !important;
+        }
     }
 }
 
@@ -996,3 +1022,21 @@
         }
     }
 }
+
+// ── 20. 分析弹窗窄屏响应式 (301 波) ─────────────────────────────
+// 指标卡四列网格在 ≤480px（手机竖屏）降级为两列，避免文字挤压换行溢出；
+// 弹窗宽度硬编码 px 在窄屏自适应收窄。
+@media (max-width: 480px) {
+    .lv-dialog-scroll-body {
+        [style*="grid-template-columns:repeat(4, 1fr)"],
+        [style*="grid-template-columns:repeat(3, 1fr)"] {
+            grid-template-columns: repeat(2, 1fr) !important;
+        }
+
+        .lv-metric-lg,
+        .lv-subcard {
+            padding: 10px;
+        }
+    }
+}
+

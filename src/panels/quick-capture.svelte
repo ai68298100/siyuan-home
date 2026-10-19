@@ -427,19 +427,21 @@
                     <div style="display:flex;gap:6px;align-items:center">
                         <input class="b3-text-field" style="flex:1;font-size:12px;padding:4px 8px"
                             placeholder={t("capture.smartHint")}
+                            aria-label={t("capture.smartHint")}
                             bind:value={smartInputText}
                             oninput={handleSmartInput}
                             disabled={saving}
                         />
                         {#if smartParsed && smartParsed.title}
                             <button class="b3-button b3-button--outline" style="font-size:11.5px;padding:3px 8px;flex-shrink:0"
+                                aria-label={t("capture.smartDetected").replace("${module}", modLabel(smartParsed.suggestedModule || moduleId))}
                                 onclick={applySmartParse}>
                                 {t("capture.smartDetected").replace("${module}", modLabel(smartParsed.suggestedModule || moduleId))}
                             </button>
                         {/if}
                     </div>
                 </div>
-                <div class="lv-capture-context" role="status">
+                <div class="lv-capture-context" role="status" aria-live="polite">
                     <div class="lv-capture-context__main">
                         <span class="lv-capture-context__eyebrow">{t("capture.contextTitle")}</span>
                         <strong>{modLabel(moduleId)}</strong>
