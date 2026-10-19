@@ -1630,6 +1630,8 @@
     "ledger.mediaEmpty": "暂无书影音消费记录",
     "ledger.mediaCopy": "复制简报",
     "ledger.mediaCopied": "书影音年度简报已复制到剪贴板",
+    "ledger.petCareTitle": "宠物生理年龄与护理健康",
+    "ledger.petAgeEquivalent": "人类对等年龄",
     "vehicle.summary.title": "车辆总览",
     "vehicle.summary.hint": "汇总已记录的加油、充电和维护费用；未填写金额的流水不会被估算为完整成本。油耗与电耗仍分开统计。",
     "vehicle.summary.totalCost": "已记录总成本",

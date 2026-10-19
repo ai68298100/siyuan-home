@@ -1630,6 +1630,8 @@
     "ledger.mediaEmpty": "No media records found",
     "ledger.mediaCopy": "Copy summary",
     "ledger.mediaCopied": "Media summary copied to clipboard",
+    "ledger.petCareTitle": "Pet Age & Care",
+    "ledger.petAgeEquivalent": "Human age equivalent",
     "vehicle.summary.title": "Vehicle overview",
     "vehicle.summary.hint": "Summarizes recorded fuel, charging, and maintenance costs. Entries without an amount are not treated as complete cost data; fuel and electricity remain separate.",
     "vehicle.summary.totalCost": "Recorded total cost",

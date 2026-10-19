@@ -3943,6 +3943,88 @@
                         }
                     })();
                 }
+            } else if (active === "pets") {
+                const speciesVal = ref?.columns?.species ? cellText(row.cells[ref.columns.species]) : "cat";
+                const vdueVal = ref?.columns?.vaccine_due ? cellText(row.cells[ref.columns.vaccine_due]) : undefined;
+                const ddueVal = ref?.columns?.deworm_due ? cellText(row.cells[ref.columns.deworm_due]) : undefined;
+                const noteVal = ref?.columns?.note ? cellText(row.cells[ref.columns.note]) : "";
+
+                // 尝试从备注中匹配生日或出生日期（如 "2024-05-01" 或 "出生: 2024-05-01"）
+                let birthMatch = noteVal.match(/\b(20\d{2}-\d{2}-\d{2})\b/)?.[1];
+
+                const petCareSection = document.createElement("div");
+                petCareSection.className = "lv-detail-section";
+                petCareSection.style.cssText = "margin-top:14px;padding-top:10px;border-top:1px solid var(--b3-border-color)";
+
+                const head = document.createElement("div");
+                head.style.cssText = "display:flex;align-items:center;justify-content:space-between;margin-bottom:8px";
+                const title = document.createElement("span");
+                title.className = "ft__on-surface";
+                title.style.cssText = "font-weight:600;font-size:12px";
+                title.textContent = t("ledger.petCareTitle");
+                head.append(title);
+                petCareSection.append(head);
+
+                const contentWrap = document.createElement("div");
+                contentWrap.style.cssText = "padding:10px 12px;background:var(--lv-surface-2);border-radius:8px;border:1px solid var(--lv-line);display:flex;flex-direction:column;gap:8px;font-size:12px";
+                petCareSection.append(contentWrap);
+                body.appendChild(petCareSection);
+
+                void (async () => {
+                    const { evaluatePetSummary } = await import("@/core/pets");
+                    const summary = evaluatePetSummary(
+                        birthMatch,
+                        speciesVal,
+                        vdueVal !== "—" ? vdueVal : undefined,
+                        ddueVal !== "—" ? ddueVal : undefined,
+                    );
+
+                    contentWrap.replaceChildren();
+
+                    // 1. 生理年龄与阶段
+                    if (summary.ageInfo) {
+                        const ageLine = document.createElement("div");
+                        ageLine.style.cssText = "display:flex;align-items:center;justify-content:space-between;gap:8px";
+                        ageLine.innerHTML = `
+                            <span>${t("ledger.petAgeEquivalent")}: <b>${summary.ageInfo.humanEquivalentAge} 岁</b> (${summary.ageInfo.chronologicalYears} 岁 ${summary.ageInfo.chronologicalMonths} 个月)</span>
+                            <span class="lv-badge purple">${summary.ageInfo.lifeStageLabel}</span>
+                        `;
+                        const desc = document.createElement("div");
+                        desc.className = "lv-caption";
+                        desc.style.cssText = "font-size:11px;line-height:1.4";
+                        desc.textContent = summary.ageInfo.description;
+                        contentWrap.append(ageLine, desc);
+                    }
+
+                    // 2. 疫苗与驱虫状态条
+                    const careGrid = document.createElement("div");
+                    careGrid.style.cssText = "display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:2px";
+
+                    const badgeCls = (u: string) => u === "overdue" ? "danger" : u === "soon" ? "orange" : u === "ok" ? "green" : "gray";
+
+                    const vBox = document.createElement("div");
+                    vBox.style.cssText = "padding:6px 8px;background:var(--lv-surface);border-radius:6px;border:1px solid var(--lv-line);display:flex;flex-direction:column;gap:3px";
+                    vBox.innerHTML = `
+                        <div style="display:flex;justify-content:space-between;align-items:center">
+                            <span style="font-weight:500">${t("field.vaccine_due")}</span>
+                            <span class="lv-badge ${badgeCls(summary.vaccine.urgency)}">${summary.vaccine.label}</span>
+                        </div>
+                        <span class="lv-caption" style="font-size:11px">${summary.vaccine.dueDate ? summary.vaccine.dueDate : "未填写"}</span>
+                    `;
+
+                    const dBox = document.createElement("div");
+                    dBox.style.cssText = "padding:6px 8px;background:var(--lv-surface);border-radius:6px;border:1px solid var(--lv-line);display:flex;flex-direction:column;gap:3px";
+                    dBox.innerHTML = `
+                        <div style="display:flex;justify-content:space-between;align-items:center">
+                            <span style="font-weight:500">${t("field.deworm_due")}</span>
+                            <span class="lv-badge ${badgeCls(summary.deworm.urgency)}">${summary.deworm.label}</span>
+                        </div>
+                        <span class="lv-caption" style="font-size:11px">${summary.deworm.dueDate ? summary.deworm.dueDate : "未填写"}</span>
+                    `;
+
+                    careGrid.append(vBox, dBox);
+                    contentWrap.append(careGrid);
+                })();
             } else if (active === "travel-plan") {
                 // Certificate checks are appended and deduplicated by the row-log helper.
                 await addRowLogSection({

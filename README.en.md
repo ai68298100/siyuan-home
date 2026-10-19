@@ -39,34 +39,25 @@ Certificates expire, medicine expires, insurance needs renewal, subscriptions au
 
 Image OCR uses the engine configured in SiYuan Settings → OCR. It runs only when requested and does not require automatic OCR to be enabled. AI OCR asks before each run because the image is sent to the selected AI service. Results are saved to SiYuan OCR text and included in search; re-running replaces the previous result. Encrypted notebook images and PDFs are not supported, and OCR text is never written into ledger fields automatically.
 
-## 🆕 What's new in v0.5.1
+## 🆕 What's new in v0.5.2
 
-This release keeps the vehicle workspace and first-install fixes from v0.5.0, then improves startup, long-list rendering, image stability and shared visual tokens across the plugin.
-
-- **Added**: per-vehicle refueling, charging and maintenance logs with consumption, cost, trend, category and next date/odometer summaries.
-- **Added**: energy entries for date, odometer, grade/mode, quantity, unit/total cost, full-tank/full-charge boundary, station and notes. Full-to-full calculations are preferred; incomplete data is labeled as estimated or pending.
-- **Improved**: first-install provisioning accepts the object response returned by SiYuan 3.8.6+; save, failure, retry and empty states now have visible feedback across the main flows.
-- **Improved**: complete ID-card entry with validation and masking; on-demand SiYuan OCR explains engine setup, privacy and the fact that results never auto-fill ledger fields.
-- **Fixed**: empty member-card menus, select persistence on SiYuan 3.8.x, storage error-envelope contamination and cramped mobile top-bar actions.
-- **Validation**: TypeScript, Svelte, i18n, metadata, unit tests, production build, package smoke and isolated-kernel E2E all pass (40/40, 6/6, 4/4 and 5/5).
-
-For v0.5.1, the main screens and quick-capture form load on demand, long ledger tables use viewport windowing, and shared tokens now cover spacing, typography, controls, radii, shadows, layering and motion. Chrome measurements recorded about 148 ms to first visible panel, 67–119 ms tab switches, 55 ms first quick-capture open, and 0 px desktop overflow.
+This release brings a major expansion in family life management, deep cross-module linkages, and enhanced GTD workflows:
 
 - **Added**: table density toggle (comfortable 48px / compact 34px), copy record as masked text (IDs, phone, email masked), and rebuild all enabled ledgers in diagnostics.
-- **Added**: reminder card in-place summary expansion (rule, member, due date without opening drawer), and saved filter views with one-click switching and persistence.
+- **Added**: reminder card in-place summary expansion (rule, member, due date without opening drawer), saved filter views with one-click switching and persistence, and dual-date scheduling (planning date separate from strict deadline, Things 3 style).
 - **Added**: batch reassignment of ledger rows to members, linked warranty/contracts review in house drawer, and baby food 3-day observation timeline linked with health allergy records.
-- **Performance**: overview, reminders, ledger and members are loaded on demand; ledger tables use viewport windowing for long lists, while vehicle cards keep progressive image loading.
-- **Design system**: spacing, typography, control sizes, radii, shadows, z-index and motion durations now use shared tokens across light and dark themes.
-- **Measured**: Chrome walkthrough first visible panel about 148 ms, tab switches 67–119 ms, first quick-capture open about 55 ms, and 0 px desktop overflow.
-## 📦 Install (v0.5.1)
+- **Added**: favors annual gift balance report, bookmarks broken link health check, statutory & progressive retirement countdown (China 2025 policy), emergency kit checklist doc template, and subscription expenses normalized to monthly/annual costs.
+- **Added**: shopping purchase to real assets creation, child vaccination schedule (given/overdue/due soon/upcoming), food dietary & allergy conflict check, schooling stage graduation countdown, media reading/viewing report, and pet physiological age equivalent with care tracking.
+- **Validation**: TypeScript, Svelte, i18n (1682 keys), metadata, 527 unit tests, production build, package smoke and loader verification all pass.
+## 📦 Install (v0.5.2)
 
 1. Download `package.zip` from [Releases](https://github.com/ai68298100/siyuan-home/releases/latest)
 2. SiYuan → Settings → Marketplace → Download → **Import** the zip
 3. Enable the plugin → complete the 2-step onboarding (household → module picks and provisioning)
 4. Press `Ctrl+Alt+H` anytime to open the hub
 
-> **Validation status:** core data paths have automated tests and isolated-kernel coverage. The v0.5.1 GitHub Release is available; Android WebView behavior remains host-specific validation. `icon.png` and `preview.png` were redesigned for v0.3.13 (brand-gradient tile + geometric mark; dark overview with sample data).
-> **Version note:** the tagged v0.5.1 package is the current GitHub release; local quality checks report 458 unit tests.
+> **Validation status:** core data paths have automated tests and isolated-kernel coverage. The v0.5.2 GitHub Release is available; Android WebView behavior remains host-specific validation. `icon.png` and `preview.png` were redesigned for v0.3.13 (brand-gradient tile + geometric mark; dark overview with sample data).
+> **Version note:** the tagged v0.5.2 package is the current GitHub release; local quality checks report 527 unit tests.
 >
 > Family sharing depends on SiYuan's collaboration, permissions, sync and conflict behavior. Test with non-sensitive data before sharing; this plugin does not provide a separate permission system.
 >
@@ -142,7 +133,7 @@ pnpm run dev      # dev (app + kernel watch)
 pnpm run build    # dist/ + package.zip
 pnpm run check    # 5-layer gate (types + svelte + i18n + meta + audit)
 pnpm run smoke    # release package and single-file loader smoke checks
-pnpm test         # unit tests (458)
+pnpm test         # unit tests (527)
 ```
 
 - Setup & conventions: [CONTRIBUTING.md](./CONTRIBUTING.md)
