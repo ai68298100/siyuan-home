@@ -817,6 +817,17 @@
     gap: 4px;
 }
 
+.lv-subcard {
+    padding: 10px 12px;
+    background: var(--lv-surface-2);
+    border-radius: 8px;
+    border: 1px solid var(--lv-line);
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    font-size: 12px;
+}
+
 .lv-dialog-scroll-body {
     max-height: 70vh;
     overflow: auto;
