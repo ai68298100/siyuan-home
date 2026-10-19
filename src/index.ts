@@ -11,8 +11,11 @@ import { runScan, deriveVisible, type ScanResult } from "@/core/hub/scanner";
 import { buildScanProviders } from "@/core/hub/registry";
 import { dailyDigest, markNotified, inSilentHours, weeklyPreview, markWeeklyNotified } from "@/core/hub/notify";
 import { complete, snooze, mute, unmute, renew, restore, addMemo, removeMemo, updateMemo } from "@/core/hub/actions";
-import { provisionModule } from "@/core/provisioner";
+import { getProvisioningReport, provisionModule, type ProvisioningReport } from "@/core/provisioner";
+import { createSingleFlightUntilStable } from "@/core/single-flight";
 import { addDetachedRow, setCell } from "@/core/siyuan";
+import { loadRowLogs } from "@/core/rowlog";
+import { compactUserMessage, sameOriginReturnPath } from "@/core/auth";
 import { mountLvHomeBridge } from "@/bridge/external-bridge";
 import { SCHEMA_CATALOG, validateSchema } from "@/core/schema";
 import type { HomeSettings } from "@/types";
@@ -32,18 +35,29 @@ export default class LvHomePlugin extends Plugin {
     private heartbeat: number | undefined;
     /** 所有延迟回调统一登记，确保卸载时没有匿名计时器继续访问插件实例。 */
     private readonly timeoutIds = new Set<number>();
+    /** 统一处理内核鉴权失效，避免每个面板各自跳转或留下空白状态。 */
+    private authExpiredHandler?: (event: Event) => void;
+    private permissionDeniedHandler?: (event: Event) => void;
+    /** Multiple providers can fail with the same expired token in one scan. */
+    private authRedirectScheduled = false;
     /** moduleId → schema 目录（193 波收口为 SCHEMA_CATALOG 单源；UI 按需读取列定义/枚举，与 ensureCoreLedgers 同源） */
     schemaCatalog: Record<string, any> = SCHEMA_CATALOG;
     /** Tab 面板刷新回调（支持多实例，33.1：所有打开的管家面板同步刷新） */
     hubListeners = new Set<() => void>();
     /** 扫描序号（H11）：慢的旧扫描不得覆写新扫描结果或之后的手动动作 */
     private scanSeq = 0;
+    private readonly provisionLedgersSingleFlight = createSingleFlightUntilStable(
+        () => [...new Set(this.settings.enabledModules)].sort().join("\0"),
+        () => this.provisionLedgers(),
+    );
     /** EC03/v0.3：服务桥卸载函数 */
     private disposeLvHomeBridge?: () => void;
     /** EC21：lv-exam:stats 监听（window CustomEvent，非 eventBus） */
     private examStatsHandler?: (e: Event) => void;
     /** EC09/EC10：打卡集成事件监听（window CustomEvent） */
     private checkinEventHandler?: (e: Event) => void;
+    /** Epoch 6：小驴闪卡复习事件监听（window CustomEvent） */
+    private cardsReviewedHandler?: (e: Event) => void;
     /** 下次面板挂载的目标页签（状态栏/通知入口预选） */
     pendingScreen?: string;
     /** 已挂载面板的页签直切回调（tab-panel 挂载时注册、卸载时清空） */
@@ -68,6 +82,9 @@ export default class LvHomePlugin extends Plugin {
     private mobileTopBarRetry?: number;
     private mobileDialog?: Dialog;
     private mobileDialogUnmount?: () => void;
+    /** C6c captureTo idempotency window: duplicate block-menu clicks while
+     * the first kernel write is still pending must not add duplicate rows. */
+    private readonly captureDedupe = new Map<string, number>();
     /** PF13/15 组：可见性恢复补扫（休眠错过心跳的场景）；10 分钟最小间隔合并重复触发 */
     private visibilityHandler?: () => void;
     private lastScanAt = 0;
@@ -102,6 +119,78 @@ export default class LvHomePlugin extends Plugin {
         const self = this;
         this.settings = await loadSettings(this);
         this.runtime = await loadRuntime(this);
+
+        // All API wrappers dispatch the same event for expired sessions. Keep
+        // the current location in sessionStorage so the host login page can
+        // return here, and fail closed while credentials are being renewed.
+        this.authExpiredHandler = (event: Event) => {
+            const detail = (event as CustomEvent<{ returnTo?: unknown }>).detail;
+            const currentLocation = typeof location !== "undefined"
+                ? `${location.pathname}${location.search}${location.hash}`
+                : "/";
+            const candidate = typeof detail?.returnTo === "string" && detail.returnTo ? detail.returnTo : currentLocation;
+            const returnTo = sameOriginReturnPath(candidate, location.origin, currentLocation);
+            try { sessionStorage.setItem("siyuan-home:auth-return", returnTo); } catch { /* storage may be unavailable */ }
+            if (this.runtime?.cache) {
+                const errors = (this.runtime.cache.errors ?? []).filter((error) => error.moduleId !== "auth");
+                this.runtime.cache = { ...this.runtime.cache, errors: [...errors, { moduleId: "auth", message: this.i18nText("auth.expired") }] };
+            }
+            if (this.scan) {
+                const errors = (this.scan.errors ?? []).filter((error) => error.moduleId !== "auth");
+                this.scan = { ...this.scan, stale: true, errors: [...errors, { moduleId: "auth", message: this.i18nText("auth.expired") }] };
+            }
+            this.hubListeners.forEach((listener) => listener());
+            showMessage(this.i18nText("auth.expired"), 7000, "error");
+            const authPath = "/check-auth";
+            if (!this.authRedirectScheduled && location.pathname !== authPath && !location.pathname.startsWith(`${authPath}/`)) {
+                const target = `${authPath}?returnTo=${encodeURIComponent(returnTo)}`;
+                this.authRedirectScheduled = true;
+                this.scheduleTimeout(() => {
+                    // Avoid racing a successful login or repeatedly redirecting
+                    // if several requests fail in the same render cycle.
+                    if (location.pathname === authPath || location.pathname.startsWith(`${authPath}/`)) return;
+                    location.assign(target);
+                }, 0);
+            }
+        };
+        window.addEventListener("siyuan-home:auth-expired", this.authExpiredHandler);
+        this.permissionDeniedHandler = (event: Event) => {
+            const detail = (event as CustomEvent<{ message?: unknown }>).detail;
+            const message = compactUserMessage(detail?.message, this.i18nText("permission.denied"));
+            if (this.runtime?.cache) {
+                const errors = (this.runtime.cache.errors ?? []).filter((error) => error.moduleId !== "permission");
+                this.runtime.cache = {
+                    ...this.runtime.cache,
+                    errors: [...errors, { moduleId: "permission", message }],
+                };
+            }
+            if (this.scan) {
+                const errors = (this.scan.errors ?? []).filter((error) => error.moduleId !== "permission");
+                this.scan = { ...this.scan, stale: true, errors: [...errors, { moduleId: "permission", message }] };
+            }
+            this.hubListeners.forEach((listener) => listener());
+            showMessage(message, 7000, "error");
+        };
+        window.addEventListener("siyuan-home:permission-denied", this.permissionDeniedHandler);
+        try {
+            const restored = sessionStorage.getItem("siyuan-home:auth-return");
+            if (restored) {
+                const current = `${location.pathname}${location.search}${location.hash}`;
+                const targetPath = sameOriginReturnPath(restored, location.origin, current);
+                if (targetPath && targetPath !== current) {
+                    // Some SiYuan versions honor returnTo themselves and some
+                    // return to the workspace root. Restore the same-origin
+                    // location saved before redirect in either case.
+                    location.replace(new URL(targetPath, location.origin).href);
+                } else {
+                    sessionStorage.removeItem("siyuan-home:auth-return");
+                    this.scheduleTimeout(() => {
+                        this.showTab();
+                        showMessage(this.i18nText("auth.restored"), 3500, "info");
+                    }, 100);
+                }
+            }
+        } catch { /* storage may be unavailable */ }
 
         // DEVICE-07（227 波）：移动前端标识 + 顶栏入口注入（petal addTopBar 在移动端不渲染；
         // 参照 checkin ensureMobileTopBarButtonFor 的注入+重试方案，点击弹全屏 Dialog 面板）
@@ -228,6 +317,7 @@ export default class LvHomePlugin extends Plugin {
             get scan() { return self.scan; },
             showTab: () => self.showTab(),
             openRemindersTab: () => self.openRemindersScreen(),
+            openModuleTab: (m) => self.openModuleTab(m),
             addMemo: (title, due) => self.addMemo(title, due),
             onBridgeDisposed: () => { self.disposeLvHomeBridge = undefined; },
         });
@@ -247,6 +337,14 @@ export default class LvHomePlugin extends Plugin {
         };
         window.addEventListener("lv-exam:stats", this.examStatsHandler);
 
+        // Epoch 6：消费 lv-cards:reviewed 闪卡复习事件（更新家庭/成员学习活跃度）
+        this.cardsReviewedHandler = (e: Event) => {
+            const detail = (e as CustomEvent).detail as Record<string, unknown> | undefined;
+            if (!detail || typeof detail !== "object") return;
+            this.hubListeners.forEach((fn) => fn());
+        };
+        window.addEventListener("lv-cards:reviewed", this.cardsReviewedHandler);
+
         // EC09/EC10：打卡集成事件（checkin:*）→ 节流刷新健康模块卡打卡摘要
         this.checkinEventHandler = () => {
             // checkin 事件频繁（每次打卡触发）；60 秒节流后拉取强度摘要
@@ -264,7 +362,11 @@ export default class LvHomePlugin extends Plugin {
     /** EC09/EC10：拉取打卡强度摘要（只读；写入 runtime 供模块卡展示）[待实测] */
     private async pullCheckinSummary(): Promise<void> {
         try {
-            const checkin = (window as {siyuanCheckin?: {whenReady: () => Promise<boolean>; getStrengthSummary: (o?: {windowDays?: number}) => {items: {itemId: string; name: string; score: number}[]; windowDays: number}}}).siyuanCheckin;
+            const w = (typeof window !== "undefined" ? window : {}) as Record<string, unknown>;
+            const checkin = (w.siyuanCheckin || w.xiaolvCheckin || w.lvCheckin) as {
+                whenReady: () => Promise<boolean>;
+                getStrengthSummary: (o?: {windowDays?: number}) => {items: {itemId: string; name: string; score: number}[]; windowDays: number};
+            } | undefined;
             if (!checkin?.whenReady || !checkin.getStrengthSummary) return;
             const ready = await checkin.whenReady();
             if (!ready) return;
@@ -381,7 +483,12 @@ export default class LvHomePlugin extends Plugin {
 
     /** members 先建（relation 目标），其余按需；幂等。启用模块才建库（P4）。
      * 12 轮修复：遍历 schemaCatalog（members 声明序居首），删除第二份手工清单防漂移 */
-    async ensureCoreLedgers(): Promise<void> {
+    async ensureCoreLedgers(): Promise<ProvisioningReport> {
+        await this.provisionLedgersSingleFlight();
+        return getProvisioningReport(this.settings);
+    }
+
+    private async provisionLedgers(): Promise<void> {
         const resolveName = (key: string) => String(this.i18n[`field.${key}`] ?? key);
         const enabled = new Set(this.settings.enabledModules);
         for (const [id, schema] of Object.entries(this.schemaCatalog)) {
@@ -412,6 +519,8 @@ export default class LvHomePlugin extends Plugin {
         const deps = {
             settings: this.settings,
             getDbRef: (id: string) => this.settings.dbRefs[id],
+            loadRowLogs: () => loadRowLogs(this),
+            t: (key: string) => this.i18nText(key),
             onStats: (id: string, stats: { rowCount: number; memberCounts: Record<string, number> }) => moduleStats.set(id, stats),
         };
         // 12 轮修复：provider 由 schemaCatalog 程序化派生（手工清单曾漏掉 parenting/schooling，
@@ -516,7 +625,14 @@ export default class LvHomePlugin extends Plugin {
         try {
             await saveRuntime(this, this.runtime);
         } catch (e) {
-            console.warn("[siyuan-home] runtime save after action failed:", e instanceof Error ? e.message : e);
+            // The action itself was already committed by withRuntime. Keep
+            // the derived in-memory view current and explain that only its
+            // cache snapshot failed; throwing here would falsely imply the
+            // action failed and invite a duplicate completion.
+            const detail = e instanceof Error ? e.message : String(e);
+            const message = this.i18nText("hub.cacheSaveFailed").replace("${msg}", detail);
+            this.scan = { ...this.scan, stale: true, errors: [...(this.scan.errors ?? []), { moduleId: "runtime", message: detail }] };
+            showMessage(message, 6500, "error");
         }
         this.updateStatusbar(reminders.filter((r) => r.daysLeft <= 0).length);
         this.hubListeners.forEach((fn) => fn());
@@ -540,6 +656,17 @@ export default class LvHomePlugin extends Plugin {
             showMessage(this.i18nText("capture.moduleOff").replace("${module}", this.i18nText(`module.${moduleId}`)), 5000, "info");
             return;
         }
+        const normalizedText = text.trim();
+        if (!normalizedText) {
+            showMessage(this.i18nText("capture.empty"), 3000, "info");
+            return;
+        }
+        const dedupeKey = `${moduleId}\u0000${normalizedText}`;
+        const now = Date.now();
+        for (const [key, at] of this.captureDedupe) if (now - at > 2_000) this.captureDedupe.delete(key);
+        if (this.captureDedupe.has(dedupeKey)) return;
+        this.captureDedupe.set(dedupeKey, now);
+        const operationKey = `capture:${moduleId}:${now.toString(36)}:${Math.random().toString(36).slice(2)}`;
         try {
             await this.ensureCoreLedgers();
             const ref = this.settings.dbRefs[moduleId];
@@ -550,14 +677,15 @@ export default class LvHomePlugin extends Plugin {
             // 目标列缺失时必须在建行前失败，避免留下无法写入正文的空行并误报成功。
             if (!targetCol) throw new Error(`target column unavailable: ${moduleId}`);
             // 码点安全截断（Array.from 按 Unicode 码点切，emoji/生僻字不被劈成乱码）
-            const name = Array.from(text).length > 40 ? `${Array.from(text).slice(0, 40).join("")}…` : text;
-            const itemID = await addDetachedRow(ref.avId, name);
+            const name = Array.from(normalizedText).length > 40 ? `${Array.from(normalizedText).slice(0, 40).join("")}…` : normalizedText;
+            const itemID = await addDetachedRow(ref.avId, name, { idempotencyKey: `${operationKey}:row` });
             await setCell(ref.avId, targetCol, itemID, moduleId === "bookmarks"
-                ? { type: "url", url: { content: text } }
-                : { type: "text", text: { content: text } });
+                ? { type: "url", url: { content: normalizedText } }
+                : { type: "text", text: { content: normalizedText } }, { idempotencyKey: `${operationKey}:cell` });
             showMessage(this.i18nText("capture.saved").replace("${module}", this.i18nText(`module.${moduleId}`)), 3000, "info");
             // 常用语/书签/地址无提醒规则——写入不触发扫描（PF06：无相关变更不重扫）
         } catch (e) {
+            this.captureDedupe.delete(dedupeKey);
             const { coalescedNotify } = await import("@/libs/notify-queue");
             coalescedNotify("capture-failed", () =>
                 showMessage(this.i18nText("capture.failed").replace("${msg}", e instanceof Error ? e.message : String(e)), 5000, "error"));
@@ -592,6 +720,13 @@ export default class LvHomePlugin extends Plugin {
         this.pendingScreen = "reminders";
         this.showTab();
         this.panelScreenSwitch?.("reminders");
+    }
+
+    /** 导航并打开指定台账模块（如 "assets" | "members" | "medicine" | "vehicle" 等） */
+    openModuleTab(moduleId: string) {
+        this.pendingScreen = moduleId;
+        this.showTab();
+        this.panelScreenSwitch?.(moduleId);
     }
 
     /** 移动前端顶栏入口（DEVICE-07）：petal addTopBar 在移动端不渲染，直接注入 #mobileTopBar；
@@ -652,7 +787,10 @@ export default class LvHomePlugin extends Plugin {
         }
         // 全屏化样式钩子（100vw/100dvh、无圆角、内容滚动）
         dialog.element.classList.add("b3-dialog--lvmobile");
-        this.mobileDialogUnmount = mount(TabPanel, { target: host, props: { plugin: self } }) as () => void;
+        this.mobileDialogUnmount = mount(TabPanel, {
+            target: host,
+            props: { plugin: self, onMobileClose: () => dialog.destroy() },
+        }) as () => void;
         this.mobileDialog = dialog;
     }
 
@@ -720,12 +858,10 @@ export default class LvHomePlugin extends Plugin {
         this.settings.onboarded = true;
         // C7c：建库批处理进度提示（31 模块串行需数秒；起止均有反馈，失败落 dbRefs.provisionError 诊断可见）
         showMessage(this.i18nText("wiz.provisioning").replace("${n}", String(moduleIds.length)), 4000, "info");
-        await this.ensureCoreLedgers();
+        const provisioning = await this.ensureCoreLedgers();
         await saveSettings(this, this.settings);
         // C7c 收尾：建库失败浮出（此前只进诊断区，向导完成后用户无感）
-        const failed = Object.entries(this.settings.dbRefs)
-            .filter(([id, ref]) => this.settings.enabledModules.includes(id) && (ref as any)?.provisionError)
-            .map(([id]) => this.i18nText(`module.${id}`));
+        const failed = provisioning.issues.map(({ moduleId }) => this.i18nText(`module.${moduleId}`));
         if (failed.length > 0) {
             showMessage(this.i18nText("wiz.provisionIssues")
                 .replace("${n}", String(failed.length))
@@ -733,7 +869,9 @@ export default class LvHomePlugin extends Plugin {
         } else {
             showMessage(this.i18nText("wiz.provisioned").replace("${n}", String(moduleIds.length)), 3000, "info");
         }
-        await this.refreshHub();
+        // Onboarding provisions ledgers and may add member rows. Force the
+        // first post-wizard scan so the overview is built from fresh data.
+        await this.refreshHub(undefined, true);
     }
 
     /** Tab 面板挂载入口（tab callback 由框架调 addTab 注册的 destroy 之外回调） */
@@ -750,7 +888,8 @@ export default class LvHomePlugin extends Plugin {
             title: this.i18nText("settingsTitle"),
             component: HomeSettingsPanel,
             props: { plugin: this, settings: this.settings },
-            width: "860px",
+            width: "min(920px, calc(100vw - 32px))",
+            height: "min(760px, calc(100vh - 96px))",
         });
     }
 
@@ -759,6 +898,11 @@ export default class LvHomePlugin extends Plugin {
         this.heartbeat = undefined;
         for (const timer of this.timeoutIds) window.clearTimeout(timer);
         this.timeoutIds.clear();
+        if (this.authExpiredHandler) window.removeEventListener("siyuan-home:auth-expired", this.authExpiredHandler);
+        this.authExpiredHandler = undefined;
+        this.authRedirectScheduled = false;
+        if (this.permissionDeniedHandler) window.removeEventListener("siyuan-home:permission-denied", this.permissionDeniedHandler);
+        this.permissionDeniedHandler = undefined;
         // DEVICE-07：移动顶栏按钮/重试计时器/全屏面板清理
         if (this.mobileTopBarRetry !== undefined) {
             window.clearTimeout(this.mobileTopBarRetry);
@@ -782,6 +926,9 @@ export default class LvHomePlugin extends Plugin {
         // EC21：lv-exam:stats 监听移除
         if (this.examStatsHandler) window.removeEventListener("lv-exam:stats", this.examStatsHandler);
         this.examStatsHandler = undefined;
+        // Epoch 6：lv-cards:reviewed 闪卡复习事件移除
+        if (this.cardsReviewedHandler) window.removeEventListener("lv-cards:reviewed", this.cardsReviewedHandler);
+        this.cardsReviewedHandler = undefined;
         // EC09/EC10：打卡集成事件移除
         if (this.checkinEventHandler) {
             for (const evt of ["checkin:event-recorded", "checkin:event-deleted", "checkin:item-updated"]) {

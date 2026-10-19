@@ -5,7 +5,7 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { setTransport, KernelError } from "@/core/siyuan";
 import {
-    provisionModule, ensureNotebook, isDocMissingError, DEFAULT_NOTEBOOK_NAME,
+    provisionModule, ensureNotebook, isDocMissingError, DEFAULT_NOTEBOOK_NAME, getProvisioningReport,
     type ProvisionOptions,
 } from "@/core/provisioner";
 import type { HomeSettings, DbRef } from "@/types";
@@ -19,11 +19,17 @@ const NB2_ID = "20260101000001-def2345";
 interface FakeState {
     notebooks: { id: string; name: string; closed: boolean }[];
     docs: { id: string; box: string; hpath: string }[];
-    avBlocks: { id: string; root_id: string }[];
+    avBlocks: { id: string; root_id: string; seed?: string }[];
     notebookCreated: string[];
+    notebookResponseLostOnce: boolean;
+    notebookVisibilityDelay: number;
     notebookOpened: string[];
     docCreated: string[];
+    docResponseLostOnce: boolean;
     columnsAdded: { avID: string; keyName: string }[];
+    avColumns: { id: string; name: string }[];
+    columnResponseLostOnce: boolean;
+    avInsertResponseLostOnce: boolean;
     hpathByID: (id: string) => string | Error;
 }
 
@@ -33,19 +39,33 @@ function fakeKernel() {
         docs: [],
         avBlocks: [],
         notebookCreated: [],
+        notebookResponseLostOnce: false,
+        notebookVisibilityDelay: 0,
         notebookOpened: [],
         docCreated: [],
+        docResponseLostOnce: false,
         columnsAdded: [],
+        avColumns: [],
+        columnResponseLostOnce: false,
+        avInsertResponseLostOnce: false,
         hpathByID: () => "/台账 · 测试",
     };
     setTransport(async (endpoint, payload: any) => {
         switch (endpoint) {
             case "/api/notebook/lsNotebooks":
+                if (s.notebookVisibilityDelay > 0) {
+                    s.notebookVisibilityDelay--;
+                    return { code: 0, msg: "", data: { notebooks: [] } };
+                }
                 return { code: 0, msg: "", data: { notebooks: s.notebooks } };
             case "/api/notebook/createNotebook": {
                 s.notebookCreated.push(payload.name);
                 const id = `2026010100000${s.notebookCreated.length}-new0001`;
                 s.notebooks.push({ id, name: payload.name, closed: false });
+                if (s.notebookResponseLostOnce) {
+                    s.notebookResponseLostOnce = false;
+                    throw new TypeError("response lost after notebook commit");
+                }
                 return { code: 0, msg: "", data: id };
             }
             case "/api/notebook/openNotebook": {
@@ -63,6 +83,10 @@ function fakeKernel() {
                 s.docCreated.push(payload.path);
                 const id = `doc-${s.docCreated.length}`;
                 s.docs.push({ id, box: payload.notebook, hpath: payload.path });
+                if (s.docResponseLostOnce) {
+                    s.docResponseLostOnce = false;
+                    throw new TypeError("response lost after document commit");
+                }
                 return { code: 0, msg: "", data: id };
             }
             case "/api/query/sql": {
@@ -70,6 +94,11 @@ function fakeKernel() {
                 const hpath = stmt.match(/hpath='([^']*)'/)?.[1];
                 const box = stmt.match(/box='([^']*)'/)?.[1];
                 const rootId = stmt.match(/root_id='([^']*)'/)?.[1];
+                const avSeed = stmt.match(/markdown LIKE '%([^%]+)%'/)?.[1];
+                if (avSeed && stmt.includes("type='av'")) {
+                    const matches = s.avBlocks.filter((b) => b.root_id === rootId && b.seed === avSeed);
+                    return { code: 0, msg: "", data: matches.map((b) => ({ id: b.id })) };
+                }
                 if (stmt.includes("type='av' AND root_id=")) {
                     return { code: 0, msg: "", data: s.avBlocks.filter((b) => b.root_id === rootId).map((b) => ({ id: b.id })) };
                 }
@@ -84,14 +113,25 @@ function fakeKernel() {
             case "/api/block/insertBlock": {
                 // createAttributeView 的 div 插入：登记一个 av 块（parentID=文档）
                 const avId = `av-${s.avBlocks.length + 1}`;
-                s.avBlocks.push({ id: avId, root_id: payload.parentID });
+                const seed = String(payload.data).match(/data-av-id="([^"]+)"/)?.[1] ?? "";
+                s.avBlocks.push({ id: avId, root_id: payload.parentID, seed });
+                if (s.avInsertResponseLostOnce) {
+                    s.avInsertResponseLostOnce = false;
+                    throw new TypeError("response lost after attribute view commit");
+                }
                 return { code: 0, msg: "", data: [] };
             }
             case "/api/av/renderAttributeView":
-                return { code: 0, msg: "", data: { view: { columns: [], rows: [], rowCount: 0 } } };
-            case "/api/av/addAttributeViewKey":
+                return { code: 0, msg: "", data: { view: { columns: s.avColumns, rows: [], rowCount: 0 } } };
+            case "/api/av/addAttributeViewKey": {
                 s.columnsAdded.push({ avID: payload.avID, keyName: payload.keyName });
+                s.avColumns.push({ id: payload.keyID, name: payload.keyName });
+                if (s.columnResponseLostOnce) {
+                    s.columnResponseLostOnce = false;
+                    throw new TypeError("response lost after column commit");
+                }
                 return { code: 0, msg: "", data: null };
+            }
             case "/api/av/getAttributeViewPrimaryKeyValues":
                 return { code: 0, msg: "", data: { rows: { values: [] } } };
             default:
@@ -142,6 +182,22 @@ describe("ensureNotebook（D07）", () => {
     it("无登记且默认名不存在 → 新建", async () => {
         const s = fakeKernel();
         await ensureNotebook(undefined);
+        expect(s.notebookCreated).toEqual([DEFAULT_NOTEBOOK_NAME]);
+    });
+
+    it("笔记本已创建但响应丢失 → 按名称回读唯一 ID，不重复创建", async () => {
+        const s = fakeKernel();
+        s.notebookResponseLostOnce = true;
+        await expect(ensureNotebook(undefined)).resolves.toMatch(/^2026010100000\d-new0001$/);
+        expect(s.notebookCreated).toEqual([DEFAULT_NOTEBOOK_NAME]);
+    });
+
+    it("创建已提交但列表索引延迟 → 短轮询后找回唯一 ID，不重复创建", async () => {
+        const s = fakeKernel();
+        s.notebookResponseLostOnce = true;
+        // The initial ensureNotebook read is current; only recovery reads lag.
+        s.notebookVisibilityDelay = 2;
+        await expect(ensureNotebook(undefined)).resolves.toMatch(/^2026010100000\d-new0001$/);
         expect(s.notebookCreated).toEqual([DEFAULT_NOTEBOOK_NAME]);
     });
 });
@@ -203,6 +259,46 @@ describe("provisionModule（D07/D08）", () => {
         expect(res.dbRef.provisionError).toBeUndefined(); // 旧错误清除
     });
 
+    it("④ 设置映射缺失但真实列已存在 → 回收现有 keyID，不重复加列", async () => {
+        const s = fakeKernel();
+        s.notebooks = [NB];
+        s.avColumns = [{ id: "k-note-existing", name: "名-note" }];
+        const st = settings({ certs: { docId: "doc-1", avId: "av-1", columns: { name: "k1" }, notebook: NB_ID } });
+        const res = await provisionModule(st, "certs", schema, "证件", opts);
+        expect(res.dbRef.columns.note).toBe("k-note-existing");
+        expect(s.columnsAdded).toHaveLength(0);
+    });
+
+    it("④ 加列提交后响应丢失 → 回读真实列并登记，不再重加", async () => {
+        const s = fakeKernel();
+        s.notebooks = [NB];
+        s.columnResponseLostOnce = true;
+        const st = settings({ certs: { docId: "doc-1", avId: "av-1", columns: { name: "k1" }, notebook: NB_ID } });
+        const res = await provisionModule(st, "certs", schema, "证件", opts);
+        expect(res.dbRef.columns.note).toBeTruthy();
+        expect(s.columnsAdded.filter((column) => column.keyName === "名-note")).toHaveLength(1);
+        expect(res.dbRef.provisionError).toBeUndefined();
+    });
+
+    it("文档已创建但响应丢失 → 按笔记本和路径回读，不再创建", async () => {
+        const s = fakeKernel();
+        s.notebooks = [NB];
+        s.docResponseLostOnce = true;
+        const res = await provisionModule(settings({}), "certs", schema, "证件", opts);
+        expect(res.created).toBe(true);
+        expect(s.docCreated).toHaveLength(1);
+        expect(res.dbRef.docId).toBe("doc-1");
+    });
+
+    it("属性视图块已插入但响应丢失 → 按 seed 回读并复用，不再插块", async () => {
+        const s = fakeKernel();
+        s.notebooks = [NB];
+        s.avInsertResponseLostOnce = true;
+        const res = await provisionModule(settings({}), "certs", schema, "证件", opts);
+        expect(res.dbRef.avId).toBe("av-1");
+        expect(s.avBlocks).toHaveLength(1);
+    });
+
     it("② 文档在、登记丢（补登记）→ 找回文档内 av 块复用原库 + 补列", async () => {
         const s = fakeKernel();
         s.notebooks = [NB];
@@ -241,5 +337,19 @@ describe("provisionModule（D07/D08）", () => {
         const res2 = await provisionModule(st, "medicine", schema, "药箱", opts);
         expect(res2.created).toBe(false);
         expect(res2.dbRef.provisionError).toBeTruthy(); // 记录而非抛出
+    });
+});
+
+describe("getProvisioningReport", () => {
+    it("reports enabled modules with missing AV or provision errors", () => {
+        const st = { ...defaultSettings(), enabledModules: ["members", "certs", "medicine"], dbRefs: {
+            members: { docId: "d-members", avId: "av-members" },
+            certs: { docId: "d-certs", avId: "av-certs", provisionError: "column failed" },
+            medicine: { docId: "d-medicine" },
+        } } as HomeSettings;
+        expect(getProvisioningReport(st).issues).toEqual([
+            { moduleId: "certs", message: "column failed" },
+            { moduleId: "medicine", message: "Attribute view unavailable" },
+        ]);
     });
 });

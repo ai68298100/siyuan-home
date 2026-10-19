@@ -16,7 +16,7 @@ Ledger page → Certificates → fill in the quick form:
 | Storage location | where it is physically kept |
 | Notes | free text |
 
-After a category is selected, the quick form adds fields for that document. ID cards expose an address summary, issuing authority and front/back scans; passports expose nationality, birth place and data page; driving licences expose class, first issue date and review date; academic, qualification and title certificates expose school, major, level and issuer. Store only the last four digits of a document number when possible.
+After a category is selected, the quick form adds fields for that document. ID cards expose an address summary, issuing authority and front/back scans; passports expose nationality, birth place and data page; driving licences expose class, first issue date and review date; academic, qualification and title certificates expose school, major, level and issuer. The number field accepts a full number when needed. Lists mask it by default and details hide it until explicitly revealed; masking is display-only, not encryption. A full value remains in the SiYuan ledger and may be included in CSV exports, so enter only what you need and protect the workspace and exported files.
 
 ## Quick upload and download
 

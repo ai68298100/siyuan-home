@@ -1,24 +1,55 @@
 <script lang="ts">
     import { Dialog, Menu, showMessage, confirm } from "siyuan";
+    import { onDestroy } from "svelte";
     import { fade } from "svelte/transition";
     import type { HomePluginLike } from "@/types/plugin";
-    import { saveRuntime } from "@/core/hub/runtime";
+    import {
+        saveRuntime, saveNamedView, removeNamedView, applyNamedView, type ReminderNamedView,
+        setReminderPlanDate, clearReminderPlanDate, getReminderPlanStatus, type ReminderPlanStatus,
+    } from "@/core/hub/runtime";
     import { buildDisplay as display } from "@/core/hub/display";
     import { relativeDue, weekdayKey, localDateKey } from "@/core/hub/rule";
     import { addDetachedRow, setCell } from "@/core/siyuan";
     import { provisionModule } from "@/core/provisioner";
     import { toggleMemoPin } from "@/core/hub/actions";
     import Calendar from "@/panels/screens/calendar.svelte";
-    import { moduleIcon } from "@/core/modules";
+    import UiIcon from "@/ui/icon.svelte";
+    import { moduleUiIcon } from "@/ui/icons";
     import { memberHue } from "@/core/format";
-    import type { Reminder } from "@/types";
+    import type { Reminder, ReminderKind } from "@/types";
     let { plugin, t, version }: { plugin: HomePluginLike; t: (k: string) => string; version?: number } = $props();
+
+    // 就地展开摘要（§17）：不打开抽屉直接查看派生规则、所属模块与责任成员
+    let expandedReminders = $state(new Set<string>());
+    function toggleReminderExpand(id: string) {
+        const next = new Set(expandedReminders);
+        if (next.has(id)) next.delete(id);
+        else next.add(id);
+        expandedReminders = next;
+    }
+    function ruleText(ruleKey: string): string {
+        const key = `rule.${ruleKey}`;
+        const val = t(key);
+        return val === key ? ruleKey : val;
+    }
+    function kindText(kind?: ReminderKind): string {
+        if (!kind) return "";
+        const map: Record<string, string> = {
+            recurring: t("hub.kindRecurring"),
+            anniversary: t("hub.kindAnniversary"),
+            oneoff: t("hub.kindOneoff"),
+            after: t("hub.kindAfter"),
+        };
+        return map[kind] ?? kind;
+    }
 
     // version（H02）：hub 变更时递增，驱动派生重算（plugin.* 为普通对象引用）
     const all = $derived.by(() => {
         void version;
         return plugin.scan?.reminders ?? [];
     });
+    const overdueCount = $derived(all.filter((r: Reminder) => r.level === "overdue").length);
+    const permissionDenied = $derived((plugin.scan?.errors ?? []).some((error) => error.moduleId === "permission"));
     // C3d：筛选持久化（runtime.hubFilter）——初始快照为设计意图
     // svelte-ignore state_referenced_locally
     let filter = $state(plugin.runtime.hubFilter ?? "all");
@@ -30,13 +61,179 @@
     // C3a 时间窗：all=不限 / 0=今天 / 7 / 30（含逾期）
     // svelte-ignore state_referenced_locally
     let dueWithin = $state<string>(plugin.runtime.hubDueWithin ?? "all");
+
+    // 双日期模式（§17/284波 Things 3 印证）：计划处理日 (planDate) 与客观截止日 (deadline/dueDate) 分离
+    const planDates = $derived.by(() => {
+        void version;
+        return plugin.runtime.planDates ?? {};
+    });
+    const planStatusOf = (r: Reminder): ReminderPlanStatus =>
+        getReminderPlanStatus(localDateKey(new Date()), r.dueDate, planDates[r.id]);
+
+    function schedulePlanDialog(r: Reminder) {
+        const currentPlan = planDates[r.id] || "";
+        const todayKey = localDateKey(new Date());
+        const tomorrow = new Date();
+        tomorrow.setDate(tomorrow.getDate() + 1);
+        const tomorrowKey = localDateKey(tomorrow);
+
+        // 计算下周一
+        const nextMon = new Date();
+        const dayOfWeek = nextMon.getDay();
+        const daysUntilMon = ((1 + 7 - dayOfWeek) % 7) || 7;
+        nextMon.setDate(nextMon.getDate() + daysUntilMon);
+        const nextMonKey = localDateKey(nextMon);
+
+        const dlg = new Dialog({
+            title: t("hub.planScheduleTitle"),
+            content: `<div class="b3-dialog__content" style="padding:16px;display:flex;flex-direction:column;gap:12px">
+                <p class="lv-caption" style="margin:0">${t("hub.planScheduleIntro")}</p>
+                <div style="font-size:12px;color:var(--b3-theme-on-surface)">
+                    <b>${r.title}</b> · ${t("hub.summaryDue")}: ${r.dueDate}
+                </div>
+                <div style="display:flex;flex-wrap:wrap;gap:6px">
+                    <button class="b3-button b3-button--outline" id="lv-plan-preset-today" style="font-size:12px;padding:3px 8px">${t("hub.planPresetToday")}</button>
+                    <button class="b3-button b3-button--outline" id="lv-plan-preset-tomorrow" style="font-size:12px;padding:3px 8px">${t("hub.planPresetTomorrow")}</button>
+                    <button class="b3-button b3-button--outline" id="lv-plan-preset-nextmon" style="font-size:12px;padding:3px 8px">${t("hub.planPresetNextWeek")}</button>
+                </div>
+                <label style="display:flex;flex-direction:column;gap:6px">
+                    <span style="font-size:12px;color:var(--b3-theme-on-surface)">${t("hub.planDateLabel")}</span>
+                    <input class="b3-text-field" id="lv-plan-date-input" type="date" value="${currentPlan || todayKey}" style="width:100%" />
+                </label>
+            </div>
+            <div class="b3-dialog__action">
+                ${currentPlan ? `<button class="b3-button b3-button--text ft__error" id="lv-plan-clear" style="color:var(--b3-theme-error)">${t("hub.clearPlanDate")}</button>` : ""}
+                <span class="fn__flex-1"></span>
+                <button class="b3-button b3-button--cancel" id="lv-plan-cancel">${t("cancel")}</button>
+                <button class="b3-button" id="lv-plan-save">${t("save")}</button>
+            </div>`,
+            width: "420px",
+        });
+
+        const dateInput = dlg.element.querySelector("#lv-plan-date-input") as HTMLInputElement;
+        const setDate = (val: string) => { if (dateInput) dateInput.value = val; };
+
+        (dlg.element.querySelector("#lv-plan-preset-today") as HTMLButtonElement).onclick = () => setDate(todayKey);
+        (dlg.element.querySelector("#lv-plan-preset-tomorrow") as HTMLButtonElement).onclick = () => setDate(tomorrowKey);
+        (dlg.element.querySelector("#lv-plan-preset-nextmon") as HTMLButtonElement).onclick = () => setDate(nextMonKey);
+
+        const clearBtn = dlg.element.querySelector("#lv-plan-clear") as HTMLButtonElement | null;
+        if (clearBtn) {
+            clearBtn.onclick = async () => {
+                dlg.destroy();
+                clearReminderPlanDate(plugin.runtime, r.id);
+                try {
+                    await saveRuntime(plugin, plugin.runtime);
+                    showMessage(t("hub.planDateCleared"), 2500, "info");
+                    await plugin.refreshHub?.(undefined, true);
+                } catch (e) {
+                    showMessage(t("hub.filterSaveFailed").replace("${msg}", e instanceof Error ? e.message : String(e)), 5000, "error");
+                }
+            };
+        }
+
+        (dlg.element.querySelector("#lv-plan-cancel") as HTMLButtonElement).onclick = () => dlg.destroy();
+        (dlg.element.querySelector("#lv-plan-save") as HTMLButtonElement).onclick = async function (this: HTMLButtonElement) {
+            const chosenDate = dateInput?.value.trim();
+            if (!chosenDate) {
+                showMessage(t("hub.planScheduleIntro"), 3000, "error");
+                return;
+            }
+            this.disabled = true;
+            dlg.destroy();
+            setReminderPlanDate(plugin.runtime, r.id, chosenDate);
+            try {
+                await saveRuntime(plugin, plugin.runtime);
+                showMessage(t("hub.planDateSaved"), 2500, "info");
+                await plugin.refreshHub?.(undefined, true);
+            } catch (e) {
+                showMessage(t("hub.filterSaveFailed").replace("${msg}", e instanceof Error ? e.message : String(e)), 5000, "error");
+            }
+        };
+    }
+
+    // 命名视图（§17）：筛选组合一键保存与切换
+    const namedViews = $derived.by(() => {
+        void version;
+        return plugin.runtime.namedViews ?? [];
+    });
+    // svelte-ignore state_referenced_locally
+    let activeNamedViewId = $state<string | undefined>(plugin.runtime.activeNamedViewId);
+
+    function applyView(v: ReminderNamedView) {
+        applyNamedView(plugin.runtime, v);
+        filter = v.filter ?? "all";
+        filterMember = v.memberId;
+        filterModule = v.moduleId;
+        dueWithin = v.dueWithin ?? "all";
+        activeNamedViewId = v.id;
+        pruneSelection();
+        void persistFilter();
+    }
+
+    function promptSaveNamedView() {
+        const dlg = new Dialog({
+            title: t("hub.saveViewTitle"),
+            content: `<div class="b3-dialog__content" style="padding:16px;display:flex;flex-direction:column;gap:12px">
+                <p class="lv-caption" style="margin:0">${t("hub.saveViewIntro")}</p>
+                <input class="b3-text-field" id="lv-named-view-input" placeholder="${t("hub.saveViewPlaceholder")}" style="width:100%" />
+            </div>
+            <div class="b3-dialog__action">
+                <button class="b3-button b3-button--cancel" id="lv-named-view-cancel">${t("cancel")}</button>
+                <button class="b3-button" id="lv-named-view-save">${t("save")}</button>
+            </div>`,
+            width: "400px",
+        });
+        const input = dlg.element.querySelector("#lv-named-view-input") as HTMLInputElement;
+        requestAnimationFrame(() => input?.focus());
+        (dlg.element.querySelector("#lv-named-view-cancel") as HTMLButtonElement).onclick = () => dlg.destroy();
+        (dlg.element.querySelector("#lv-named-view-save") as HTMLButtonElement).onclick = async function (this: HTMLButtonElement) {
+            const nameVal = input?.value.trim();
+            if (!nameVal) {
+                showMessage(t("hub.saveViewEmptyName"), 3000, "error");
+                return;
+            }
+            this.disabled = true;
+            dlg.destroy();
+            const saved = saveNamedView(plugin.runtime, {
+                name: nameVal,
+                filter,
+                memberId: filterMember,
+                moduleId: filterModule,
+                dueWithin,
+            });
+            activeNamedViewId = saved.id;
+            try {
+                await saveRuntime(plugin, plugin.runtime);
+                showMessage(t("hub.namedViewSaved"), 2500, "info");
+            } catch (e) {
+                showMessage(t("hub.filterSaveFailed").replace("${msg}", e instanceof Error ? e.message : String(e)), 5000, "error");
+            }
+        };
+    }
+
+    function confirmDeleteNamedView(v: ReminderNamedView) {
+        confirm(t("hub.deleteViewTitle"), t("hub.deleteViewBody").replace("${name}", v.name), async () => {
+            removeNamedView(plugin.runtime, v.id);
+            if (activeNamedViewId === v.id) activeNamedViewId = undefined;
+            try {
+                await saveRuntime(plugin, plugin.runtime);
+                showMessage(t("hub.namedViewDeleted"), 2500, "info");
+            } catch (e) {
+                showMessage(t("hub.filterSaveFailed").replace("${msg}", e instanceof Error ? e.message : String(e)), 5000, "error");
+            }
+        });
+    }
     const memberOptions = $derived.by(() => {
         void version;
         return plugin.settings.members ?? [];
     });
     const moduleOptions = $derived.by(() => {
         void version;
-        return [...new Set((plugin.scan?.reminders ?? []).map((r: Reminder) => r.moduleId))];
+        return [...new Set([
+            ...(plugin.scan?.reminders ?? []).map((r: Reminder) => r.moduleId),
+            ...(plugin.listHandled?.() ?? []).map((entry) => entry.moduleId).filter(Boolean),
+        ])];
     });
     // 262 波（Todoist/Linear assignee avatar 语言）：行级成员微头像
     const memberOf = (id: string | undefined) => (id ? (memberOptions ?? []).find((m) => m.id === id) : undefined);
@@ -45,7 +242,12 @@
         plugin.runtime.hubMemberId = filterMember;
         plugin.runtime.hubModuleId = filterModule;
         plugin.runtime.hubDueWithin = dueWithin;
-                await saveRuntime(plugin, plugin.runtime);
+        plugin.runtime.activeNamedViewId = activeNamedViewId;
+        try {
+            await saveRuntime(plugin, plugin.runtime);
+        } catch (e) {
+            showMessage(t("hub.filterSaveFailed").replace("${msg}", e instanceof Error ? e.message : String(e)), 5000, "error");
+        }
     }
     const filtered = $derived.by(() => {
         const level = filter;
@@ -61,15 +263,27 @@
         }
         return list;
     });
+    // Index the scan once so handled filtering does not repeatedly scan the
+    // complete derived cache for every archived entry (O(n*m) on large hubs).
+    const reminderById = $derived.by(() => {
+        void version;
+        const map = new Map<string, Reminder>();
+        for (const reminder of plugin.runtime?.cache?.derived ?? []) map.set(reminder.id, reminder);
+        return map;
+    });
     // 225 波：行级级别徽章撤除（级别由色轨+右侧相对时间大字承载，避免重复）——levelBadge 随之移除
 
     // UG11 v1：提醒导出 .ics（当前筛选为范围；G1 同款——含高后果模块先点名确认）
     const HIGH_CONSEQUENCE_MODULES = new Set(["health", "parenting", "certs", "insurance", "assets-real", "assets-virtual", "contracts", "medicine", "schooling"]);
+    let exportingIcs = $state(false);
     function exportIcs() {
         const list = filtered;
         if (list.length === 0) { showMessage(t("hub.icsEmpty"), 3000, "error"); return; }
-        const download = () => {
-            import("@/core/ics").then(({ buildIcs }) => {
+        const download = async () => {
+            if (exportingIcs) return;
+            exportingIcs = true;
+            try {
+                const { buildIcs } = await import("@/core/ics");
                 const events = list.map((r: Reminder) => ({
                     uid: `${r.id}@lvhome.local`,
                     date: r.dueDate,
@@ -84,33 +298,91 @@
                 a.click();
                 URL.revokeObjectURL(a.href);
                 showMessage(t("hub.icsDone").replace("${n}", String(list.length)), 3000, "info");
-            });
+            } catch (e) {
+                showMessage(t("hub.icsFailed").replace("${msg}", e instanceof Error ? e.message : String(e)), 5000, "error");
+            } finally {
+                exportingIcs = false;
+            }
         };
         if (list.some((r: Reminder) => HIGH_CONSEQUENCE_MODULES.has(r.moduleId))) {
-            confirm(t("hub.icsTitle"), t("hub.icsBody").replace("${n}", String(list.length)), download);
+            confirm(t("hub.icsTitle"), t("hub.icsBody").replace("${n}", String(list.length)), () => { void download(); });
             return;
         }
-        download();
+        void download();
     }
     // H07：已处理视图真实数据源（runtime 留痕 + 缓存派生列表回查标题）
     const handledEntries = $derived.by(() => {
         void version;
         return plugin.listHandled?.() ?? [];
     });
+    const handledFiltered = $derived.by(() => {
+        let list = handledEntries;
+        if (filterMember) {
+            list = list.filter((entry) => {
+                const reminder = reminderById.get(entry.id);
+                // 运行态留痕可能比派生缓存更久（模块扫描失败、历史行删除或缓存迁移时尤甚）。
+                // 无法确认成员归属时保留条目，避免用户在成员筛选下误以为已处理记录丢失。
+                return !reminder || !reminder.memberId || reminder.memberId === filterMember;
+            });
+        }
+        if (filterModule) list = list.filter((entry) => entry.moduleId === filterModule);
+        if (dueWithin !== "all") {
+            const today = new Date();
+            const end = new Date(today.getFullYear(), today.getMonth(), today.getDate() + Number(dueWithin));
+            const endKey = [end.getFullYear(), String(end.getMonth() + 1).padStart(2, "0"), String(end.getDate()).padStart(2, "0")].join("-");
+            list = list.filter((entry) => !!entry.dueDate && entry.dueDate <= endKey);
+        }
+        return list;
+    });
+    function changeFilter(value: string) {
+        filter = value;
+        activeNamedViewId = undefined;
+        if (value === "handled") clearSelection();
+        pruneSelection();
+        void persistFilter();
+    }
     const kindLabel: Record<string, string> = {
         done: "hub.handledDone", muted: "hub.handledMuted",
         year: "hub.handledYear", period: "hub.handledPeriod", memo: "hub.handledMemo",
     };
     async function restoreEntry(id: string) {
-        await plugin.restore(id);
-        showMessage(t("hub.restoreDone"), 3000, "info");
+        await runReminderAction(async () => {
+            await plugin.restore(id);
+            showMessage(t("hub.restoreDone"), 3000, "info");
+        }, id);
+    }
+
+    function confirmDeleteHandledMemo(id: string, title: string) {
+        confirm(t("delete"), t("hub.memoDeleteBody").replace("${title}", title), async () => {
+            await runReminderAction(async () => {
+                await plugin.removeMemo(id);
+                showMessage(t("hub.memoDeleted"), 2500, "info");
+            }, id);
+        });
+    }
+
+    let reminderBusy = $state<Set<string>>(new Set());
+    async function runReminderAction(action: () => Promise<void>, key = "global") {
+        if (reminderBusy.has(key)) return;
+        reminderBusy = new Set([...reminderBusy, key]);
+        try { await action(); }
+        catch (e) {
+            showMessage(t("hub.actionFailed").replace("${msg}", e instanceof Error ? e.message : String(e)), 5000, "error");
+        }
+        finally {
+            const next = new Set(reminderBusy);
+            next.delete(key);
+            reminderBusy = next;
+        }
     }
 
     // H03：未处理备忘的显式删除（确认后物理删除；这是备忘唯一的物理删除路径）
     function confirmDeleteMemo(r: Reminder) {
         confirm(t("delete"), t("hub.memoDeleteBody").replace("${title}", r.title), async () => {
-            await plugin.removeMemo(r.id);
-            showMessage(t("hub.memoDeleted"), 2500, "info");
+            await runReminderAction(async () => {
+                await plugin.removeMemo(r.id);
+                showMessage(t("hub.memoDeleted"), 2500, "info");
+            }, r.id);
         });
     }
 
@@ -123,8 +395,9 @@
     function setViewMode(mode: "list" | "calendar") {
         if (viewMode === mode) return;
         viewMode = mode;
+        if (mode === "calendar") clearSelection();
         plugin.runtime.hubViewMode = mode;
-        saveRuntime(plugin, plugin.runtime).catch((e) => console.warn("[siyuan-home] view mode persist failed:", e));
+        saveRuntime(plugin, plugin.runtime).catch((e) => showMessage(t("hub.preferenceSaveFailed").replace("${msg}", e instanceof Error ? e.message : String(e)), 5000, "error"));
     }
     let selected = $state<Set<string>>(new Set());
     let batchBusy = $state(false);
@@ -138,12 +411,23 @@
     function selectAllFiltered() {
         selected = new Set(filtered.map((r: Reminder) => r.id));
     }
+    function pruneSelection() {
+        const visibleIds = new Set(filtered.map((r: Reminder) => r.id));
+        const next = new Set([...selected].filter((id) => visibleIds.has(id)));
+        if (next.size !== selected.size) selected = next;
+    }
     function clearSelection() {
         selected = new Set();
         batchMode = false;
     }
     async function runBatch(kind: "done" | "snooze7" | "mute") {
         if (batchBusy || selected.size === 0) return;
+        const visibleIds = new Set(filtered.map((r: Reminder) => r.id));
+        selected = new Set([...selected].filter((id) => visibleIds.has(id)));
+        if (selected.size === 0) {
+            showMessage(t("hub.selectionNoLongerVisible"), 3500, "info");
+            return;
+        }
         batchBusy = true;
         try {
             const byId = new Map<string, Reminder>(all.map((r: Reminder) => [r.id, r] as [string, Reminder]));
@@ -192,9 +476,14 @@
         dlg.element.querySelector("#lv-renew-cancel")?.addEventListener("click", () => dlg.destroy());
         dlg.element.querySelector("#lv-renew-ok")?.addEventListener("click", async () => {
             const v = dateInput?.value;
-            if (!v) return;
-            const okBtn = dlg.element.querySelector("#lv-renew-ok") as HTMLButtonElement;
             const err = dlg.element.querySelector("#lv-renew-err") as HTMLElement;
+            if (!v) {
+                err.textContent = t("form.required");
+                err.style.display = "block";
+                dateInput?.focus();
+                return;
+            }
+            const okBtn = dlg.element.querySelector("#lv-renew-ok") as HTMLButtonElement;
             try {
                 okBtn.disabled = true;
                 // plugin.renew 内部写回后触发 refreshHub（行数据已变，不走 notifyHubChanged）
@@ -215,18 +504,74 @@
         // 传播中打开的菜单会被立即清空（2026-10-09 分层采样实证——document 层 4 项可见，
         // window 层 0 项；仅延迟 open 会在重展示时拿到已被清空的共享壳）。整个构建+打开
         // 都放进宏任务，等打开它的这次 click 传播清算完毕后再新建。
-        const x = ev.clientX, y = ev.clientY;
+        const target = ev.currentTarget instanceof HTMLElement ? ev.currentTarget : undefined;
+        const rect = target?.getBoundingClientRect();
+        const rawX = ev.detail > 0 ? ev.clientX : rect?.right ?? 0;
+        const rawY = ev.detail > 0 ? ev.clientY : rect?.bottom ?? 0;
+        const x = Math.max(8, Math.min(rawX, window.innerWidth - 8));
+        const y = Math.max(8, Math.min(rawY, window.innerHeight - 8));
         setTimeout(() => {
             const menu = new Menu("lv-snooze");
             for (const d of [1, 3, 7, 30]) {
                 menu.addItem({
                     label: t("act.snoozeN").replace("${n}", String(d)),
-                    click: () => plugin.snooze(r.id, d),
+                    click: () => { void runReminderAction(() => plugin.snooze(r.id, d), r.id); },
                 });
             }
             menu.open({ x, y });
         }, 0);
     }
+
+    let activeMoreMenu: { button: HTMLButtonElement; menu: HTMLElement; dispose: () => void } | undefined;
+    function closeMoreMenu(restoreFocus = false) {
+        const active = activeMoreMenu;
+        if (!active) return;
+        activeMoreMenu = undefined;
+        active.menu.dataset.open = "false";
+        active.button.setAttribute("aria-expanded", "false");
+        active.dispose();
+        if (restoreFocus) active.button.focus();
+    }
+    function toggleMoreMenu(event: MouseEvent) {
+        const button = event.currentTarget as HTMLButtonElement;
+        const menu = button.nextElementSibling as HTMLElement | null;
+        if (!menu) return;
+        if (activeMoreMenu?.button === button) { closeMoreMenu(); return; }
+        closeMoreMenu();
+        menu.dataset.open = "true";
+        button.setAttribute("aria-expanded", "true");
+        const onPointerDown = (e: PointerEvent) => {
+            const target = e.target;
+            if (target instanceof Node && (menu.contains(target) || button.contains(target))) return;
+            closeMoreMenu();
+        };
+        const onKeyDown = (e: KeyboardEvent) => {
+            if (e.key !== "Escape") return;
+            e.preventDefault();
+            e.stopPropagation();
+            closeMoreMenu(true);
+        };
+        document.addEventListener("pointerdown", onPointerDown, true);
+        document.addEventListener("keydown", onKeyDown, true);
+        activeMoreMenu = {
+            button,
+            menu,
+            dispose: () => {
+                document.removeEventListener("pointerdown", onPointerDown, true);
+                document.removeEventListener("keydown", onKeyDown, true);
+            },
+        };
+    }
+    function closeMoreOnMenuClick(node: HTMLElement) {
+        const onClick = (event: MouseEvent) => {
+            if (event.target instanceof Element && event.target.closest("button") && !event.target.closest(".lv-rem-more-toggle")) {
+                closeMoreMenu();
+            }
+        };
+        node.addEventListener("click", onClick);
+        return { destroy: () => node.removeEventListener("click", onClick) };
+    }
+    onDestroy(() => closeMoreMenu());
 
     // 246 波（收件箱深化）：备忘编辑对话框（标题/到期日修正 → updateMemo 落盘）
     function editMemoDialog(r: Reminder) {
@@ -244,16 +589,28 @@
         row2.append(l2, dateInput);
         // 260 波：确认键升为描边按钮（幽灵样式的保存键没有动作感，与取消键主次不分）
         const save = document.createElement("button"); save.className = "b3-button"; save.textContent = t("save");
+        const err = document.createElement("span"); err.className = "lv-caption"; err.setAttribute("role", "alert"); err.style.color = "var(--lv-danger)";
+        let saving = false;
         save.addEventListener("click", async () => {
+            if (saving) return;
             const title = titleInput.value.trim();
-            if (!title) return;
-            await plugin.updateMemo(r.id, { title, dueDate: dateInput.value });
-            dlg.destroy();
+            if (!title) { err.textContent = t("ledger.nameRequired"); titleInput.focus(); return; }
+            if (!dateInput.value) { err.textContent = t("form.required"); dateInput.focus(); return; }
+            saving = true;
+            save.disabled = true;
+            try {
+                await plugin.updateMemo(r.id, { title, dueDate: dateInput.value });
+                dlg.destroy();
+            } catch (e) {
+                err.textContent = t("ledger.saveFailed").replace("${msg}", e instanceof Error ? e.message : String(e));
+                save.disabled = false;
+                saving = false;
+            }
         });
         const row3 = document.createElement("div");
         row3.style.cssText = "display:flex;gap:8px;justify-content:flex-end";
         row3.append(save);
-        box.append(row1, row2, row3);
+        box.append(row1, row2, err, row3);
         titleInput.focus();
     }
 
@@ -267,7 +624,43 @@
     }
     // 29 组：同成员同日多条合并为一条可展开卡；175 波 O(n) 分组、179 波抽纯函数（core/hub/display，带单测）
     // 181 波：DisplayEntry 平铺化（key/row/items 恒有值），模板无需联合收窄。
-    const buildDisplay = (items: Reminder[]) => display(items);
+    // Keep grouping and pin sorting in one derived pass. The old template
+    // rebuilt three filtered arrays and three sorted arrays on every update.
+    const displayGroups = $derived.by(() => {
+        void version;
+        if (filter === "all") {
+            return [
+                { key: "overdue", label: t("hub.groupOverdue"), items: pinnedFirst(filtered.filter((r: Reminder) => r.level === "overdue")) },
+                { key: "soon", label: t("hub.groupSoon"), items: pinnedFirst(filtered.filter((r: Reminder) => r.level === "soon")) },
+                { key: "lead", label: t("hub.groupLead"), items: pinnedFirst(filtered.filter((r: Reminder) => r.level === "lead")) },
+            ].filter((g) => g.items.length > 0);
+        }
+        return [{ key: filter, label: "", items: pinnedFirst(filtered) }];
+    });
+    // Rendering every reminder at once makes a large inbox expensive even
+    // though filtering and batch actions still need the complete data set.
+    // Keep the data model complete but progressively mount rows in chunks.
+    const REMINDER_PAGE_SIZE = 120;
+    let renderLimit = $state(REMINDER_PAGE_SIZE);
+    $effect(() => {
+        void filter;
+        void filterMember;
+        void filterModule;
+        void dueWithin;
+        void version;
+        renderLimit = REMINDER_PAGE_SIZE;
+    });
+    const renderedGroups = $derived.by(() => {
+        let remaining = renderLimit;
+        return displayGroups
+            .map((group) => {
+                const items = remaining > 0 ? group.items.slice(0, remaining) : [];
+                remaining -= items.length;
+                return { ...group, items, total: group.items.length };
+            })
+            .filter((group) => group.items.length > 0);
+    });
+    const handledVisible = $derived(handledFiltered.slice(0, renderLimit));
 
     // 236 波（收件箱分诊）：备忘 → 正式台账行。目标限已建库的非成员模块；
     // 名称带入备忘标题、日期带入目标模块首个日期列；创建后完成备忘（可在"已处理"恢复）。
@@ -299,7 +692,10 @@
         const none = document.createElement("option"); none.value = ""; none.textContent = t("members.unassigned");
         memberSel.append(none);
         for (const m of plugin.settings.members ?? []) {
-            const o = document.createElement("option"); o.value = m.avItemId ?? m.id; o.textContent = m.name;
+            const o = document.createElement("option");
+            o.value = m.avItemId ?? "";
+            o.disabled = !m.avItemId;
+            o.textContent = `${m.name}${m.avItemId ? "" : ` · ${t("members.notLinked")}`}`;
             memberSel.append(o);
         }
         rowM.append(lM, memberSel);
@@ -314,10 +710,24 @@
         const dateInput = document.createElement("input"); dateInput.className = "b3-text-field"; dateInput.type = "date"; dateInput.value = r.dueDate;
         row3.append(l3, dateInput);
         const ok = document.createElement("button"); ok.className = "b3-button"; ok.textContent = t("triage.create");
+        const err = document.createElement("span"); err.className = "lv-caption"; err.setAttribute("role", "alert"); err.style.color = "var(--lv-danger)";
+        // 一个转台账对话框对应一个业务操作。若首个请求超时、或用户点击重试，
+        // 必须复用同一幂等 key，避免内核已落行但前端未拿到响应时再次建出重复行。
+        const operationKey = (() => {
+            try { return `triage:${crypto.randomUUID()}`; }
+            catch { return `triage:${Date.now().toString(36)}:${Math.random().toString(36).slice(2)}`; }
+        })();
+        let pendingRowId: string | undefined;
+        let pendingModuleId: string | undefined;
+        let identityPending = false;
         const doCreate = async () => {
             const title = nameInput.value.trim();
-            if (!title) return;
+            if (!title) { err.textContent = t("ledger.nameRequired"); nameInput.focus(); return; }
             const mod = sel.value;
+            if (pendingRowId && pendingModuleId !== mod) {
+                err.textContent = t("triage.pendingTarget");
+                return;
+            }
             let ref = plugin.settings.dbRefs[mod];
             // 247 波：未建库模块自动建库（provisionModule 幂等；登记写入 settings 后 ref 即有效）
             if (!ref?.avId) {
@@ -326,13 +736,41 @@
                 ref = plugin.settings.dbRefs[mod];
                 if (!ref?.avId) { showMessage(t("triage.noTarget"), 3000, "error"); return; }
             }
-            const itemID = await addDetachedRow(ref.avId, title);
+            const selectedMember = memberSel.value;
+            if (selectedMember && !(plugin.settings.members ?? []).some((m) => m.avItemId === selectedMember)) {
+                err.textContent = t("members.notLinked");
+                memberSel.focus();
+                return;
+            }
+            let itemID = pendingRowId;
+            if (!itemID) {
+                try {
+                    itemID = await addDetachedRow(ref.avId, title, { idempotencyKey: `${operationKey}:row`, retries: 1 });
+                    pendingRowId = itemID;
+                    pendingModuleId = mod;
+                } catch (e) {
+                    const { RowIdentityPendingError } = await import("@/core/siyuan");
+                    if (e instanceof RowIdentityPendingError) {
+                        identityPending = true;
+                        ok.disabled = true;
+                        err.textContent = t("triage.identityPending");
+                        return;
+                    }
+                    throw e;
+                }
+            }
             // 新建行身份确认存在延迟：setCell 失败受控重试（同格重写不会重复建行）
             const setCellSafe = async (key: string, value: unknown) => {
                 const keyID = ref.columns?.[key];
                 if (!keyID) return;
                 for (let attempt = 0; ; attempt++) {
-                    try { await setCell(ref.avId, keyID, itemID, value); return; }
+                    try {
+                        await setCell(ref.avId, keyID, itemID, value, {
+                            idempotencyKey: `${operationKey}:cell:${keyID}`,
+                            retries: 1,
+                        });
+                        return;
+                    }
                     catch (e) {
                         if (attempt >= 2) throw e;
                         await new Promise((r2) => setTimeout(r2, 400));
@@ -348,16 +786,27 @@
                 ?? schemaCols.find((c: any) => c.type === "date");
             if (dateCol && r.dueDate) await setCellSafe(dateCol.key, { type: "date", date: { content: new Date(`${r.dueDate}T00:00:00`).getTime(), isNotEmpty: true, isNotTime: true } });
             // 成员分配（246 波）：relation 写入（选了成员才写）
-            const member = memberSel.value;
-            if (member) await setCellSafe("member", { type: "relation", relation: { blockIDs: [member], contents: null } });
+            if (selectedMember) await setCellSafe("member", { type: "relation", relation: { blockIDs: [selectedMember], contents: null } });
+            await plugin.complete(r);
             dlg.destroy();
             showMessage(t("triage.done").replace("${mod}", modLabel(mod)), 4000, "info");
-            await plugin.complete(r);
-            // 转行改变了台账数据：全量重扫让新行立即派生提醒（缓存派生不含新行）
-            await plugin.refreshHub();
+            // 转行改变了台账数据：全量重扫让新行立即派生提醒（缓存派生不含新行）。
+            // The triage flow just created a new ledger row. The cached scan
+            // does not contain it, so this refresh must bypass the debounce.
+            try { await plugin.refreshHub(undefined, true); }
+            catch (e) {
+                console.warn("[siyuan-home] triage saved but refresh failed:", e);
+                showMessage(t("triage.refreshFailed"), 5000, "error");
+            }
         };
-        ok.addEventListener("click", () => { ok.disabled = true; doCreate().finally(() => { ok.disabled = false; }); });
-        box.append(row1, rowM, row2, row3, ok);
+        ok.addEventListener("click", () => {
+            if (identityPending) return;
+            ok.disabled = true;
+            doCreate().catch((e) => {
+                err.textContent = t("ledger.saveFailed").replace("${msg}", e instanceof Error ? e.message : String(e));
+            }).finally(() => { if (!identityPending) ok.disabled = false; });
+        });
+        box.append(row1, rowM, row2, row3, err, ok);
         nameInput.focus();
     }
 
@@ -373,9 +822,14 @@
         rescanning = true;
         try {
             await plugin.refreshHub(undefined, true);
+        } catch (e) {
+            showMessage(t("hub.rescanFailed").replace("${msg}", e instanceof Error ? e.message : String(e)), 5000, "error");
         } finally {
             rescanning = false;
         }
+    }
+    function toggleTodaySilent() {
+        void runReminderAction(() => plugin.toggleTodaySilent(), "today-silent");
     }
 
     // 260 波：首扫 loading 态（未知 ≠ "暂无事项"，33.3/13 §3.4）
@@ -413,132 +867,256 @@
 </script>
 
 {#snippet remRow(r: Reminder)}
+    {@const plan = planStatusOf(r)}
     <!-- 261 波：完成/延后后行 150ms 淡出离场（瞬消失让用户怀疑误触；respects reduced-motion 由全局降级） -->
-    <div class="lv-rem {r.level}" out:fade={{ duration: 150 }}>
-        {#if batchMode}
-            <input type="checkbox" class="b3-checkbox" aria-label={t("hub.select")}
-                checked={selected.has(r.id)} onchange={() => toggleSelect(r.id)} style="flex-shrink:0" />
+    <div class="lv-rem {r.level}" class:lv-rem--batch={batchMode && viewMode === "list" && filter !== "handled"} out:fade={{ duration: 150 }}>
+    {#if batchMode && viewMode === "list" && filter !== "handled"}
+            <input type="checkbox" class="b3-checkbox" aria-label={`${t("hub.select")}: ${r.title}`}
+                checked={selected.has(r.id)} disabled={batchBusy} onchange={() => toggleSelect(r.id)} style="flex-shrink:0" />
         {/if}
         <!-- 259 波：图标砖收回中性（对齐原型 .rem .ic）——级别语义由色轨+右侧大字承载 -->
-        <div class="lv-rem-ic" aria-hidden="true">{r.moduleId === "adhoc" ? "📝" : moduleIcon(r.moduleId)}</div>
+        <div class="lv-rem-ic" aria-hidden="true"><UiIcon name={moduleUiIcon(r.moduleId)} size={18} /></div>
         <div class="lv-rem-t" title={(r.autoRenew ? `${t("hub.autoRenew")} · ` : "") + r.dueDate}>
-            <b>{r.title}{r.ruleKey === "reciprocate" ? ` · ${t("rule.reciprocate")}` : ""}</b>
+            <b>
+                {r.title}{r.ruleKey === "reciprocate" ? ` · ${t("rule.reciprocate")}` : ""}
+                {#if plan.hasPlan}
+                    <span class="lv-plan-badge" class:is-planned-now={plan.isPlannedNow} title={`${t("hub.planDateLabel")}: ${plan.planDate}`}>
+                        🗓️ {plan.planDate}{#if plan.isPlannedNow} · 🎯 {t("hub.planActive")}{/if}
+                    </span>
+                {/if}
+                <button class="lv-rem-expand-btn" type="button"
+                    aria-expanded={expandedReminders.has(r.id)}
+                    aria-label={expandedReminders.has(r.id) ? t("hub.collapseSummary") : t("hub.expandSummary")}
+                    title={expandedReminders.has(r.id) ? t("hub.collapseSummary") : t("hub.expandSummary")}
+                    onclick={() => toggleReminderExpand(r.id)}>
+                    <span aria-hidden="true">{expandedReminders.has(r.id) ? "▴" : "▾"}</span>
+                </button>
+            </b>
             <!-- 249 波：meta 补模块名（对齐原型三段 meta）；262 波：成员微头像前置（"这是谁的事"） -->
-            <span class="lv-num">{#if memberOf(r.memberId)}{@const member = memberOf(r.memberId)}<span class="lv-miniava" style="background:linear-gradient(135deg, hsl({memberHue(member.id)} 62% 52%), hsl({(memberHue(member.id) + 42) % 360} 62% 40%))" aria-hidden="true">{member.name.slice(0, 1)}</span>{/if}{r.moduleId !== "adhoc" ? (t(`module.${r.moduleId}`) !== `module.${r.moduleId}` ? t(`module.${r.moduleId}`) : r.moduleId) + " · " : ""}{r.dueDate}{r.lunar ? " 🌙" : ""}{r.autoRenew ? " 🔄" : ""}</span>
+            <span class="lv-num">{#if memberOf(r.memberId)}{@const member = memberOf(r.memberId)}<span class="lv-miniava" style="background:linear-gradient(135deg, hsl({memberHue(member.id)} 62% 52%), hsl({(memberHue(member.id) + 42) % 360} 62% 40%))" aria-hidden="true">{member.name.slice(0, 1)}</span>{/if}{r.moduleId !== "adhoc" ? (t(`module.${r.moduleId}`) !== `module.${r.moduleId}` ? t(`module.${r.moduleId}`) : r.moduleId) + " · " : ""}{r.dueDate}{#if !r.memberId} · {t("members.unassigned")}{/if}{r.lunar ? " 🌙" : ""}{r.autoRenew ? " 🔄" : ""}</span>
         </div>
         <!-- 对齐原型：相对到期大字居右（颜色随级别；文字本身已承载逾期/N天后语义，级别徽章不再重复） -->
         <div class="lv-rem-when">
             <b class="lv-num" style="color:var(--lv-{r.level === 'overdue' ? 'danger' : r.level === 'soon' ? 'warn' : 'amber'})">{relDue(r.daysLeft, r.dueDate)}</b>
         </div>
         <div class="lv-rem-ops">
-            <button class="b3-button b3-button--text" onclick={() => plugin.complete(r)}>{t("act.done")}</button>
-            {#if ["certs", "insurance", "contracts"].includes(r.moduleId)}
-                <!-- 续保/换证/合同续约：新到期日写回规则 field 列（26.6 + 98 波：contracts 规则带 field=expiry 与
-                     autoRenewField 升级路径，此前 🔄 决策提醒无"续"动作入口——漏项补齐） -->
-                <button class="b3-button b3-button--text" onclick={() => renewDialog(r)}>{t("act.renew")}</button>
-            {/if}
-            {#if r.moduleId !== "adhoc" && plugin.settings.dbRefs[r.moduleId]?.docId}
-                <button class="b3-button b3-button--text" title={t("act.locate")} onclick={() => plugin.showTabDocs(plugin.settings.dbRefs[r.moduleId].docId)}>{t("act.locate")}</button>
-            {/if}
-            <button class="b3-button b3-button--text" onclick={(e) => snoozeMenu(r, e)}>{t("act.snooze")} ▾</button>
-            <button class="b3-button b3-button--text" onclick={() => plugin.mute(r.id)}>{t("act.mute")}</button>
-            {#if r.moduleId === "adhoc"}
-                <!-- 246 波（收件箱深化）：备忘置顶（置顶项组内排最前） -->
-                <button class="b3-button b3-button--text" title={isPinned(r) ? t("act.unpin") : t("act.pin")}
-                    onclick={() => toggleMemoPin(plugin, r.id).then(() => plugin.refreshHub())}>{isPinned(r) ? t("act.unpin") : t("act.pin")}</button>
-                <!-- 246 波（收件箱深化）：备忘编辑（标题/到期日） -->
-                <button class="b3-button b3-button--text" onclick={() => editMemoDialog(r)}>{t("memo.edit")}</button>
-                <!-- H03：备忘的显式删除（唯一物理删除路径；未处理项不自动清理） -->
-                <button class="b3-button b3-button--text" onclick={() => confirmDeleteMemo(r)}>{t("delete")}</button>
-                <!-- 240 波（收件箱分诊）：备忘 → 正式台账行 -->
-                <button class="b3-button b3-button--text" onclick={() => toLedgerDialog(r)}>{t("triage.title")}</button>
-            {/if}
+            <button class="b3-button b3-button--text" disabled={batchBusy || reminderBusy.has(r.id)} aria-busy={reminderBusy.has(r.id)} onclick={() => void runReminderAction(() => plugin.complete(r), r.id)}>{reminderBusy.has(r.id) ? t("ledger.saving") : t("act.done")}</button>
+            <div class="lv-rem-more">
+                <button class="b3-button b3-button--text lv-rem-more-toggle" type="button" aria-expanded="false" aria-haspopup="true" aria-controls={`lv-rem-more-${r.id}`}
+                    onclick={toggleMoreMenu}>{t("ledger.detailMore")} <span aria-hidden="true">⌄</span></button>
+                <div id={`lv-rem-more-${r.id}`} class="lv-rem-more-menu" role="group" aria-label={t("ledger.detailMore")} data-open="false" use:closeMoreOnMenuClick>
+                    {#if ["certs", "insurance", "contracts"].includes(r.moduleId)}
+                        <!-- 续保/换证/合同续约：新到期日写回规则 field 列（26.6 + 98 波：contracts 规则带 field=expiry 与
+                             autoRenewField 升级路径，此前 🔄 决策提醒无"续"动作入口——漏项补齐） -->
+                    <button class="b3-button b3-button--text" disabled={batchBusy || reminderBusy.has(r.id)} onclick={() => renewDialog(r)}>{t("act.renew")}</button>
+                    {/if}
+                    {#if r.moduleId !== "adhoc" && plugin.settings.dbRefs[r.moduleId]?.docId}
+                        <button class="b3-button b3-button--text" disabled={batchBusy} title={t("act.locate")} onclick={() => plugin.showTabDocs(plugin.settings.dbRefs[r.moduleId].docId)}>{t("act.locate")}</button>
+                    {/if}
+                    <button class="b3-button b3-button--text" disabled={batchBusy || reminderBusy.has(r.id)} onclick={() => schedulePlanDialog(r)}>{plan.hasPlan ? t("hub.editPlanDate") : t("hub.setPlanDate")}</button>
+                    <button class="b3-button b3-button--text" aria-haspopup="menu" disabled={batchBusy || reminderBusy.has(r.id)} aria-busy={reminderBusy.has(r.id)} onclick={(e) => snoozeMenu(r, e)}>{reminderBusy.has(r.id) ? t("ledger.saving") : `${t("act.snooze")} ▾`}</button>
+                    <button class="b3-button b3-button--text" disabled={batchBusy || reminderBusy.has(r.id)} aria-busy={reminderBusy.has(r.id)} onclick={() => void runReminderAction(() => plugin.mute(r.id), r.id)}>{reminderBusy.has(r.id) ? t("ledger.saving") : t("act.mute")}</button>
+                    {#if r.moduleId === "adhoc"}
+                        <!-- 246 波（收件箱深化）：备忘置顶（置顶项组内排最前） -->
+                        <button class="b3-button b3-button--text" title={isPinned(r) ? t("act.unpin") : t("act.pin")}
+                            disabled={batchBusy || reminderBusy.has(r.id)} aria-busy={reminderBusy.has(r.id)}
+                            onclick={() => void runReminderAction(async () => { await toggleMemoPin(plugin, r.id); await plugin.refreshHub(); }, r.id)}>{reminderBusy.has(r.id) ? t("ledger.saving") : (isPinned(r) ? t("act.unpin") : t("act.pin"))}</button>
+                        <!-- 246 波（收件箱深化）：备忘编辑（标题/到期日） -->
+                        <button class="b3-button b3-button--text" disabled={batchBusy || reminderBusy.has(r.id)} onclick={() => editMemoDialog(r)}>{t("memo.edit")}</button>
+                        <!-- H03：备忘的显式删除（唯一物理删除路径；未处理项不自动清理） -->
+                        <button class="b3-button b3-button--text" disabled={batchBusy || reminderBusy.has(r.id)} onclick={() => confirmDeleteMemo(r)}>{t("delete")}</button>
+                        <!-- 240 波（收件箱分诊）：备忘 → 正式台账行 -->
+                        <button class="b3-button b3-button--text" disabled={batchBusy || reminderBusy.has(r.id)} onclick={() => toLedgerDialog(r)}>{t("triage.title")}</button>
+                    {/if}
+                </div>
+            </div>
         </div>
+        {#if expandedReminders.has(r.id)}
+            <div class="lv-rem-summary" role="region" aria-label={t("hub.summary")}>
+                <div class="lv-rem-summary__item">
+                    <span class="label">{t("hub.summaryRule")}:</span>
+                    <span>{r.moduleId !== "adhoc" ? (t(`module.${r.moduleId}`) !== `module.${r.moduleId}` ? t(`module.${r.moduleId}`) : r.moduleId) + " · " : ""}{ruleText(r.ruleKey)}{r.kind ? `（${kindText(r.kind)}）` : ""}{r.lunar ? " · 🌙" : ""}{r.autoRenew ? " · 🔄" : ""}</span>
+                </div>
+                <div class="lv-rem-summary__item">
+                    <span class="label">{t("hub.summaryMember")}:</span>
+                    <span>{#if memberOf(r.memberId)}{@const member = memberOf(r.memberId)}{member.name}{member.role ? `（${member.role}）` : ""}{:else}{t("members.unassigned")}{/if}</span>
+                </div>
+                <div class="lv-rem-summary__item">
+                    <span class="label">{t("hub.summaryDue")}:</span>
+                    <span>{r.dueDate} · {relDue(r.daysLeft, r.dueDate)}</span>
+                </div>
+                {#if plan.hasPlan}
+                    <div class="lv-rem-summary__item">
+                        <span class="label">{t("hub.planDateLabel")}:</span>
+                        <span>{plan.planDate}{#if plan.isPlannedNow}（🎯 {t("hub.planActive")}）{/if}</span>
+                    </div>
+                {/if}
+                {#if r.moduleId !== "adhoc" && plugin.settings.dbRefs[r.moduleId]?.docId}
+                    <div class="lv-rem-summary__item">
+                        <button class="b3-button b3-button--text" style="padding:0 4px;font-size:12px;color:var(--lv-accent)"
+                            onclick={() => plugin.showTabDocs(plugin.settings.dbRefs[r.moduleId].docId)}>
+                            {t("act.locate")} →
+                        </button>
+                    </div>
+                {/if}
+            </div>
+        {/if}
     </div>
 {/snippet}
 
-<div class="lv-hero"><h1>{t("hub.title")}</h1><p>{t("hub.subtitle")}</p></div>
+<section class="lv-hub-head" aria-labelledby="lv-hub-title">
+    <div class="lv-hero lv-hub-title">
+        <div><span class="lv-hub-eyebrow">{t("dash.upcoming")}</span><h1 id="lv-hub-title">{t("hub.title")}</h1><p>{t("hub.subtitle")}</p></div>
+    </div>
+    <div class="lv-hub-summary" aria-label={t("hub.title")}>
+        <div class="lv-hub-summary__item"><span>{t("hub.filterAll")}</span><b class="lv-num">{all.length}</b></div>
+        <div class="lv-hub-summary__item is-overdue"><span>{t("hub.groupOverdue")}</span><b class="lv-num">{overdueCount}</b></div>
+    </div>
+</section>
 
-<div class="lv-toolbar" style="margin:16px 0">
-    <select class="b3-select" value={filter} onchange={(e) => { filter = (e.target as HTMLSelectElement).value; persistFilter(); }}>
-        <option value="all">{t("hub.filterAll")}</option>
-        <option value="overdue">{t("hub.filterOverdue")}</option>
-        <option value="soon">{t("hub.filterSoon")}</option>
-        <option value="lead">{t("hub.filterLead")}</option>
-        <option value="handled">{t("hub.filterHandled")}</option>
-    </select>
-    <select class="b3-select" value={filterMember ?? ""} onchange={(e) => { filterMember = (e.target as HTMLSelectElement).value || undefined; persistFilter(); }}>
-        <option value="">{t("field.member")}: {t("members.all")}</option>
-        {#each memberOptions as m (m.id)}
-            <option value={m.id}>{m.name}</option>
-        {/each}
-    </select>
-    <select class="b3-select" value={filterModule ?? ""} onchange={(e) => { filterModule = (e.target as HTMLSelectElement).value || undefined; persistFilter(); }}>
-        <option value="">{t("hub.filterAllModule")}</option>
-        {#each moduleOptions as mid (mid)}
-            <option value={mid}>{mid === "adhoc" ? t("adhoc.name") : (t(`module.${mid}`) !== `module.${mid}` ? t(`module.${mid}`) : mid)}</option>
-        {/each}
-    </select>
-    <select class="b3-select" value={dueWithin} onchange={(e) => { dueWithin = (e.target as HTMLSelectElement).value; persistFilter(); }}>
-        <option value="all">{t("hub.dueAll")}</option>
-        <option value="0">{t("hub.dueToday")}</option>
-        <option value="7">{t("hub.due7")}</option>
-        <option value="30">{t("hub.due30")}</option>
-    </select>
-    <button class="b3-button b3-button--outline" onclick={exportIcs}>{t("hub.icsExport")}</button>
-    <!-- 243 波（收件箱分诊）：一键切片到备忘项集合（转行/完成/延后集中处理） -->
-    <button class="b3-button b3-button--outline {filterModule === "adhoc" ? "b3-button--text" : ""}"
-        onclick={() => { filterModule = filterModule === "adhoc" ? undefined : "adhoc"; persistFilter(); }}>
-        {t("hub.triageChip")}{#if filterModule === "adhoc"} ✓{/if}
-    </button>
-    <span class="fn__flex-1"></span>
-    <span class="lv-tabs" style="padding:2px" role="group" aria-label={t("view.list") + "/" + t("view.calendar")}>
-        <button class="lv-tabs__item" class:on={viewMode === "list"} style="min-height:28px;padding:4px 12px"
-            aria-pressed={viewMode === "list"} onclick={() => setViewMode("list")}>{t("view.list")}</button>
-        <button class="lv-tabs__item" class:on={viewMode === "calendar"} style="min-height:28px;padding:4px 12px"
-            aria-pressed={viewMode === "calendar"} onclick={() => setViewMode("calendar")}>{t("view.calendar")}</button>
-    </span>
-    <button class="b3-button b3-button--outline" class:b3-button--text={todaySilentOn}
-        aria-pressed={todaySilentOn} title={t("hub.todaySilentTip")}
-        onclick={() => plugin.toggleTodaySilent()}>{todaySilentOn ? "🔕 " : ""}{t("hub.todaySilent")}{todaySilentOn ? " ✓" : ""}</button>
-    <button class="b3-button b3-button--outline" class:b3-button--text={batchMode} onclick={() => (batchMode ? clearSelection() : (batchMode = true))}>{t("hub.batch")}</button>
-    <button class="b3-button b3-button--outline" disabled={rescanning} aria-busy={rescanning} onclick={rescan}>{t("hub.rescan")}</button>
-</div>
+<section class="lv-hub-controls" aria-label={t("hub.title")}>
+    <div class="lv-card lv-hub-filter-panel">
+        <div class="lv-hub-panel-label">{t("hub.filterAll")}</div>
+        <div class="lv-toolbar lv-hub-filters">
+            <select class="b3-select" aria-label={t("hub.title")} value={filter} disabled={batchBusy} onchange={(e) => changeFilter((e.target as HTMLSelectElement).value)}>
+                <option value="all">{t("hub.filterAll")}</option>
+                <option value="overdue">{t("hub.filterOverdue")}</option>
+                <option value="soon">{t("hub.filterSoon")}</option>
+                <option value="lead">{t("hub.filterLead")}</option>
+                <option value="handled">{t("hub.filterHandled")}</option>
+            </select>
+            <select class="b3-select" aria-label={t("field.member")} value={filterMember ?? ""} disabled={batchBusy} onchange={(e) => { filterMember = (e.target as HTMLSelectElement).value || undefined; activeNamedViewId = undefined; pruneSelection(); persistFilter(); }}>
+                <option value="">{t("field.member")}: {t("members.all")}</option>
+                {#each memberOptions as m (m.id)}
+                    <option value={m.id}>{m.name}</option>
+                {/each}
+            </select>
+            <select class="b3-select" aria-label={t("hub.filterAllModule")} value={filterModule ?? ""} disabled={batchBusy} onchange={(e) => { filterModule = (e.target as HTMLSelectElement).value || undefined; activeNamedViewId = undefined; pruneSelection(); persistFilter(); }}>
+                <option value="">{t("hub.filterAllModule")}</option>
+                {#each moduleOptions as mid (mid)}
+                    <option value={mid}>{mid === "adhoc" ? t("adhoc.name") : (t(`module.${mid}`) !== `module.${mid}` ? t(`module.${mid}`) : mid)}</option>
+                {/each}
+            </select>
+            <select class="b3-select" aria-label={t("hub.dueAll")} value={dueWithin} disabled={batchBusy} onchange={(e) => { dueWithin = (e.target as HTMLSelectElement).value; activeNamedViewId = undefined; pruneSelection(); persistFilter(); }}>
+                <option value="all">{t("hub.dueAll")}</option>
+                <option value="0">{t("hub.dueToday")}</option>
+                <option value="7">{t("hub.due7")}</option>
+                <option value="30">{t("hub.due30")}</option>
+            </select>
+            <!-- 243 波（收件箱分诊）：一键切片到备忘项集合（转行/完成/延后集中处理） -->
+            <button class="b3-button b3-button--outline" class:is-filtered={filterModule === "adhoc"} disabled={batchBusy}
+                aria-pressed={filterModule === "adhoc"} onclick={() => { filterModule = filterModule === "adhoc" ? undefined : "adhoc"; activeNamedViewId = undefined; persistFilter(); }}>
+                {t("hub.triageChip")}{#if filterModule === "adhoc"} ✓{/if}
+            </button>
+        </div>
+        {#if !batchMode}
+            <div class="lv-named-views-bar" role="group" aria-label={t("hub.namedViews")}>
+                <span class="lv-caption" style="font-size:11.5px;color:var(--lv-tx-3)">{t("hub.namedViews")}:</span>
+                {#each namedViews as v (v.id)}
+                    <span class="lv-named-view-chip" class:is-active={activeNamedViewId === v.id}>
+                        <button type="button" class="lv-named-view-btn"
+                            onclick={() => applyView(v)}
+                            title={`${v.name} (${v.filter ?? "all"})`}>
+                            {v.name}
+                        </button>
+                        <button type="button" class="lv-named-view-del"
+                            onclick={(e) => { e.stopPropagation(); confirmDeleteNamedView(v); }}
+                            title={t("hub.deleteView")}>
+                            ×
+                        </button>
+                    </span>
+                {/each}
+                <button type="button" class="b3-button b3-button--text lv-save-view-btn"
+                    style="font-size:12px;padding:2px 8px;color:var(--lv-accent)"
+                    onclick={promptSaveNamedView}>
+                    ＋ {t("hub.saveCurrentView")}
+                </button>
+            </div>
+        {/if}
+    </div>
+    <div class="lv-card lv-hub-action-panel">
+        <div class="lv-hub-panel-label">{t("view.list")}</div>
+        <div class="lv-toolbar lv-hub-actions">
+            <span class="lv-tabs lv-hub-view-toggle" role="group" aria-label={t("view.list") + "/" + t("view.calendar")}>
+                <button class="lv-tabs__item" class:on={viewMode === "list"}
+                    disabled={batchBusy} aria-pressed={viewMode === "list"} onclick={() => setViewMode("list")}>{t("view.list")}</button>
+                <button class="lv-tabs__item" class:on={viewMode === "calendar"}
+                    disabled={batchBusy} aria-pressed={viewMode === "calendar"} onclick={() => setViewMode("calendar")}>{t("view.calendar")}</button>
+            </span>
+            <button class="b3-button b3-button--outline" class:is-active={todaySilentOn}
+                aria-pressed={todaySilentOn} title={t("hub.todaySilentTip")}
+                disabled={batchBusy} onclick={toggleTodaySilent}>{todaySilentOn ? "🔕 " : ""}{t("hub.todaySilent")}{todaySilentOn ? " ✓" : ""}</button>
+            <button class="b3-button b3-button--outline" class:is-active={batchMode} disabled={batchBusy} onclick={() => (batchMode ? clearSelection() : (batchMode = true))}>{t("hub.batch")}</button>
+            <button class="b3-button b3-button--outline" disabled={batchBusy || rescanning} aria-busy={rescanning} onclick={rescan}>{t("hub.rescan")}</button>
+            <button class="b3-button b3-button--outline" disabled={batchBusy || exportingIcs} aria-busy={exportingIcs} onclick={exportIcs}>{exportingIcs ? t("ledger.saving") : t("hub.icsExport")}</button>
+        </div>
+    </div>
+</section>
 
-{#if batchMode}
-    <div class="lv-card lv-toolbar" style="padding:8px 14px;margin-bottom:10px">
+{#if permissionDenied}
+    <div class="lv-card" role="alert" style="display:flex;align-items:center;gap:12px;padding:12px 16px">
+        <UiIcon name="alert" size={18} />
+        <span style="flex:1;min-width:0;overflow-wrap:anywhere">{t("permission.body")}</span>
+        <button class="b3-button b3-button--outline" disabled={rescanning} aria-busy={rescanning} onclick={rescan}>
+            {rescanning ? t("diag.rebuilding") : t("hub.rescan")}
+        </button>
+    </div>
+{/if}
+
+{#if batchMode && filter !== "handled" && viewMode === "list"}
+    <div class="lv-card lv-toolbar lv-hub-batchbar">
         <b class="lv-caption">{t("hub.selectedN").replace("${n}", String(selectedCount))}</b>
-        <button class="b3-button b3-button--text" onclick={selectAllFiltered}>{t("hub.selectAll")}</button>
+        <button class="b3-button b3-button--text" disabled={batchBusy} onclick={selectAllFiltered}>{t("hub.selectAll")}</button>
         <span class="fn__flex-1"></span>
         <button class="b3-button b3-button--text" disabled={batchBusy || selectedCount === 0} onclick={() => runBatch("done")}>{t("act.done")}</button>
         <button class="b3-button b3-button--text" disabled={batchBusy || selectedCount === 0} onclick={() => runBatch("snooze7")}>{t("act.snooze7")}</button>
         <button class="b3-button b3-button--text" disabled={batchBusy || selectedCount === 0} onclick={() => runBatch("mute")}>{t("act.mute")}</button>
-        <button class="b3-button b3-button--outline" onclick={clearSelection}>{t("cancel")}</button>
+        <button class="b3-button b3-button--outline" disabled={batchBusy} onclick={clearSelection}>{t("cancel")}</button>
     </div>
 {/if}
 
+
+
 {#if filter === "handled"}
-    {#if handledEntries.length === 0}
-        <div class="lv-card"><div class="lv-empty"><div class="eic">✓</div><b>{t("hub.handledTitle")}</b><span>{t("hub.handledHint")}</span></div></div>
+    {#if handledFiltered.length === 0 && handledEntries.length > 0}
+        <div class="lv-card"><div class="lv-empty" role="status"><div class="eic"><UiIcon name="search" size={22} /></div><b>{t("hub.filteredEmpty")}</b><span>{t("hub.filteredEmptyHint")}</span>
+            <button class="b3-button b3-button--outline" style="margin-top:8px" onclick={() => { filterMember = undefined; filterModule = undefined; dueWithin = "all"; void persistFilter(); }}>{t("hub.clearFilters")}</button>
+        </div></div>
+    {:else if handledFiltered.length === 0}
+        <div class="lv-card"><div class="lv-empty"><div class="eic"><UiIcon name="check" size={22} /></div><b>{t("hub.handledTitle")}</b><span>{t("hub.handledHint")}</span></div></div>
     {:else}
         <div class="lv-card lv-rems">
-            {#each handledEntries as h (h.id + h.kind)}
+            {#each handledVisible as h (h.id + h.kind)}
                 <div class="lv-rem lead">
-                    <div class="lv-rem-ic">{h.kind === "memo" ? "📝" : h.kind === "muted" ? "🔇" : "✓"}</div>
+                    <div class="lv-rem-ic"><UiIcon name={h.kind === "memo" ? "note" : h.kind === "muted" ? "mute" : "check"} size={18} /></div>
                     <div class="lv-rem-t">
                         <b>{h.title || t("hub.handledUnknown")}</b>
                         <span class="lv-caption">{t(kindLabel[h.kind] ?? "hub.handledDone")}{h.dueDate ? ` · ${h.dueDate}` : ""}{h.moduleId && h.moduleId !== "adhoc" ? ` · ${t(`module.${h.moduleId}`)}` : ""}</span>
                     </div>
                     <div class="lv-rem-ops">
-                        <button class="b3-button b3-button--text" onclick={() => restoreEntry(h.id)}>{t("hub.restore")}</button>
+                        <button class="b3-button b3-button--text" disabled={reminderBusy.has(h.id)} aria-busy={reminderBusy.has(h.id)} onclick={() => restoreEntry(h.id)}>{reminderBusy.has(h.id) ? t("ledger.saving") : t("hub.restore")}</button>
                         {#if h.kind === "memo"}
-                            <button class="b3-button b3-button--text" onclick={() => plugin.removeMemo(h.id)}>{t("delete")}</button>
+                            <button class="b3-button b3-button--text" disabled={reminderBusy.has(h.id)} onclick={() => confirmDeleteHandledMemo(h.id, h.title || t("hub.handledUnknown"))}>{t("delete")}</button>
                         {/if}
                     </div>
                 </div>
             {/each}
+            {#if handledFiltered.length > handledVisible.length}
+                <div style="display:flex;justify-content:center;padding:12px">
+                    <button class="b3-button b3-button--outline" onclick={() => (renderLimit += REMINDER_PAGE_SIZE)}>
+                        {t("ledger.loadMore").replace("${n}", String(handledFiltered.length - handledVisible.length))}
+                    </button>
+                </div>
+            {/if}
         </div>
     {/if}
+{:else if viewMode === "calendar" && filter !== "handled"}
+    <!-- 日历在空筛选结果时仍提供日期浏览与新增备忘入口。 -->
+    <Calendar items={filtered} {t} {version} initialMode={plugin.runtime.hubCalMode}
+        onModeChange={(m: "month" | "week") => { plugin.runtime.hubCalMode = m; saveRuntime(plugin, plugin.runtime).catch((e) => showMessage(t("hub.preferenceSaveFailed").replace("${msg}", e instanceof Error ? e.message : String(e)), 5000, "error")); }}
+        onComplete={(r: Reminder) => runReminderAction(() => plugin.complete(r), `calendar:${r.id}`)}
+        onAddMemo={(title: string, due: string) => plugin.addMemo(title, due)}
+        onConvert={(r: Reminder) => toLedgerDialog(r)} />
 {:else if filtered.length === 0}
     {#if firstScanPending}
         <!-- 260 波：首扫骨架（未知 ≠ 全部完成） -->
@@ -554,35 +1132,29 @@
             {/each}
         </div>
         <p class="lv-caption" style="margin:8px 2px">{t("hub.firstScan")}</p>
+    {:else if plugin.scan?.errors?.length}
+        <div class="lv-card"><div class="lv-empty" role="alert"><div class="eic"><UiIcon name="alert" size={22} /></div><b>{t("hub.partialScanTitle")}</b><span>{t("hub.partialScanBody").replace("${n}", String(plugin.scan.errors.length))}</span>
+            <button class="b3-button b3-button--outline" style="margin-top:8px" disabled={rescanning} onclick={rescan}>{rescanning ? t("diag.rebuilding") : t("hub.rescan")}</button>
+        </div></div>
+    {:else if filter !== "all" || filterMember || filterModule || dueWithin !== "all"}
+        <div class="lv-card"><div class="lv-empty" role="status"><div class="eic"><UiIcon name="search" size={22} /></div><b>{t("hub.filteredEmpty")}</b><span>{t("hub.filteredEmptyHint")}</span>
+            <button class="b3-button b3-button--outline" style="margin-top:8px" onclick={() => { filter = "all"; filterMember = undefined; filterModule = undefined; dueWithin = "all"; pruneSelection(); persistFilter(); }}>{t("hub.clearFilters")}</button>
+        </div></div>
     {:else}
-        <div class="lv-card"><div class="lv-empty"><div class="eic">🌤</div><b>{t("dash.allClear")}</b><span>{t("hub.emptyHint")}</span></div></div>
+        <div class="lv-card"><div class="lv-empty"><div class="eic"><UiIcon name="checkCircle" size={22} /></div><b>{t("dash.allClear")}</b><span>{t("hub.emptyHint")}</span></div></div>
     {/if}
-{:else if viewMode === "calendar"}
-    <!-- 230 波：原生日历视图（数据同列表筛选口径；动作仅"完成"，其余回列表）；263 波：模式偏好持久化 -->
-    <Calendar items={filtered} {t} {version} initialMode={plugin.runtime.hubCalMode}
-        onModeChange={(m: "month" | "week") => { plugin.runtime.hubCalMode = m; saveRuntime(plugin, plugin.runtime).catch((e) => console.warn("[siyuan-home] cal mode persist failed:", e)); }}
-        onComplete={(r: Reminder) => plugin.complete(r)}
-        onAddMemo={(title: string, due: string) => plugin.addMemo(title, due)}
-        onConvert={(r: Reminder) => toLedgerDialog(r)} />
 {:else}
-    {@const groups = filter === "all"
-        ? [
-            { key: "overdue", label: t("hub.groupOverdue"), items: pinnedFirst(filtered.filter((r: Reminder) => r.level === "overdue")) },
-            { key: "soon", label: t("hub.groupSoon"), items: pinnedFirst(filtered.filter((r: Reminder) => r.level === "soon")) },
-            { key: "lead", label: t("hub.groupLead"), items: pinnedFirst(filtered.filter((r: Reminder) => r.level === "lead")) },
-        ].filter((g) => g.items.length > 0)
-        : [{ key: filter, label: "", items: pinnedFirst(filtered) }]}
-    {#each groups as g (g.key)}
-        {#if g.label}<div class="lv-group-label">{g.label} · {g.items.length}</div>{/if}
+    {#each renderedGroups as g (g.key)}
+        {#if g.label}<div class="lv-group-label">{g.label} · {g.total}</div>{/if}
         <div class="lv-card lv-rems">
-            {#each buildDisplay(g.items) as entry (entry.key)}
+            {#each display(g.items) as entry (entry.key)}
                 {#if entry.merged}
                     <!-- 29 组：同成员同日合并卡；PL13：Enter/Space 等价 + aria-expanded -->
                     <div class="lv-rem lead" role="button" tabindex="0"
                         aria-expanded={expandedMerges.has(entry.key)}
                         onkeydown={(e: KeyboardEvent) => (e.key === "Enter" || e.key === " ") && (e.preventDefault(), toggleMerge(entry.key))}
                         onclick={() => toggleMerge(entry.key)}>
-                        <div class="lv-rem-ic" aria-hidden="true">👪</div>
+                        <div class="lv-rem-ic" aria-hidden="true"><UiIcon name="users" size={18} /></div>
                         <div class="lv-rem-t" title={`${memberName(entry.memberId)} · ${entry.dueDate}`}><b>{memberName(entry.memberId)} · {relDue(entry.row.daysLeft, entry.dueDate)}</b><span class="lv-caption">{t("hub.mergeHint")}</span></div>
                         <span class="lv-badge orange">{entry.items.length}</span>
                         <div class="lv-rem-ops"><span class="lv-caption" aria-hidden="true">{expandedMerges.has(entry.key) ? "▾" : "▸"}</span></div>
@@ -598,4 +1170,108 @@
             {/each}
         </div>
     {/each}
+    {#if filtered.length > renderLimit}
+        <div class="lv-card" style="display:flex;justify-content:center;padding:12px">
+            <button class="b3-button b3-button--outline" onclick={() => (renderLimit += REMINDER_PAGE_SIZE)}>
+                {t("ledger.loadMore").replace("${n}", String(filtered.length - renderLimit))}
+            </button>
+        </div>
+    {/if}
 {/if}
+
+<style>
+    /* 提醒页局部视觉层级：页头负责摘要，控制区分成筛选与动作两层，避免长工具条抢占内容。 */
+    .lv-hub-head {
+        display: flex;
+        align-items: flex-end;
+        justify-content: space-between;
+        gap: 20px;
+        margin: 4px 2px 18px;
+    }
+    .lv-hub-title { margin: 0; }
+    .lv-hub-title h1 { margin: 2px 0 0; }
+    .lv-hub-eyebrow {
+        display: block;
+        color: var(--lv-accent);
+        font-size: 11px;
+        font-weight: 650;
+        letter-spacing: .08em;
+        text-transform: uppercase;
+    }
+    .lv-hub-summary {
+        display: flex;
+        align-items: stretch;
+        gap: 1px;
+        flex: none;
+        overflow: hidden;
+        border: 1px solid var(--lv-line);
+        border-radius: var(--lv-r-3);
+        background: var(--lv-surface);
+        box-shadow: var(--lv-shadow-1), inset 0 1px 0 var(--lv-inset);
+    }
+    .lv-hub-summary__item {
+        min-width: 74px;
+        padding: 9px 13px;
+        display: flex;
+        flex-direction: column-reverse;
+        gap: 2px;
+        text-align: right;
+        background: var(--lv-surface);
+    }
+    .lv-hub-summary__item + .lv-hub-summary__item { border-left: 1px solid var(--lv-line); }
+    .lv-hub-summary__item span { color: var(--lv-tx-3); font-size: 11px; white-space: nowrap; }
+    .lv-hub-summary__item b { font-size: 19px; line-height: 1.1; font-weight: 650; }
+    .lv-hub-summary__item.is-overdue b { color: var(--lv-danger); }
+    .lv-hub-controls { display: grid; grid-template-columns: minmax(0, 1.35fr) minmax(300px, .65fr); gap: 10px; margin-bottom: 18px; }
+    .lv-hub-filter-panel, .lv-hub-action-panel { padding: 11px 13px; min-width: 0; }
+    .lv-hub-panel-label {
+        margin: 0 0 7px 2px;
+        color: var(--lv-tx-3);
+        font-size: 10.5px;
+        font-weight: 600;
+        letter-spacing: .06em;
+        text-transform: uppercase;
+    }
+    .lv-hub-filters, .lv-hub-actions { margin: 0; gap: 6px; }
+    .lv-hub-filters .b3-select { flex: 1 1 120px; min-width: 0; }
+    .lv-hub-actions { align-items: center; }
+    .lv-hub-actions .b3-button { flex: 1 1 auto; min-width: 0; }
+    .lv-hub-view-toggle { flex: 0 0 auto; padding: 2px; }
+    .lv-hub-view-toggle .lv-tabs__item { min-height: 28px; padding: 4px 10px; font-size: 12px; }
+    .lv-hub-filters .is-filtered, .lv-hub-actions .is-active { color: var(--lv-accent); border-color: var(--lv-accent-line); background: var(--lv-accent-soft); }
+    .lv-hub-batchbar { padding: 8px 13px; margin-bottom: 12px; border-color: var(--lv-accent-line); background: var(--lv-surface); }
+    .lv-hub-batchbar .lv-caption { color: var(--lv-tx-2); font-weight: 600; }
+    @media (max-width: 760px) {
+        .lv-hub-head { align-items: flex-start; flex-direction: column; gap: 10px; margin-bottom: 14px; }
+        .lv-hub-summary { align-self: stretch; width: 100%; }
+        .lv-hub-summary__item { flex: 1; min-width: 0; text-align: left; }
+        .lv-hub-controls { grid-template-columns: 1fr; gap: 8px; }
+        .lv-hub-filter-panel, .lv-hub-action-panel { padding: 10px; }
+        .lv-hub-actions .b3-button { flex: 1 1 110px; }
+    }
+    @media (max-width: 420px) {
+        .lv-hub-filters .b3-select { flex-basis: calc(50% - 4px); }
+        .lv-hub-filters .b3-button { flex-basis: 100%; }
+        .lv-hub-actions .b3-button { flex-basis: calc(50% - 4px); }
+        .lv-hub-view-toggle { width: 100%; }
+        .lv-hub-view-toggle .lv-tabs__item { flex: 1; }
+    }
+    /* 嵌入思源侧栏时 viewport 仍可能很宽，使用面板容器宽度复用移动布局。 */
+    @container lv-home (max-width: 760px) {
+        .lv-hub-head { align-items: flex-start; flex-direction: column; gap: 10px; margin-bottom: 14px; }
+        .lv-hub-summary { align-self: stretch; width: 100%; }
+        .lv-hub-summary__item { flex: 1; min-width: 0; text-align: left; }
+        .lv-hub-controls { grid-template-columns: 1fr; gap: 8px; }
+        .lv-hub-filter-panel, .lv-hub-action-panel { padding: 10px; }
+        .lv-hub-actions .b3-button { flex: 1 1 110px; }
+    }
+    @container lv-home (max-width: 420px) {
+        .lv-hub-filters .b3-select { flex-basis: calc(50% - 4px); }
+        .lv-hub-filters .b3-button { flex-basis: 100%; }
+        .lv-hub-actions .b3-button { flex-basis: calc(50% - 4px); }
+        .lv-hub-view-toggle { width: 100%; }
+        .lv-hub-view-toggle .lv-tabs__item { flex: 1; }
+        .lv-hub-summary__item { padding-inline: 9px; }
+        .lv-hub-summary__item b { font-size: 17px; }
+    }
+</style>

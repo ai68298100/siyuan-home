@@ -12,7 +12,7 @@ import {
     applyRuntime, defaultRuntime, listHandled, purgeHandled, recordModuleHistory, type HubRuntime,
 } from "@/core/hub/runtime";
 import { runScan, deriveVisible } from "@/core/hub/scanner";
-import { snooze, mute, complete, restore, withRuntime, renew, updateMemo } from "@/core/hub/actions";
+import { snooze, mute, complete, restore, withRuntime, renew, updateMemo, addMemo } from "@/core/hub/actions";
 import { CertsProvider, leadFor } from "@/core/hub/providers";
 import { inSilentHours, dailyDigest, weeklyPreview, markWeeklyNotified, isoWeekKey } from "@/core/hub/notify";
 import { setTransport } from "@/core/siyuan";
@@ -65,6 +65,34 @@ describe("H01 运行态写串行化", () => {
         await withRuntime(plugin, () => { throw new Error("boom"); }).catch(() => undefined);
         await snooze(plugin, "a::certs.expiry", 1, TODAY);
         expect(JSON.parse(store["hub-runtime.json"]).snoozed["a::certs.expiry"]).toBe("2026-10-02");
+    });
+
+    it("运行态落盘失败 → 插件内存回滚到操作前快照", async () => {
+        const { plugin } = memoryPlugin();
+        plugin.runtime = defaultRuntime();
+        const before = JSON.stringify(plugin.runtime);
+        plugin.saveData = async () => { throw new Error("storage unavailable"); };
+        await expect(withRuntime(plugin, (rt) => { rt.muted["x::certs.expiry"] = true; })).rejects.toThrow("storage unavailable");
+        expect(JSON.stringify(plugin.runtime)).toBe(before);
+        expect(plugin.runtime.muted["x::certs.expiry"]).toBeUndefined();
+    });
+});
+
+describe("D1 备忘写入幂等与边界", () => {
+    it("相同标题/日期短时间重复提交只落一条", async () => {
+        const { plugin, store } = memoryPlugin();
+        await Promise.all([
+            addMemo(plugin, " 给老师打电话 ", "2026-10-10"),
+            addMemo(plugin, "给老师打电话", "2026-10-10"),
+        ]);
+        expect(JSON.parse(store["hub-runtime.json"]).memos).toHaveLength(1);
+    });
+
+    it("拒绝空标题、非法日期和不存在的日历日期", async () => {
+        const { plugin } = memoryPlugin();
+        await expect(addMemo(plugin, "  ", "2026-10-10")).rejects.toThrow("标题");
+        await expect(addMemo(plugin, "事项", "2026/10/10")).rejects.toThrow("日期");
+        await expect(addMemo(plugin, "事项", "2026-02-31")).rejects.toThrow("日期");
     });
 });
 
@@ -200,6 +228,17 @@ describe("H07 已处理视图数据", () => {
         const kinds = listHandled(rt, derived).map((h) => h.kind).sort();
         expect(kinds).toEqual(["done", "muted", "period", "year"]);
     });
+
+    it("缓存缺失时从提醒 ID 回推历史条目的模块", () => {
+        const rt: HubRuntime = {
+            ...defaultRuntime(),
+            muted: { "row-1::assets-real.expiry": true },
+            handledYear: { "row-2::members.birthday": 2026 },
+            handledUntil: { "row-3::contracts.expiry": "2026-10-20" },
+        };
+        const entries = listHandled(rt, []);
+        expect(entries.map((entry) => entry.moduleId).sort()).toEqual(["assets-real", "contracts", "members"]);
+    });
 });
 
 describe("H04 扫描失败保留模块快照", () => {
@@ -262,6 +301,29 @@ describe("H04 扫描失败保留模块快照", () => {
         expect(res.counts.overdue).toBe(1);
     });
 
+    it("PF06：增量扫描保留范围外模块的旧错误；实扫成功后清除该模块错误", async () => {
+        const rt = defaultRuntime();
+        rt.cache = {
+            reminders: [], counts: { overdue: 0, soon: 0, lead: 0 },
+            errors: [{ moduleId: "members", message: "kernel down" }], derived: [],
+            byModule: {
+                certs: { reminders: [], at: "2026-09-30T00:00:00Z" },
+                members: { reminders: [rem("old::members.birthday", "2026-10-03", "soon", "anniversary", "members")], at: "2026-09-30T00:00:00Z" },
+            },
+        };
+        const certs: DataProvider = { moduleId: "certs", collect: async () => [rem("new::certs.expiry", "2026-10-20")] };
+        const members: DataProvider = { moduleId: "members", collect: async () => [rem("new::members.birthday", "2026-10-21", "lead", "anniversary", "members")] };
+
+        const partial = await runScan([certs, members], settings(), rt, new Date(2026, 9, 2), new Set(["certs"]));
+        expect(partial.stale).toBe(true);
+        expect(partial.errors).toEqual([{ moduleId: "members", message: "kernel down" }]);
+
+        rt.cache = { reminders: partial.reminders, counts: partial.counts, errors: partial.errors, derived: partial.derived, byModule: partial.byModule };
+        const recovered = await runScan([certs, members], settings(), rt, new Date(2026, 9, 3), new Set(["members"]));
+        expect(recovered.stale).toBe(false);
+        expect(recovered.errors).toEqual([]);
+    });
+
     it("deriveVisible：禁用模块过滤 + 忽略过滤 + 计数重算（H02 数据源）", async () => {
         const rt: HubRuntime = { ...defaultRuntime(), muted: { "a::certs.expiry": true } };
         const derived = [
@@ -318,6 +380,21 @@ describe("H10 续期目标列分派", () => {
         const r = rem("row6::certs.expiry", "2026-10-05", "lead");
         await expect(renew(plugin, r, "2026-11-05", { avId: "av-certs", columns: { expiry: "k-expiry" } })).rejects.toThrow("kernel unavailable");
         expect(store["hub-runtime.json"]).toBeUndefined();
+    });
+
+    it("运行态写失败 → 续期单元格回滚到原日期", async () => {
+        const written: any[] = [];
+        setTransport(async (endpoint: string, payload: any) => {
+            if (endpoint === "/api/av/setAttributeViewBlockAttr") { written.push(payload); return { code: 0, msg: "", data: null }; }
+            throw new Error("unexpected endpoint");
+        });
+        const { plugin } = memoryPlugin();
+        plugin.saveData = async () => { throw new Error("storage unavailable"); };
+        const r = rem("row5::certs.expiry", "2026-10-05", "lead");
+        await expect(renew(plugin, r, "2026-11-05", { avId: "av-certs", columns: { expiry: "k-expiry" } })).rejects.toThrow("storage unavailable");
+        expect(written).toHaveLength(2);
+        expect(written[0].value.date.content).toBe(new Date("2026-11-05T00:00:00").getTime());
+        expect(written[1].value.date.content).toBe(new Date("2026-10-05T00:00:00").getTime());
     });
 });
 

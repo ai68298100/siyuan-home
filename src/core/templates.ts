@@ -5,11 +5,13 @@
  */
 import parentMeeting from "@/templates/schooling/parent-meeting.tpl?raw";
 import checkupPlan from "@/templates/health/checkup-plan.tpl?raw";
+import emergencyKit from "@/templates/stock/emergency-kit.tpl?raw";
 
 /** file 字段（schema DocTemplate）→ 模板内容 */
 const TEMPLATE_FILES: Record<string, string> = {
     "schooling/parent-meeting.tpl": parentMeeting,
     "health/checkup-plan.tpl": checkupPlan,
+    "stock/emergency-kit.tpl": emergencyKit,
 };
 
 export function getTemplate(file: string): string | undefined {

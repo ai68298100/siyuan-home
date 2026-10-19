@@ -2,13 +2,25 @@
 // ① 设计系统（docs/design/07 §3、08）—— C1-C8 全部 UI 的实现基座
 @use "./styles/design-system";
 
+// Body 级 Dialog 不在 .lv-home 的继承树中，提供同一套令牌的安全默认值，
+// 保证详情、油耗和设置弹窗在暗色与浅色主题下都不会因为变量缺失而退化。
+:root {
+    --lv-space-1: 4px; --lv-space-2: 8px; --lv-space-3: 12px; --lv-space-4: 16px;
+    --lv-space-5: 20px; --lv-space-6: 24px; --lv-space-7: 32px; --lv-space-8: 40px;
+    --lv-font-xs: 11px; --lv-font-sm: 12px; --lv-font-md: 13px;
+    --lv-font-body: 14px; --lv-font-title: 18px; --lv-font-display: 26px;
+    --lv-leading-tight: 1.25; --lv-leading-body: 1.6; --lv-leading-relaxed: 1.75;
+    --lv-weight-regular: 400; --lv-weight-medium: 500; --lv-weight-semibold: 600;
+    --lv-control-sm: 32px; --lv-control-md: 36px; --lv-control-lg: 40px;
+}
+
 // ② settings.svelte 现役样式（C1c 收尾完成：dashboard 已删、类名已统一 lv-settings 命名空间；
 //    仅剩此文件与 design-system 两处，无 LEGACY 残留）
 .lv-home {
-    padding: 16px;
+    padding: var(--lv-space-4);
     display: flex;
     flex-direction: column;
-    gap: 16px;
+    gap: var(--lv-space-4);
     height: 100%;
     box-sizing: border-box;
     overflow: auto;
@@ -24,30 +36,90 @@
 .lv-settings {
     display: grid;
     grid-template-columns: 176px minmax(0, 1fr);
-    gap: 18px;
-    align-items: start;
+    grid-template-rows: minmax(0, 1fr) auto;
+    gap: var(--lv-space-3) var(--lv-space-5);
+    align-items: stretch;
     min-width: 0;
+    min-height: 0;
+    overflow: hidden;
 }
 
-// 侧栏导航（原型 .set-nav）：sticky 跟随，锚点式纵向页签
+// 设置页主分类：内容区独立滚动，导航和保存栏保持可见。
 .lv-setnav {
     display: flex;
     flex-direction: column;
-    gap: 2px;
-    position: sticky;
-    top: 0;
+    gap: var(--lv-space-1);
+    min-height: 0;
+    overflow-y: auto;
+    padding-right: 10px;
+    border-right: 1px solid var(--lv-line);
+
+    .lv-setnav__brand {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        padding: 6px 8px 14px;
+        margin-bottom: 4px;
+        border-bottom: 1px solid var(--lv-line);
+
+        > div { min-width: 0; display: flex; flex-direction: column; gap: 1px; }
+        b { font-size: 14px; font-weight: 650; line-height: 1.2; }
+        span:not(.lv-setnav__brand-mark) { color: var(--lv-tx-3); font-size: 11px; line-height: 1.3; }
+    }
+
+    .lv-setnav__brand-mark {
+        width: 30px;
+        height: 30px;
+        flex: none;
+        display: grid;
+        place-items: center;
+        border-radius: 9px;
+        color: var(--b3-theme-on-primary);
+        background: var(--lv-accent);
+        box-shadow: inset 0 1px 0 rgba(255, 255, 255, .28);
+        font-size: 18px;
+        line-height: 1;
+    }
+
+    .lv-setnav__label {
+        padding: 6px 12px 4px;
+        color: var(--lv-tx-3);
+        font-size: 10px;
+        font-weight: 650;
+        letter-spacing: .08em;
+        text-transform: uppercase;
+    }
 
     .lv-setnav__item {
         text-align: left;
-        padding: 9px 14px;
+        padding: 10px 12px;
         border: none;
         border-radius: var(--lv-r-2);
         font-size: 13px;
         color: var(--lv-tx-2);
         background: none;
         cursor: pointer;
-        min-height: 36px;
+        min-height: var(--lv-control-lg);
         transition: background var(--lv-t-fast) var(--lv-ease), color var(--lv-t-fast) var(--lv-ease);
+        white-space: normal;
+
+        display: flex;
+        align-items: center;
+        gap: 9px;
+
+        .lv-setnav__icon {
+            width: 22px;
+            height: 22px;
+            flex: none;
+            display: grid;
+            place-items: center;
+            border-radius: 6px;
+            color: var(--lv-tx-3);
+            background: var(--lv-surface-2);
+            font-size: 13px;
+            line-height: 1;
+            transition: color var(--lv-t-fast) var(--lv-ease), background var(--lv-t-fast) var(--lv-ease);
+        }
 
         &:hover {
             background: var(--lv-surface-2);
@@ -58,16 +130,62 @@
             background: var(--lv-accent-soft);
             color: var(--lv-accent);
             font-weight: 500;
+
+            .lv-setnav__icon { color: var(--lv-accent); background: color-mix(in srgb, var(--lv-accent-soft) 65%, var(--lv-surface)); }
         }
     }
 }
 
-// 右侧内容列：卡片纵排
+// 右侧工作区：二级分类固定在顶部，只有当前细分类内容滚动。
 .lv-setpane {
     display: flex;
     flex-direction: column;
-    gap: 12px;
+    gap: var(--lv-space-2);
     min-width: 0;
+    min-height: 0;
+    overflow: hidden;
+}
+
+.lv-settings__pane-title {
+    flex: none;
+    margin: 2px 0;
+    font-size: 15px;
+    font-weight: 600;
+}
+
+.lv-settings__subnav {
+    display: flex;
+    flex: none;
+    gap: var(--lv-space-1);
+    overflow-x: auto;
+    padding-bottom: 4px;
+    scrollbar-width: thin;
+
+    .lv-setnav__item {
+        flex: none;
+        min-height: var(--lv-control-sm);
+        padding: 6px 10px;
+        border: 1px solid transparent;
+        border-radius: var(--lv-r-2);
+        color: var(--lv-tx-2);
+        background: transparent;
+        cursor: pointer;
+        white-space: nowrap;
+
+        &:hover { background: var(--lv-surface-2); color: var(--lv-tx); }
+        &.on { border-color: var(--lv-line); background: var(--lv-surface-2); color: var(--lv-accent); }
+    }
+}
+
+.lv-settings__scroll {
+    display: flex;
+    flex: 1 1 auto;
+    flex-direction: column;
+    gap: var(--lv-space-3);
+    min-height: 0;
+    overflow: auto;
+    padding: 2px 4px 8px 0;
+    overscroll-behavior: contain;
 }
 
 // 子项的默认 min-width 会把设置卡片撑出窄侧栏；表单行允许在容器内收缩和换行。
@@ -79,7 +197,7 @@
 
 // 分组卡片（原型 .set-card）：标题 + hint + 开关行分区
 .lv-setcard {
-    padding: 16px 18px;
+    padding: var(--lv-space-4) 18px;
 
     .lv-setcard__title {
         font-size: 13.5px;
@@ -96,7 +214,7 @@
 
     .lv-setcard__actions {
         display: flex;
-        gap: 8px;
+        gap: var(--lv-space-2);
         margin-top: 8px;
         flex-wrap: wrap;
     }
@@ -116,7 +234,7 @@
 
 .lv-settings__row {
     align-items: flex-start;
-    gap: 12px;
+    gap: var(--lv-space-3);
     // 控件较多时在行内自然换行，避免窄容器依赖额外的横向滚动。
     flex-wrap: wrap;
     padding: 10px 8px;
@@ -167,10 +285,10 @@
 }
 
 @media (max-width: 480px) {
-    .lv-settings { gap: 8px; }
+    .lv-settings { gap: var(--lv-space-2); }
     .lv-setnav { margin-inline: -4px; }
     .lv-setcard { padding: 12px; }
-    .lv-settings__row { gap: 8px; }
+    .lv-settings__row { gap: var(--lv-space-2); }
     // settings.svelte 的说明标签带有历史 inline min-width:180px；用 !important
     // 在窄容器中覆盖它，并允许长的中文/URL 文案换行，避免行宽被撑出面板。
     .lv-settings__row > span:first-child {
@@ -190,20 +308,30 @@
 @container lv-home (max-width: 480px) {
     .lv-settings {
         grid-template-columns: minmax(0, 1fr);
-        gap: 8px;
+        grid-template-rows: auto minmax(0, 1fr) auto;
+        gap: 6px;
     }
     .lv-settings .lv-setnav {
         position: static;
         flex-direction: row;
         overflow-x: auto;
+        overflow-y: hidden;
         scrollbar-width: none;
         margin-inline: -4px;
+        padding: 0 4px 4px;
+        border-right: 0;
+        border-bottom: 1px solid var(--lv-line);
+
+        .lv-setnav__brand { flex: none; padding: 0 10px 4px 0; margin: 0 2px 0 0; border-bottom: 0; }
+        .lv-setnav__brand > div, .lv-setnav__label { display: none; }
+        .lv-setnav__brand-mark { width: 28px; height: 28px; }
 
         &::-webkit-scrollbar { display: none; }
-        .lv-setnav__item { flex: none; }
+        .lv-setnav__item { flex: none; min-height: 34px; padding: 7px 10px; }
     }
+    .lv-settings .lv-settings__footer { grid-column: 1; }
     .lv-settings .lv-setcard { padding: 12px; }
-    .lv-settings .lv-settings__row { gap: 8px; }
+    .lv-settings .lv-settings__row { gap: var(--lv-space-2); }
     .lv-settings .lv-settings__row > span:first-child {
         min-width: 0 !important;
         max-width: 100%;
@@ -221,9 +349,16 @@
 
 .lv-settings__footer {
     grid-column: 1 / -1;
-    gap: 8px;
-    margin-top: 2px;
+    gap: var(--lv-space-2);
+    flex-wrap: wrap;
+    margin: 0;
+    padding-top: 10px;
     align-items: center;
+    border-top: 1px solid var(--lv-line);
+    background: var(--lv-canvas);
+
+    > .fn__flex-1 { min-width: 12px; }
+    > .lv-btn.primary { margin-left: auto; }
 }
 
 .lv-settings__about {
@@ -231,17 +366,26 @@
     font-size: 13px;
 }
 
-// 窄屏：单列，侧栏转横向滚动页签（原型 760px 分支同款）
+// 窄视口：两级导航都转为横向滚动，保留右侧内容区和底部操作区。
 @media (max-width: 760px) {
     .lv-settings {
         grid-template-columns: minmax(0, 1fr);
+        grid-template-rows: auto minmax(0, 1fr) auto;
     }
 
     .lv-setnav {
         position: static;
         flex-direction: row;
         overflow-x: auto;
+        overflow-y: hidden;
         scrollbar-width: none;
+        padding: 0 4px 4px;
+        border-right: 0;
+        border-bottom: 1px solid var(--lv-line);
+
+        .lv-setnav__brand { flex: none; padding: 0 10px 4px 0; margin: 0 2px 0 0; border-bottom: 0; }
+        .lv-setnav__brand > div, .lv-setnav__label { display: none; }
+        .lv-setnav__brand-mark { width: 28px; height: 28px; }
 
         &::-webkit-scrollbar {
             display: none;
@@ -249,8 +393,12 @@
 
         .lv-setnav__item {
             flex: none;
+            min-height: 34px;
+            padding: 7px 10px;
         }
     }
+
+    .lv-settings__footer { grid-column: 1; }
 }
 
 // C4b：台账行点击进详情（键盘/指针可达提示）
@@ -267,12 +415,13 @@
     }
 }
 
-// 253 波：台账详情抽屉 kv 排版（对齐原型 .kv：标签列定宽、中性灰、行距舒适）。
+// 台账详情窗口的标签与字段值保持清晰层级，长文本可以在当前窗口内折行。
 // b3-dialog 挂在 body 层、拿不到 .lv-home 作用域的 lv token——按 07 §1 用 b3 变量现场派生；
 // 插件专属 id 前缀（lv-*）保证不污染思源其他弹窗
 #lv-detail-body {
     > .fn__flex {
-        gap: 12px;
+        min-width: 0;
+        gap: var(--lv-space-3);
         padding: 7px 0;
         align-items: baseline;
 
@@ -283,7 +432,8 @@
         }
 
         > span:not(:first-child) {
-            word-break: break-all;
+            min-width: 0;
+            overflow-wrap: anywhere;
         }
     }
 
@@ -302,6 +452,61 @@
     min-width: 0;
 }
 
+// 原生详情/油耗/购物等弹窗挂在 body，无法继承面板里的表面令牌。
+// 只匹配管家专属内容，保持思源和其他插件的弹窗样式独立。
+.b3-dialog:has([id^="lv-"]),
+.b3-dialog:has(.lv-home) {
+    // 思源 Dialog 默认 z-index 较低，可能被插件自身 sticky 顶栏压住；
+    // 管家弹层必须完整覆盖主面板，避免标题栏横跨窗口顶部。
+    z-index: 110 !important;
+    --lv-surface: var(--b3-theme-surface);
+    --lv-surface-2: var(--b3-theme-surface-light);
+    --lv-line: var(--b3-border-color);
+    --lv-accent: var(--b3-theme-primary);
+    --lv-tx: var(--b3-theme-on-background);
+    --lv-tx-3: color-mix(in srgb, var(--b3-theme-on-background) 64%, var(--b3-theme-background));
+
+    .b3-dialog__container {
+        border-radius: 20px;
+        background: var(--lv-surface);
+        color: var(--lv-tx);
+    }
+    .b3-dialog__header { font-size: 17px; font-weight: 600; }
+    .b3-dialog__content { color: var(--lv-tx); line-height: 1.6; background: var(--lv-surface); }
+    .b3-dialog__action { background: var(--lv-surface); border-top: 1px solid var(--lv-line); }
+    :is(.b3-text-field:not([type="checkbox"]):not([type="radio"]):not([type="file"]), .b3-select) {
+        min-height: var(--lv-control-lg);
+        border-radius: 10px;
+        font-size: 13.5px;
+        background-color: var(--lv-surface-2);
+    }
+    .b3-button { min-height: 34px; border-radius: 10px; }
+    .ft__on-surface { color: var(--lv-tx-3); }
+
+    .lv-card {
+        background: var(--lv-surface);
+        border: 1px solid var(--lv-line);
+        border-radius: var(--lv-r-3, 18px);
+        box-shadow: none;
+    }
+}
+
+:root[data-theme-mode="light"] :is(.b3-dialog:has([id^="lv-"]), .b3-dialog:has(.lv-home)) {
+    @include design-system.light-surfaces;
+    // 原生 Dialog 和内联统计块仍消费 b3 表面变量；别名限定在当前插件弹窗。
+    --b3-theme-background: var(--lv-surface);
+    --b3-theme-background-light: var(--lv-surface);
+    --b3-theme-surface: var(--lv-surface);
+    --b3-theme-surface-light: var(--lv-surface-2);
+    --b3-border-color: var(--lv-line);
+
+    .b3-dialog__container { box-shadow: var(--lv-shadow-3); }
+}
+
+:root[data-theme-mode="dark"] :is(.b3-dialog:has([id^="lv-"]), .b3-dialog:has(.lv-home)) {
+    color-scheme: dark;
+}
+
 // 257 波：插件自建弹窗家族（body 层、无 .lv-home 作用域）内的辅助文字统一中性化——
 // ft__on-surface 在思源默认暗色主题下发蓝，与主面板的中性灰语言冲突。
 // 全部弹窗内容容器遵循 #lv-* id 约定，按清单收敛；新增弹窗记得把容器 id 加进来
@@ -315,17 +520,17 @@
 #lv-pick-body,
 #lv-pick-list {
     .ft__on-surface {
-        color: color-mix(in srgb, var(--b3-theme-on-background) 52%, var(--b3-theme-background));
+            color: var(--lv-tx-3);
     }
 }
 
-// 263 波：台账详情弹窗 → 右滑抽屉形态（对齐原型 .drawer：440px 贴右全高 + 蒙层模糊 +
-// 弹簧入场）。纯 CSS 改造——openDetail 的 DOM 构建逻辑（附件上传/编辑/续期历史）原样保留，
-// 只换容器呈现；body 层拿不到 lv token，按 07 §1 用 b3 变量现场派生
+// 详情采用居中窗口：标题与底栏留在 flex 流中，仅详情主体滚动。
+// 尺寸随视口和安全区收缩；表面、弱描边与留白保持和工作台相同的层级。
 .b3-dialog:has(#lv-detail-body) {
-    // 思源 .b3-dialog 是 flex 居中容器——抽屉要贴右停靠，改为尾对齐 + 纵向拉伸
-    justify-content: flex-end;
-    align-items: stretch;
+    justify-content: center;
+    align-items: center;
+    box-sizing: border-box;
+    padding: max(12px, env(safe-area-inset-top)) max(12px, env(safe-area-inset-right)) max(12px, env(safe-area-inset-bottom)) max(12px, env(safe-area-inset-left));
 
     .b3-dialog__scrim {
         backdrop-filter: blur(3px);
@@ -333,60 +538,165 @@
     }
 
     .b3-dialog__container {
-        right: 0 !important;
-        left: auto !important;
-        top: 0 !important;
-        bottom: 0 !important;
-        width: min(440px, 94vw) !important;
-        height: 100% !important;
-        max-width: none !important;
-        max-height: none !important;
-        border-radius: 0 !important;
-        border-left: 1px solid var(--b3-border-color);
-        box-shadow: 0 24px 64px rgba(0, 0, 0, .30), 0 6px 16px rgba(0, 0, 0, .18);
+        position: relative !important;
+        inset: auto !important;
+        box-sizing: border-box;
+        width: min(720px, 92vw) !important;
+        height: auto !important;
+        min-width: 0;
+        max-width: 100% !important;
+        max-height: min(88dvh, 860px, calc(100dvh - max(12px, env(safe-area-inset-top)) - max(12px, env(safe-area-inset-bottom)))) !important;
+        margin: 0 !important;
+        border: 1px solid var(--lv-line);
+        border-radius: 20px !important;
+        box-shadow: var(--lv-shadow-3, 0 20px 60px rgba(0, 0, 0, .22));
         display: flex;
         flex-direction: column;
-        animation: lv-drawer-in 320ms cubic-bezier(.32, .72, 0, 1);
+        // 更多菜单从底栏向上展开，滚动与裁切只由详情主体承担。
+        overflow: visible !important;
+        animation: lv-dialog-in 220ms cubic-bezier(.2, 0, 0, 1);
     }
 
     .b3-dialog__header {
-        padding: 16px 20px;
-        border-bottom: 1px solid var(--b3-border-color);
-        font-size: 15px;
+        flex: none;
+        min-width: 0;
+        padding: 20px 52px 18px 24px;
+        border-bottom: 1px solid var(--lv-line);
+        border-radius: 20px 20px 0 0;
+        font-size: 17px;
         font-weight: 600;
+        overflow-wrap: anywhere;
     }
 
-    .b3-dialog__content {
-        flex: 1;
-        min-height: 0; // 269 波：缺此值内容不收缩，动作栏被长 kv 列表顶出容器外（审计实证）
-        overflow: auto;
-        padding: 18px 20px !important;
-    }
-
-    // 内容自身不再限高——滚动交给 .b3-dialog__content（抽屉主体），避免双滚动条
     #lv-detail-body {
+        .lv-detail-intro { margin: 0 0 14px; font-size: 12px; color: var(--lv-tx-3); }
+        .lv-detail-value.is-empty { color: var(--lv-tx-3); font-size: 12px; }
+        flex: 1 1 auto;
+        min-height: 0;
+        min-width: 0;
+        box-sizing: border-box;
+        // 覆盖 DOM 的旧 60vh 限制，窗口 flex 布局为实际标题/底栏高度预留空间。
         max-height: none !important;
-        overflow: visible !important;
+        overflow: auto !important;
+        overscroll-behavior: contain;
+        scrollbar-width: thin;
+        scrollbar-color: var(--lv-line) transparent;
+        padding: 20px 24px !important;
+
+        // 车辆基础字段双列排列，记录、图片、统计和快捷操作横跨两列。
+        &.lv-detail-body-vehicle {
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            align-content: start;
+            gap: 0 24px;
+
+            > .lv-detail-kv {
+                min-width: 0;
+            }
+
+            > .lv-detail-wide {
+                grid-column: 1 / -1;
+            }
+
+            > section,
+            > .lv-detail-section,
+            > .ft__on-surface,
+            > .lv-record-next,
+            > .lv-vehicle-quick-actions {
+                grid-column: 1 / -1;
+            }
+        }
     }
 
     .b3-dialog__action {
-        // 269 波：思源默认把动作栏绝对定位在底部——会盖住长 kv 列表尾行（审计实证），
-        // 抽屉形态下强制回 flex 流（static），由容器布局承担；不透明底防滚动内容透出
+        // 思源默认动作栏绝对定位；回到 flex 流后不会遮住长列表末项。
         position: static !important;
         flex: none;
-        background: var(--b3-theme-surface);
-        padding: 12px 20px;
-        border-top: 1px solid var(--b3-border-color);
+        min-width: 0;
+        overflow: visible;
+        background: var(--lv-surface);
+        padding: 14px 24px;
+        border-top: 1px solid var(--lv-line);
+        border-radius: 0 0 20px 20px;
+    }
+
+    // 主操作与关闭留在底栏；次要操作统一收进向上展开的更多菜单。
+    .lv-detail-actions {
+        display: flex;
+        align-items: center;
+        gap: var(--lv-space-2);
+        flex-wrap: wrap;
+    }
+    .lv-detail-actions > #lv-detail-edit { min-width: 96px; }
+    .lv-detail-more { position: relative; margin-left: auto; }
+    .lv-detail-more[hidden] { display: none !important; }
+    .lv-detail-more > summary {
+        list-style: none;
+        cursor: pointer;
+        border-radius: 8px;
+        padding: 7px 10px;
+    }
+    .lv-detail-more > summary::-webkit-details-marker { display: none; }
+    .lv-detail-more[open] > summary { background: var(--lv-surface-2); }
+    .lv-detail-more-menu {
+        position: absolute;
+        z-index: 3;
+        right: 0;
+        bottom: calc(100% + 8px);
+        display: flex;
+        flex-direction: column;
+        gap: 2px;
+        min-width: 150px;
+        max-width: calc(100vw - 48px);
+        max-height: min(360px, calc(100dvh - 128px));
+        overflow: auto;
+        overscroll-behavior: contain;
+        padding: 6px;
+        border: 1px solid var(--lv-line);
+        border-radius: 12px;
+        background: var(--lv-surface);
+        box-shadow: var(--lv-shadow-2, 0 12px 28px rgba(0, 0, 0, .16));
+    }
+    .lv-detail-more-menu .b3-button { justify-content: flex-start; text-align: left; white-space: nowrap; }
+    .lv-detail-value:hover { background: var(--lv-surface-2); }
+    .lv-detail-value:focus-visible {
+        background: var(--lv-surface-2);
+        outline: 2px solid var(--lv-accent);
+        outline-offset: 2px;
+    }
+    .lv-inline-editor { width: 100%; min-width: 0; }
+
+    // 即使通用弹窗移动规则把按钮设为半宽，详情仍能保持三个清晰入口。
+    @media (max-width: 480px) {
+        .lv-detail-actions > :is(.b3-button, .lv-btn) {
+            flex: 1 1 auto;
+            min-width: 0;
+            min-height: 44px;
+        }
+        .lv-detail-more > summary { min-height: 44px; }
     }
 }
 
-@keyframes lv-drawer-in {
-    from { transform: translateX(36px); opacity: 0; }
-    to { transform: none; opacity: 1; }
+@keyframes lv-dialog-in {
+    from { opacity: 0; transform: translateY(8px) scale(.985); }
+    to { opacity: 1; transform: none; }
 }
 
 @media (prefers-reduced-motion: reduce) {
     .b3-dialog:has(#lv-detail-body) .b3-dialog__container { animation: none !important; }
+}
+
+@media (max-width: 620px) {
+    .b3-dialog:has(#lv-detail-body) {
+        .b3-dialog__container {
+            width: 100% !important;
+            max-height: calc(100dvh - max(12px, env(safe-area-inset-top)) - max(12px, env(safe-area-inset-bottom))) !important;
+        }
+        .b3-dialog__header { padding: var(--lv-space-4) 46px 14px 18px; }
+        #lv-detail-body { padding: 18px !important; }
+        #lv-detail-body.lv-detail-body-vehicle { grid-template-columns: 1fr; }
+        .lv-inline-editor > :is(.b3-text-field, .b3-select) { min-width: 0 !important; }
+    }
 }
 
 // 17 组：紧急信息卡打印样式——隐藏导航/操作/输入，保留核心数据。
@@ -457,12 +767,17 @@
 // DEVICE-07（227 波）：移动端全屏面板 Dialog——顶栏按钮点击后以整屏弹层承载同一 TabPanel
 .lv-mobile-host {
     height: 100%;
-    overflow: auto;
+    // 移动全屏弹层只保留一个滚动容器：交给 .lv-home，避免弹层内容、宿主
+    // 和面板三层滚动叠加导致顶部吸附和返回手势不稳定。
+    overflow: hidden;
     -webkit-overflow-scrolling: touch;
 }
 
 .b3-dialog--lvmobile {
     .b3-dialog__scrim { background: var(--b3-theme-background); }
+    // Dialog 自带标题栏会与面板内的品牌栏重复；关闭入口由面板顶栏提供，
+    // 这样移动端顶部只保留一层产品导航。
+    .b3-dialog__header { display: none; }
     .b3-dialog__container {
         width: 100vw !important;
         height: 100dvh !important;
@@ -475,8 +790,154 @@
         flex-direction: column;
         .b3-dialog__content {
             flex: 1;
-            overflow: auto;
-            padding: 0 10px 12px;
+            min-height: 0;
+            overflow: hidden;
+            padding: 0 !important;
+        }
+    }
+}
+
+// Vehicle energy forms and stats remain usable in narrow desktop panes and on phones.
+.lv-energy-dialog {
+    .b3-dialog__container {
+        width: min(620px, calc(100vw - 24px)) !important;
+        max-width: calc(100vw - 24px) !important;
+        max-height: min(88vh, 760px) !important;
+        display: flex;
+        flex-direction: column;
+    }
+    .b3-dialog__content {
+        min-height: 0;
+        overflow: auto;
+    }
+    .b3-dialog__action {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 6px;
+        flex: none;
+    }
+}
+
+@media (max-width: 480px) {
+    .lv-energy-dialog {
+        .b3-dialog__container {
+            width: calc(100vw - 12px) !important;
+            max-width: calc(100vw - 12px) !important;
+            max-height: 92dvh !important;
+            margin: 6px !important;
+        }
+        .b3-dialog__content { padding: 12px !important; }
+        .b3-dialog__action { padding: var(--lv-space-2) 12px !important; }
+    }
+}
+
+// ── 18. body 级插件弹窗的控件节奏 ─────────────────────────
+// 详情、油耗、购物等弹窗挂在 body，无法消费 .lv-home 内的控件原语；
+// 与内嵌录入弹层保持同一触控高度，移动端也不再出现过矮的操作按钮。
+.b3-dialog:has([id^="lv-"]),
+.b3-dialog:has(.lv-home) {
+    :is(.b3-button, .lv-btn) {
+        min-height: var(--lv-control-md);
+        border-radius: 10px;
+    }
+
+    .b3-dialog__action {
+        display: flex;
+        align-items: center;
+        flex-wrap: wrap;
+        gap: var(--lv-space-2);
+    }
+}
+
+@media (max-width: 480px) {
+    .b3-dialog:has([id^="lv-"]),
+    .b3-dialog:has(.lv-home) {
+        .b3-dialog__header { padding: 12px 14px; }
+        .b3-dialog__action { padding: 10px 12px; }
+        .b3-dialog__action > :is(.b3-button, .lv-btn) {
+            flex: 1 1 calc(50% - 8px);
+            justify-content: center;
+            min-width: 0;
+            min-height: var(--lv-control-lg);
+        }
+    }
+}
+
+// ── 19. body 级插件弹窗高对比度与无障碍加固 (Epoch 5) ──────────────
+@media (forced-colors: active) {
+    .b3-dialog:has([id^="lv-"]),
+    .b3-dialog:has(.lv-home),
+    .b3-dialog--lvmobile,
+    .lv-energy-dialog {
+        --lv-surface: Canvas;
+        --lv-surface-2: Canvas;
+        --lv-line: CanvasText;
+        --lv-accent: Highlight;
+        --lv-tx: CanvasText;
+        --lv-tx-3: CanvasText;
+
+        .b3-dialog__container {
+            border: 2px solid CanvasText !important;
+            background: Canvas !important;
+            color: CanvasText !important;
+            box-shadow: none !important;
+        }
+
+        .b3-dialog__header {
+            background: Canvas !important;
+            color: CanvasText !important;
+            border-bottom: 1px solid CanvasText !important;
+        }
+
+        .b3-dialog__content,
+        #lv-detail-body {
+            background: Canvas !important;
+            color: CanvasText !important;
+        }
+
+        .b3-dialog__action {
+            background: Canvas !important;
+            color: CanvasText !important;
+            border-top: 1px solid CanvasText !important;
+        }
+
+        .lv-detail-more-menu {
+            border: 2px solid CanvasText !important;
+            background: Canvas !important;
+            box-shadow: none !important;
+        }
+
+        .b3-button--primary {
+            background: Highlight !important;
+            color: HighlightText !important;
+            border: 1px solid Highlight !important;
+        }
+
+        :is(.b3-button, .lv-btn, .b3-text-field, .b3-select) {
+            border: 1px solid CanvasText;
+        }
+
+        .lv-detail-value:focus-visible {
+            outline: 2px solid Highlight !important;
+            outline-color: Highlight !important;
+            outline-offset: 2px;
+        }
+    }
+}
+
+@media (prefers-contrast: more) {
+    .b3-dialog:has([id^="lv-"]),
+    .b3-dialog:has(.lv-home),
+    .b3-dialog--lvmobile,
+    .lv-energy-dialog {
+        .b3-dialog__container {
+            border: 2px solid var(--b3-theme-on-background) !important;
+        }
+
+        .b3-dialog__header,
+        .b3-dialog__action,
+        .lv-detail-more-menu {
+            border-color: var(--b3-theme-on-background) !important;
         }
     }
 }

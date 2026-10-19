@@ -57,14 +57,20 @@ export async function runHealthCheck(
             }
             const read = await renderLedgerAll(ref.avId);
             const declared = new Set((schema?.columns ?? []).map((c) => c.key));
-            const missing = [...declared].filter((k) => !ref.columns![k]);
+            const registered = ref.columns ?? {};
+            const missing = [...declared].filter((k) => !registered[k]);
+            const errors: string[] = [];
+            if (!read.complete) errors.push(`incomplete read (${read.rows.length}/${read.rowCount})`);
+            if (missing.length > 0) errors.push(`missing schema columns: ${missing.join(", ")}`);
             modules.push({
                 moduleId,
-                ok: read.complete,
+                // A complete read is necessary but not sufficient: the provisioned
+                // attribute view must also contain every schema-declared column.
+                ok: read.complete && missing.length === 0,
                 rows: read.rows.length,
                 complete: read.complete,
                 missingColumns: missing,
-                error: read.complete ? undefined : `incomplete read (${read.rows.length}/${read.rowCount})`,
+                error: errors.length > 0 ? errors.join("; ") : undefined,
             });
         } catch (e) {
             modules.push({ moduleId, ok: false, error: e instanceof Error ? e.message : String(e) });

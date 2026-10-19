@@ -687,6 +687,14 @@ exports[`31 模块 schema 契约快照（21 组） > 每个 schema 的结构快�
 
 exports[`31 模块 schema 契约快照（21 组） > 每个 schema 的结构快照（有意变更时用 -u 更新并记录原因） 3`] = `
 {
+  "activity": {
+    "dateField": "date",
+    "detailFields": [
+      "category",
+      "amount",
+      "location",
+    ],
+  },
   "capture": [
     "name",
     "category",
@@ -742,7 +750,10 @@ exports[`31 模块 schema 契约快照（21 组） > 每个 schema 的结构快�
     {
       "key": "amount",
       "labelKey": "field.amount",
+      "min": 0,
+      "step": 0.01,
       "type": "number",
+      "unitKey": "capture.unitCny",
     },
     {
       "key": "expiry",
@@ -805,6 +816,15 @@ exports[`31 模块 schema 契约快照（21 组） > 每个 schema 的结构快�
 
 exports[`31 模块 schema 契约快照（21 组） > 每个 schema 的结构快照（有意变更时用 -u 更新并记录原因） 4`] = `
 {
+  "activity": {
+    "dateField": "date",
+    "detailFields": [
+      "category",
+      "hospital",
+      "department",
+      "diagnosis",
+    ],
+  },
   "capture": [
     "name",
     "member",
@@ -964,12 +984,16 @@ exports[`31 模块 schema 契约快照（21 组） > 每个 schema 的结构快�
     {
       "key": "stock_qty",
       "labelKey": "field.stock_qty",
+      "min": 0,
       "type": "number",
+      "unitKey": "capture.unitCount",
     },
     {
       "key": "low_stock_at",
       "labelKey": "field.low_stock_at",
+      "min": 0,
       "type": "number",
+      "unitKey": "capture.unitCount",
     },
     {
       "key": "location",
@@ -1073,7 +1097,10 @@ exports[`31 模块 schema 契约快照（21 组） > 每个 schema 的结构快�
     {
       "key": "amount",
       "labelKey": "field.amount",
+      "min": 0,
+      "step": 0.01,
       "type": "number",
+      "unitKey": "capture.unitCny",
     },
     {
       "key": "note",
@@ -1153,6 +1180,14 @@ exports[`31 模块 schema 契约快照（21 组） > 每个 schema 的结构快�
 
 exports[`31 模块 schema 契约快照（21 组） > 每个 schema 的结构快照（有意变更时用 -u 更新并记录原因） 7`] = `
 {
+  "activity": {
+    "dateField": "claim_date",
+    "detailFields": [
+      "claim_status",
+      "claim_amount",
+      "insurer",
+    ],
+  },
   "capture": [
     "name",
     "category",
@@ -1302,6 +1337,15 @@ exports[`31 模块 schema 契约快照（21 组） > 每个 schema 的结构快�
 
 exports[`31 模块 schema 契约快照（21 组） > 每个 schema 的结构快照（有意变更时用 -u 更新并记录原因） 8`] = `
 {
+  "activity": {
+    "dateField": "date",
+    "detailFields": [
+      "category",
+      "amount",
+      "channel",
+      "qty",
+    ],
+  },
   "capture": [
     "name",
     "amount",
@@ -1340,7 +1384,10 @@ exports[`31 模块 schema 契约快照（21 组） > 每个 schema 的结构快�
     {
       "key": "amount",
       "labelKey": "field.amount",
+      "min": 0,
+      "step": 0.01,
       "type": "number",
+      "unitKey": "capture.unitCny",
     },
     {
       "key": "url",
@@ -1370,7 +1417,9 @@ exports[`31 模块 schema 契约快照（21 组） > 每个 schema 的结构快�
     {
       "key": "qty",
       "labelKey": "field.qty",
+      "min": 0,
       "type": "number",
+      "unitKey": "capture.unitCount",
     },
     {
       "key": "target_amount",
@@ -1405,6 +1454,14 @@ exports[`31 模块 schema 契约快照（21 组） > 每个 schema 的结构快�
 
 exports[`31 模块 schema 契约快照（21 组） > 每个 schema 的结构快照（有意变更时用 -u 更新并记录原因） 9`] = `
 {
+  "activity": {
+    "dateField": "date",
+    "detailFields": [
+      "category",
+      "party",
+      "deposit",
+    ],
+  },
   "capture": [
     "name",
     "category",
@@ -1516,6 +1573,14 @@ exports[`31 模块 schema 契约快照（21 组） > 每个 schema 的结构快�
 
 exports[`31 模块 schema 契约快照（21 组） > 每个 schema 的结构快照（有意变更时用 -u 更新并记录原因） 10`] = `
 {
+  "activity": {
+    "dateField": "exam_date",
+    "detailFields": [
+      "category",
+      "status",
+      "issuer",
+    ],
+  },
   "capture": [
     "name",
     "member",
@@ -1600,6 +1665,15 @@ exports[`31 模块 schema 契约快照（21 组） > 每个 schema 的结构快�
 
 exports[`31 模块 schema 契约快照（21 组） > 每个 schema 的结构快照（有意变更时用 -u 更新并记录原因） 11`] = `
 {
+  "activity": {
+    "dateField": "date",
+    "detailFields": [
+      "category",
+      "direction",
+      "amount",
+      "source",
+    ],
+  },
   "capture": [
     "name",
     "category",
@@ -1641,7 +1715,10 @@ exports[`31 模块 schema 契约快照（21 组） > 每个 schema 的结构快�
     {
       "key": "amount",
       "labelKey": "field.amount",
+      "min": 0,
+      "step": 0.01,
       "type": "number",
+      "unitKey": "capture.unitCny",
     },
     {
       "key": "date",
@@ -1671,6 +1748,15 @@ exports[`31 模块 schema 契约快照（21 组） > 每个 schema 的结构快�
 
 exports[`31 模块 schema 契约快照（21 组） > 每个 schema 的结构快照（有意变更时用 -u 更新并记录原因） 12`] = `
 {
+  "activity": {
+    "dateField": "date",
+    "detailFields": [
+      "category",
+      "direction",
+      "person",
+      "amount",
+    ],
+  },
   "capture": [
     "name",
     "direction",
@@ -1714,7 +1800,10 @@ exports[`31 模块 schema 契约快照（21 组） > 每个 schema 的结构快�
     {
       "key": "amount",
       "labelKey": "field.amount",
+      "min": 0,
+      "step": 0.01,
       "type": "number",
+      "unitKey": "capture.unitCny",
     },
     {
       "key": "date",
@@ -1777,6 +1866,7 @@ exports[`31 模块 schema 契约快照（21 组） > 每个 schema 的结构快�
         "daily_chem",
         "paper",
         "medical_st",
+        "emergency_st",
         "other_st",
       ],
       "type": "select",
@@ -1799,12 +1889,16 @@ exports[`31 模块 schema 契约快照（21 组） > 每个 schema 的结构快�
     {
       "key": "qty",
       "labelKey": "field.qty",
+      "min": 0,
       "type": "number",
+      "unitKey": "capture.unitCount",
     },
     {
       "key": "low_stock_at",
       "labelKey": "field.low_stock_at",
+      "min": 0,
       "type": "number",
+      "unitKey": "capture.unitCount",
     },
   ],
   "numericRules": [
@@ -1820,6 +1914,13 @@ exports[`31 模块 schema 契约快照（21 组） > 每个 schema 的结构快�
       "key": "expiry",
       "kind": "oneoff",
       "leadDays": 30,
+    },
+  ],
+  "templates": [
+    {
+      "file": "stock/emergency-kit.tpl",
+      "key": "emergency_kit",
+      "nameKey": "tpl.emergencyKit",
     },
   ],
   "views": [
@@ -1842,6 +1943,12 @@ exports[`31 模块 schema 契约快照（21 组） > 每个 schema 的结构快�
 
 exports[`31 模块 schema 契约快照（21 组） > 每个 schema 的结构快照（有意变更时用 -u 更新并记录原因） 14`] = `
 {
+  "activity": {
+    "dateField": "last_done",
+    "detailFields": [
+      "category",
+    ],
+  },
   "capture": [
     "name",
     "member",
@@ -2154,11 +2261,21 @@ exports[`31 模块 schema 契约快照（21 组） > 每个 schema 的结构快�
 
 exports[`31 模块 schema 契约快照（21 组） > 每个 schema 的结构快照（有意变更时用 -u 更新并记录原因） 18`] = `
 {
+  "activity": {
+    "dateField": "purchase_date",
+    "detailFields": [
+      "plate",
+      "brand_model",
+      "energy_type",
+      "mileage",
+    ],
+  },
   "capture": [
     "name",
     "plate",
-    "expiry",
-    "inspection_due",
+    "brand_model",
+    "energy_type",
+    "mileage",
   ],
   "columns": [
     {
@@ -2177,6 +2294,34 @@ exports[`31 模块 schema 契约快照（21 组） > 每个 schema 的结构快�
       "type": "text",
     },
     {
+      "key": "brand_model",
+      "labelKey": "field.brand_model",
+      "type": "text",
+    },
+    {
+      "key": "vin",
+      "labelKey": "field.vin",
+      "type": "text",
+    },
+    {
+      "key": "color",
+      "labelKey": "field.color",
+      "type": "text",
+    },
+    {
+      "default": "gasoline",
+      "key": "energy_type",
+      "labelKey": "field.energy_type",
+      "options": [
+        "gasoline",
+        "diesel",
+        "hybrid",
+        "electric",
+        "other",
+      ],
+      "type": "select",
+    },
+    {
       "key": "expiry",
       "labelKey": "field.expiry",
       "type": "date",
@@ -2187,14 +2332,57 @@ exports[`31 模块 schema 契约快照（21 组） > 每个 schema 的结构快�
       "type": "text",
     },
     {
+      "key": "attachments",
+      "labelKey": "field.attachments",
+      "type": "mAsset",
+    },
+    {
       "key": "mileage",
       "labelKey": "field.mileage",
+      "min": 0,
+      "step": 1,
+      "type": "number",
+      "unitKey": "capture.unitKm",
+    },
+    {
+      "key": "purchase_date",
+      "labelKey": "field.purchase_date",
+      "type": "date",
+    },
+    {
+      "key": "purchase_price",
+      "labelKey": "field.purchase_price",
+      "type": "number",
+    },
+    {
+      "key": "current_value",
+      "labelKey": "field.current_value",
       "type": "number",
     },
     {
       "key": "inspection_due",
       "labelKey": "field.inspection_due",
       "type": "date",
+    },
+    {
+      "key": "insurance_company",
+      "labelKey": "field.insurance_company",
+      "type": "text",
+    },
+    {
+      "key": "insurance_due",
+      "labelKey": "field.insurance_due",
+      "type": "date",
+    },
+    {
+      "key": "vehicle_tax_due",
+      "labelKey": "field.vehicle_tax_due",
+      "type": "date",
+    },
+    {
+      "key": "battery_capacity",
+      "labelKey": "field.battery_capacity",
+      "type": "number",
     },
     {
       "key": "battery_due",
@@ -2217,6 +2405,18 @@ exports[`31 模块 schema 契约快照（21 组） > 每个 schema 的结构快�
     {
       "field": "inspection_due",
       "key": "inspection",
+      "kind": "oneoff",
+      "leadDays": 30,
+    },
+    {
+      "field": "insurance_due",
+      "key": "insurance",
+      "kind": "oneoff",
+      "leadDays": 30,
+    },
+    {
+      "field": "vehicle_tax_due",
+      "key": "vehicle_tax",
       "kind": "oneoff",
       "leadDays": 30,
     },
@@ -2288,6 +2488,13 @@ exports[`31 模块 schema 契约快照（21 组） > 每个 schema 的结构快�
 
 exports[`31 模块 schema 契约快照（21 组） > 每个 schema 的结构快照（有意变更时用 -u 更新并记录原因） 20`] = `
 {
+  "activity": {
+    "dateField": "date",
+    "detailFields": [
+      "destination",
+      "status",
+    ],
+  },
   "capture": [
     "name",
     "destination",
@@ -2329,7 +2536,10 @@ exports[`31 模块 schema 契约快照（21 组） > 每个 schema 的结构快�
     {
       "key": "amount",
       "labelKey": "field.amount",
+      "min": 0,
+      "step": 0.01,
       "type": "number",
+      "unitKey": "capture.unitCny",
     },
     {
       "key": "note",
@@ -2355,6 +2565,13 @@ exports[`31 模块 schema 契约快照（21 组） > 每个 schema 的结构快�
 
 exports[`31 模块 schema 契约快照（21 组） > 每个 schema 的结构快照（有意变更时用 -u 更新并记录原因） 21`] = `
 {
+  "activity": {
+    "dateField": "date",
+    "detailFields": [
+      "category",
+      "amount",
+    ],
+  },
   "capture": [
     "name",
     "category",
@@ -2387,7 +2604,10 @@ exports[`31 模块 schema 契约快照（21 组） > 每个 schema 的结构快�
     {
       "key": "amount",
       "labelKey": "field.amount",
+      "min": 0,
+      "step": 0.01,
       "type": "number",
+      "unitKey": "capture.unitCny",
     },
     {
       "key": "attachments",
@@ -2410,6 +2630,12 @@ exports[`31 模块 schema 契约快照（21 组） > 每个 schema 的结构快�
 
 exports[`31 模块 schema 契约快照（21 组） > 每个 schema 的结构快照（有意变更时用 -u 更新并记录原因） 22`] = `
 {
+  "activity": {
+    "dateField": "date",
+    "detailFields": [
+      "status",
+    ],
+  },
   "capture": [
     "name",
     "date",
@@ -2452,6 +2678,13 @@ exports[`31 模块 schema 契约快照（21 组） > 每个 schema 的结构快�
 
 exports[`31 模块 schema 契约快照（21 组） > 每个 schema 的结构快照（有意变更时用 -u 更新并记录原因） 23`] = `
 {
+  "activity": {
+    "dateField": "date",
+    "detailFields": [
+      "cities",
+      "amount",
+    ],
+  },
   "capture": [
     "name",
     "date",
@@ -2476,7 +2709,10 @@ exports[`31 模块 schema 契约快照（21 组） > 每个 schema 的结构快�
     {
       "key": "amount",
       "labelKey": "field.amount",
+      "min": 0,
+      "step": 0.01,
       "type": "number",
+      "unitKey": "capture.unitCny",
     },
     {
       "key": "attachments",
@@ -2574,6 +2810,13 @@ exports[`31 模块 schema 契约快照（21 组） > 每个 schema 的结构快�
 
 exports[`31 模块 schema 契约快照（21 组） > 每个 schema 的结构快照（有意变更时用 -u 更新并记录原因） 25`] = `
 {
+  "activity": {
+    "dateField": "date",
+    "detailFields": [
+      "category",
+      "rating",
+    ],
+  },
   "capture": [
     "name",
     "category",
@@ -2604,6 +2847,9 @@ exports[`31 模块 schema 契约快照（21 组） > 每个 schema 的结构快�
     {
       "key": "rating",
       "labelKey": "field.rating",
+      "max": 5,
+      "min": 0,
+      "step": 0.5,
       "type": "number",
     },
     {
@@ -2768,6 +3014,16 @@ exports[`31 模块 schema 契约快照（21 组） > 每个 schema 的结构快�
 
 exports[`31 模块 schema 契约快照（21 组） > 每个 schema 的结构快照（有意变更时用 -u 更新并记录原因） 29`] = `
 {
+  "activity": {
+    "dateField": "date",
+    "detailFields": [
+      "category",
+      "vaccine_name",
+      "dose_no",
+      "metric_type",
+      "metric_value",
+    ],
+  },
   "capture": [
     "name",
     "member",
@@ -2865,6 +3121,14 @@ exports[`31 模块 schema 契约快照（21 组） > 每个 schema 的结构快�
 
 exports[`31 模块 schema 契约快照（21 组） > 每个 schema 的结构快照（有意变更时用 -u 更新并记录原因） 30`] = `
 {
+  "activity": {
+    "dateField": "exam_date",
+    "detailFields": [
+      "school",
+      "category",
+      "status",
+    ],
+  },
   "capture": [
     "name",
     "school",
@@ -2931,7 +3195,10 @@ exports[`31 模块 schema 契约快照（21 组） > 每个 schema 的结构快�
     {
       "key": "amount",
       "labelKey": "field.amount",
+      "min": 0,
+      "step": 0.01,
       "type": "number",
+      "unitKey": "capture.unitCny",
     },
     {
       "key": "due",

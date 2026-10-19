@@ -23,6 +23,7 @@ const COLS = [
     { key: "name", type: "text" },
     { key: "qty", type: "number" },
     { key: "buy_date", type: "date" },
+    { key: "status", type: "select", options: ["active", "archived"] },
 ];
 
 describe("planImport", () => {
@@ -35,11 +36,44 @@ describe("planImport", () => {
         );
         expect(plan.rows).toHaveLength(3);
         expect(plan.rows[0].cells).toContainEqual({ key: "qty", type: "number", value: "2" });
-        expect(plan.rows[1].warnings[0]).toContain("不是数字");
-        expect(plan.rows[1].cells.find((c) => c.key === "buy_date")?.value).toBe("2026-3-2"); // 斜杠转连字符
+        expect(plan.rows[1].warnings[0].message).toContain("不是数字");
+        expect(plan.rows[1].cells.find((c) => c.key === "buy_date")?.value).toBe("2026-03-02"); // 标准日期格式
         expect(plan.rows[2].cells.find((c) => c.key === "buy_date")).toBeUndefined();
         expect(plan.rows[2].cells.find((c) => c.key === "qty")?.value).toBe("1"); // 合法单元格保留
+        expect(plan.rows[2].warnings[0]).toEqual({ key: "buy_date", message: "「坏日期」不是有效日期" });
         expect(plan.skipped).toBe(0);
+    });
+
+    it("rejects impossible calendar dates and accepts leap days", () => {
+        const plan = planImport(
+            [["name", "buy_date"], ["过期日期", "2026-02-31"], ["闰日", "2024/2/29"]],
+            { 0: "name", 1: "buy_date" }, COLS, "name",
+        );
+        expect(plan.rows[0].cells).toHaveLength(0);
+        expect(plan.rows[0].warnings[0].key).toBe("buy_date");
+        expect(plan.rows[1].cells[0].value).toBe("2024-02-29");
+    });
+
+    it("validates select options and refuses unsupported cell types", () => {
+        const plan = planImport(
+            [["name", "status", "attachments"], ["有效", "invalid", "photo.jpg"]],
+            { 0: "name", 1: "status", 2: "attachments" },
+            [...COLS, { key: "attachments", type: "mAsset" }], "name",
+        );
+        expect(plan.rows[0].cells).toHaveLength(0);
+        expect(plan.rows[0].warnings).toEqual([
+            { key: "status", message: "「invalid」不是该字段的有效选项" },
+            { key: "attachments", message: "该字段类型暂不支持 CSV 导入" },
+        ]);
+    });
+
+    it("keeps the first value when multiple CSV columns map to one field", () => {
+        const plan = planImport(
+            [["name", "qty-a", "qty-b"], ["药品", "2", "9"]],
+            { 0: "name", 1: "qty", 2: "qty" }, COLS, "name",
+        );
+        expect(plan.rows[0].cells).toEqual([{ key: "qty", type: "number", value: "2" }]);
+        expect(plan.rows[0].warnings).toEqual([{ key: "qty", message: "多个 CSV 列映射到同一字段，已忽略后续列" }]);
     });
 
     it("名称为空整行跳过；name 列不重复入 cells；checkbox 中文/符号识别", () => {

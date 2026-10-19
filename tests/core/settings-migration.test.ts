@@ -36,6 +36,13 @@ describe("settings 迁移（21 组：v0.1 → v0.2）", () => {
         expect(s.enabledModules.length).toBeGreaterThan(0);
         expect(s.members).toEqual([]);
         expect(s.onboarded).toBe(false);
+        expect(s.avatar).toBe("我");
+    });
+
+    it("头像设置兼容旧配置并清洗过长文字与非法照片", async () => {
+        const s = await loadSettings(pluginWithSettings({ avatar: "小驴管家", avatarImage: "https://example.com/avatar.png" }));
+        expect(s.avatar).toBe("小驴");
+        expect(s.avatarImage).toBeUndefined();
     });
 
     it("成员 sex 清洗（D23）：合法保留，非法/缺失清除", async () => {
@@ -51,6 +58,30 @@ describe("settings 迁移（21 组：v0.1 → v0.2）", () => {
         expect(s.members[0].sex).toBe("male");
         expect(s.members[1].sex).toBeUndefined();
         expect(s.members[2].sex).toBeUndefined();
+    });
+
+    it("成员建行待核实快照在重启读取后保留并清洗候选 ID", async () => {
+        const pending = {
+            avId: "av-members",
+            baselineItemIds: ["old-row", "old-row", 7],
+            candidateItemIds: ["new-row", "new-row", null],
+            fingerprint: { name: "张三", role: "self", birthday: "1990-01-02", lunarBirthday: false },
+            startedAt: "2026-10-14T00:00:00.000Z",
+        };
+        const legacy = {
+            members: [
+                { id: "m-pending", name: "张三", role: "self", avRowCreatePending: pending },
+                { id: "m-invalid", name: "李四", role: "self", avRowCreatePending: { ...pending, fingerprint: { name: "李四", role: "bogus" } } },
+            ],
+        };
+        const s = await loadSettings(pluginWithSettings(legacy));
+        expect(s.members[0].avRowCreatePending).toMatchObject({
+            avId: "av-members",
+            baselineItemIds: ["old-row"],
+            candidateItemIds: ["new-row"],
+            fingerprint: { name: "张三", role: "self", birthday: "1990-01-02", lunarBirthday: false },
+        });
+        expect(s.members[1].avRowCreatePending).toBeUndefined();
     });
 });
 
@@ -286,7 +317,15 @@ describe("导入归一化（16 轮：未知模块剔除 + 成员字段修复）"
         expect(settings.checkinBindings).toEqual(original.checkinBindings);
         expect(settings.notifyHour).toBe(7);
         expect(settings.silentFrom).toBe(23);
+        expect(settings.avatar).toBe("我");
         expect((settings as any).someFutureField).toBe("forward-compat");
+    });
+
+    it("导入头像时保留合法本地图片并过滤远程与超大数据", () => {
+        const valid = "data:image/png;base64,iVBORw0KGgo=";
+        expect(normalizeImportedSettings({ avatar: "★", avatarImage: valid }).settings).toMatchObject({ avatar: "★", avatarImage: valid });
+        expect(normalizeImportedSettings({ avatarImage: "https://example.com/avatar.png" }).settings.avatarImage).toBeUndefined();
+        expect(normalizeImportedSettings({ avatarImage: `data:image/png;base64,${"A".repeat(1_000_000)}` }).settings.avatarImage).toBeUndefined();
     });
 });
 

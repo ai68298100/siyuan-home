@@ -11,7 +11,13 @@ export const TOKEN = process.env.SIYUAN_TOKEN || "";
 export const APP = `${BASE}/stage/build/desktop/`;
 export const COOKIE_FILE = path.resolve(ROOT, "tmp/ui3-cookies.json");
 export const WS_DIR = process.env.TEST_WS_DIR || path.resolve(ROOT, "tmp/sy-ui3");
-const KERNEL = process.env.SIYUAN_KERNEL || "D:\\biji\\SiYuan\\resources\\kernel\\SiYuan-Kernel.exe";
+const KERNEL_CANDIDATES = [
+    process.env.SIYUAN_KERNEL,
+    "D:\\RJ\\SiYuan\\resources\\kernel\\SiYuan-Kernel.exe",
+    "D:\\biji\\SiYuan\\resources\\kernel\\SiYuan-Kernel.exe",
+    "C:\\Program Files\\SiYuan\\resources\\kernel\\SiYuan-Kernel.exe",
+].filter(Boolean);
+const KERNEL = KERNEL_CANDIDATES.find((candidate) => existsSync(candidate)) ?? KERNEL_CANDIDATES[0];
 
 export const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
@@ -19,6 +25,9 @@ export const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 export async function ensureKernel() {
     const alive = await fetch(`${BASE}/check-auth`, { signal: AbortSignal.timeout(1500) }).then((r) => r.ok).catch(() => false);
     if (alive) return;
+    if (!KERNEL || !existsSync(KERNEL)) {
+        throw new Error(`SiYuan-Kernel.exe not found; set SIYUAN_KERNEL to its full path (checked: ${KERNEL_CANDIDATES.join(", ")})`);
+    }
     execSync(`powershell.exe -NoProfile -Command "Start-Process -FilePath '${KERNEL}' -ArgumentList 'serve','--workspace','${WS_DIR.replace(/\\/g, "\\\\")}','--port','${PORT}','--lang','zh-CN' -WindowStyle Hidden"`, { stdio: "ignore" });
     for (let i = 0; i < 30; i++) {
         await sleep(1000);
@@ -40,21 +49,37 @@ export async function login(ctx) {
     }
     const page = await ctx.newPage();
     await page.goto(`${BASE}/check-auth`, { waitUntil: "domcontentloaded" });
-    await page.locator("input:visible").first().fill(process.env.TEST_WS_AUTH_CODE || "ui3pass1234");
-    await page.locator("button:visible").first().click();
-    await sleep(2500);
+    // The auth page also exposes a visible remember-me checkbox, and when the
+    // kernel has no lock screen the password panel is hidden altogether. Only
+    // fill and submit an actual editable auth field; otherwise keep the
+    // already-authorized session and avoid clicking the unrelated "exit"
+    // button.
+    const authInput = page.locator('input:not([type="checkbox"]):not([type="hidden"]):visible').first();
+    if (await authInput.count()) {
+        await authInput.fill(process.env.TEST_WS_AUTH_CODE || "ui3pass1234");
+        await page.locator("button:visible").first().click();
+        await sleep(2500);
+    }
     writeFileSync(COOKIE_FILE, JSON.stringify(await ctx.cookies()));
     await page.close();
 }
 
 /** 打开管家面板并跳过首启向导（幂等）。 */
 export async function openPanel(page) {
-    await page.evaluate(() => {
-        const tb = document.getElementById("toolbar");
-        const el = tb?.querySelector('[data-name="siyuan-home"]')
-            ?? Array.from(tb?.children ?? []).find((c) => (c.getAttribute("aria-label") || "").includes("小驴管家"));
-        el?.click();
-    });
+    // Reload can restore the plugin tab that was open before navigation. The
+    // toolbar button is a toggle, so clicking it unconditionally would close
+    // an already-mounted panel and make this helper non-idempotent. Only open
+    // the panel when no mounted host is present.
+    const alreadyOpen = await page.locator(".lv-home").count();
+    if (alreadyOpen === 0) {
+        await page.evaluate(() => {
+            const tb = document.getElementById("toolbar");
+            const el = tb?.querySelector('[data-name="siyuan-home"]')
+                ?? Array.from(tb?.children ?? []).find((c) => (c.getAttribute("aria-label") || "").includes("小驴管家"));
+            el?.click();
+        });
+    }
+    await page.locator(".lv-home").first().waitFor({ state: "visible", timeout: 20000 });
     await sleep(3500);
     await page.evaluate(() => {
         document.querySelectorAll(".b3-snackbar__close").forEach((b) => b.dispatchEvent(new MouseEvent("click", { bubbles: true })));
@@ -91,7 +116,7 @@ export async function armFullRender(page) {
         }
         // width 必须显式给定：.lv-home 带 container-type:inline-size（尺寸包含），
         // 固定定位下不设宽度会把 inline-size 解析为 0，整面板塌缩成竖条
-        el.style.cssText = "position:fixed;inset:auto;top:0;left:0;width:calc(100vw - 32px);z-index:9999;background:var(--b3-theme-background);overflow:visible;height:auto;padding:16px";
+        el.style.cssText = "position:fixed;inset:auto;top:0;left:0;width:calc(100vw - 32px);z-index:9999;overflow:visible;height:auto;padding:16px";
     });
     await sleep(600);
 }

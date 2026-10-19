@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { assetHref, downloadAsset, safeDownloadName } from "@/core/assets";
+import { assetHref, downloadAsset, isEncryptedNotebookAsset, isImageAsset, safeDownloadName } from "@/core/assets";
 
 describe("assetHref", () => {
     it("resolves kernel relative paths on the supplied origin", () => {
@@ -28,6 +28,25 @@ describe("safeDownloadName", () => {
     });
 });
 
+describe("isImageAsset", () => {
+    it("accepts local image formats and rejects PDFs, traversal, and external URLs", () => {
+        expect(isImageAsset("assets/siyuan-home/id-front.png")).toBe(true);
+        expect(isImageAsset("/assets/siyuan-home/护照.HEIC?box=nb-1")).toBe(true);
+        expect(isImageAsset("assets/siyuan-home/scan.pdf")).toBe(false);
+        expect(isImageAsset("assets/../outside.png")).toBe(false);
+        expect(isImageAsset("https://outside.example/photo.png")).toBe(false);
+    });
+});
+
+describe("isEncryptedNotebookAsset", () => {
+    it("recognizes encrypted notebook asset references", () => {
+        const notebooks = [{ id: "private-box", encrypted: true }, { id: "open-box", encrypted: false }];
+        expect(isEncryptedNotebookAsset("assets/private.png?box=private-box", notebooks)).toBe(true);
+        expect(isEncryptedNotebookAsset("assets/open.png?box=open-box", notebooks)).toBe(false);
+        expect(isEncryptedNotebookAsset("assets/plain.png", notebooks)).toBe(false);
+    });
+});
+
 describe("downloadAsset", () => {
     it("fetches a same-origin asset and clicks a named download link", async () => {
         const click = vi.fn();
@@ -47,7 +66,9 @@ describe("downloadAsset", () => {
             { origin: "https://notes.example/", fetchImpl, documentRef },
         );
 
-        expect(fetchImpl).toHaveBeenCalledWith("https://notes.example/assets/siyuan-home/passport.pdf", { credentials: "same-origin" });
+        expect(fetchImpl).toHaveBeenCalledWith("https://notes.example/assets/siyuan-home/passport.pdf", {
+            credentials: "same-origin", signal: expect.any(AbortSignal),
+        });
         expect(anchor.href).toBe("blob:asset");
         expect(anchor.download).toBe("护照.pdf");
         expect(appendChild).toHaveBeenCalledWith(anchor);
