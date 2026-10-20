@@ -1884,5 +1884,15 @@
     "overview.shareCardDownload": "Download PNG",
     "overview.shareCardImageCopied": "Recap card image copied to clipboard!",
     "overview.shareCardCopyImageFailed": "Failed to copy image, please download PNG or copy text",
-    "overview.shareCardDownloaded": "Image download started!"
+    "overview.shareCardDownloaded": "Image download started!",
+    "capture.keepContext": "Batch Entry: retain member/date/location/category",
+    "capture.frequentModules": "Frequent",
+    "capture.presetToday": "Today",
+    "capture.presetTomorrow": "Tomorrow",
+    "capture.presetNextWeek": "7 Days",
+    "capture.presetNextMonth": "30 Days",
+    "capture.presetNextYear": "1 Year",
+    "capture.presetLocations": "Frequent Locations",
+    "ledger.matchCount": "${n} matched",
+    "clear": "Clear"
 }

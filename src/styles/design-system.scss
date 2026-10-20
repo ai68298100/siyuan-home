@@ -624,6 +624,22 @@
       border-top: 1px solid var(--lv-line); } }
 
   // ── 10b. 快速记录弹层表单（267 波）：frow 行 + b3 控件统一进 lv 体系（同 .lv-toolbar 观感）
+  .lv-quick-chips { display: flex; gap: 5px; flex-wrap: wrap; margin-bottom: 8px; }
+  .lv-quick-chip {
+    display: inline-flex; align-items: center; gap: 4px; padding: 3px 9px; font-size: 11.5px;
+    border-radius: var(--lv-r-full, 999px); background: var(--lv-surface-2); color: var(--lv-tx-2);
+    border: 1px solid var(--lv-line); cursor: pointer; transition: all var(--lv-t-fast) var(--lv-ease);
+    user-select: none; line-height: 1.2;
+    &:hover { background: var(--lv-accent-soft); border-color: var(--lv-accent); color: var(--lv-accent); }
+    &.active { background: var(--lv-accent); color: #fff; border-color: var(--lv-accent); font-weight: 500; }
+  }
+  .lv-preset-tags { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 5px; }
+  .lv-preset-tag {
+    font-size: 11px; padding: 2px 7px; border-radius: var(--lv-r-1, 4px);
+    background: var(--lv-surface-2); color: var(--lv-tx-2); border: 1px solid var(--lv-line);
+    cursor: pointer; transition: all var(--lv-t-fast) var(--lv-ease); user-select: none; line-height: 1.2;
+    &:hover { background: var(--lv-accent-soft); border-color: var(--lv-accent); color: var(--lv-accent); }
+  }
   .lv-cap-body .lv-frow { align-items: center; }
   .lv-cap-body .b3-select,
   .lv-cap-body .b3-text-field { width: 100%; min-width: 0; min-height: var(--lv-control-sm); padding: 6px 10px; font-size: 13px;

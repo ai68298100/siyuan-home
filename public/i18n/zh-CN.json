@@ -1884,5 +1884,15 @@
     "overview.shareCardDownload": "下载 PNG",
     "overview.shareCardImageCopied": "长图已成功复制到剪贴板！",
     "overview.shareCardCopyImageFailed": "复制图片失败，请使用“下载 PNG”或复制文字",
-    "overview.shareCardDownloaded": "长图下载已开始！"
+    "overview.shareCardDownloaded": "长图下载已开始！",
+    "capture.keepContext": "批量录入：保留成员/日期/位置/分类",
+    "capture.frequentModules": "常用分类",
+    "capture.presetToday": "今天",
+    "capture.presetTomorrow": "明天",
+    "capture.presetNextWeek": "7天后",
+    "capture.presetNextMonth": "30天后",
+    "capture.presetNextYear": "1年后",
+    "capture.presetLocations": "常用存放位置",
+    "ledger.matchCount": "匹配 ${n} 条",
+    "clear": "清空"
 }
