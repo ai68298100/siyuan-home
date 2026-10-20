@@ -1552,30 +1552,14 @@
                 return;
             }
 
-            const { calculateExpenseTrend, formatExpenseTrendReport } = await import("@/core/expense-trend");
-            const report = calculateExpenseTrend(entries);
-            const text = formatExpenseTrendReport(report);
-
-            const dlg = new Dialog({
-                title: t("ledger.expenseTrendTitle"),
-                content: `<div class="b3-dialog__content lv-dialog-scroll-body"><pre class="lv-caption" style="white-space:pre-wrap;line-height:1.7;margin:0"></pre></div>
-<div class="b3-dialog__action">
-  <button class="b3-button b3-button--cancel">${t("close")}</button>
-  <button class="b3-button" id="lv-et-copy">${t("ledger.emergencyKitCopy")}</button>
-</div>`,
-                width: "560px",
+            const { openExpenseTrendDialog } = await import("@/core/expense-dialog");
+            openExpenseTrendDialog({
+                entries,
+                budgetLimits: plugin.settings.budgetLimits,
+                t,
+                DialogCls: Dialog,
+                showMessageFn: showMessage,
             });
-            const pre = dlg.element.querySelector("pre");
-            if (pre) pre.textContent = text;
-            (dlg.element.querySelector(".b3-button--cancel") as HTMLButtonElement).onclick = () => dlg.destroy();
-            (dlg.element.querySelector("#lv-et-copy") as HTMLButtonElement).onclick = async () => {
-                try {
-                    await navigator.clipboard.writeText(text);
-                    showMessage(t("overview.lifeIndexCopied"), 2500, "info");
-                } catch {
-                    showMessage(t("ledger.copyAsImageFail"), 4000, "error");
-                }
-            };
         } catch (e) {
             showMessage(t("ledger.logReadFailed") + " (" + (e instanceof Error ? e.message : String(e)) + ")", 5000, "error");
         }

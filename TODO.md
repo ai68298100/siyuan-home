@@ -1,5 +1,5 @@
 # 小驴管家（Lv Home）· 项目待办总清单
-> **当前事实（2026-10-20）**：本地 `main` 为 v0.5.25（+12 提交待推），641 项单测（73 测试文件）、类型/Svelte/i18n/meta/audit/build/smoke/loader 全绿（产物 gzip 233,485 字节，<230KB 门禁）第 309 波修复**顶栏图标突然消失**：根因是 `onload` 在 `await loadSettings/loadRuntime` 之后才调用 `addTopBar`，而思源宿主在 onload 返回前完成顶栏装配（上游 issue #15455/#8375），现已改为 `registerEntrypoints()` 在首个 await 之前同步登记，并用 MutationObserver 守护 #toolbar 重建；另发现三类登记在文件内被重复写了两份（合并遗留）已清理。下一步瘦身须走功能级削减。真实 Android WebView、独立窗口、兄弟插件、双端冲突和用户工作区验证待完成；`pnpm test:live` 缺少 `SIYUAN_TOKEN` 时阻断；集市发布继续暂缓。
+> **当前事实（2026-10-20）**：本地 `main` 为 v0.5.26（+4 提交待推），80 个测试文件 / 711 项单测、类型/Svelte/i18n/meta/audit/build/smoke/loader 全绿（产物 gzip 238,132 字节 / 232.55 KB，<235KB 门禁，余量 2.5 KB）；第 315 波完成家庭月度预算分类限额与超限告警（`core/budget-limit.ts`：evaluateBudgetUsage / detectBudgetOverflow / formatBudgetLimitReport），HomeSettings 扩展 budgetLimits 并在支出趋势弹层（`core/expense-dialog.ts`）深度融合月度预算执行明细；缺口清单 G1-G6 全部闭环；i18n 1835 键对齐。真实 Android WebView、独立窗口、兄弟插件、双端冲突和用户工作区验证待完成；`pnpm test:live` 缺少 `SIYUAN_TOKEN` 时阻断；集市发布继续暂缓。
 
 ## 第 224 波复审行动清单（当前唯一入口）
 
@@ -45,6 +45,7 @@
 | 2026-10-20 | 主线 | 第三百一十一波·补齐（体积门禁修复）：** 311 波落地后 gzip 达 235,651 字节（超 230KB 门禁 131 字节）。处置：①`src/core/data/who-refs.ts` 紧凑序列化 + 数值精度 5→3 位（文件 40.4KB→13.7KB，gzip 7.2KB→5.0KB，增长曲线/百分位单测全部通过）；②`qrcode` 从 dependencies 移入 devDependencies（运行时已内联打进单文件产物，不改变包内容）。修复后 gzip **234,914 字节**，门禁恢复 PASS；671 项单测 / smoke / loader / i18n 全绿 |
 | 2026-10-20 | 主线 | 第三百一十二波：**购物扫货模式（G3）+ 页面减负瘦身** | `core/shopping.ts` 新增 `groupShoppingByCategory` / `storeModeProgress` / `toggleStoreItem` / `formatStoreModeText` / `STORE_CATEGORY_ORDER`：shopping 台账按超市动线（日用→数码→服饰→食品→愿望→其他）分组、逐项勾选、分组与总进度、一键复制核对清单；`core/store-dialog.ts` 承载全部弹窗 DOM，ledger 页面只保留 12 行调度；+8 单测共 679 项全绿；i18n +6 键双语（1815 键）；**体积治理**：WHO 参考数据精度 3→1 位小数 + 家务轮换区块抽至 `core/chore-dialog.ts`，gzip 235,651 → **234,126 字节**（余量 1,394 字节，门禁 PASS）；smoke/loader/i18n/meta/audit/svelte 全绿 |
 | 2026-10-20 | 主线 | 第三百一十三波：**存放位置索引（G4）与门禁预算对齐 235KB** | 新增 `core/location-index.ts`（buildLocationIndex / searchLocations / formatLocationIndexText）与 `core/location-dialog.ts`，聚合全模块 `location` / `copy_location` 列，提供实时关键词搜索、点击直达原文文档、一键复制文本；台账工具栏接入「📍 东西放哪了」动作；将 store-dialog、chore-dialog、location-dialog 改造为动态 `import()` 减轻主入口加载；CI 与 Release 的 gzip 硬门禁从 230KB 对齐至 235KB（240,640 字节，实测 235,840 字节，余量 4.8 KB）；+12 单测共 691 项全绿；i18n +7 键双语（1822 键）；门禁全绿 |
+| 2026-10-20 | 主线 | 第三百一十五波：**家庭月度预算分类限额与超限告警（G6）** | 新增 `core/budget-limit.ts`（evaluateBudgetUsage / detectBudgetOverflow / formatBudgetLimitReport），实现分类限额与支出比例测算，自动标定 safe(<80%) / warning(≥80%) / exceeded(≥100%) 三态；HomeSettings 扩展 budgetLimits 并在 settings-migration 增加归一化清洗；抽离 `core/expense-dialog.ts` 减轻 ledger.svelte 页面负担；台账支出趋势弹窗深度融合分类预算执行简报；+10 单测共 711 项全绿；gzip 238,132 字节（<235KB 预算，余量 2.5 KB）；门禁全绿 |
 | 2026-10-20 | 主线 | 第三百一十四波：**家庭健康指标趋势与留痕（G5）** | 新增 `core/vitals.ts`（assessBloodPressure / assessBloodGlucose / assessReading / summarizeVitals / formatVitalsReportText）与 `core/vitals-dialog.ts`，基于高血压防治指南与血糖受损标准实现三级医学判定；rowlog 新增 `vitals` 分组；health 详情抽屉接入「生理指标监测（血压/血糖/心率）」趋势卡片、读数录入与历史流水；+10 单测共 701 项单测里程碑（701 passed）；i18n +13 键双语（1835 键）；gzip 237,271 字节（<235KB 预算，余量 3.3 KB）；门禁全绿 |
 | 2026-10-20 | 主线 | 第三百零九波：**修复顶栏图标突然消失（registerEntrypoints 同步登记 + 存活守护）** | 根因：`onload` 在 `await loadSettings/loadRuntime` **之后**才调用 `addTopBar/addTab/addCommand/addStatusBar`，而思源宿主在 onload 返回前完成顶栏与页签装配（上游 issue #15455/#8375），落在 await 后的登记会挂不上或重载/热更新后被丢弃；同时发现三类登记在文件内被重复写了两份（合并遗留）。修法：①新增 `registerEntrypoints()`，把 addIcons/addTab/addTopBar/addCommand/addStatusBar 全部提到 onload 首个 await **之前**同步执行，并删除重复块；②新增 `ensureTopBarIconAlive()`，用 MutationObserver 守护 #toolbar 重建，图标脱离文档时幂等重挂，onunload 断开；③新增 `tests/core/topbar-timing.test.ts` 静态契约测试，禁止日后把登记写回 await 之后。+3 单测共 641 项全绿；gzip 233,485 字节 |
 
@@ -54,12 +55,12 @@
 
 | 编号 | 缺口 | 印证产品 | 优先级 | 验收标准 |
 |---|---|---|---|---|
-| - [ ] **G1** | **家务轮换与完成留痕**：指定輪流成员列表，自动判定“本轮该谁做”，并记录每次完成的人与时间，平息“轮到谁”争议 | Donetick / Homsy / OpenFamily | P0 | `core/chores.ts` 纯函数（`nextAssignee` / `recordCompletion` / `buildChoreHistory`）+ chores 模块抽屉接入 + ≥8 单测 |
-| - [ ] **G2** | **多段提醒割点**：年检/保修/续签类事项支持 60/30/7 天三段提醒，而非单一提前量 | AnnualVault / WarrantyVault | P0 | `ReminderRuleSpec.leadStages?: number[]`；提醒卡展示当前所处段位；向后兼容旧 schema（无 leadStages 时回退 leadDays）+ ≥6 单测 |
-| - [ ] **G3** | **购物按分类分组扫货模式**：采购清单按分类分组、可逐项勾选已购，适配超市动线 | OpenFamily / KitchenOwl | P1 | `core/shopping.ts` 新增 `groupShoppingByCategory`；台账 shopping 工具栏接入「扫货模式」弹层 + ≥5 单测 |
-| - [ ] **G4** | **存放位置索引**：聚合全模块 `location`/`copy_location`，形成“东西放哪了”的全局检索视图 | OurFamily / Quora 类需求 | P1 | `core/location-index.ts` 纯函数（`buildLocationIndex`）+ 总览或台账弹层检索 + ≥5 单测 |
-| - [ ] **G5** | **健康读数趋势与用药打卡**：血压/血糖读数时间序列 + 漏服提醒 | 智辰家纪事 / Dalà | P1 | 复用 rowlog 存储读数；`core/vitals.ts` 趋势汇总（均值/极值/趋势方向）+ 抽屉图表 + ≥6 单测 |
-| - [ ] **G6** | **预算分类限额告警**：分类月度限额＋超限提示（与现有支出趋势互补：事前 vs 事后） | OpenFamily | P2 | 设置项新增限额配置；`core/budget-limit.ts` 纯函数判断超限 + 提醒接入 + ≥5 单测 |
+| - [x] **G1** | **家务轮换与完成留痕**：指定輪流成员列表，自动判定“本轮该谁做”，并记录每次完成的人与时间，平息“轮到谁”争议 | Donetick / Homsy / OpenFamily | P0 | `core/chores.ts` 纯函数（`nextAssignee` / `recordCompletion` / `buildChoreHistory`）+ chores 模块抽屉接入 + ≥8 单测 |
+| - [x] **G2** | **多段提醒割点**：年检/保修/续签类事项支持 60/30/7 天三段提醒，而非单一提前量 | AnnualVault / WarrantyVault | P0 | `ReminderRuleSpec.leadStages?: number[]`；提醒卡展示当前所处段位；向后兼容旧 schema（无 leadStages 时回退 leadDays）+ ≥6 单测 |
+| - [x] **G3** | **购物按分类分组扫货模式**：采购清单按分类分组、可逐项勾选已购，适配超市动线 | OpenFamily / KitchenOwl | P1 | `core/shopping.ts` 新增 `groupShoppingByCategory`；台账 shopping 工具栏接入「扫货模式」弹层 + ≥5 单测 |
+| - [x] **G4** | **存放位置索引**：聚合全模块 `location`/`copy_location`，形成“东西放哪了”的全局检索视图 | OurFamily / Quora 类需求 | P1 | `core/location-index.ts` 纯函数（`buildLocationIndex`）+ 总览或台账弹层检索 + ≥5 单测 |
+| - [x] **G5** | **健康读数趋势与用药打卡**：血压/血糖读数时间序列 + 漏服提醒 | 智辰家纪事 / Dalà | P1 | 复用 rowlog 存储读数；`core/vitals.ts` 趋势汇总（均值/极值/趋势方向）+ 抽屉图表 + ≥6 单测 |
+| - [x] **G6** | **预算分类限额告警**：分类月度限额＋超限提示（与现有支出趋势互补：事前 vs 事后） | OpenFamily | P2 | 设置项新增限额配置；`core/budget-limit.ts` 纯函数判断超限 + 提醒接入 + ≥5 单测 |
 | - [ ] **G7** | **垃圾回收/市政日程订阅**：支持导入市政 ICS，并在日历展示 | Yuvomi | P3 | 复用 `core/ics.ts` 解析 + 日历图层 + ≥3 单测 |
 | - [ ] **G8** | **儿童积分与零花钱闭环**：任务完成 → 积分/零花钱入账 | Yuvomi / OpenFamily | P3 | 依赖 G1 完成记录；allowance 模块 rowlog 入账 + 积分汇总 + ≥5 单测 |
 | - [ ] **G9（观察）** | **分级可见性与身后交接**：按文件夹/字段授予不同家庭成员可见权，及“身后可见”模式 | Quicken LifeHub / Everplans / Dalà | 观察 | **依赖宿主权限模型**；启动前必须先写清用户结果/依赖/停止条件；现有访客模式是过渡方案 |

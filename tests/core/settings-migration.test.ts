@@ -327,6 +327,13 @@ describe("导入归一化（16 轮：未知模块剔除 + 成员字段修复）"
         expect(normalizeImportedSettings({ avatarImage: "https://example.com/avatar.png" }).settings.avatarImage).toBeUndefined();
         expect(normalizeImportedSettings({ avatarImage: `data:image/png;base64,${"A".repeat(1_000_000)}` }).settings.avatarImage).toBeUndefined();
     });
+
+    it("导入分类预算限额归一化过滤非法值", () => {
+        const { settings } = normalizeImportedSettings({
+            budgetLimits: { food_sh: 2000, daily: -50, invalid: "100", zero: 0 },
+        });
+        expect(settings.budgetLimits).toEqual({ food_sh: 2000 });
+    });
 });
 
 describe("打卡绑定归一化（EC09/D20，第六十六轮）", () => {

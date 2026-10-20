@@ -27,6 +27,7 @@ export function defaultSettings(): HomeSettings {
         webhookUrl: "",
         webhookMode: "bark",
         avatar: DEFAULT_AVATAR,
+        budgetLimits: {},
     };
 }
 
@@ -182,6 +183,9 @@ export async function loadSettings(plugin: Plugin): Promise<HomeSettings> {
     const overrides = isPlainObject(data.leadOverrides)
         ? Object.fromEntries(Object.entries(data.leadOverrides).filter((entry): entry is [string, number] => typeof entry[1] === "number" && Number.isFinite(entry[1]) && entry[1] >= 0))
         : defaults.leadOverrides;
+    const budgetLimits = isPlainObject(data.budgetLimits)
+        ? Object.fromEntries(Object.entries(data.budgetLimits).filter((entry): entry is [string, number] => typeof entry[1] === "number" && Number.isFinite(entry[1]) && entry[1] > 0))
+        : defaults.budgetLimits;
     const household = isPlainObject(data.household) ? data.household : undefined;
     const validRoles = Array.isArray(household?.roles)
         ? household.roles.filter((role: unknown): role is MemberRole => typeof role === "string" && MEMBER_ROLES.has(role as MemberRole))
@@ -212,6 +216,7 @@ export async function loadSettings(plugin: Plugin): Promise<HomeSettings> {
         checkinBindings: normalizeCheckinBindings(data.checkinBindings),
         avatar: normalizeAvatarText(data.avatar),
         avatarImage: normalizeAvatarImage(data.avatarImage),
+        budgetLimits,
     };
 }
 
@@ -286,6 +291,9 @@ export function normalizeImportedSettings(input: unknown): NormalizedImport {
         webhookEnabled: typeof data.webhookEnabled === "boolean" ? data.webhookEnabled : defaults.webhookEnabled,
         webhookUrl: typeof data.webhookUrl === "string" ? data.webhookUrl : defaults.webhookUrl,
         webhookMode: data.webhookMode === "ntfy" ? "ntfy" : "bark",
+        budgetLimits: isPlainObject(data.budgetLimits)
+            ? Object.fromEntries(Object.entries(data.budgetLimits).filter((entry): entry is [string, number] => typeof entry[1] === "number" && Number.isFinite(entry[1]) && entry[1] > 0))
+            : {},
     };
     return { settings, droppedModules, repairedMembers };
 }
