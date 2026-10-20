@@ -2406,19 +2406,34 @@ exports[`31 模块 schema 契约快照（21 组） > 每个 schema 的结构快�
       "field": "inspection_due",
       "key": "inspection",
       "kind": "oneoff",
-      "leadDays": 30,
+      "leadDays": 60,
+      "leadStages": [
+        60,
+        30,
+        7,
+      ],
     },
     {
       "field": "insurance_due",
       "key": "insurance",
       "kind": "oneoff",
-      "leadDays": 30,
+      "leadDays": 60,
+      "leadStages": [
+        60,
+        30,
+        7,
+      ],
     },
     {
       "field": "vehicle_tax_due",
       "key": "vehicle_tax",
       "kind": "oneoff",
-      "leadDays": 30,
+      "leadDays": 60,
+      "leadStages": [
+        60,
+        30,
+        7,
+      ],
     },
     {
       "field": "battery_due",

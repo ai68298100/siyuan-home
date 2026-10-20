@@ -39,25 +39,31 @@ Certificates expire, medicine expires, insurance needs renewal, subscriptions au
 
 Image OCR uses the engine configured in SiYuan Settings → OCR. It runs only when requested and does not require automatic OCR to be enabled. AI OCR asks before each run because the image is sent to the selected AI service. Results are saved to SiYuan OCR text and included in search; re-running replaces the previous result. Encrypted notebook images and PDFs are not supported, and OCR text is never written into ledger fields automatically.
 
-## 🆕 What's new in v0.5.26
+## 🆕 What's new in v0.5.27
 
-This release brings a major expansion in family life management, deep cross-module linkages, and enhanced GTD workflows:
+This release completely eliminates top bar icon jitter and reload loops caused by frequent background disk writes, while delivering the full set of gaps (G1-G8) from our second family app research, family emergency card, two-way block ingestion, and annual milestone chronicle:
 
-- **Added**: table density toggle (comfortable 48px / compact 34px), copy record as masked text (IDs, phone, email masked), and rebuild all enabled ledgers in diagnostics.
-- **Added**: reminder card in-place summary expansion (rule, member, due date without opening drawer), saved filter views with one-click switching and persistence, and dual-date scheduling (planning date separate from strict deadline, Things 3 style).
-- **Added**: batch reassignment of ledger rows to members, linked warranty/contracts review in house drawer, and baby food 3-day observation timeline linked with health allergy records.
-- **Added**: favors annual gift balance report, bookmarks broken link health check, statutory & progressive retirement countdown (China 2025 policy), emergency kit checklist doc template, and subscription expenses normalized to monthly/annual costs.
-- **Added**: shopping purchase to real assets creation, child vaccination schedule (given/overdue/due soon/upcoming), food dietary & allergy conflict check, schooling stage graduation countdown, media reading/viewing report, and pet physiological age equivalent with care tracking.
-- **Validation**: TypeScript, Svelte, i18n (1682 keys), metadata, 527 unit tests, production build, package smoke and loader verification all pass.
-## 📦 Install (v0.5.26)
+- **Fixed (Core Stability)**: Eliminated top bar icon blinking and reload loops caused by background scan disk writes triggering SiYuan's kernel file watcher and push_reload. Decoupled transient timestamps via `semanticRuntimeFingerprint` (zero disk write when data has not changed), added dirty detection to `saveSettings`, filtered self-induced WebSocket events in `wsHandler`, and guarded `ensureTopBarIconAlive` with 300ms debounce and unloading checks.
+- **Added (G1 Chore Rotation)**: Automatic next-assignee determination based on chore execution history with completed execution logging.
+- **Added (G2 Multi-Stage Reminders)**: 60/30/7-day multi-stage lead reminder badges for vehicle inspection, insurance, and warranty.
+- **Added (G3 Shopping Store Mode)**: Supermarket aisle flow grouping with live checklist progress.
+- **Added (G4 Global Location Index)**: Aggregated `location` search across all modules ("where is it?" quick lookup).
+- **Added (G5 Physiological Vitals Tracking)**: Blood pressure, glucose, and heart rate tracking with clinical 3-tier health guidelines.
+- **Added (G6 Monthly Budget Limits & Alerts)**: Category-level budget limit evaluation with safe/warning/exceeded status.
+- **Added (G7 Municipal Waste Schedule)**: Automated municipal recycling and garbage pickup schedule inference.
+- **Added (G8 Children Rewards & Allowance Linking)**: Chore completion rewards points with settlement into allowance ledger.
+- **Added (Emergency Card & Block Ingestion)**: Comprehensive family emergency and disaster card with de-identification; bidirectional SiYuan note block ingestion with backlinking.
+- **Added (Annual Family Milestones)**: Milestone chronicles and year-in-review long-image export.
+- **Validation**: 86 test suites, **762 unit tests passing**, TypeScript, Svelte, i18n (1881 keys), metadata, and package smoke all green.
+## 📦 Install (v0.5.27)
 
 1. Download `package.zip` from [Releases](https://github.com/ai68298100/siyuan-home/releases/latest)
 2. SiYuan → Settings → Marketplace → Download → **Import** the zip
 3. Enable the plugin → complete the 2-step onboarding (household → module picks and provisioning)
 4. Press `Ctrl+Alt+H` anytime to open the hub
 
-> **Validation status:** core data paths have automated tests and isolated-kernel coverage. The v0.5.26 GitHub Release is available; Android WebView behavior remains host-specific validation. `icon.png` and `preview.png` were redesigned for v0.3.13 (brand-gradient tile + geometric mark; dark overview with sample data).
-> **Version note:** the tagged v0.5.26 package is the current GitHub release; local quality checks report 641 unit tests.
+> **Validation status:** core data paths have automated tests and isolated-kernel coverage. The v0.5.27 GitHub Release is available; Android WebView behavior remains host-specific validation. `icon.png` and `preview.png` were redesigned for v0.3.13 (brand-gradient tile + geometric mark; dark overview with sample data).
+> **Version note:** the tagged v0.5.27 package is the current GitHub release; local quality checks report 762 unit tests.
 >
 > Family sharing depends on SiYuan's collaboration, permissions, sync and conflict behavior. Test with non-sensitive data before sharing; this plugin does not provide a separate permission system.
 >
@@ -115,7 +121,7 @@ The v0.5.1 release is available on GitHub, with static isolated-kernel gates and
 
 | Phase | Content |
 |---|---|
-| ✅ v0.5.26 (current) | Fix top bar icon disappearance, add natural-language smart capture, emergency kit stock linking, attachment archive export, urgent reminder pinning, expense trend analysis, weekly digest report, and timeline insight |
+| ✅ v0.5.27 (current) | Eliminate top bar icon jitter, close G1-G8 gaps (chore rotation, multi-stage reminders, store mode, location index, vitals tracking, budget limit, waste schedule, reward allowance), emergency card, block ingestion, and milestone review |
 | 🔜 Next | Task workbench, evidence center, inbox, health recovery |
 | 🔭 Later | Family collaboration, template packs, yearly family report, AI capabilities |
 
@@ -133,7 +139,7 @@ pnpm run dev      # dev (app + kernel watch)
 pnpm run build    # dist/ + package.zip
 pnpm run check    # 5-layer gate (types + svelte + i18n + meta + audit)
 pnpm run smoke    # release package and single-file loader smoke checks
-pnpm test         # unit tests (527)
+pnpm test         # unit tests (762)
 ```
 
 - Setup & conventions: [CONTRIBUTING.md](./CONTRIBUTING.md)

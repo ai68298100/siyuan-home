@@ -34,3 +34,20 @@ export function selectCellContent(cell: AvCellLike | undefined | null): string |
     if (m.length > 0) return m[0];
     return cell.select?.content || undefined;
 }
+
+/** 提取单元格展示文本（无 UI 依赖纯函数） */
+export function cellContentText(cell: AvCellLike | undefined | null): string {
+    if (!cell) return "";
+    if (cell.text?.content) return cell.text.content;
+    if (cell.block?.content) return cell.block.content;
+    const sel = selectCellContent(cell);
+    if (sel) return sel;
+    if (typeof cell.number?.content === "number") return String(cell.number.content);
+    if (typeof cell.date?.content === "number") {
+        const d = new Date(cell.date.content);
+        return isNaN(d.getTime()) ? "" : d.toISOString().slice(0, 10);
+    }
+    if (cell.url?.content) return cell.url.content;
+    return "";
+}
+

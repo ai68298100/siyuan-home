@@ -45,11 +45,15 @@ export interface RowLog {
     chargings?: Record<string, unknown>[];
     /** 车辆保养/维修流水，按车辆行隔离。 */
     maintenance?: Record<string, unknown>[];
+    /** 家务完成留痕（310 波）：{ date, memberId?, note?, at } 追加制，用于轮换判定与责任追溯 */
+    chexecs?: Record<string, unknown>[];
+    /** 生理指标流水（314 波，G5）：血压/血糖/心率读数时间序列 */
+    vitals?: Record<string, unknown>[];
 }
 
 export type RowLogs = Record<string, RowLog>;
 
-export type LogKind = "valuations" | "moves" | "prices" | "transfers" | "meters" | "checks" | "loans" | "deposits" | "fuelings" | "chargings" | "maintenance";
+export type LogKind = "valuations" | "moves" | "prices" | "transfers" | "meters" | "checks" | "loans" | "deposits" | "fuelings" | "chargings" | "maintenance" | "chexecs" | "vitals";
 
 export interface MeterEntry {
     date: string;

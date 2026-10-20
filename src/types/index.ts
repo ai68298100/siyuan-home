@@ -90,6 +90,11 @@ export interface ReminderRuleSpec {
     offsetDays?: number;
     /** after：仅当该 select 列值等于 equals 时才派生（favors 只对 direction=in 回礼） */
     onlyIf?: { field: string; equals: string };
+    /**
+     * 多段提醒割点（311 波，G2）：如 [60, 30, 7]——到达每个割点各重现一次（取最近一个已过割点）。
+     * 缺省时行为完全不变（回退 leadDays 单一窗口），向后兼容旧 schema。
+     */
+    leadStages?: number[];
 }
 
 /** 紧急级别：🔴 已逾期 / 🟠 7 天内 / 🟡 提前量内 / ⚪ 更远 */
@@ -174,6 +179,8 @@ export interface HomeSettings {
     avatar?: string;
     /** 经裁剪压缩的本地头像 data URL（不超过 1 MB） */
     avatarImage?: string;
+    /** 315 波（G6）：预算分类月度限额（分类 key → 限额元） */
+    budgetLimits?: Record<string, number>;
 }
 
 /** EC09：打卡绑定。metric 显式区分（不把次数当体重）；itemName 为绑定时点快照（展示用） */

@@ -261,6 +261,48 @@ describe("坏文件容错（15 组）", () => {
         expect(writesA).toHaveLength(1);
         expect(writesB).toHaveLength(1);
     });
+
+    it("运行态语义去重：仅 scannedAt 或 byModule.at 时间戳变动不触发物理落盘（防止抖动死循环）", async () => {
+        const writes: unknown[] = [];
+        const plugin = { saveData: async (_name: string, value: unknown) => { writes.push(value); } } as any;
+        const rt1 = defaultRuntime();
+        rt1.scannedAt = "2026-10-21T00:00:00.000Z";
+        rt1.cache = {
+            reminders: [{ id: "r1", moduleId: "certs", ruleKey: "expiry", rowId: "row1", title: "身份证", dueDate: "2026-11-01", daysLeft: 11, level: "soon" }],
+            counts: { overdue: 0, soon: 1, lead: 0 },
+            errors: [],
+            derived: [],
+            byModule: { certs: { reminders: [], at: "2026-10-21T00:00:00.000Z", rowCount: 1, memberCounts: {} } },
+        };
+        await saveRuntime(plugin, rt1);
+        expect(writes).toHaveLength(1);
+
+        // 2 分钟后后台定时扫描再次执行：业务数据完全未变，仅时间戳更新
+        const rt2 = JSON.parse(JSON.stringify(rt1));
+        rt2.scannedAt = "2026-10-21T00:02:00.000Z";
+        rt2.cache.byModule.certs.at = "2026-10-21T00:02:00.000Z";
+        await saveRuntime(plugin, rt2);
+        // 断言：绝不触发二次写入（杜绝触发内核 FS Watcher 广播 push_reload）
+        expect(writes).toHaveLength(1);
+
+        // 当业务数据确实发生改变（如新增了逾期提醒）
+        const rt3 = JSON.parse(JSON.stringify(rt2));
+        rt3.cache.counts.overdue = 1;
+        await saveRuntime(plugin, rt3);
+        expect(writes).toHaveLength(2);
+    });
+
+    it("settings 保存去重：内容未变时跳过物理写入（0 次写盘）", async () => {
+        const writes: unknown[] = [];
+        const plugin = { saveData: async (_name: string, value: unknown) => { writes.push(value); } } as any;
+        const s = { enabledModules: ["certs"], members: [] } as any;
+        await saveSettings(plugin, s);
+        expect(writes).toHaveLength(1);
+
+        // 重复调用 saveSettings 保存相同内容（如 provisionLedgers 校验后无修改）
+        await saveSettings(plugin, s);
+        expect(writes).toHaveLength(1);
+    });
 });
 
 describe("导入归一化（16 轮：未知模块剔除 + 成员字段修复）", () => {
@@ -326,6 +368,13 @@ describe("导入归一化（16 轮：未知模块剔除 + 成员字段修复）"
         expect(normalizeImportedSettings({ avatar: "★", avatarImage: valid }).settings).toMatchObject({ avatar: "★", avatarImage: valid });
         expect(normalizeImportedSettings({ avatarImage: "https://example.com/avatar.png" }).settings.avatarImage).toBeUndefined();
         expect(normalizeImportedSettings({ avatarImage: `data:image/png;base64,${"A".repeat(1_000_000)}` }).settings.avatarImage).toBeUndefined();
+    });
+
+    it("导入分类预算限额归一化过滤非法值", () => {
+        const { settings } = normalizeImportedSettings({
+            budgetLimits: { food_sh: 2000, daily: -50, invalid: "100", zero: 0 },
+        });
+        expect(settings.budgetLimits).toEqual({ food_sh: 2000 });
     });
 });
 

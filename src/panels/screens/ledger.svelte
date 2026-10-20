@@ -25,6 +25,8 @@
     import { loadRowLogs, updateRowLogs, getEntries, appendEntry, removeEntry } from "@/core/rowlog";
     import type { LogKind } from "@/core/rowlog";
     import { rowLogActivityId, type ActivityTarget } from "@/core/activity";
+    /** 312 波：抽屉内子记录行样式（原 4 处重复字面量收敛） */
+    const substRowCss = "padding:2px 0;font-size:12.5px";
     import { onDestroy } from "svelte";
     import UiIcon from "@/ui/icon.svelte";
     import { uiIcon } from "@/ui/icons";
@@ -1003,150 +1005,17 @@
         }
     }
 
-    // Favors annual summary report and relationship balance analysis.
+    // Favors annual summary report and relationship balance analysis (317波抽离减负).
     async function openFavorsReport() {
         if (!ref?.avId || !ref.columns) return;
-        try {
-            const all = await renderLedgerAll(ref.avId);
-            if (!all.complete) {
-                showMessage(t("ledger.loadIncomplete"), 5000, "error");
-                return;
-            }
-            const { buildFavorsReport, formatFavorsReportText } = await import("@/core/favors");
-            let selectedYear: number | "all" = new Date().getFullYear();
-
-            const dlg = new Dialog({
-                title: t("ledger.favorsReport"),
-                content: `<div class="b3-dialog__content lv-dialog-scroll-body" id="lv-favors-body"></div>
-<div class="b3-dialog__action"><button class="b3-button b3-button--cancel" id="lv-favors-close">${t("close")}</button><button class="b3-button" id="lv-favors-copy">${t("ledger.favorsCopyText")}</button></div>`,
-                width: "560px",
-            });
-            const body = dlg.element.querySelector("#lv-favors-body") as HTMLElement;
-
-            const render = () => {
-                body.replaceChildren();
-                const report = buildFavorsReport(all.rows, ref!.columns, selectedYear);
-
-                const toolbar = document.createElement("div");
-                toolbar.style.cssText = "display:flex;align-items:center;justify-content:space-between;gap:8px";
-
-                const yearSelect = document.createElement("select");
-                yearSelect.className = "b3-select";
-                yearSelect.style.cssText = "font-size:12px;padding:4px 8px";
-                const optAll = document.createElement("option");
-                optAll.value = "all";
-                optAll.textContent = t("ledger.favorsYearAll");
-                if (selectedYear === "all") optAll.selected = true;
-                yearSelect.appendChild(optAll);
-
-                for (const y of report.availableYears) {
-                    const opt = document.createElement("option");
-                    opt.value = String(y);
-                    opt.textContent = `${y} 年`;
-                    if (selectedYear === y) opt.selected = true;
-                    yearSelect.appendChild(opt);
-                }
-                yearSelect.onchange = () => {
-                    selectedYear = yearSelect.value === "all" ? "all" : Number(yearSelect.value);
-                    render();
-                };
-
-                const subSummary = document.createElement("span");
-                subSummary.className = "lv-caption";
-                subSummary.textContent = t("ledger.favorsCountRecords").replace("${n}", String(report.countIn + report.countOut));
-                toolbar.append(yearSelect, subSummary);
-                body.appendChild(toolbar);
-
-                if (report.countIn === 0 && report.countOut === 0) {
-                    const empty = document.createElement("div");
-                    empty.className = "lv-caption";
-                    empty.style.cssText = "text-align:center;padding:24px 0";
-                    empty.textContent = t("ledger.favorsEmpty");
-                    body.appendChild(empty);
-                    return;
-                }
-
-                const metrics = document.createElement("div");
-                metrics.style.cssText = "display:grid;grid-template-columns:repeat(3, 1fr);gap:10px";
-
-                const inCard = document.createElement("div");
-                inCard.className = "lv-metric-lg";
-                inCard.innerHTML = `<span class="lv-caption">${t("ledger.favorsInTotal")}</span><b class="lv-num" style="color:var(--lv-accent);font-size:18px">¥${formatAmount(report.totalIn)}</b><span class="lv-caption">${report.countIn} 笔</span>`;
-
-                const outCard = document.createElement("div");
-                outCard.className = "lv-metric-lg";
-                outCard.innerHTML = `<span class="lv-caption">${t("ledger.favorsOutTotal")}</span><b class="lv-num" style="color:var(--lv-warn);font-size:18px">¥${formatAmount(report.totalOut)}</b><span class="lv-caption">${report.countOut} 笔</span>`;
-
-                const netCard = document.createElement("div");
-                const netColor = report.netAmount >= 0 ? "var(--lv-accent)" : "var(--lv-danger)";
-                const netLabel = report.netAmount >= 0 ? t("ledger.favorsNetSurplus") : t("ledger.favorsNetDeficit");
-                netCard.className = "lv-metric-lg";
-                netCard.innerHTML = `<span class="lv-caption">${t("ledger.favorsNetAmount")}</span><b class="lv-num" style="color:${netColor};font-size:18px">${report.netAmount >= 0 ? "+" : "-"}¥${formatAmount(Math.abs(report.netAmount))}</b><span class="lv-caption">${netLabel}</span>`;
-
-                metrics.append(inCard, outCard, netCard);
-                body.appendChild(metrics);
-
-                if (report.topPersons.length > 0) {
-                    const sec = document.createElement("div");
-                    sec.style.cssText = "margin-top:4px";
-                    sec.innerHTML = `<div class="ft__on-surface lv-section-title">${t("ledger.favorsTopPersons")}</div>`;
-                    const list = document.createElement("div");
-                    list.style.cssText = "display:flex;flex-direction:column;gap:6px";
-                    for (const p of report.topPersons) {
-                        const item = document.createElement("div");
-                        item.style.cssText = "display:flex;align-items:center;justify-content:space-between;padding:7px 12px;background:var(--lv-surface-2);border-radius:6px;border:1px solid var(--lv-line);font-size:12.5px";
-                        const left = document.createElement("span");
-                        left.style.cssText = "font-weight:500;color:var(--lv-tx)";
-                        left.textContent = p.person;
-                        const right = document.createElement("span");
-                        right.style.cssText = "font-size:12px";
-                        const pNetColor = p.net >= 0 ? "var(--lv-accent)" : "var(--lv-danger)";
-                        right.innerHTML = `收 ¥${formatAmount(p.inAmount)} · 送 ¥${formatAmount(p.outAmount)} · <b style="color:${pNetColor}">${p.net >= 0 ? "+" : "-"}¥${formatAmount(Math.abs(p.net))}</b>`;
-                        item.append(left, right);
-                        list.appendChild(item);
-                    }
-                    sec.appendChild(list);
-                    body.appendChild(sec);
-                }
-
-                if (report.categoryBreakdown.length > 0) {
-                    const sec = document.createElement("div");
-                    sec.style.cssText = "margin-top:4px";
-                    sec.innerHTML = `<div class="ft__on-surface lv-section-title">${t("ledger.favorsCategory")}</div>`;
-                    const list = document.createElement("div");
-                    list.style.cssText = "display:flex;flex-direction:column;gap:6px";
-                    for (const c of report.categoryBreakdown) {
-                        const item = document.createElement("div");
-                        item.style.cssText = "display:flex;align-items:center;justify-content:space-between;padding:6px 12px;background:var(--lv-surface-2);border-radius:6px;border:1px solid var(--lv-line);font-size:12px";
-                        const left = document.createElement("span");
-                        left.textContent = t(`field.category.opt.${c.category}`) !== `field.category.opt.${c.category}` ? t(`field.category.opt.${c.category}`) : c.category;
-                        const right = document.createElement("span");
-                        right.className = "lv-caption";
-                        right.textContent = `收 ¥${formatAmount(c.inAmount)} · 送 ¥${formatAmount(c.outAmount)} (${c.count} 笔)`;
-                        item.append(left, right);
-                        list.appendChild(item);
-                    }
-                    sec.appendChild(list);
-                    body.appendChild(sec);
-                }
-            };
-
-            render();
-
-            (dlg.element.querySelector("#lv-favors-close") as HTMLButtonElement).onclick = () => dlg.destroy();
-            (dlg.element.querySelector("#lv-favors-copy") as HTMLButtonElement).onclick = async () => {
-                const report = buildFavorsReport(all.rows, ref!.columns, selectedYear);
-                const text = formatFavorsReportText(report, (cat) => t(`field.category.opt.${cat}`) !== `field.category.opt.${cat}` ? t(`field.category.opt.${cat}`) : cat);
-                try {
-                    await navigator.clipboard.writeText(text);
-                    showMessage(t("ledger.favorsCopyDone"), 2500, "info");
-                } catch {
-                    showMessage(t("ledger.copyAsImageFail"), 4000, "error");
-                }
-            };
-        } catch (e) {
-            showMessage(t("ledger.logReadFailed") + " (" + (e instanceof Error ? e.message : String(e)) + ")", 6000, "error");
-        }
+        const { openFavorsReportDialog } = await import("@/core/favors-dialog");
+        return openFavorsReportDialog({
+            ref,
+            t,
+            DialogCls: Dialog,
+            showMessageFn: showMessage,
+            loadRows: () => renderLedgerAll(ref!.avId!),
+        });
     }
 
     // Check validity of URLs in bookmarks ledger and highlight broken links.
@@ -1519,6 +1388,31 @@
         }
     }
 
+    // Municipal Waste Schedule & Recycling (316波):
+    async function openWasteScheduleModal() {
+        const { openWasteScheduleDialog } = await import("@/core/waste-dialog");
+        openWasteScheduleDialog({
+            t,
+            DialogCls: Dialog,
+            showMessageFn: showMessage,
+        });
+    }
+
+    // Chores Rewards & Allowance Settlement (317波):
+    async function openRewardsLedgerModal() {
+        const { openRewardsDialog } = await import("@/core/rewards-dialog");
+        openRewardsDialog({
+            t,
+            plugin,
+            DialogCls: Dialog,
+            showMessageFn: showMessage,
+            renderLedgerAllFn: renderLedgerAll,
+            cellTextFn: cellText,
+            addDetachedRowFn: addDetachedRow,
+            setCellFn: setCell,
+        });
+    }
+
     // Expense Trend & Spikes Analysis (305波):
     // Aggregate all rows with an amount + date field into monthly totals, compute MoM and detect spikes.
     async function openExpenseTrendModal() {
@@ -1550,30 +1444,14 @@
                 return;
             }
 
-            const { calculateExpenseTrend, formatExpenseTrendReport } = await import("@/core/expense-trend");
-            const report = calculateExpenseTrend(entries);
-            const text = formatExpenseTrendReport(report);
-
-            const dlg = new Dialog({
-                title: t("ledger.expenseTrendTitle"),
-                content: `<div class="b3-dialog__content lv-dialog-scroll-body"><pre class="lv-caption" style="white-space:pre-wrap;line-height:1.7;margin:0"></pre></div>
-<div class="b3-dialog__action">
-  <button class="b3-button b3-button--cancel">${t("close")}</button>
-  <button class="b3-button" id="lv-et-copy">${t("ledger.emergencyKitCopy")}</button>
-</div>`,
-                width: "560px",
+            const { openExpenseTrendDialog } = await import("@/core/expense-dialog");
+            openExpenseTrendDialog({
+                entries,
+                budgetLimits: plugin.settings.budgetLimits,
+                t,
+                DialogCls: Dialog,
+                showMessageFn: showMessage,
             });
-            const pre = dlg.element.querySelector("pre");
-            if (pre) pre.textContent = text;
-            (dlg.element.querySelector(".b3-button--cancel") as HTMLButtonElement).onclick = () => dlg.destroy();
-            (dlg.element.querySelector("#lv-et-copy") as HTMLButtonElement).onclick = async () => {
-                try {
-                    await navigator.clipboard.writeText(text);
-                    showMessage(t("overview.lifeIndexCopied"), 2500, "info");
-                } catch {
-                    showMessage(t("ledger.copyAsImageFail"), 4000, "error");
-                }
-            };
         } catch (e) {
             showMessage(t("ledger.logReadFailed") + " (" + (e instanceof Error ? e.message : String(e)) + ")", 5000, "error");
         }
@@ -1611,6 +1489,56 @@
         } catch (e) {
             showMessage(t("ledger.logReadFailed") + " (" + (e instanceof Error ? e.message : String(e)) + ")", 5000, "error");
         }
+    }
+
+    // 313 波（G4）：存放位置全局检索（动态加载 core/location-dialog.ts 减轻初始 bundle）
+    async function openLocationIndexModal() {
+        const { openLocationIndexDialog } = await import("@/core/location-dialog");
+        return openLocationIndexDialog({
+            t,
+            plugin,
+            DialogCls: Dialog,
+            showMessageFn: showMessage,
+            renderLedgerAllFn: renderLedgerAll,
+            cellTextFn: cellText,
+        });
+    }
+
+    // 319 波：思源块收录入台账（动态加载 core/block-ingest-dialog.ts）
+    async function openBlockIngestModal() {
+        const { openBlockIngestDialog } = await import("@/core/block-ingest-dialog");
+        return openBlockIngestDialog({
+            t,
+            currentModule: active,
+            plugin,
+            DialogCls: Dialog,
+            showMessageFn: showMessage,
+            addDetachedRowFn: addDetachedRow,
+            setCellFn: setCell,
+            onSuccessCallback: async () => {
+                await load();
+                try { await plugin.refreshHub([active]); } catch { /* ignore */ }
+            },
+        });
+    }
+
+    // 312 波（G3）：扫货模式（动态加载 core/store-dialog.ts）
+    async function openStoreModeModal() {
+        const sourceRef = ref;
+        if (!sourceRef?.avId || !sourceRef.columns?.name) return;
+        const { openStoreModeDialog } = await import("@/core/store-dialog");
+        return openStoreModeDialog({
+            t,
+            DialogCls: Dialog,
+            showMessageFn: showMessage,
+            loadRows: () => renderLedgerAll(sourceRef.avId!),
+            columns: {
+                name: sourceRef.columns.name,
+                category: sourceRef.columns.category,
+                qty: sourceRef.columns.qty,
+                note: sourceRef.columns.note,
+            },
+        });
     }
 
     // Emergency Kit Checklist & Stock Linking (302波):
@@ -2475,7 +2403,7 @@
             for (const h of history) {
                 const line = document.createElement("div");
                 if (active === "vehicles") line.className = "lv-detail-wide";
-                line.style.cssText = "padding:2px 0;font-size:12.5px";
+                line.style.cssText = substRowCss;
                 line.textContent = `${h.from} → ${h.to} · ${h.at.slice(0, 10)}`;
                 body.appendChild(line);
             }
@@ -2923,7 +2851,7 @@
                 section.replaceChildren();
                 for (const e of loaded) {
                     const line = document.createElement("div");
-                    line.style.cssText = "padding:2px 0;font-size:12.5px;display:flex;gap:6px;align-items:center";
+                    line.style.cssText = `${substRowCss};display:flex;gap:6px;align-items:center`;
                     if (opts.kind) {
                         line.dataset.lvActivityId = rowLogActivityId(active, row.itemID, opts.kind, e);
                         if (line.dataset.lvActivityId === activityTarget?.activityId) markActivityLine(line);
@@ -3740,6 +3668,14 @@
                     remove: async (e) => { await rl.updateRowLogs(plugin as any, (current) => rl.removeEntry(current, ref!.avId!, row.itemID, "prices", e)); },
                     format: (e) => `${e.date} · ${formatAmount(Number(e.price))}${e.channel ? ` · ${e.channel}` : ""}`,
                 });
+            } else if (active === "chores") {
+                // 310/313 波：家务轮换（动态加载 core/chore-dialog.ts）
+                const { addChoreRotationSectionImpl } = await import("@/core/chore-dialog");
+                await addChoreRotationSectionImpl({ t, plugin, avId: ref!.avId!, rowId: row.itemID, body, showMessageFn: showMessage });
+            } else if (active === "health") {
+                // 314 波（G5）：生理指标（血压/血糖/心率）趋势与留痕
+                const { addVitalsSectionImpl } = await import("@/core/vitals-dialog");
+                await addVitalsSectionImpl({ t, plugin: plugin as any, avId: ref!.avId!, rowId: row.itemID, body, showMessageFn: showMessage });
             } else if (active === "schooling") {
                 await addRowLogSection({
                     title: t("ledger.transfers"), emptyText: t("ledger.noTransfers"), addLabel: t("ledger.valAdd"), kind: "transfers",
@@ -4706,13 +4642,13 @@
             body.appendChild(head);
             for (const id of forward) {
                 const line = document.createElement("div");
-                line.style.cssText = "padding:2px 0;font-size:12.5px";
+                line.style.cssText = substRowCss;
                 line.textContent = `→ ${nameOf(id)} (${t("ledger.newCert")})`;
                 body.appendChild(line);
             }
             for (const r of backward) {
                 const line = document.createElement("div");
-                line.style.cssText = "padding:2px 0;font-size:12.5px";
+                line.style.cssText = substRowCss;
                 line.textContent = `← ${String(cellText(r.cells[ref!.columns.name]))} (${t("ledger.oldCert")})`;
                 body.appendChild(line);
             }
@@ -5285,6 +5221,9 @@
                 {/if}
                 {#if active === "stock"}<button class="b3-button b3-button--outline" onclick={openShoppingList}>{t("ledger.shoppingList")}</button>{/if}
                 {#if active === "stock"}<button class="b3-button b3-button--outline" onclick={openEmergencyKitModal}>{t("ledger.emergencyKit")}</button>{/if}
+                {#if active === "shopping"}<button class="b3-button b3-button--outline" onclick={openStoreModeModal}>{t("ledger.storeMode")}</button>{/if}
+                <button class="b3-button b3-button--outline" onclick={openLocationIndexModal}>{t("ledger.locSearch")}</button>
+                <button class="b3-button b3-button--outline" onclick={openBlockIngestModal}>{t("capture.ingestAction")}</button>
                 {#if ref?.columns?.amount}<button class="b3-button b3-button--outline" onclick={openExpenseTrendModal}>{t("ledger.expenseTrend")}</button>{/if}
                 {#if active === "favors"}<button class="b3-button b3-button--outline" onclick={openFavorsReport}>{t("ledger.favorsReport")}</button>{/if}
                 {#if active === "bookmarks"}<button class="b3-button b3-button--outline" onclick={openBookmarksCheck}>{t("ledger.checkBookmarks")}</button>{/if}
@@ -5294,6 +5233,8 @@
                 {#if active === "food"}<button class="b3-button b3-button--outline" onclick={openMealPlanModal}>{t("ledger.mealPlan")}</button>{/if}
                 {#if active === "medicine"}<button class="b3-button b3-button--outline" onclick={openMedicineSupplyModal}>{t("ledger.medicineSupply")}</button>{/if}
                 {#if active === "house"}<button class="b3-button b3-button--outline" onclick={openUtilityTiersModal}>{t("ledger.utilityTiers")}</button>{/if}
+                {#if active === "house" || active === "chores"}<button class="b3-button b3-button--outline" onclick={openWasteScheduleModal}>{t("ledger.wasteSchedule")}</button>{/if}
+                {#if active === "chores"}<button class="b3-button b3-button--outline" onclick={openRewardsLedgerModal}>{t("ledger.rewardsSettle")}</button>{/if}
                 {#if active !== "members" && active !== "adhoc"}<button class="b3-button b3-button--outline" disabled={printing || exporting} onclick={openCsvImport}>{t("ledger.importCsv")}</button>{/if}
                 <button class="b3-button b3-button--outline" disabled={!ref?.docId}
                     onclick={() => plugin.showTabDocs(ref?.docId)}>{t("ledger.openDoc")} →</button>

@@ -27,6 +27,7 @@ export function defaultSettings(): HomeSettings {
         webhookUrl: "",
         webhookMode: "bark",
         avatar: DEFAULT_AVATAR,
+        budgetLimits: {},
     };
 }
 
@@ -182,6 +183,9 @@ export async function loadSettings(plugin: Plugin): Promise<HomeSettings> {
     const overrides = isPlainObject(data.leadOverrides)
         ? Object.fromEntries(Object.entries(data.leadOverrides).filter((entry): entry is [string, number] => typeof entry[1] === "number" && Number.isFinite(entry[1]) && entry[1] >= 0))
         : defaults.leadOverrides;
+    const budgetLimits = isPlainObject(data.budgetLimits)
+        ? Object.fromEntries(Object.entries(data.budgetLimits).filter((entry): entry is [string, number] => typeof entry[1] === "number" && Number.isFinite(entry[1]) && entry[1] > 0))
+        : defaults.budgetLimits;
     const household = isPlainObject(data.household) ? data.household : undefined;
     const validRoles = Array.isArray(household?.roles)
         ? household.roles.filter((role: unknown): role is MemberRole => typeof role === "string" && MEMBER_ROLES.has(role as MemberRole))
@@ -192,7 +196,7 @@ export async function loadSettings(plugin: Plugin): Promise<HomeSettings> {
     const demoRows = isPlainObject(data.demoRows)
         ? Object.fromEntries(Object.entries(data.demoRows).filter((entry): entry is [string, string[]] => Array.isArray(entry[1])).map(([id, rows]) => [id, rows.filter((row): row is string => typeof row === "string")]))
         : undefined;
-    return {
+    const result: HomeSettings = {
         ...defaults,
         ...data,
         enabledModules: enabled,
@@ -212,22 +216,33 @@ export async function loadSettings(plugin: Plugin): Promise<HomeSettings> {
         checkinBindings: normalizeCheckinBindings(data.checkinBindings),
         avatar: normalizeAvatarText(data.avatar),
         avatarImage: normalizeAvatarImage(data.avatarImage),
+        budgetLimits,
     };
+    lastSerializedSettingsByPlugin.set(plugin, JSON.stringify(result));
+    return result;
 }
+
+const lastSerializedSettingsByPlugin = new WeakMap<object, string>();
 
 export async function saveSettings(plugin: Plugin, settings: HomeSettings): Promise<void> {
     // Capture before queueing: callers often mutate the live settings object
     // immediately after awaiting a panel action.
     const snapshot = JSON.parse(JSON.stringify(settings)) as HomeSettings;
+    const json = JSON.stringify(snapshot);
+    if (lastSerializedSettingsByPlugin.get(plugin) === json) return;
+
     const previous = settingsSaveChains.get(plugin) ?? Promise.resolve();
     const run = previous.then(async () => {
+        if (lastSerializedSettingsByPlugin.get(plugin) === json) return;
         // §15：写入失败重试一次（瞬时内核忙/工作区切换等）；仍失败抛带原始信息的错误，由调用方上报
         try {
             await plugin.saveData(SETTINGS_NAME, snapshot);
+            lastSerializedSettingsByPlugin.set(plugin, json);
         } catch (e1) {
             await new Promise((r) => setTimeout(r, 300));
             try {
                 await plugin.saveData(SETTINGS_NAME, snapshot);
+                lastSerializedSettingsByPlugin.set(plugin, json);
             } catch {
                 throw new Error(`settings save failed after retry: ${e1 instanceof Error ? e1.message : String(e1)}`);
             }
@@ -286,6 +301,9 @@ export function normalizeImportedSettings(input: unknown): NormalizedImport {
         webhookEnabled: typeof data.webhookEnabled === "boolean" ? data.webhookEnabled : defaults.webhookEnabled,
         webhookUrl: typeof data.webhookUrl === "string" ? data.webhookUrl : defaults.webhookUrl,
         webhookMode: data.webhookMode === "ntfy" ? "ntfy" : "bark",
+        budgetLimits: isPlainObject(data.budgetLimits)
+            ? Object.fromEntries(Object.entries(data.budgetLimits).filter((entry): entry is [string, number] => typeof entry[1] === "number" && Number.isFinite(entry[1]) && entry[1] > 0))
+            : {},
     };
     return { settings, droppedModules, repairedMembers };
 }

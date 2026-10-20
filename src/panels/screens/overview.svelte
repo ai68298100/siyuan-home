@@ -364,6 +364,45 @@
             showMessage(t("ledger.logReadFailed") + " (" + (e instanceof Error ? e.message : String(e)) + ")", 5000, "error");
         }
     }
+
+    // 318波：家庭急救与应急联络卡
+    async function openEmergencyCardModal() {
+        try {
+            const { openEmergencyCardDialog } = await import("@/core/emergency-card-dialog");
+            const { renderLedgerAll } = await import("@/core/siyuan");
+            const { cellContentText } = await import("@/core/avcell");
+            await openEmergencyCardDialog({
+                t,
+                plugin,
+                DialogCls: Dialog,
+                showMessageFn: showMessage,
+                renderLedgerAllFn: renderLedgerAll,
+                cellTextFn: cellContentText,
+            });
+        } catch (e) {
+            showMessage(t("ledger.logReadFailed") + " (" + (e instanceof Error ? e.message : String(e)) + ")", 5000, "error");
+        }
+    }
+
+    // 320波：家庭生活年度回顾长图与里程碑卡片
+    async function openShareCardModal() {
+        try {
+            const { openYearlyShareCardDialog } = await import("@/core/sharecard-dialog");
+            const { renderLedgerAll } = await import("@/core/siyuan");
+            const { cellContentText } = await import("@/core/avcell");
+            await openYearlyShareCardDialog({
+                t,
+                plugin,
+                allReminders,
+                DialogCls: Dialog,
+                showMessageFn: showMessage,
+                renderLedgerAllFn: renderLedgerAll,
+                cellTextFn: cellContentText,
+            });
+        } catch (e) {
+            showMessage(t("ledger.logReadFailed") + " (" + (e instanceof Error ? e.message : String(e)) + ")", 5000, "error");
+        }
+    }
 </script>
 
 {#if !onboarded}
@@ -388,6 +427,8 @@
         <div class="lv-hero-actions">
             <button class="b3-button lv-hero-open" onclick={() => onGoto("reminders")}><UiIcon name="clock" size={17} />{t("dash.heroOpen")}</button>
             <button class="b3-button b3-button--outline lv-hero-life-index" onclick={openLifeIndexModal} style="display:inline-flex;align-items:center;gap:5px"><UiIcon name="shield" size={16} />{t("overview.lifeIndex")}</button>
+            <button class="b3-button b3-button--outline lv-hero-emergency-card" onclick={openEmergencyCardModal} style="display:inline-flex;align-items:center;gap:5px"><UiIcon name="alert" size={16} />{t("overview.emergencyCard")}</button>
+            <button class="b3-button b3-button--outline lv-hero-share-card" onclick={openShareCardModal} style="display:inline-flex;align-items:center;gap:5px"><UiIcon name="camera" size={16} />{t("overview.shareCard")}</button>
             {#if onCapture}<button class="b3-button b3-button--outline lv-hero-capture" onclick={() => onCapture()}><UiIcon name="add" size={16} />{t("dash.quickRecord")}</button>{/if}
         </div>
         {#if monthlyDone > 0}<p><span class="lv-badge green">✓ {t("dash.monthlyDone").replace("${n}", monthlyDueTotal > 0 ? `${monthlyDone}/${monthlyDueTotal}` : String(monthlyDone))}</span></p>{/if}

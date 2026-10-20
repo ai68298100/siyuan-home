@@ -106,12 +106,15 @@ export default defineConfig(buildTarget === "kernel" ? {
             ecma: 2022,
             compress: {
                 ecma: 2022,
-                passes: 3,
+                passes: 4,
                 drop_console: true,
                 drop_debugger: true,
                 pure_getters: true,
                 unsafe_arrows: true,
                 toplevel: true,
+                reduce_funcs: true,
+                reduce_vars: true,
+                inline: 3,
             },
             mangle: {
                 toplevel: true,
