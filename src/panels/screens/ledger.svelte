@@ -1519,6 +1519,66 @@
         }
     }
 
+    // Expense Trend & Spikes Analysis (305波):
+    // Aggregate all rows with an amount + date field into monthly totals, compute MoM and detect spikes.
+    async function openExpenseTrendModal() {
+        const sourceRef = ref;
+        if (!sourceRef?.avId) return;
+        const amountCol = sourceRef.columns?.amount;
+        const dateCol = sourceRef.columns?.date ?? sourceRef.columns?.expiry;
+        if (!amountCol || !dateCol) {
+            showMessage(t("ledger.expenseTrendNoCol"), 4000, "info");
+            return;
+        }
+        try {
+            const all = await renderLedgerAll(sourceRef.avId);
+            if (!all.complete) {
+                showMessage(t("ledger.loadIncomplete"), 5000, "error");
+                return;
+            }
+
+            const entries = all.rows
+                .map((row) => ({
+                    date: cellText(row.cells[dateCol]),
+                    amount: Number(cellText(row.cells[amountCol]).replace(/[^\d.-]/g, "")),
+                    category: sourceRef.columns?.category ? cellText(row.cells[sourceRef.columns.category]) : undefined,
+                }))
+                .filter((e) => e.date && Number.isFinite(e.amount) && e.amount > 0);
+
+            if (entries.length === 0) {
+                showMessage(t("ledger.expenseTrendEmpty"), 4000, "info");
+                return;
+            }
+
+            const { calculateExpenseTrend, formatExpenseTrendReport } = await import("@/core/expense-trend");
+            const report = calculateExpenseTrend(entries);
+            const text = formatExpenseTrendReport(report);
+
+            const dlg = new Dialog({
+                title: t("ledger.expenseTrendTitle"),
+                content: `<div class="b3-dialog__content lv-dialog-scroll-body"><pre class="lv-caption" style="white-space:pre-wrap;line-height:1.7;margin:0"></pre></div>
+<div class="b3-dialog__action">
+  <button class="b3-button b3-button--cancel">${t("close")}</button>
+  <button class="b3-button" id="lv-et-copy">${t("ledger.emergencyKitCopy")}</button>
+</div>`,
+                width: "560px",
+            });
+            const pre = dlg.element.querySelector("pre");
+            if (pre) pre.textContent = text;
+            (dlg.element.querySelector(".b3-button--cancel") as HTMLButtonElement).onclick = () => dlg.destroy();
+            (dlg.element.querySelector("#lv-et-copy") as HTMLButtonElement).onclick = async () => {
+                try {
+                    await navigator.clipboard.writeText(text);
+                    showMessage(t("overview.lifeIndexCopied"), 2500, "info");
+                } catch {
+                    showMessage(t("ledger.copyAsImageFail"), 4000, "error");
+                }
+            };
+        } catch (e) {
+            showMessage(t("ledger.logReadFailed") + " (" + (e instanceof Error ? e.message : String(e)) + ")", 5000, "error");
+        }
+    }
+
     // Household Utility Tiers & Stepped Pricing Calculation (299波):
     // Analyze meter readings (electricity, water, gas), calculate tiered costs, and issue high-tier warnings.
     async function openUtilityTiersModal() {
@@ -5225,6 +5285,7 @@
                 {/if}
                 {#if active === "stock"}<button class="b3-button b3-button--outline" onclick={openShoppingList}>{t("ledger.shoppingList")}</button>{/if}
                 {#if active === "stock"}<button class="b3-button b3-button--outline" onclick={openEmergencyKitModal}>{t("ledger.emergencyKit")}</button>{/if}
+                {#if ref?.columns?.amount}<button class="b3-button b3-button--outline" onclick={openExpenseTrendModal}>{t("ledger.expenseTrend")}</button>{/if}
                 {#if active === "favors"}<button class="b3-button b3-button--outline" onclick={openFavorsReport}>{t("ledger.favorsReport")}</button>{/if}
                 {#if active === "bookmarks"}<button class="b3-button b3-button--outline" onclick={openBookmarksCheck}>{t("ledger.checkBookmarks")}</button>{/if}
                 {#if active === "memberships"}<button class="b3-button b3-button--outline" onclick={openSubscriptionStats}>{t("ledger.subscriptionStats")}</button>{/if}

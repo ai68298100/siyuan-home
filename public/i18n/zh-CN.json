@@ -1785,5 +1785,9 @@
     "ledger.exportArchiveTip": "扫描当前模块全部记录的附件与凭据（证件照、合同PDF等），生成离线 Markdown 归档索引",
     "ledger.exportArchiveEmpty": "当前模块所有记录均未上传附件",
     "ledger.exportArchiveNoAttCol": "当前模块不支持附件字段",
-    "ledger.exportArchiveSuccess": "成功导出含 ${n} 份附件的归档清单！"
+    "ledger.exportArchiveSuccess": "成功导出含 ${n} 份附件的归档清单！",
+    "ledger.expenseTrend": "支出趋势",
+    "ledger.expenseTrendTitle": "家庭支出趋势与异常波动分析",
+    "ledger.expenseTrendNoCol": "当前模块缺少金额或日期字段，无法进行趋势分析",
+    "ledger.expenseTrendEmpty": "当前模块暂无有效的金额与日期记录"
 }

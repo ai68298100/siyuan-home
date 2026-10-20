@@ -1785,5 +1785,9 @@
     "ledger.exportArchiveTip": "Scan all records for attachments and certificates, generating an offline Markdown archive index",
     "ledger.exportArchiveEmpty": "No attachments found in the current module records",
     "ledger.exportArchiveNoAttCol": "The current module does not have an attachment column",
-    "ledger.exportArchiveSuccess": "Successfully exported manifest with ${n} attachments!"
+    "ledger.exportArchiveSuccess": "Successfully exported manifest with ${n} attachments!",
+    "ledger.expenseTrend": "Expense Trend",
+    "ledger.expenseTrendTitle": "Household Expense Trend & Spike Analysis",
+    "ledger.expenseTrendNoCol": "This module lacks amount or date fields, trend analysis unavailable",
+    "ledger.expenseTrendEmpty": "No valid amount and date records in this module"
 }
