@@ -111,6 +111,9 @@ export const FIELD_DICT: Record<string, ColumnDef> = {
 };
 
 const d = (...keys: string[]): ColumnDef[] => keys.map((k) => FIELD_DICT[k]);
+const cat = (options: string[]): ColumnDef => ({ ...FIELD_DICT.category, options });
+const sta = (options: string[], def = options[0]): ColumnDef => ({ ...FIELD_DICT.status, options, default: def });
+const tbl = (key: string, extra?: Partial<ViewDef>): ViewDef => ({ key, type: "table", ...extra });
 
 // ── certs 证件管理（02 §4.2①）──────────────────────────────
 
@@ -292,8 +295,8 @@ const CERT_PRIVATE: ColumnDef[] = [
 export const CERTS_SCHEMA: ModuleSchema = {
     columns: [
         ...d("name", "member"),
-        { ...FIELD_DICT.category, options: [...CERTIFICATE_CATEGORY_OPTIONS] },
-        { ...FIELD_DICT.status, options: ["valid", "expired", "renewed", "void"], default: "valid" },
+        cat([...CERTIFICATE_CATEGORY_OPTIONS]),
+        sta(["valid", "expired", "renewed", "void"]),
         ...d("date"),
         ...CERT_PRIVATE,
         ...d("expiry", "due", "remind_before", "location", "attachments", "note"),
@@ -303,8 +306,8 @@ export const CERTS_SCHEMA: ModuleSchema = {
     ],
     capture: ["name", "member", "category", "expiry", "attachments"],
     views: [
-        { key: "by_member", type: "table", groupBy: "member" },
-        { key: "expiring", type: "table", sortBy: { key: "expiry", asc: true } },
+        tbl("by_member", { groupBy: "member" }),
+        tbl("expiring", { sortBy: { key: "expiry", asc: true } }),
     ],
     reminders: [
         rem("expiry", "expiry", 90),
@@ -340,11 +343,11 @@ export const MEMBERS_SCHEMA: ModuleSchema = {
     columns: [
         ...d("name"),
         ...MEMBERS_PRIVATE,
-        { ...FIELD_DICT.status, options: ["active", "archived"], default: "active" },
+        sta(["active", "archived"]),
         ...d("note"),
     ],
     capture: ["name", "role", "birthday", "lunar"],
-    views: [{ key: "by_role", type: "table", groupBy: "role" }],
+    views: [tbl("by_role", { groupBy: "role" })],
     // 生日周年提醒由 members provider 声明（lunarField 指向 lunar 列）
     reminders: [
         rem("birthday", "birthday", 7, "anniversary", { lunarField: "lunar" }),
@@ -356,15 +359,15 @@ export const MEMBERS_SCHEMA: ModuleSchema = {
 export const MEDICINE_SCHEMA: ModuleSchema = {
     columns: [
         ...d("name", "member"),
-        { ...FIELD_DICT.category, options: ["rx", "otc", "external", "device", "supplement"] },
-        { ...FIELD_DICT.status, options: ["inuse", "standby", "med_expired", "discarded"], default: "inuse" },
+        cat(["rx", "otc", "external", "device", "supplement"]),
+        sta(["inuse", "standby", "med_expired", "discarded"]),
         ...d("expiry", "remind_before"),
         num("stock_qty", { min: 0, unitKey: "capture.unitCount" }),
         num("low_stock_at", { min: 0, unitKey: "capture.unitCount" }),
         ...d("location", "note"),
     ],
     capture: ["name", "category", "expiry", "stock_qty", "location"],
-    views: [{ key: "expiring", type: "table", sortBy: { key: "expiry", asc: true } }],
+    views: [tbl("expiring", { sortBy: { key: "expiry", asc: true } })],
     reminders: [rem("expiry", "expiry", 30)],
     // H15：低库存双规则之数值侧（效期侧由 expiry 规则承担；阈值逐行 low_stock_at）
     numericRules: [{ key: "low_stock", field: "stock_qty", thresholdField: "low_stock_at" }],
@@ -373,8 +376,8 @@ export const MEDICINE_SCHEMA: ModuleSchema = {
 export const MEMBERSHIPS_SCHEMA: ModuleSchema = {
     columns: [
         ...d("name", "member"),
-        { ...FIELD_DICT.category, options: ["member_card", "prepaid", "subscription", "coupon", "points"] },
-        { ...FIELD_DICT.status, options: ["active", "m_expired", "refunded"], default: "active" },
+        cat(["member_card", "prepaid", "subscription", "coupon", "points"]),
+        sta(["active", "m_expired", "refunded"]),
         ...d("expiry", "cycle", "amount", "note"),
         dat("next_pay"),
         dat("trial_end"),
@@ -384,7 +387,7 @@ export const MEMBERSHIPS_SCHEMA: ModuleSchema = {
         { key: "cancel_guide", type: "url", labelKey: "field.cancel_guide" }, // 16 组：取消自动续费指引链接
     ],
     capture: ["name", "category", "amount", "cycle", "next_pay"],
-    views: [{ key: "renewing", type: "table", sortBy: { key: "next_pay", asc: true } }],
+    views: [tbl("renewing", { sortBy: { key: "next_pay", asc: true } })],
     reminders: [
         rem("next_pay", "next_pay", 14, "recurring", { cycleField: "cycle", autoRenewField: "auto_renew" }),
         rem("trial_end", "trial_end", 3),
@@ -395,8 +398,8 @@ export const MEMBERSHIPS_SCHEMA: ModuleSchema = {
 export const INSURANCE_SCHEMA: ModuleSchema = {
     columns: [
         ...d("name", "member"),
-        { ...FIELD_DICT.category, options: ["health", "critical", "accident", "life", "vehicle", "property", "other_ins"] },
-        { ...FIELD_DICT.status, options: ["in_force", "paying", "ins_expired", "surrendered"], default: "in_force" },
+        cat(["health", "critical", "accident", "life", "vehicle", "property", "other_ins"]),
+        sta(["in_force", "paying", "ins_expired", "surrendered"]),
         txt("insurer"),
         txt("contact"), // EC13：对接人（人脉快照）
         txt("policy_no"),
@@ -412,7 +415,7 @@ export const INSURANCE_SCHEMA: ModuleSchema = {
     ],
     capture: ["name", "category", "insurer", "premium", "next_pay"],
     activity: { dateField: "claim_date", detailFields: ["claim_status", "claim_amount", "insurer"] },
-    views: [{ key: "paying", type: "table", groupBy: "member" }],
+    views: [tbl("paying", { groupBy: "member" })],
     reminders: [
         rem("next_pay", "next_pay", 30, "recurring", { cycleField: "pay_cycle" }),
         rem("expiry", "expiry", 30),
@@ -424,8 +427,8 @@ export const INSURANCE_SCHEMA: ModuleSchema = {
 export const ASSETS_REAL_SCHEMA: ModuleSchema = {
     columns: [
         ...d("name", "member"),
-        { ...FIELD_DICT.category, options: ["appliance", "furniture", "digital", "toy", "apparel", "jewelry", "collection", "sports", "other_ar"] },
-        { ...FIELD_DICT.status, options: ["inuse", "idle", "lent", "repairing", "disposed"], default: "inuse" },
+        cat(["appliance", "furniture", "digital", "toy", "apparel", "jewelry", "collection", "sports", "other_ar"]),
+        sta(["inuse", "idle", "lent", "repairing", "disposed"]),
         ...d("date", "amount", "expiry", "location", "attachments", "tags", "note"),
         txt("brand_model"),
         dat("warranty_expiry"),
@@ -433,15 +436,15 @@ export const ASSETS_REAL_SCHEMA: ModuleSchema = {
     ],
     capture: ["name", "category", "amount", "date", "attachments"],
     activity: { dateField: "date", detailFields: ["category", "amount", "location"] },
-    views: [{ key: "by_location", type: "table", groupBy: "location" }],
+    views: [tbl("by_location", { groupBy: "location" })],
     reminders: [rem("warranty", "warranty_expiry", 30)],
 };
 
 export const HEALTH_SCHEMA: ModuleSchema = {
     columns: [
         ...d("name", "member"),
-        { ...FIELD_DICT.category, options: ["visit", "report", "vaccine", "medication", "allergy", "checkup"] },
-        { ...FIELD_DICT.status, options: ["following", "closed"], default: "following" },
+        cat(["visit", "report", "vaccine", "medication", "allergy", "checkup"]),
+        sta(["following", "closed"]),
         ...d("date", "attachments", "note"),
         txt("hospital"),
         txt("department"),
@@ -451,14 +454,14 @@ export const HEALTH_SCHEMA: ModuleSchema = {
     capture: ["name", "member", "category", "date", "attachments"],
     activity: { dateField: "date", detailFields: ["category", "hospital", "department", "diagnosis"] },
     templates: [{ key: "checkup_plan", nameKey: "tpl.checkupPlan", file: "health/checkup-plan.tpl" }],
-    views: [{ key: "by_member", type: "table", groupBy: "member" }],
+    views: [tbl("by_member", { groupBy: "member" })],
     reminders: [rem("followup", "followup_date", 7)],
 };
 
 export const SHOPPING_SCHEMA: ModuleSchema = {
     columns: [
         ...d("name", "member"),
-        { ...FIELD_DICT.category, options: ["daily", "digital", "apparel", "food_sh", "other_sh", "wish"] },
+        cat(["daily", "digital", "apparel", "food_sh", "other_sh", "wish"]),
         ...d("date", "amount", "url", "note"),
         txt("channel"),
         txt("tracking_no"),
@@ -478,8 +481,8 @@ export const SHOPPING_SCHEMA: ModuleSchema = {
 export const CONTRACTS_SCHEMA: ModuleSchema = {
     columns: [
         ...d("name", "member"),
-        { ...FIELD_DICT.category, options: ["rent", "renovation", "purchase", "labor", "property_ct", "other_ct"] },
-        { ...FIELD_DICT.status, options: ["ct_active", "ct_expired", "terminated"], default: "ct_active" },
+        cat(["rent", "renovation", "purchase", "labor", "property_ct", "other_ct"]),
+        sta(["ct_active", "ct_expired", "terminated"]),
         ...d("date", "expiry", "remind_before", "attachments", "note"),
         txt("party"),
         txt("contact"), // EC13：对接人（人脉快照）
@@ -496,8 +499,8 @@ export const CONTRACTS_SCHEMA: ModuleSchema = {
 export const EXAMS_SCHEMA: ModuleSchema = {
     columns: [
         ...d("name", "member"),
-        { ...FIELD_DICT.category, options: ["vocational", "title", "language", "academic", "other_ex"] },
-        { ...FIELD_DICT.status, options: ["preparing", "passed", "ex_expired"], default: "preparing" },
+        cat(["vocational", "title", "language", "academic", "other_ex"]),
+        sta(["preparing", "passed", "ex_expired"]),
         ...d("expiry", "attachments", "note"),
         txt("issuer"),
         txt("contact"), // EC13：对接人（人脉快照）
@@ -511,20 +514,20 @@ export const EXAMS_SCHEMA: ModuleSchema = {
 export const ALLOWANCE_SCHEMA: ModuleSchema = {
     columns: [
         ...d("name", "member"),
-        { ...FIELD_DICT.category, options: ["lucky", "allowance_al", "reward", "interest_al"] },
+        cat(["lucky", "allowance_al", "reward", "interest_al"]),
         sel("direction", ["in", "out"]),
         ...d("amount", "date", "note"),
         txt("source"),
     ],
     capture: ["name", "category", "amount", "direction", "date"],
     activity: { dateField: "date", detailFields: ["category", "direction", "amount", "source"] },
-    views: [{ key: "by_member", type: "table", groupBy: "member" }],
+    views: [tbl("by_member", { groupBy: "member" })],
 };
 
 export const FAVORS_SCHEMA: ModuleSchema = {
     columns: [
         ...d("name"),
-        { ...FIELD_DICT.category, options: ["wedding", "full_moon", "housewarming", "graduation", "birthday_fv", "other_fv"] },
+        cat(["wedding", "full_moon", "housewarming", "graduation", "birthday_fv", "other_fv"]),
         sel("direction", ["in", "out"]),
         txt("person"),
         ...d("amount", "date", "note"),
@@ -533,13 +536,13 @@ export const FAVORS_SCHEMA: ModuleSchema = {
     activity: { dateField: "date", detailFields: ["category", "direction", "person", "amount"] },
     // 16 组/190 波：回礼提醒——收礼（direction=in）30 天后一次性（leadDays 0=到期当天起提醒）；提醒卡带「回礼」标记（rule.reciprocate）
     reminders: [rem("reciprocate", "date", 0, "after", { offsetDays: 30, onlyIf: { field: "direction", equals: "in" } })],
-    views: [{ key: "by_person", type: "table", groupBy: "person" }],
+    views: [tbl("by_person", { groupBy: "person" })],
 };
 
 export const STOCK_SCHEMA: ModuleSchema = {
     columns: [
         ...d("name", "member"),
-        { ...FIELD_DICT.category, options: ["food_st", "daily_chem", "paper", "medical_st", "emergency_st", "other_st"] },
+        cat(["food_st", "daily_chem", "paper", "medical_st", "emergency_st", "other_st"]),
         ...d("expiry", "location", "note"),
         num("qty", { min: 0, unitKey: "capture.unitCount" }),
         num("low_stock_at", { min: 0, unitKey: "capture.unitCount" }),
@@ -547,8 +550,8 @@ export const STOCK_SCHEMA: ModuleSchema = {
     capture: ["name", "qty", "low_stock_at", "expiry"],
     // 品类分区（Apple Reminders Grocery 印证，26.6）：囤货按品类自动归组
     views: [
-        { key: "by_category", type: "table", groupBy: "category" },
-        { key: "expiring", type: "table", sortBy: { key: "expiry", asc: true } },
+        tbl("by_category", { groupBy: "category" }),
+        tbl("expiring", { sortBy: { key: "expiry", asc: true } }),
     ],
     templates: [{ key: "emergency_kit", nameKey: "tpl.emergencyKit", file: "stock/emergency-kit.tpl" }],
     reminders: [rem("expiry", "expiry", 30)],
@@ -559,7 +562,7 @@ export const STOCK_SCHEMA: ModuleSchema = {
 export const CHORES_SCHEMA: ModuleSchema = {
     columns: [
         ...d("name", "member"),
-        { ...FIELD_DICT.category, options: ["housework", "maintenance", "care", "other_ch"] },
+        cat(["housework", "maintenance", "care", "other_ch"]),
         ...d("cycle", "due", "note"),
         dat("last_done"),
     ],
@@ -572,7 +575,7 @@ export const CHORES_SCHEMA: ModuleSchema = {
 export const HOUSE_SCHEMA: ModuleSchema = {
     columns: [
         ...d("name", "member"),
-        { ...FIELD_DICT.category, options: ["payment", "maintenance_h", "anniversary", "emergency"] },
+        cat(["payment", "maintenance_h", "anniversary", "emergency"]),
         ...d("cycle", "note"),
         dat("pay_day"),
         chk("lunar"),
@@ -586,7 +589,7 @@ export const HOUSE_SCHEMA: ModuleSchema = {
 export const FOOD_SCHEMA: ModuleSchema = {
     columns: [
         ...d("name", "member"),
-        { ...FIELD_DICT.category, options: ["home_cook", "restaurant", "takeout"] },
+        cat(["home_cook", "restaurant", "takeout"]),
         num("rating", { min: 0, max: 5, step: 0.5 }),
         ...d("date", "url", "note"),
         chk("dislike_safe"),
@@ -600,7 +603,7 @@ export const FOOD_SCHEMA: ModuleSchema = {
 export const ADDRESS_SCHEMA: ModuleSchema = {
     columns: [
         ...d("name", "member"),
-        { ...FIELD_DICT.category, options: ["home", "shipping", "id_addr", "org"] },
+        cat(["home", "shipping", "id_addr", "org"]),
         txt("address_full"),
         ...d("url", "note"),
     ],
@@ -610,7 +613,7 @@ export const ADDRESS_SCHEMA: ModuleSchema = {
 export const BOOKMARKS_SCHEMA: ModuleSchema = {
     columns: [
         ...d("name"),
-        { ...FIELD_DICT.category, options: ["gov", "payment_bm", "shopping_bm", "learning", "work", "other_bm"] },
+        cat(["gov", "payment_bm", "shopping_bm", "learning", "work", "other_bm"]),
         ...d("url", "note"),
         { key: "account_note", type: "text", labelKey: "field.account_name" },
     ],
@@ -620,7 +623,7 @@ export const BOOKMARKS_SCHEMA: ModuleSchema = {
 export const SNIPPETS_SCHEMA: ModuleSchema = {
     columns: [
         ...d("name"),
-        { ...FIELD_DICT.category, options: ["greeting", "address_sn", "intro", "reply", "other_sn"] },
+        cat(["greeting", "address_sn", "intro", "reply", "other_sn"]),
         txt("content"),
         ...d("tags"),
     ],
@@ -630,7 +633,7 @@ export const SNIPPETS_SCHEMA: ModuleSchema = {
 export const PARENTING_SCHEMA: ModuleSchema = {
     columns: [
         ...d("name", "member"),
-        { ...FIELD_DICT.category, options: ["vaccine_p", "growth", "feeding", "milestone"] },
+        cat(["vaccine_p", "growth", "feeding", "milestone"]),
         // due 必备：next_visit 规则引用此列（缺列会令 requireReminderColumns 抛错——第六十五轮修复）
         ...d("date", "due", "attachments", "note"),
         txt("vaccine_name"),
@@ -648,8 +651,8 @@ export const PARENTING_SCHEMA: ModuleSchema = {
 export const SCHOOLING_SCHEMA: ModuleSchema = {
     columns: [
         ...d("name", "member"),
-        { ...FIELD_DICT.category, options: ["kindergarten", "primary", "junior", "senior", "college", "grad_school", "extracurricular"] },
-        { ...FIELD_DICT.status, options: ["applying", "enrolled", "graduated"], default: "applying" },
+        cat(["kindergarten", "primary", "junior", "senior", "college", "grad_school", "extracurricular"]),
+        sta(["applying", "enrolled", "graduated"]),
         txt("school"),
         txt("grade"),
         txt("teacher"),
@@ -670,7 +673,7 @@ export const SCHOOLING_SCHEMA: ModuleSchema = {
 export const SOCIAL_SCHEMA: ModuleSchema = {
     columns: [
         ...d("name", "member"),
-        { ...FIELD_DICT.category, options: ["shebao", "gongjijin", "yibao", "resident_pension", "commercial_pension"] },
+        cat(["shebao", "gongjijin", "yibao", "resident_pension", "commercial_pension"]),
         ...d("note"),
         txt("account_no"),
         chk("retire_check"),
@@ -686,8 +689,8 @@ export const SOCIAL_SCHEMA: ModuleSchema = {
 export const MEDIA_SCHEMA: ModuleSchema = {
     columns: [
         ...d("name", "member"),
-        { ...FIELD_DICT.category, options: ["movie", "tv", "variety", "book", "comic", "novel"] },
-        { ...FIELD_DICT.status, options: ["wishlist", "consuming", "done", "dropped"], default: "wishlist" },
+        cat(["movie", "tv", "variety", "book", "comic", "novel"]),
+        sta(["wishlist", "consuming", "done", "dropped"]),
         num("rating"),
         txt("progress"),
         // 16 组/189 波：追更提醒——更新日手动登记，提醒中枢派生（oneoff，当天提醒）
@@ -699,7 +702,7 @@ export const MEDIA_SCHEMA: ModuleSchema = {
     // 海报墙（seerr 印证，26.6）：画廊视图以封面卡片呈现；思源 gallery 视图类型原生支持
     views: [
         { key: "wall", type: "gallery" },
-        { key: "consuming", type: "table", groupBy: "status" },
+        tbl("consuming", { groupBy: "status" }),
     ],
 };
 
@@ -759,7 +762,7 @@ export const VEHICLES_SCHEMA: ModuleSchema = {
 export const TRANSIT_SCHEMA: ModuleSchema = {
     columns: [
         ...d("name", "member"),
-        { ...FIELD_DICT.category, options: ["etc", "transit_card", "monthly", "senior"] },
+        cat(["etc", "transit_card", "monthly", "senior"]),
         ...d("expiry", "note"),
         txt("card_no"),
     ],
@@ -770,7 +773,7 @@ export const TRANSIT_SCHEMA: ModuleSchema = {
 export const TRAVEL_PLAN_SCHEMA: ModuleSchema = {
     columns: [
         ...d("name", "member"),
-        { ...FIELD_DICT.status, options: ["planning", "ongoing", "finished"], default: "planning" },
+        sta(["planning", "ongoing", "finished"]),
         ...d("date", "expiry", "amount", "note"),
         txt("destination"),
     ],
@@ -782,7 +785,7 @@ export const TRAVEL_PLAN_SCHEMA: ModuleSchema = {
 export const TRAVEL_BOOKING_SCHEMA: ModuleSchema = {
     columns: [
         ...d("name"),
-        { ...FIELD_DICT.category, options: ["flight", "hotel", "train", "ticket", "rental"] },
+        cat(["flight", "hotel", "train", "ticket", "rental"]),
         ...d("date", "amount", "attachments", "note"),
         txt("order_no"),
     ],
@@ -793,7 +796,7 @@ export const TRAVEL_BOOKING_SCHEMA: ModuleSchema = {
 export const TRAVEL_PACKING_SCHEMA: ModuleSchema = {
     columns: [
         ...d("name"),
-        { ...FIELD_DICT.status, options: ["draft", "packed"], default: "draft" },
+        sta(["draft", "packed"]),
         ...d("date", "note"),
         txt("checklist_doc"),
     ],
@@ -814,7 +817,7 @@ export const TRAVEL_LOG_SCHEMA: ModuleSchema = {
 export const ASSETS_VIRTUAL_SCHEMA: ModuleSchema = {
     columns: [
         ...d("name", "member"),
-        { ...FIELD_DICT.category, options: ["account", "domain", "game", "nft", "license", "other_v"] },
+        cat(["account", "domain", "game", "nft", "license", "other_v"]),
         ...d("expiry", "note"),
         txt("platform"),
         txt("account_name"),

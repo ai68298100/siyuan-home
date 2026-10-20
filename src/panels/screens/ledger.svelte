@@ -1492,6 +1492,38 @@
         }
     }
 
+    // Emergency Kit Checklist & Stock Linking (302波):
+    // Compare standard emergency kit items with current stock ledger and import missing rows.
+    async function openEmergencyKitModal() {
+        if (!ref?.avId || !ref.columns?.name) return;
+        try {
+            const allStock = await renderLedgerAll(ref.avId);
+            if (!allStock.complete) {
+                showMessage(t("ledger.loadIncomplete"), 5000, "error");
+                return;
+            }
+
+            const { openEmergencyKitDialog } = await import("@/core/emergency-kit");
+            openEmergencyKitDialog({
+                stockRows: allStock.rows,
+                ref: ref as { avId: string; columns?: Record<string, string> },
+                t,
+                DialogCls: Dialog,
+                showMessageFn: showMessage,
+                cellTextFn: cellText,
+                addDetachedRowFn: addDetachedRow,
+                setCellFn: setCell,
+                isGuestReadOnly: Boolean(plugin.runtime?.guestModeActive),
+                onCreatedCallback: async () => {
+                    await load();
+                    try { await plugin.refreshHub([active]); } catch { /* ignore */ }
+                },
+            });
+        } catch (e) {
+            showMessage(t("ledger.logReadFailed") + " (" + (e instanceof Error ? e.message : String(e)) + ")", 5000, "error");
+        }
+    }
+
     // CSV import uses a schema-driven mapping wizard; core owns the planning logic.
     function openCsvImport() {
         if (!ref?.avId) return;
@@ -5129,6 +5161,7 @@
                     <button class="b3-button b3-button--outline" onclick={openVaccineScheduleModal}>{t("ledger.vaccineSchedule")}</button>
                 {/if}
                 {#if active === "stock"}<button class="b3-button b3-button--outline" onclick={openShoppingList}>{t("ledger.shoppingList")}</button>{/if}
+                {#if active === "stock"}<button class="b3-button b3-button--outline" onclick={openEmergencyKitModal}>{t("ledger.emergencyKit")}</button>{/if}
                 {#if active === "favors"}<button class="b3-button b3-button--outline" onclick={openFavorsReport}>{t("ledger.favorsReport")}</button>{/if}
                 {#if active === "bookmarks"}<button class="b3-button b3-button--outline" onclick={openBookmarksCheck}>{t("ledger.checkBookmarks")}</button>{/if}
                 {#if active === "memberships"}<button class="b3-button b3-button--outline" onclick={openSubscriptionStats}>{t("ledger.subscriptionStats")}</button>{/if}

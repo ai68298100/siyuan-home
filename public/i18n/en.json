@@ -1769,5 +1769,15 @@
     "overview.lifeIndexCopied": "Family life index report copied to clipboard",
     "capture.smartHint": "Smart capture: naturally parses title, amount, date & target module",
     "capture.smartDetected": "Detected fields for ${module}, ready to autofill",
-    "capture.smartConfidence": "Confidence ${n}%"
+    "capture.smartConfidence": "Confidence ${n}%",
+    "ledger.emergencyKit": "Emergency Kit Audit",
+    "ledger.emergencyKitTitle": "Emergency Kit Audit & Stock Linking",
+    "ledger.emergencyKitTotal": "Standard Items",
+    "ledger.emergencyKitReady": "Ready in Stock",
+    "ledger.emergencyKitDeficit": "Missing Deficit",
+    "ledger.emergencyKitInStock": "In Stock",
+    "ledger.emergencyKitMissing": "Missing",
+    "ledger.emergencyKitCopy": "Copy Audit Report",
+    "ledger.emergencyKitImport": "Import Missing Items (${n})",
+    "ledger.emergencyKitImportSuccess": "Successfully imported ${n} emergency stock items!"
 }

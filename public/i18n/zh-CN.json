@@ -1769,5 +1769,15 @@
     "overview.lifeIndexCopied": "家庭生活指数与盘点简报已复制到剪贴板",
     "capture.smartHint": "智能速记：将日常话语自动解析为标题/金额/日期/归属模块并预填",
     "capture.smartDetected": "识别到 ${module} 字段，可一键预填到对应台账",
-    "capture.smartConfidence": "置信度 ${n}%"
+    "capture.smartConfidence": "置信度 ${n}%",
+    "ledger.emergencyKit": "应急物资自查",
+    "ledger.emergencyKitTitle": "家庭应急物资储备自查与台账联动",
+    "ledger.emergencyKitTotal": "应急标准项",
+    "ledger.emergencyKitReady": "已备齐/在库",
+    "ledger.emergencyKitDeficit": "待补充缺口",
+    "ledger.emergencyKitInStock": "已在库",
+    "ledger.emergencyKitMissing": "待入库",
+    "ledger.emergencyKitCopy": "复制自查报告",
+    "ledger.emergencyKitImport": "一键建档缺口 (${n})",
+    "ledger.emergencyKitImportSuccess": "成功建档 ${n} 项应急储备物资！"
 }

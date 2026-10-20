@@ -18,3 +18,4 @@ tmp
 .playwright-cli/
 output/
 coverage
+.jeikcode/codegraph/

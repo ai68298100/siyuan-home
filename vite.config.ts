@@ -103,17 +103,22 @@ export default defineConfig(buildTarget === "kernel" ? {
         emptyOutDir: false,
         minify: "terser",
         terserOptions: {
+            ecma: 2022,
             compress: {
+                ecma: 2022,
                 passes: 3,
                 drop_console: true,
                 drop_debugger: true,
                 pure_getters: true,
+                unsafe_arrows: true,
+                toplevel: true,
             },
             mangle: {
                 toplevel: true,
             },
             format: {
                 comments: false,
+                ecma: 2022,
             },
         },
         sourcemap: isSrcmap ? "inline" : false,

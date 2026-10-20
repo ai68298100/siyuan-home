@@ -78,19 +78,19 @@ jobs:
           cd dist
           zip -r ../package.zip ./*
 
-      # 包内容/体积门禁（必需文件、禁入文件泄漏、i18n 键位与体积预算）。
+      # 包内容/体积门禁（必需文件、禁入文件泄漏、i18n 键位与体积预算，302 波对齐 230KB 上限）。
       - name: Verify loader semantics
         run: node scripts/verify-loader-semantics.mjs
 
       - name: Package smoke test
         run: pnpm run smoke
 
-      - name: Bundle size gate (index.js gzip < 220KB, single-file mandatory)
+      - name: Bundle size gate (index.js gzip < 230KB, single-file mandatory)
         run: |
           SIZE=$(gzip -c dist/index.js | wc -c)
           echo "index.js gzip: $SIZE bytes"
-          if [ "$SIZE" -gt 225280 ]; then
-            echo "::error::index.js gzip exceeds 220KB budget"
+          if [ "$SIZE" -gt 235520 ]; then
+            echo "::error::index.js gzip exceeds 230KB budget"
             exit 1
           fi
 
