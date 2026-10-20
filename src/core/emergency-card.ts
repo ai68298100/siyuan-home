@@ -49,7 +49,7 @@ export interface StockRowLike {
     location?: string;
 }
 
-const BLOOD_TYPE_REGEX = /(Rh[+-阴阳]|AB|A|B|O)型?/i;
+const BLOOD_TYPE_REGEX = /(Rh[+\-阴阳]|AB|A|B|O)型?/i;
 
 /** 从自由文本中嗅探血型 */
 export function extractBloodType(text?: string): string | undefined {

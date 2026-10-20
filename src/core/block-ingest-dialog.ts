@@ -26,6 +26,15 @@ export interface BlockIngestDialogOptions {
     onSuccessCallback?: () => Promise<void> | void;
 }
 
+function escapeHtml(str: string): string {
+    return str
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;")
+        .replace(/'/g, "&#039;");
+}
+
 export function openBlockIngestDialog(opts: BlockIngestDialogOptions): void {
     const { t, currentModule, plugin, DialogCls, showMessageFn, addDetachedRowFn, setCellFn, onSuccessCallback } = opts;
 
@@ -81,15 +90,19 @@ export function openBlockIngestDialog(opts: BlockIngestDialogOptions): void {
         const targetMod = modSel.value;
         const res = parseBlockToLedgerRow({ blockId, content: text, targetModule: targetMod });
         previewEl.style.display = "flex";
+        const safeName = escapeHtml(res.rowPayload.name);
+        const safeMod = escapeHtml(modLabel(res.suggestedModule));
+        const safeBlockId = escapeHtml(res.blockId);
+        const safeDate = res.rowPayload.date ? escapeHtml(res.rowPayload.date) : "";
         previewEl.innerHTML = `
             <div style="display:flex;justify-content:space-between">
-                <b>${res.rowPayload.name}</b>
-                <span class="lv-badge green">${modLabel(res.suggestedModule)}</span>
+                <b>${safeName}</b>
+                <span class="lv-badge green">${safeMod}</span>
             </div>
             <div class="lv-caption" style="display:flex;gap:8px;flex-wrap:wrap">
-                ${res.rowPayload.date ? `<span>📅 ${res.rowPayload.date}</span>` : ""}
+                ${safeDate ? `<span>📅 ${safeDate}</span>` : ""}
                 ${res.rowPayload.amount !== undefined ? `<span>💰 ¥${res.rowPayload.amount}</span>` : ""}
-                <span>🔗 ${res.blockId}</span>
+                <span>🔗 ${safeBlockId}</span>
             </div>
         `;
     };
