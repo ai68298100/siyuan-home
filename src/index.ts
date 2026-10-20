@@ -63,6 +63,10 @@ export default class LvHomePlugin extends Plugin {
     /** 已挂载面板的页签直切回调（tab-panel 挂载时注册、卸载时清空） */
     panelScreenSwitch?: (screen: string) => void;
     private statusbarEl?: HTMLElement;
+    /** 309 波：addTopBar 返回的顶栏元素（存活守护用；onunload 清理） */
+    private topBarEl?: HTMLElement;
+    /** 309 波：顶栏被宿主重建后的重挂守护 */
+    private topBarObserver?: MutationObserver;
     /** C6c 块菜单监听（onunload 精确解绑用） */
     private captureMenuHandler?: (...args: any[]) => void;
     /** PF06/18 组：他端台账变更（websocket）→ 节流补扫 [待实测] 事件名/频度以实例为准 */
@@ -105,6 +109,60 @@ export default class LvHomePlugin extends Plugin {
         return String(this.i18n[key] ?? key);
     }
 
+    /**
+     * 309 波：所有思源 UI 入口的同步登记（页签/顶栏/命令/状态栏/图标）。
+     * 必须在 onload 的首个 await 之前调用：宿主在 onload 返回前完成顶栏与页签装配，
+     * 位于 await 之后的登记可能落不到 toolbar —— 这正是“顶栏图标突然消失”的根因。
+     */
+    private registerEntrypoints(): void {
+        const self = this;
+
+        // 移动前端：自定义图标符号必须在任何使用前同步注册
+        this.isMobileFrontend = getFrontend() === "mobile" || getFrontend() === "browser-mobile";
+        if (this.isMobileFrontend) {
+            this.addIcons(`<symbol id="iconLvHomeApp" viewBox="0 0 32 32">
+                <path d="M5 14 16 4l11 10v13a1.5 1.5 0 0 1-1.5 1.5h-6V20h-7v8.5h-6A1.5 1.5 0 0 1 5 27V14Z" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linejoin="round"/>
+            </symbol>`);
+        }
+
+        // Tab 面板：init 时挂载 Svelte，destroy 时卸载（同一 Tab 可多次打开）
+        const unmounts = new WeakMap<Element, () => void>();
+        this.addTab({
+            type: TAB_TYPE,
+            init(this: Custom) {
+                const um = mount(TabPanel, { target: this.element, props: { plugin: self } });
+                unmounts.set(this.element, um as () => void);
+            },
+            destroy(this: Custom) {
+                const um = unmounts.get(this.element);
+                if (um) unmount(um as any);
+            },
+        });
+
+        // 顶栏入口（桌面端图标 + 点击开面板）
+        this.topBarEl = this.addTopBar({
+            icon: "iconEmoji",
+            title: String(this.i18n.butler ?? "Lv Home"),
+            callback: () => this.showTab(),
+        });
+        this.ensureTopBarIconAlive();
+
+        this.addCommand({
+            langKey: "openButler",
+            // 26.7 默认热键策略：Alt+H（H=Home，避开常见组合；用户可在设置-快捷键改）
+            hotkey: "Ctrl+Alt+H",
+            callback: () => this.showTab(),
+        });
+
+        // 28 组：状态栏「今日到期 N」角标（点击打开管家并预选提醒页）
+        const statusEl = document.createElement("div");
+        statusEl.className = "lv-statusbar";
+        statusEl.style.cssText = "cursor:pointer;padding:0 6px;font-size:12px;display:none";
+        statusEl.onclick = () => this.openRemindersScreen();
+        this.addStatusBar({ element: statusEl });
+        this.statusbarEl = statusEl;
+    }
+
     private scheduleTimeout(callback: () => void, delay: number): number {
         let timer = 0;
         timer = window.setTimeout(() => {
@@ -115,8 +173,42 @@ export default class LvHomePlugin extends Plugin {
         return timer;
     }
 
+    /**
+     * 309 波：顶栏图标存活守护。宿主会在主题切换/窗口重建/插件热重载时重建 #toolbar，
+     * 把已注册的条目元素丢掉——表现为图标“突然消失”。这里用一次轻量 MutationObserver
+     * 观察顶栏容器，一旦发现我们的按钮离开文档，就重新调用 addTopBar 登记（同插件内幂等）。
+     * 只在桌面端生效；卸载时断开观察。
+     */
+    private ensureTopBarIconAlive(): void {
+        if (this.isMobileFrontend || typeof MutationObserver === "undefined" || typeof document === "undefined") return;
+        const toolbar = document.getElementById("toolbar");
+        if (!toolbar) return;
+        this.topBarObserver?.disconnect();
+        const observer = new MutationObserver(() => {
+            if (this.topBarEl && this.topBarEl.isConnected) return;
+            if (!document.getElementById("toolbar")) return;
+            try {
+                this.topBarEl = this.addTopBar({
+                    icon: "iconEmoji",
+                    title: String(this.i18n.butler ?? "Lv Home"),
+                    callback: () => this.showTab(),
+                });
+            } catch {
+                // 宿主尚未装配完成：留给下一次 DOM 变更重试
+            }
+        });
+        observer.observe(toolbar, { childList: true });
+        this.topBarObserver = observer;
+    }
+
     async onload() {
         const self = this;
+        // 309 波（顶栏图标突然消失的真因）：思源宿主在插件 onload 返回前完成顶栏/页签装配，
+        // 历史实现在 `await loadSettings/loadRuntime` 之后才 addTopBar，注册时机落在装配窗口之外，
+        // 重载/热更新后条目就会丢失（图标“突然消失”，面板同时被重新渲染）。
+        // 修法：所有 UI 登记全部提到第一个 await 之前，同步完成。
+        this.registerEntrypoints();
+
         this.settings = await loadSettings(this);
         this.runtime = await loadRuntime(this);
 
@@ -192,42 +284,13 @@ export default class LvHomePlugin extends Plugin {
             }
         } catch { /* storage may be unavailable */ }
 
-        // DEVICE-07（227 波）：移动前端标识 + 顶栏入口注入（petal addTopBar 在移动端不渲染；
-        // 参照 checkin ensureMobileTopBarButtonFor 的注入+重试方案，点击弹全屏 Dialog 面板）
-        this.isMobileFrontend = getFrontend() === "mobile" || getFrontend() === "browser-mobile";
+        // DEVICE-07（227 波）：移动前端标识（图标符号与按钮注入已在 registerEntrypoints 中完成）
         if (this.isMobileFrontend) {
-            this.addIcons(`<symbol id="iconLvHomeApp" viewBox="0 0 32 32">
-                <path d="M5 14 16 4l11 10v13a1.5 1.5 0 0 1-1.5 1.5h-6V20h-7v8.5h-6A1.5 1.5 0 0 1 5 27V14Z" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linejoin="round"/>
-            </symbol>`);
             this.ensureMobileTopBarButton();
         }
 
-        // Tab 面板：init 时挂载 Svelte，destroy 时卸载（同一 Tab 可多次打开）
-        const unmounts = new WeakMap<Element, () => void>();
-        this.addTab({
-            type: TAB_TYPE,
-            init(this: Custom) {
-                const um = mount(TabPanel, { target: this.element, props: { plugin: self } });
-                unmounts.set(this.element, um as () => void);
-            },
-            destroy(this: Custom) {
-                const um = unmounts.get(this.element);
-                if (um) unmount(um as any);
-            },
-        });
-
-        this.addTopBar({
-            icon: "iconEmoji",
-            title: String(this.i18n.butler ?? "Lv Home"),
-            callback: () => this.showTab(),
-        });
-
-        this.addCommand({
-            langKey: "openButler",
-            // 26.7 默认热键策略：Alt+H（H=Home，避开常见组合；用户可在设置-快捷键改）
-            hotkey: "Ctrl+Alt+H",
-            callback: () => this.showTab(),
-        });
+        // 309 波：页签/顶栏/命令/图标的注册已全部移到 registerEntrypoints()，
+        // 在 onload 的首个 await 之前同步完成（宿主装配窗口内）——此处不再重复登记。
 
         // schema 契约门禁（33.2；193 波收口 SCHEMA_CATALOG 单源）：开发期发现违规立即暴露
         for (const [id, schema] of Object.entries(SCHEMA_CATALOG)) {
@@ -281,13 +344,7 @@ export default class LvHomePlugin extends Plugin {
         }) as any;
         this.eventBus.on("open-menu-content", this.captureMenuHandler);
 
-        // 28 组：状态栏「今日到期 N」角标（点击打开管家并预选提醒页）
-        const statusEl = document.createElement("div");
-        statusEl.className = "lv-statusbar";
-        statusEl.style.cssText = "cursor:pointer;padding:0 6px;font-size:12px;display:none";
-        statusEl.onclick = () => this.openRemindersScreen();
-        this.addStatusBar({ element: statusEl });
-        this.statusbarEl = statusEl;
+        // 28 组：状态栏已移至 registerEntrypoints()（同步登记）
 
         // PF13/15 组：休眠/切走后恢复可见 → 补扫（错过 30min 心跳的场景）；10 分钟最小间隔合并重复触发
         this.visibilityHandler = () => {
@@ -894,6 +951,12 @@ export default class LvHomePlugin extends Plugin {
     }
 
     onunload() {
+        // 309 波：断开顶栏复活观察器，避免卸载后重建条目
+        if (this.topBarObserver) {
+            this.topBarObserver.disconnect();
+            this.topBarObserver = undefined;
+        }
+        this.topBarEl = undefined;
         if (this.heartbeat) window.clearInterval(this.heartbeat);
         this.heartbeat = undefined;
         for (const timer of this.timeoutIds) window.clearTimeout(timer);
