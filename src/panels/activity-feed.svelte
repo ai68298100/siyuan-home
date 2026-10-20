@@ -1,5 +1,6 @@
 <script lang="ts">
     import { showMessage } from "siyuan";
+    import { Dialog } from "siyuan";
     import { onDestroy } from "svelte";
     import type { ActivityRecord, ActivitySnapshot } from "@/core/activity";
     import { loadActivitySnapshot } from "@/core/activity";
@@ -60,6 +61,51 @@
     function memberName(id: string | undefined): string {
         if (!id) return t("members.unassigned");
         return plugin.settings.members.find((member) => member.id === id)?.name ?? t("members.unassigned");
+    }
+
+    // 307 波：时间轴活跃度洞察（模块/成员热度 + 长期空窗预警）
+    let insightBusy = $state(false);
+    async function openInsightDialog() {
+        if (insightBusy) return;
+        insightBusy = true;
+        try {
+            const { buildTimelineInsight, formatTimelineInsight } = await import("@/core/timeline-insight");
+            const input = (snapshot?.records ?? []).map((r) => ({
+                id: r.id,
+                moduleId: r.moduleId,
+                memberId: r.memberId,
+                date: r.recordedAt ?? r.eventDate,
+            }));
+            const knownModules = [...new Set((snapshot?.records ?? []).map((r) => r.moduleId))].slice(0, 40);
+            const insight = buildTimelineInsight(input, { knownModules, windowDays: 180, gapDays: 60 });
+            const text = formatTimelineInsight(insight, (id) =>
+                t(`module.${id}`) !== `module.${id}` ? t(`module.${id}`) : memberName(id));
+
+            const dlg = new Dialog({
+                title: t("activity.insightTitle"),
+                content: `<div class="b3-dialog__content lv-dialog-scroll-body"><pre class="lv-caption" style="white-space:pre-wrap;line-height:1.7;margin:0"></pre></div>
+<div class="b3-dialog__action">
+  <button class="b3-button b3-button--cancel">${t("close")}</button>
+  <button class="b3-button" id="lv-insight-copy">${t("activity.insightCopy")}</button>
+</div>`,
+                width: "600px",
+            });
+            const pre = dlg.element.querySelector("pre");
+            if (pre) pre.textContent = text;
+            (dlg.element.querySelector(".b3-button--cancel") as HTMLButtonElement).onclick = () => dlg.destroy();
+            (dlg.element.querySelector("#lv-insight-copy") as HTMLButtonElement).onclick = async () => {
+                try {
+                    await navigator.clipboard.writeText(text);
+                    showMessage(t("overview.lifeIndexCopied"), 2500, "info");
+                } catch {
+                    showMessage(t("activity.insightCopyFailed"), 4000, "error");
+                }
+            };
+        } catch (e) {
+            showMessage(t("activity.insightFailed").replace("${msg}", e instanceof Error ? e.message : String(e)), 5000, "error");
+        } finally {
+            insightBusy = false;
+        }
     }
 
     async function refresh(force = false) {
@@ -182,6 +228,8 @@
                 <button type="button" class="b3-button b3-button--text" onclick={() => void refresh(true)} disabled={loading} aria-busy={loading}>
                     {#if loading}<span class="lv-activity-spinner lv-activity-spinner--small" aria-hidden="true"></span>{:else}<UiIcon name="history" size={14} />{/if}{t("activity.refresh")}
                 </button>
+                <!-- 307 波：时间轴活跃度洞察（模块/成员热度 + 长期空窗预警） -->
+                <button type="button" class="b3-button b3-button--text" disabled={!snapshot?.records.length || insightBusy} onclick={openInsightDialog}>{t("activity.insight")}</button>
             {/if}
             <button type="button" class="lv-iconbtn" aria-expanded={!collapsed} aria-controls={memberId ? `lv-activity-body-${memberId}` : "lv-activity-body"}
                 aria-label={collapsed ? t("activity.expand") : t("activity.collapse")} onclick={(event) => { collapsed = !collapsed; if (collapsed && event.currentTarget instanceof HTMLElement) event.currentTarget.focus(); }}>

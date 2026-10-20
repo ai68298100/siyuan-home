@@ -9,6 +9,7 @@ import { CERTS_SCHEMA, MEMBERS_SCHEMA, type ModuleSchema, type NumericRuleSpec }
 import type { DbRef, HomeSettings } from "@/types";
 import { getEntries, type RowLogs } from "../rowlog";
 import { normalizeMaintenanceRecords, type MaintenanceRecord } from "../vehicle";
+import type { AvCellLike } from "../avcell";
 
 export interface DataProvider {
     readonly moduleId: string;
@@ -32,13 +33,13 @@ export function requireReminderColumns(columns: Record<string, string>, schema: 
 }
 
 /** H14 行级提前量：remind_before 列值 > 用户 leadOverrides > schema 默认。无效值（NaN/负数/超大）回退，clamp 0–3650 */
-export function rowLeadDays(v: any): number | undefined {
+export function rowLeadDays(v: AvCellLike | null | undefined): number | undefined {
     const n = numberFromValue(v);
     return n === undefined ? undefined : Math.min(3650, Math.max(0, n));
 }
 
 /** 从 av 行 value 提取日期（date 列 content 为 ms 时间戳） */
-function dateFromValue(v: any): string | undefined {
+function dateFromValue(v: AvCellLike | null | undefined): string | undefined {
     const d = v?.date;
     if (!d || !d.isNotEmpty || !d.content) return undefined;
     const dt = new Date(d.content);
@@ -46,18 +47,18 @@ function dateFromValue(v: any): string | undefined {
     return localDateKey(dt);
 }
 
-function textFromValue(v: any): string | undefined {
+function textFromValue(v: AvCellLike | null | undefined): string | undefined {
     const t = v?.text?.content;
     return typeof t === "string" && t.trim() ? t.trim() : undefined;
 }
 
 /** select 单选值（certs status 过滤用） */
-function selectFromValue(v: any): string | undefined {
+function selectFromValue(v: AvCellLike | null | undefined): string | undefined {
     return v?.select?.content ?? v?.mSelect?.[0]?.content ?? undefined;
 }
 
 /** number 列值（H15）：0 算有值；缺列/缺值（isNotEmpty false）返回 undefined */
-function numberFromValue(v: any): number | undefined {
+function numberFromValue(v: AvCellLike | null | undefined): number | undefined {
     const n = v?.number;
     if (!n || !n.isNotEmpty || typeof n.content !== "number" || isNaN(n.content)) return undefined;
     return n.content;

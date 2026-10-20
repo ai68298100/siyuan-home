@@ -10,7 +10,7 @@
 import type { Plugin } from "siyuan";
 import type { Reminder } from "@/types";
 import { setCell } from "../siyuan";
-import { loadRuntime, persistRuntimeUnderLock, withRuntimeSaveLock, reminderKind, type HubRuntime, type HandledRecord } from "./runtime";
+import { loadRuntime, persistRuntimeUnderLock, withRuntimeSaveLock, reminderKind, toggleReminderPinInRuntime, type HubRuntime, type HandledRecord } from "./runtime";
 
 function cloneRuntime(rt: HubRuntime): HubRuntime {
     return JSON.parse(JSON.stringify(rt)) as HubRuntime;
@@ -234,5 +234,12 @@ export function toggleMemoPin(plugin: Plugin, memoId: string) {
         const i = rt.pinnedMemoIds.indexOf(id);
         if (i >= 0) rt.pinnedMemoIds.splice(i, 1);
         else rt.pinnedMemoIds.push(id);
+    });
+}
+
+/** 提醒置顶切换（304 波）：支持任意模块重要提醒（证件/合同/台账/备忘）在提醒中枢分组内置顶优先 */
+export function toggleReminderPin(plugin: Plugin, reminderId: string) {
+    return withRuntime(plugin, (rt) => {
+        toggleReminderPinInRuntime(rt, reminderId);
     });
 }

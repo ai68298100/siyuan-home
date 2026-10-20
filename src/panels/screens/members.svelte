@@ -174,6 +174,8 @@
             menu.addItem({ label: t("members.edit"), click: () => startEdit(m) });
             const docId = plugin.settings.dbRefs?.members?.docId;
             if (docId) menu.addItem({ label: t("members.openLedger"), click: () => plugin.showTabDocs(docId) });
+            // 296 波：个人资产与合约全景时间轴
+            menu.addItem({ label: t("members.assetTimeline"), click: () => void openMemberAssetTimeline(m) });
             // 225 波：头像上传/联系人绑定收入菜单（头行只留编辑，修复 230px 窄卡按钮挤爆姓名排版）
             menu.addItem({ label: t("members.uploadAvatar"), click: () => pickAvatar(m) });
             menu.addItem({
@@ -242,6 +244,10 @@
     // 26.7 删除文案升级：说明数据保留语义（仅移除引用，台账行保留）
     // H16：删除成员后复位指向它的失效筛选（总览与提醒页）
     function confirmRemove(m: FamilyMember) {
+        if (plugin.runtime?.guestModeActive) {
+            showMessage(t("guest.writeBlocked"), 4000, "info");
+            return;
+        }
         confirm(t("members.deleteTitle"), t("members.deleteBody").replace("${name}", m.name), async () => {
             let removed = false;
             try {
@@ -346,6 +352,16 @@
     function cancelEdit() {
         editId = null; pendingNewMemberId = undefined; name = ""; role = "self"; sex = undefined; birthday = ""; lunar = false; notes = "";
         editorOpen = false;
+    }
+
+    // 296波：重要证件与合同的个人资产全景时间轴
+    async function openMemberAssetTimeline(m: FamilyMember) {
+        try {
+            const { openMemberTimelineFlow } = await import("@/core/member-timeline");
+            await openMemberTimelineFlow(m, plugin, t, Dialog, showMessage);
+        } catch (e) {
+            showMessage(t("ledger.logReadFailed") + " (" + (e instanceof Error ? e.message : String(e)) + ")", 5000, "error");
+        }
     }
 
     // UG11 v1（第九十波）：成员导出 vCard 4.0——姓名/生日/备注即个人信息，导出前一律确认
@@ -456,6 +472,11 @@ function openReassignDialog(fromMember?: FamilyMember) {
     let exportingVcf = $state(false);
     async function save() {
         if (memberSaving) return;
+        // 297 波：访客模式写保护拦截
+        if (plugin.runtime?.guestModeActive) {
+            showMessage(t("guest.writeBlocked"), 4000, "info");
+            return;
+        }
         if (!name.trim()) {
             nameInput?.focus();
             showMessage(t("ledger.nameRequired"), 4000, "info");
@@ -693,6 +714,19 @@ function openReassignDialog(fromMember?: FamilyMember) {
                         </div>
                     {/if}
                 {/if}
+                <div class="lv-member-timeline-card" style="margin:4px 0">
+                    <button class="b3-button b3-button--outline" style="width:100%;font-size:12px;padding:6px 12px;display:flex;align-items:center;justify-content:space-between;border-radius:6px"
+                        onclick={() => void openMemberAssetTimeline(m)}>
+                        <span style="display:flex;align-items:center;gap:6px">
+                            <span style="font-size:13px">📑</span>
+                            <b style="color:var(--lv-tx)">{t("members.assetTimeline")}</b>
+                        </span>
+                        <span class="lv-caption" style="display:flex;align-items:center;gap:4px">
+                            <span>{t("members.timelineCertsCount")} / {t("members.timelineContractsCount")}</span>
+                            <span>→</span>
+                        </span>
+                    </button>
+                </div>
                 <ActivityFeed {plugin} {t} {version} memberId={m.id} compact />
             </div>
         {/if}

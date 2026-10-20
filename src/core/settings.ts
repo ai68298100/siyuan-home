@@ -44,7 +44,7 @@ function looksLikeKernelErrorEnvelope(o: Record<string, unknown>): boolean {
  *  2. 部分内核把存储内容以原始字符串返回而非解析对象——先尝试 JSON 解析，
  *     解析出对象即合法数据直接采用；非对象标量按缺失处理；
  *  3. 只有"解析失败的字符串内容"（真写坏）与未知异常才落损坏标记。 */
-export async function loadDataSafe(plugin: Plugin, name: string): Promise<{ data: any; corrupted: boolean; reason?: string }> {
+export async function loadDataSafe<T = unknown>(plugin: Plugin, name: string): Promise<{ data: T | null; corrupted: boolean; reason?: string }> {
     try {
         const data = await plugin.loadData(name);
         if (data === null || data === undefined) return { data: null, corrupted: false };
@@ -55,7 +55,7 @@ export async function loadDataSafe(plugin: Plugin, name: string): Promise<{ data
             try {
                 const parsed = JSON.parse(t);
                 if (isPlainObject(parsed) && looksLikeKernelErrorEnvelope(parsed)) return { data: null, corrupted: false };
-                return { data: isPlainObject(parsed) ? parsed : null, corrupted: false };
+                return { data: (isPlainObject(parsed) ? parsed : null) as T | null, corrupted: false };
             } catch {
                 // 非法 JSON 字符串 = 文件真被写坏——保留标记（原始文件不动，留给思源备份）
                 const reason = "non-JSON string content";
@@ -64,7 +64,7 @@ export async function loadDataSafe(plugin: Plugin, name: string): Promise<{ data
             }
         }
         if (!isPlainObject(data)) return { data: null, corrupted: false };
-        return { data, corrupted: false };
+        return { data: data as T, corrupted: false };
     } catch (e) {
         const msg = e instanceof Error ? e.message : String(e);
         // 内核对缺失存储文件抛 not found 系错误——首次安装的正常路径，不是损坏

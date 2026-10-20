@@ -797,6 +797,61 @@
     }
 }
 
+.lv-metric-item {
+    padding: 8px;
+    background: var(--lv-surface-2);
+    border-radius: 6px;
+    border: 1px solid var(--lv-line);
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+.lv-metric-lg {
+    padding: 12px;
+    background: var(--lv-surface-2);
+    border-radius: 8px;
+    border: 1px solid var(--lv-line);
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.lv-subcard {
+    padding: 10px 12px;
+    background: var(--lv-surface-2);
+    border-radius: 8px;
+    border: 1px solid var(--lv-line);
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    font-size: 12px;
+}
+
+.lv-dialog-scroll-body {
+    max-height: 70vh;
+    overflow: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    padding: 16px;
+}
+
+.lv-section-title {
+    font-weight: 600;
+    font-size: 12.5px;
+    margin-bottom: 8px;
+}
+
+.lv-dialog-col {
+    padding: 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+
+
 // Vehicle energy forms and stats remain usable in narrow desktop panes and on phones.
 .lv-energy-dialog {
     .b3-dialog__container {
@@ -922,6 +977,32 @@
             outline-color: Highlight !important;
             outline-offset: 2px;
         }
+
+        // 301 波：指标卡/子卡片/弹窗滚动体在强制色下的可读性兜底
+        // forced-colors 会丢弃盒阴影与背景色，仅保留 Canvas/CanvasText——用 1px 边框维持卡片轮廓
+        .lv-metric-item,
+        .lv-metric-lg,
+        .lv-subcard {
+            border: 1px solid CanvasText !important;
+            background: Canvas !important;
+            color: CanvasText !important;
+        }
+
+        // 状态徽章（缺货/不足/充足/证件/合同）必须保留语义色差——强制色下用系统高亮色族
+        .lv-badge {
+            border: 1px solid CanvasText !important;
+        }
+
+        .lv-badge.red,
+        .lv-badge.orange,
+        .lv-badge.yellow {
+            color: Highlight !important;
+            border-color: Highlight !important;
+        }
+
+        .lv-badge.green {
+            color: CanvasText !important;
+        }
     }
 }
 
@@ -941,3 +1022,21 @@
         }
     }
 }
+
+// ── 20. 分析弹窗窄屏响应式 (301 波) ─────────────────────────────
+// 指标卡四列网格在 ≤480px（手机竖屏）降级为两列，避免文字挤压换行溢出；
+// 弹窗宽度硬编码 px 在窄屏自适应收窄。
+@media (max-width: 480px) {
+    .lv-dialog-scroll-body {
+        [style*="grid-template-columns:repeat(4, 1fr)"],
+        [style*="grid-template-columns:repeat(3, 1fr)"] {
+            grid-template-columns: repeat(2, 1fr) !important;
+        }
+
+        .lv-metric-lg,
+        .lv-subcard {
+            padding: 10px;
+        }
+    }
+}
+

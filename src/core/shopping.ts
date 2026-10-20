@@ -4,6 +4,7 @@
  * qty 与阈值均有值且 qty ≤ 阈值才入清单（缺列/缺值不评估，不误报）。
  */
 import type { AvRow } from "./siyuan";
+import type { AvCellLike } from "./avcell";
 
 export interface ShoppingItem {
     name: string;
@@ -13,11 +14,11 @@ export interface ShoppingItem {
     suggest: number;
 }
 
-function num(v: any): number | undefined {
+function num(v: AvCellLike | null | undefined): number | undefined {
     return v?.number?.isNotEmpty && typeof v.number.content === "number" ? v.number.content : undefined;
 }
 
-function nameOf(v: any): string {
+function nameOf(v: AvCellLike | null | undefined): string {
     return String(v?.text?.content ?? v?.block?.content ?? "").trim();
 }
 

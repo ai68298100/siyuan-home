@@ -101,6 +101,10 @@ export interface HubRuntime {
     memos: AdhocMemo[];
     /** 置顶备忘 id 清单（246 波收件箱深化）：列表组内置顶排序 */
     pinnedMemoIds?: string[];
+    /** 置顶提醒 id 清单（304 波支持任意重要到期项置顶，如证件/合同/台账/备忘） */
+    pinnedReminderIds?: string[];
+    /** 上期提醒摘要快照（306 波）：供周报生成逾期数量对比 */
+    digestHistory?: { overdue: number; at: string };
     /** 每日摘要去重：最后通知日期 */
     lastNotifiedDate?: string;
     /** 逾期即时提醒去重：最后提示日期（B3b） */
@@ -121,6 +125,8 @@ export interface HubRuntime {
     monthlyDueTotals?: Record<string, number>;
     /** 266 波模块卡趋势条：日期键（localDateKey）→ { 模块 id → 当日待办计数 }；滚动窗口由写入方裁剪 */
     moduleHistory?: Record<string, Record<string, number>>;
+    /** 297 波：多设备家庭协作的只读访客模式激活状态（会话级/本地运行态） */
+    guestModeActive?: boolean;
 }
 
 export function defaultRuntime(): HubRuntime {
@@ -288,6 +294,11 @@ export async function loadRuntime(plugin: Plugin): Promise<HubRuntime> {
         renewHistory: normalizeRenewHistory(data.renewHistory),
         memos: Array.isArray(data.memos) ? data.memos.map(normalizeMemo).filter((m): m is AdhocMemo => !!m) : [],
         pinnedMemoIds: Array.isArray(data.pinnedMemoIds) ? data.pinnedMemoIds.filter((id: unknown): id is string => typeof id === "string") : undefined,
+        pinnedReminderIds: Array.isArray(data.pinnedReminderIds) ? data.pinnedReminderIds.filter((id: unknown): id is string => typeof id === "string") : undefined,
+        digestHistory:
+            data.digestHistory && typeof data.digestHistory === "object" && typeof data.digestHistory.overdue === "number" && typeof data.digestHistory.at === "string"
+                ? { overdue: data.digestHistory.overdue, at: data.digestHistory.at }
+                : undefined,
         namedViews: Array.isArray(data.namedViews) ? data.namedViews.map(normalizeNamedView).filter((v): v is ReminderNamedView => !!v) : [],
         activeNamedViewId: optionalString("activeNamedViewId"),
         lastNotifiedDate: optionalString("lastNotifiedDate"),
@@ -298,6 +309,7 @@ export async function loadRuntime(plugin: Plugin): Promise<HubRuntime> {
         monthlyCompletions: numberRecord(data.monthlyCompletions),
         monthlyDueTotals: numberRecord(data.monthlyDueTotals),
         moduleHistory: normalizeNestedCounts(data.moduleHistory),
+        guestModeActive: typeof data.guestModeActive === "boolean" ? data.guestModeActive : undefined,
     };
     if (isPlainObject(data.lastExamStats)
         && [data.lastExamStats.streak, data.lastExamStats.accuracy, data.lastExamStats.attempts, data.lastExamStats.generatedAt].every((n) => typeof n === "number" && Number.isFinite(n))) {
@@ -394,6 +406,11 @@ export function cleanupRowRuntimeData(rt: HubRuntime, rowId: string): boolean {
     }
     if (rt.renewHistory?.[rowId]) { delete rt.renewHistory[rowId]; dirty = true; }
     if (rt.favorSyncs?.[rowId]) { delete rt.favorSyncs[rowId]; dirty = true; }
+    if (rt.pinnedReminderIds) {
+        const prevLen = rt.pinnedReminderIds.length;
+        rt.pinnedReminderIds = rt.pinnedReminderIds.filter((id) => !id.startsWith(prefix) && !id.includes(`::${rowId}::`));
+        if (rt.pinnedReminderIds.length < prevLen) dirty = true;
+    }
     return dirty;
 }
 
@@ -660,5 +677,30 @@ export function getReminderPlanStatus(
         planDaysDiff,
     };
 }
+
+/**
+ * 切换提醒置顶状态（304波）：支持任意重要提醒（证件/合同/台账/备忘）
+ */
+export function toggleReminderPinInRuntime(runtime: HubRuntime, reminderId: string): boolean {
+    runtime.pinnedReminderIds = runtime.pinnedReminderIds ?? [];
+    const idx = runtime.pinnedReminderIds.indexOf(reminderId);
+    if (idx >= 0) {
+        runtime.pinnedReminderIds.splice(idx, 1);
+        return false;
+    }
+    runtime.pinnedReminderIds.push(reminderId);
+    return true;
+}
+
+/**
+ * 判断指定提醒是否处于置顶状态（兼容旧版 pinnedMemoIds 与通用 pinnedReminderIds）
+ */
+export function isReminderPinned(runtime: HubRuntime | undefined, reminder: { id: string; moduleId?: string }): boolean {
+    if (!runtime) return false;
+    if (runtime.pinnedReminderIds && runtime.pinnedReminderIds.includes(reminder.id)) return true;
+    const memoId = reminder.id.startsWith("adhoc::") ? reminder.id.slice("adhoc::".length) : reminder.id;
+    return (runtime.pinnedMemoIds ?? []).includes(memoId);
+}
+
 
 

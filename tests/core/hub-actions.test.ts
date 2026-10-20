@@ -9,10 +9,10 @@
  */
 import { describe, it, expect, afterEach } from "vitest";
 import {
-    applyRuntime, defaultRuntime, listHandled, purgeHandled, recordModuleHistory, type HubRuntime,
+    applyRuntime, defaultRuntime, listHandled, purgeHandled, recordModuleHistory, cleanupRowRuntimeData, isReminderPinned, type HubRuntime,
 } from "@/core/hub/runtime";
 import { runScan, deriveVisible } from "@/core/hub/scanner";
-import { snooze, mute, complete, restore, withRuntime, renew, updateMemo, addMemo } from "@/core/hub/actions";
+import { snooze, mute, complete, restore, withRuntime, renew, updateMemo, addMemo, toggleMemoPin, toggleReminderPin } from "@/core/hub/actions";
 import { CertsProvider, leadFor } from "@/core/hub/providers";
 import { inSilentHours, dailyDigest, weeklyPreview, markWeeklyNotified, isoWeekKey } from "@/core/hub/notify";
 import { setTransport } from "@/core/siyuan";
@@ -531,3 +531,52 @@ describe("updateMemo（246 波收件箱深化）", () => {
         expect(after.memos[0].title).toBe("新标题");
     });
 });
+
+describe("toggleReminderPin & isReminderPinned（304 波重要提醒紧急置顶）", () => {
+    it("通用提醒置顶切换与落盘", async () => {
+        const { plugin, store } = memoryPlugin();
+        const certId = "certs::row-101::expiry";
+
+        expect(isReminderPinned(undefined, { id: certId })).toBe(false);
+
+        // 第一次切换：添加置顶
+        await toggleReminderPin(plugin, certId);
+        let saved = JSON.parse(store["hub-runtime.json"]);
+        expect(saved.pinnedReminderIds).toContain(certId);
+        expect(isReminderPinned(saved, { id: certId })).toBe(true);
+
+        // 第二次切换：取消置顶
+        await toggleReminderPin(plugin, certId);
+        saved = JSON.parse(store["hub-runtime.json"]);
+        expect(saved.pinnedReminderIds).not.toContain(certId);
+        expect(isReminderPinned(saved, { id: certId })).toBe(false);
+    });
+
+    it("同时兼容旧版 pinnedMemoIds", async () => {
+        const rt: HubRuntime = {
+            ...defaultRuntime(),
+            pinnedMemoIds: ["memo-abc"],
+            pinnedReminderIds: ["certs::row-1::due"],
+        };
+
+        expect(isReminderPinned(rt, { id: "adhoc::memo-abc" })).toBe(true);
+        expect(isReminderPinned(rt, { id: "certs::row-1::due" })).toBe(true);
+        expect(isReminderPinned(rt, { id: "other::row-2::expiry" })).toBe(false);
+    });
+
+    it("cleanupRowRuntimeData 清除行时连带清理该行的置顶提醒记录", () => {
+        const rt: HubRuntime = {
+            ...defaultRuntime(),
+            pinnedReminderIds: [
+                "certs::row-target::expiry",
+                "certs::row-target::due",
+                "certs::row-other::expiry",
+            ],
+        };
+
+        const changed = cleanupRowRuntimeData(rt, "row-target");
+        expect(changed).toBe(true);
+        expect(rt.pinnedReminderIds).toEqual(["certs::row-other::expiry"]);
+    });
+});
+

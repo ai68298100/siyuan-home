@@ -61,7 +61,7 @@ async function demoRow(
         else if (typeof v === "boolean") await write(key, { type: "checkbox", checkbox: { checked: v } });
     }
     // 默认状态（schema 显式声明优先，否则枚举首值；D11）与快速表单一致
-    const statusCol = (schemaCatalog[moduleId]?.columns ?? []).find((c: any) => c.key === "status");
+    const statusCol = (schemaCatalog[moduleId]?.columns ?? []).find((c) => c.key === "status");
     if (statusCol?.options?.length) await write("status", selectCellValue(statusCol.default ?? statusCol.options[0]));
     return true;
 }

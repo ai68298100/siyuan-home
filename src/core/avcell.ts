@@ -12,6 +12,7 @@ export interface AvCellLike {
     select?: { content?: string };
     mSelect?: { content?: string }[];
     text?: { content?: string };
+    block?: { content?: string; id?: string };
     number?: { content?: number; isNotEmpty?: boolean };
     date?: { content?: number; isNotEmpty?: boolean };
     url?: { content?: string };

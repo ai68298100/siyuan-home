@@ -9,7 +9,7 @@
     import { moduleUiIcon } from "@/ui/icons";
     import { showMessage } from "siyuan";
 
-    let { items, t, version, onComplete, onAddMemo, onConvert, initialMode, onModeChange }: {
+    let { items, t, version, onComplete, onAddMemo, onConvert, initialMode, onModeChange, onTogglePin, isPinnedFn }: {
         items: Reminder[];
         t: (k: string) => string;
         version?: number;
@@ -19,6 +19,8 @@
         /** 263 波：会历模式偏好（runtime 持久化，由父组件读写） */
         initialMode?: "month" | "week";
         onModeChange?: (m: "month" | "week") => void;
+        onTogglePin?: (r: Reminder) => void | Promise<void>;
+        isPinnedFn?: (r: Reminder) => boolean;
     } = $props();
 
     const now = new Date();
@@ -207,10 +209,16 @@
                     <div class="lv-cal-item">
                         <span class="lv-rem-ic" aria-hidden="true"><UiIcon name={moduleUiIcon(r.moduleId)} size={18} /></span>
                         <div style="min-width:0;flex:1">
-                            <b style="font-size:13px">{r.title}</b>
+                            <b style="font-size:13px">
+                                {#if isPinnedFn?.(r)}<span style="color:var(--lv-accent);margin-right:2px">📌</span>{/if}
+                                {r.title}
+                            </b>
                             <span class="lv-caption" style="display:block">{t(`module.${r.moduleId}`) !== `module.${r.moduleId}` ? t(`module.${r.moduleId}`) : r.moduleId}</span>
                         </div>
                         <span class="lv-badge {r.level === "overdue" ? "red" : r.level === "soon" ? "orange" : "yellow"}">{r.level === "overdue" ? t("level.overdue") : r.level === "soon" ? t("level.soon") : t("level.lead")}</span>
+                        {#if onTogglePin}
+                            <button class="b3-button b3-button--text" title={isPinnedFn?.(r) ? t("act.unpin") : t("act.pin")} onclick={() => onTogglePin?.(r)}>{isPinnedFn?.(r) ? "📌 " + t("act.unpin") : "📌 " + t("act.pin")}</button>
+                        {/if}
                         {#if r.moduleId === "adhoc"}
                             <!-- 241 波：备忘项同步提供分诊入口（与提醒中枢一致） -->
                             <button class="b3-button b3-button--text" title={t("triage.title")} onclick={() => onConvert(r)}>{t("triage.title")}</button>

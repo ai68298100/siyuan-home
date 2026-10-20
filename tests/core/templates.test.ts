@@ -31,8 +31,8 @@ describe("templates.getTemplate", () => {
     it("stock/emergency-kit.tpl 已注册且可正确渲染变量", () => {
         const tpl = getTemplate("stock/emergency-kit.tpl");
         expect(tpl).toBeDefined();
-        expect(tpl).toContain("家庭应急物资储备清单 · {{name}}");
-        expect(tpl).toContain("应急管理部《家庭应急物资储备建议清单（基础版）》");
+        expect(tpl).toContain("家庭应急物资储备 · {{name}}");
+        expect(tpl).toContain("应急工具与防护");
 
         const rendered = renderTemplate(tpl!, {
             name: "客厅应急储备箱",
@@ -40,10 +40,10 @@ describe("templates.getTemplate", () => {
             date: "2026-10-19",
             note: "包含老人降压备用药",
         });
-        expect(rendered).toContain("家庭应急物资储备清单 · 客厅应急储备箱");
-        expect(rendered).toContain("存放位置：客厅玄关柜底层");
-        expect(rendered).toContain("检查与盘点日期：2026-10-19");
-        expect(rendered).toContain("备注与特殊需求：包含老人降压备用药");
+        expect(rendered).toContain("家庭应急物资储备 · 客厅应急储备箱");
+        expect(rendered).toContain("存放：客厅玄关柜底层");
+        expect(rendered).toContain("检查：2026-10-19");
+        expect(rendered).toContain("备注：包含老人降压备用药");
     });
 
     it("未注册文件 → undefined", () => {

@@ -11,7 +11,8 @@
     import { relativeDue, weekdayKey, localDateKey } from "@/core/hub/rule";
     import { addDetachedRow, setCell } from "@/core/siyuan";
     import { provisionModule } from "@/core/provisioner";
-    import { toggleMemoPin } from "@/core/hub/actions";
+    import { toggleReminderPin } from "@/core/hub/actions";
+    import { isReminderPinned } from "@/core/hub/runtime";
     import Calendar from "@/panels/screens/calendar.svelte";
     import UiIcon from "@/ui/icon.svelte";
     import { moduleUiIcon } from "@/ui/icons";
@@ -614,10 +615,9 @@
         titleInput.focus();
     }
 
-    // 246 波（收件箱深化）：备忘置顶——置顶项在所属分组内排最前
+    // 246 波（收件箱深化）& 304 波（重要提醒与证件紧急置顶）：置顶项在所属分组内排最前
     function isPinned(r: Reminder): boolean {
-        const id = r.id.startsWith("adhoc::") ? r.id.slice("adhoc::".length) : r.id;
-        return (plugin.runtime?.pinnedMemoIds ?? []).includes(id);
+        return isReminderPinned(plugin.runtime, r);
     }
     function pinnedFirst(items: Reminder[]): Reminder[] {
         return [...items].sort((a, b) => Number(isPinned(b)) - Number(isPinned(a)));
@@ -832,6 +832,60 @@
         void runReminderAction(() => plugin.toggleTodaySilent(), "today-silent");
     }
 
+    // 306 波：家庭提醒周报/月报摘要——把当前提醒快照汇总为可粘贴的 Markdown 文本
+    let digestBusy = $state(false);
+    async function openDigestDialog() {
+        if (digestBusy) return;
+        digestBusy = true;
+        try {
+            const { buildReminderDigest, formatDigestMarkdown } = await import("@/core/reminder-digest");
+            const input = filtered.map((r) => ({
+                id: r.id,
+                moduleId: r.moduleId,
+                title: r.title,
+                dueDate: r.dueDate,
+                daysLeft: r.daysLeft,
+                level: r.level,
+            }));
+            const history = plugin.runtime?.digestHistory;
+            const digest = buildReminderDigest(input, {
+                periodLabel: t("hub.digestThisWeek"),
+                previousOverdue: typeof history?.overdue === "number" ? history.overdue : null,
+            });
+            const markdown = formatDigestMarkdown(digest, (id) => t(`module.${id}`) !== `module.${id}` ? t(`module.${id}`) : id);
+
+            const dlg = new Dialog({
+                title: t("hub.digestTitle"),
+                content: `<div class="b3-dialog__content lv-dialog-scroll-body"><pre class="lv-caption" style="white-space:pre-wrap;line-height:1.7;margin:0"></pre></div>
+<div class="b3-dialog__action">
+  <button class="b3-button b3-button--cancel">${t("close")}</button>
+  <button class="b3-button" id="lv-digest-copy">${t("hub.digestCopy")}</button>
+</div>`,
+                width: "600px",
+            });
+
+            const pre = dlg.element.querySelector("pre");
+            if (pre) pre.textContent = markdown;
+            (dlg.element.querySelector(".b3-button--cancel") as HTMLButtonElement).onclick = () => dlg.destroy();
+            (dlg.element.querySelector("#lv-digest-copy") as HTMLButtonElement).onclick = async () => {
+                try {
+                    await navigator.clipboard.writeText(markdown);
+                    showMessage(t("overview.lifeIndexCopied"), 2500, "info");
+                } catch {
+                    showMessage(t("hub.digestCopyFailed"), 4000, "error");
+                }
+            };
+
+            // 记录本次快照，供下期生成对比差值
+            plugin.runtime.digestHistory = { overdue: digest.counts.overdue, at: digest.generatedAt };
+            await saveRuntime(plugin, plugin.runtime);
+        } catch (e) {
+            showMessage(t("hub.digestFailed").replace("${msg}", e instanceof Error ? e.message : String(e)), 5000, "error");
+        } finally {
+            digestBusy = false;
+        }
+    }
+
     // 260 波：首扫 loading 态（未知 ≠ "暂无事项"，33.3/13 §3.4）
     const firstScanPending = $derived.by(() => {
         void version;
@@ -878,6 +932,11 @@
         <div class="lv-rem-ic" aria-hidden="true"><UiIcon name={moduleUiIcon(r.moduleId)} size={18} /></div>
         <div class="lv-rem-t" title={(r.autoRenew ? `${t("hub.autoRenew")} · ` : "") + r.dueDate}>
             <b>
+                {#if isPinned(r)}
+                    <span class="lv-plan-badge is-planned-now" style="background:var(--lv-accent);color:#fff;margin-right:4px;padding:1px 6px" title={t("hub.pinned")}>
+                        📌 {t("hub.pinned")}
+                    </span>
+                {/if}
                 {r.title}{r.ruleKey === "reciprocate" ? ` · ${t("rule.reciprocate")}` : ""}
                 {#if plan.hasPlan}
                     <span class="lv-plan-badge" class:is-planned-now={plan.isPlannedNow} title={`${t("hub.planDateLabel")}: ${plan.planDate}`}>
@@ -914,13 +973,13 @@
                         <button class="b3-button b3-button--text" disabled={batchBusy} title={t("act.locate")} onclick={() => plugin.showTabDocs(plugin.settings.dbRefs[r.moduleId].docId)}>{t("act.locate")}</button>
                     {/if}
                     <button class="b3-button b3-button--text" disabled={batchBusy || reminderBusy.has(r.id)} onclick={() => schedulePlanDialog(r)}>{plan.hasPlan ? t("hub.editPlanDate") : t("hub.setPlanDate")}</button>
+                    <!-- 304 波：重要证件与到期项紧急置顶（置顶项组内排最前） -->
+                    <button class="b3-button b3-button--text" title={isPinned(r) ? t("act.unpin") : t("act.pin")}
+                        disabled={batchBusy || reminderBusy.has(r.id)} aria-busy={reminderBusy.has(r.id)}
+                        onclick={() => void runReminderAction(async () => { await toggleReminderPin(plugin, r.id); await plugin.refreshHub(); }, r.id)}>{reminderBusy.has(r.id) ? t("ledger.saving") : (isPinned(r) ? t("act.unpin") : t("act.pin"))}</button>
                     <button class="b3-button b3-button--text" aria-haspopup="menu" disabled={batchBusy || reminderBusy.has(r.id)} aria-busy={reminderBusy.has(r.id)} onclick={(e) => snoozeMenu(r, e)}>{reminderBusy.has(r.id) ? t("ledger.saving") : `${t("act.snooze")} ▾`}</button>
                     <button class="b3-button b3-button--text" disabled={batchBusy || reminderBusy.has(r.id)} aria-busy={reminderBusy.has(r.id)} onclick={() => void runReminderAction(() => plugin.mute(r.id), r.id)}>{reminderBusy.has(r.id) ? t("ledger.saving") : t("act.mute")}</button>
                     {#if r.moduleId === "adhoc"}
-                        <!-- 246 波（收件箱深化）：备忘置顶（置顶项组内排最前） -->
-                        <button class="b3-button b3-button--text" title={isPinned(r) ? t("act.unpin") : t("act.pin")}
-                            disabled={batchBusy || reminderBusy.has(r.id)} aria-busy={reminderBusy.has(r.id)}
-                            onclick={() => void runReminderAction(async () => { await toggleMemoPin(plugin, r.id); await plugin.refreshHub(); }, r.id)}>{reminderBusy.has(r.id) ? t("ledger.saving") : (isPinned(r) ? t("act.unpin") : t("act.pin"))}</button>
                         <!-- 246 波（收件箱深化）：备忘编辑（标题/到期日） -->
                         <button class="b3-button b3-button--text" disabled={batchBusy || reminderBusy.has(r.id)} onclick={() => editMemoDialog(r)}>{t("memo.edit")}</button>
                         <!-- H03：备忘的显式删除（唯一物理删除路径；未处理项不自动清理） -->
@@ -1003,6 +1062,9 @@
                 <option value="7">{t("hub.due7")}</option>
                 <option value="30">{t("hub.due30")}</option>
             </select>
+            <!-- 306 波：生成本周期提醒摘要（可粘贴的 Markdown 周报） -->
+            <button class="b3-button b3-button--outline" title={t("hub.digestTip")} disabled={batchBusy || digestBusy || filtered.length === 0}
+                aria-busy={digestBusy} onclick={openDigestDialog}>{digestBusy ? t("ledger.saving") : t("hub.digest")}</button>
             <!-- 243 波（收件箱分诊）：一键切片到备忘项集合（转行/完成/延后集中处理） -->
             <button class="b3-button b3-button--outline" class:is-filtered={filterModule === "adhoc"} disabled={batchBusy}
                 aria-pressed={filterModule === "adhoc"} onclick={() => { filterModule = filterModule === "adhoc" ? undefined : "adhoc"; activeNamedViewId = undefined; persistFilter(); }}>
@@ -1115,6 +1177,8 @@
     <Calendar items={filtered} {t} {version} initialMode={plugin.runtime.hubCalMode}
         onModeChange={(m: "month" | "week") => { plugin.runtime.hubCalMode = m; saveRuntime(plugin, plugin.runtime).catch((e) => showMessage(t("hub.preferenceSaveFailed").replace("${msg}", e instanceof Error ? e.message : String(e)), 5000, "error")); }}
         onComplete={(r: Reminder) => runReminderAction(() => plugin.complete(r), `calendar:${r.id}`)}
+        onTogglePin={(r: Reminder) => runReminderAction(async () => { await toggleReminderPin(plugin, r.id); await plugin.refreshHub(); }, `calendar:pin:${r.id}`)}
+        isPinnedFn={(r: Reminder) => isPinned(r)}
         onAddMemo={(title: string, due: string) => plugin.addMemo(title, due)}
         onConvert={(r: Reminder) => toLedgerDialog(r)} />
 {:else if filtered.length === 0}
