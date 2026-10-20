@@ -6,6 +6,8 @@
     import { addDetachedRow, RowIdentityPendingError, setCell } from "@/core/siyuan";
     import { saveRuntime } from "@/core/hub/runtime";
     import { captureCellValue, getCaptureFields, validateCaptureInput } from "@/core/capture";
+    import { getGroupedModules, moduleIcon } from "@/core/modules";
+    import { localDateKey } from "@/core/hub/rule";
     import type { ColumnDef, ModuleSchema } from "@/core/schema";
     import type { HomeSettings } from "@/types";
     import UiIcon from "@/ui/icon.svelte";
@@ -203,7 +205,25 @@
         }
     });
 
-    const modOptions = $derived(modules.map((id) => ({ id, label: modLabel(id) + (plugin.settings.dbRefs?.[id]?.avId ? "" : t("triage.needProvision")) })));
+    const groupedMods = $derived(getGroupedModules(modules));
+    const FREQUENT_MODULE_CANDIDATES = ["medicine", "stock", "certs", "shopping", "chores", "contracts", "vehicles", "food", "house", "schooling"];
+    const frequentModules = $derived(FREQUENT_MODULE_CANDIDATES.filter((id) => modules.includes(id)).slice(0, 7));
+
+    let keepContext = $state(false);
+    const COMMON_LOCATIONS = ["主卧抽屉", "客厅药箱", "玄关柜", "书房书架", "储藏室", "冰箱冷藏", "厨房吊柜"];
+
+    function applyDatePreset(key: string, daysAhead: number) {
+        const d = new Date();
+        d.setDate(d.getDate() + daysAhead);
+        values[key] = localDateKey(d);
+        clearFieldError(key);
+    }
+
+    function applyLocationPreset(key: string, loc: string) {
+        values[key] = loc;
+        clearFieldError(key);
+    }
+
     const activeTarget = $derived(plugin.settings.dbRefs?.[moduleId]);
     const filledCaptureCount = $derived.by(() => captureFields.filter((field: any) => {
         const value = values[field.key];
@@ -346,9 +366,18 @@
             }
             if (!refreshFailed) showMessage(t("capture.saved").replace("${module}", modLabel(moduleId)), 3000, "info");
             if (continueAfter) {
-                // 268 波：连续录入——清空字段、保留模块（家庭录入常成批）
-                values = {};
-                valuesByModule = { ...valuesByModule, [moduleId]: {} };
+                // 268 波：连续录入——可按需保留公共字段（家庭录入常成批），焦点回名称
+                if (keepContext) {
+                    const retained: Record<string, string | number | boolean | undefined> = {};
+                    for (const k of ["member", "date", "expiry", "due", "location", "store_place", "category", "energy_type", "status"]) {
+                        if (values[k] !== undefined) retained[k] = values[k];
+                    }
+                    values = retained;
+                    valuesByModule = { ...valuesByModule, [moduleId]: { ...retained } };
+                } else {
+                    values = {};
+                    valuesByModule = { ...valuesByModule, [moduleId]: {} };
+                }
                 refocusName = true;
             } else {
                 values = {};
@@ -407,7 +436,13 @@
         <div class="lv-sheet-head">
             <b id="lv-capture-title" style="font-size:14px;display:inline-flex;align-items:center;gap:6px"><UiIcon name="bolt" size={15} /> {t("capture.title")}</b>
             <select class="b3-select" style="margin-left:auto;max-width:200px" bind:value={moduleId} aria-label={t("capture.moduleSelect")} disabled={saving || identityPending || !!pendingRowId}>
-                {#each modOptions as m (m.id)}<option value={m.id}>{m.label}</option>{/each}
+                {#each groupedMods as g (g.groupId)}
+                    <optgroup label={g.groupLabel}>
+                        {#each g.modules as m (m.id)}
+                            <option value={m.id}>{modLabel(m.id)}{plugin.settings.dbRefs?.[m.id]?.avId ? "" : t("triage.needProvision")}</option>
+                        {/each}
+                    </optgroup>
+                {/each}
             </select>
             <button class="lv-iconbtn" aria-label={t("capture.closeKeepDraft")} title={t("capture.closeKeepDraft")} onclick={close} disabled={saving}><UiIcon name="close" size={16} /></button>
         </div>
@@ -423,7 +458,7 @@
                     <button class="b3-button b3-button--outline" onclick={() => plugin.openSetting()}>{t("startGuide.openSettings")}</button>
                 </div>
             {:else}
-                <div class="lv-smart-capture-bar" style="margin-bottom:10px">
+                <div class="lv-smart-capture-bar" style="margin-bottom:8px">
                     <div style="display:flex;gap:6px;align-items:center">
                         <input class="b3-text-field" style="flex:1;font-size:12px;padding:4px 8px"
                             placeholder={t("capture.smartHint")}
@@ -441,6 +476,19 @@
                         {/if}
                     </div>
                 </div>
+                {#if frequentModules.length > 0}
+                    <div class="lv-quick-chips" style="display:flex;gap:4px;flex-wrap:wrap;margin-bottom:8px">
+                        {#each frequentModules as fId (fId)}
+                            <button type="button" class="lv-quick-chip" class:active={moduleId === fId}
+                                onclick={() => { moduleId = fId; }}
+                                disabled={saving || identityPending}
+                                title={modLabel(fId)}>
+                                <span>{moduleIcon(fId)}</span>
+                                <span>{modLabel(fId)}</span>
+                            </button>
+                        {/each}
+                    </div>
+                {/if}
                 <div class="lv-capture-context" role="status" aria-live="polite">
                     <div class="lv-capture-context__main">
                         <span class="lv-capture-context__eyebrow">{t("capture.contextTitle")}</span>
@@ -484,12 +532,26 @@
                             </select>
                         {:else if f.key !== "name" && f.type === "date"}
                             <input id="lv-cap-{f.key}" class="b3-text-field" type="date" bind:value={values[f.key]} disabled={saving} required={fieldRequired(f)} aria-invalid={fieldErrors[f.key] ? "true" : undefined} aria-describedby={fieldDescriptionIds(f)} oninput={() => clearFieldError(f.key)} />
+                            <div class="lv-preset-tags">
+                                <button type="button" class="lv-preset-tag" onclick={() => applyDatePreset(f.key, 0)}>{t("capture.presetToday")}</button>
+                                <button type="button" class="lv-preset-tag" onclick={() => applyDatePreset(f.key, 1)}>{t("capture.presetTomorrow")}</button>
+                                <button type="button" class="lv-preset-tag" onclick={() => applyDatePreset(f.key, 7)}>{t("capture.presetNextWeek")}</button>
+                                <button type="button" class="lv-preset-tag" onclick={() => applyDatePreset(f.key, 30)}>{t("capture.presetNextMonth")}</button>
+                                <button type="button" class="lv-preset-tag" onclick={() => applyDatePreset(f.key, 365)}>{t("capture.presetNextYear")}</button>
+                            </div>
                         {:else if f.key !== "name" && f.type === "number"}
                             <input id="lv-cap-{f.key}" class="b3-text-field" type="number" min={f.min} max={f.max} step={f.step ?? "any"} placeholder={fieldPlaceholder(f)} bind:value={values[f.key]} disabled={saving} required={fieldRequired(f)} aria-invalid={fieldErrors[f.key] ? "true" : undefined} aria-describedby={fieldDescriptionIds(f)} oninput={() => clearFieldError(f.key)} />
                         {:else if f.key !== "name" && f.type === "checkbox"}
                             <input id="lv-cap-{f.key}" class="b3-switch" type="checkbox" checked={values[f.key] === true} disabled={saving} required={fieldRequired(f)} aria-invalid={fieldErrors[f.key] ? "true" : undefined} aria-describedby={fieldDescriptionIds(f)} onchange={(event) => { values[f.key] = event.currentTarget.checked; clearFieldError(f.key); }} />
                         {:else if f.key !== "name"}
                             <input id="lv-cap-{f.key}" class="b3-text-field" type={f.type === "url" ? "url" : "text"} placeholder={fieldPlaceholder(f)} bind:value={values[f.key]} disabled={saving} required={fieldRequired(f)} aria-invalid={fieldErrors[f.key] ? "true" : undefined} aria-describedby={fieldDescriptionIds(f)} oninput={() => clearFieldError(f.key)} />
+                            {#if f.key === "location" || f.key === "store_place"}
+                                <div class="lv-preset-tags">
+                                    {#each COMMON_LOCATIONS as loc (loc)}
+                                        <button type="button" class="lv-preset-tag" onclick={() => applyLocationPreset(f.key, loc)}>{loc}</button>
+                                    {/each}
+                                </div>
+                            {/if}
                         {/if}
                         {#if f.key !== "name" && (fieldDetail(f.helpKey) || fieldDetail(f.unitKey))}
                             <small id="lv-cap-help-{f.key}" class="lv-capture-field-hint">
@@ -507,6 +569,10 @@
         </div>
         <div class="lv-sheet-foot">
             <button class="b3-button b3-button--text" onclick={close} disabled={saving}>{t("cancel")}</button>
+            <label class="lv-keep-context-label" style="display:inline-flex;align-items:center;gap:5px;font-size:12px;cursor:pointer;color:var(--b3-theme-on-surface);margin-left:6px" title={t("capture.keepContext")}>
+                <input type="checkbox" class="b3-switch" style="transform:scale(0.8);transform-origin:left center" bind:checked={keepContext} />
+                <span class="lv-caption" style="user-select:none">{t("capture.keepContext")}</span>
+            </label>
             <span class="fn__flex-1"></span>
             {#if identityPending}
                 <button class="lv-btn ghost" onclick={openPendingLedger} disabled={saving}>{t("capture.checkLedger")}</button>

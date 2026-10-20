@@ -35,6 +35,32 @@ describe("core/block-capture 思源块内容与笔记智能速记（301波）", 
             expect(res?.moduleId).toBe("favors");
         });
 
+        it("推断囤货模块", () => {
+            const res = inferModuleFromText("超市采购囤了抽纸和两瓶洗衣液");
+            expect(res?.moduleId).toBe("stock");
+            expect(res?.confidence).toBeGreaterThanOrEqual(0.6);
+        });
+
+        it("推断家务模块", () => {
+            const res = inferModuleFromText("周末家庭大扫除，扫地拖地并擦窗倒垃圾");
+            expect(res?.moduleId).toBe("chores");
+        });
+
+        it("推断教育上学模块", () => {
+            const res = inferModuleFromText("下周三下午学校开家长会并交下学期学费");
+            expect(res?.moduleId).toBe("schooling");
+        });
+
+        it("推断商业保险模块", () => {
+            const res = inferModuleFromText("全家投保了重疾险和百万医疗险保单");
+            expect(res?.moduleId).toBe("insurance");
+        });
+
+        it("推断影音书库模块", () => {
+            const res = inferModuleFromText("最近在读一本豆瓣高分小说书单");
+            expect(res?.moduleId).toBe("media");
+        });
+
         it("无特征文本返回 undefined", () => {
             expect(inferModuleFromText("今天天气真好，出去散步了一会儿")).toBeUndefined();
             expect(inferModuleFromText("")).toBeUndefined();

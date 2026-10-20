@@ -80,3 +80,38 @@ const MODULE_TONES: Record<string, string> = {
 
 export const moduleTone = (mid: string): string => MODULE_TONES[mid] ?? "t-blue";
 
+export const GROUP_METAS: Record<ModuleGroupId, { label: string; icon: string }> = {
+    people: { label: "人员档案", icon: "👪" },
+    assets: { label: "资产购物", icon: "💰" },
+    living: { label: "生活服务", icon: "🛋️" },
+    kids:   { label: "育儿上学", icon: "🎒" },
+    travel: { label: "出行旅行", icon: "🚗" },
+    media:  { label: "影音书库", icon: "🎬" },
+};
+
+export interface GroupedModules {
+    groupId: ModuleGroupId;
+    groupLabel: string;
+    modules: HomeModule[];
+}
+
+/**
+ * 将已启用模块按业务分类进行结构化分组（供下拉菜单 optgroup 及分类导航复用）
+ */
+export function getGroupedModules(enabledIds: string[]): GroupedModules[] {
+    const enabledSet = new Set(enabledIds);
+    const groups: GroupedModules[] = [];
+    for (const gid of MODULE_GROUPS) {
+        const mods = modulesByGroup(gid).filter((m) => enabledSet.has(m.id));
+        if (mods.length > 0) {
+            groups.push({
+                groupId: gid,
+                groupLabel: `${GROUP_METAS[gid].icon} ${GROUP_METAS[gid].label}`,
+                modules: mods,
+            });
+        }
+    }
+    return groups;
+}
+
+

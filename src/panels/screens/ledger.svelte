@@ -32,6 +32,7 @@
     import { uiIcon } from "@/ui/icons";
     import { panelSession, type TableDensity } from "../panel-session";
     import { maskValueForGuest, createDefaultGuestConfig } from "@/core/guest-mode";
+    import { getGroupedModules } from "@/core/modules";
 
     let { plugin, t, version }: { plugin: HomePluginLike; t: (k: string) => string; version?: number } = $props();
 
@@ -72,6 +73,7 @@
     // Settings can disable the currently open module while this screen stays
     // mounted. Keep the selector and form aligned with the enabled set instead
     // of leaving the user on a blank, unselectable ledger.
+    const groupedLedgers = $derived(getGroupedModules(ledgers.map((l) => l.id)));
     $effect(() => {
         const available = ledgers;
         if (available.length > 0 && !available.some((entry) => entry.id === active)) {
@@ -5176,10 +5178,14 @@
 
 <div class="lv-toolbar lv-ledger-toolbar" style="margin:0 0 14px">
     {#if ledgers.length > 0}
-        <!-- Switching modules clears the previous search query. -->
+        <!-- Switching modules clears the previous search query. Grouped by category. -->
         <select class="b3-select" value={active} onchange={switchLedger}>
-            {#each ledgers as l (l.id)}
-                <option value={l.id}>{t(`module.${l.id}`)}{l.ref?.avId ? "" : ` (${t("diag.missing")})`}</option>
+            {#each groupedLedgers as g (g.groupId)}
+                <optgroup label={g.groupLabel}>
+                    {#each g.modules as l (l.id)}
+                        <option value={l.id}>{t(`module.${l.id}`)}{plugin.settings.dbRefs?.[l.id]?.avId ? "" : ` (${t("diag.missing")})`}</option>
+                    {/each}
+                </optgroup>
             {/each}
         </select>
     {:else}
@@ -5196,8 +5202,20 @@
     {:else if !ref?.avId}
         <button class="b3-button" onclick={rebuildLedger}>{t("ledger.rebuild")}</button>
     {:else}
-        <input class="b3-text-field" style="width:150px" type="search" placeholder={t("ledger.search")}
-            bind:value={searchText} oninput={(event) => { panelMemory.ledgerSearch = event.currentTarget.value; }} title={t("ledger.search")} />
+        <div class="lv-search-box" style="position:relative;display:inline-flex;align-items:center">
+            <input class="b3-text-field" style="width:min(240px, 100%);padding-right:48px" type="search" placeholder={t("ledger.search")}
+                bind:value={searchText}
+                oninput={(event) => { panelMemory.ledgerSearch = event.currentTarget.value; }}
+                onkeydown={(event) => { if (event.key === "Escape") { searchText = ""; panelMemory.ledgerSearch = ""; } }}
+                title={t("ledger.search")} />
+            {#if searchText}
+                <span class="lv-badge" style="position:absolute;right:22px;font-size:10.5px;padding:1px 5px;pointer-events:none;opacity:0.85">
+                    {filteredRows.length}
+                </span>
+                <button class="b3-button b3-button--text" style="position:absolute;right:2px;padding:2px 5px;font-size:11px;color:var(--b3-theme-on-surface);cursor:pointer"
+                    title={t("clear")} onclick={() => { searchText = ""; panelMemory.ledgerSearch = ""; }}>✕</button>
+            {/if}
+        </div>
         <button class="b3-button b3-button--outline lv-density-btn"
             title={tableDensity === "compact" ? t("ledger.densityComfortable") : t("ledger.densityCompact")}
             aria-label={tableDensity === "compact" ? t("ledger.densityComfortable") : t("ledger.densityCompact")}
@@ -5284,6 +5302,13 @@
                                 </select>
                             {:else if e.type === "date"}
                                 <input id="lv-new-{e.key}" class="b3-text-field" type="date" bind:value={form[e.key]} disabled={saving || identityPending} aria-invalid={!!formFieldError(e)} aria-describedby={formFieldError(e) ? `lv-new-${e.key}-error` : undefined} />
+                                <div class="lv-preset-tags">
+                                    <button type="button" class="lv-preset-tag" onclick={() => { const d = new Date(); form[e.key] = localDateKey(d); }}>{t("capture.presetToday")}</button>
+                                    <button type="button" class="lv-preset-tag" onclick={() => { const d = new Date(); d.setDate(d.getDate() + 1); form[e.key] = localDateKey(d); }}>{t("capture.presetTomorrow")}</button>
+                                    <button type="button" class="lv-preset-tag" onclick={() => { const d = new Date(); d.setDate(d.getDate() + 7); form[e.key] = localDateKey(d); }}>{t("capture.presetNextWeek")}</button>
+                                    <button type="button" class="lv-preset-tag" onclick={() => { const d = new Date(); d.setDate(d.getDate() + 30); form[e.key] = localDateKey(d); }}>{t("capture.presetNextMonth")}</button>
+                                    <button type="button" class="lv-preset-tag" onclick={() => { const d = new Date(); d.setDate(d.getDate() + 365); form[e.key] = localDateKey(d); }}>{t("capture.presetNextYear")}</button>
+                                </div>
                             {:else if e.type === "number"}
                                 <input id="lv-new-{e.key}" class="b3-text-field" type="number" min={e.min} max={e.max} step={e.step ?? "any"} placeholder={fieldMetaText(e.placeholderKey) || fieldLabel(e.key)} bind:value={form[e.key]} disabled={saving || identityPending} aria-invalid={!!formFieldError(e)} aria-describedby={formFieldError(e) ? `lv-new-${e.key}-error` : undefined} />
                             {:else if e.type === "url"}
@@ -5296,6 +5321,13 @@
                                 <textarea id="lv-new-{e.key}" class="b3-text-field lv-record-textarea" rows="3" placeholder={fieldMetaText(e.placeholderKey) || fieldLabel(e.key)} bind:value={form[e.key]} disabled={saving || identityPending} aria-invalid={!!formFieldError(e)} aria-describedby={formFieldError(e) ? `lv-new-${e.key}-error` : undefined}></textarea>
                             {:else}
                                 <input id="lv-new-{e.key}" class="b3-text-field" type="text" placeholder={fieldMetaText(e.placeholderKey) || fieldLabel(e.key)} bind:value={form[e.key]} disabled={saving || identityPending} aria-invalid={!!formFieldError(e)} aria-describedby={formFieldError(e) ? `lv-new-${e.key}-error` : undefined} />
+                                {#if e.key === "location" || e.key === "store_place" || e.key === "copy_location"}
+                                    <div class="lv-preset-tags">
+                                        {#each ["主卧抽屉", "客厅药箱", "玄关柜", "书房书架", "储藏室", "冰箱冷藏", "厨房吊柜"] as loc (loc)}
+                                            <button type="button" class="lv-preset-tag" onclick={() => { form[e.key] = loc; }}>{loc}</button>
+                                        {/each}
+                                    </div>
+                                {/if}
                             {/if}
                             {#if fieldMetaText(e.helpKey) || fieldMetaText(e.unitKey)}
                                 <small class="lv-capture-field-hint">
