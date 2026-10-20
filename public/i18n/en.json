@@ -1875,5 +1875,14 @@
     "capture.ingestInvalidLink": "Invalid SiYuan block ID (format: 20261020...)",
     "capture.ingestContentRequired": "Block content is required",
     "capture.ingestSuccess": "Block successfully ingested into ledger!",
-    "capture.ingestSuccessWithSnippet": "Ingested! Backlink snippet copied to clipboard to paste in note."
+    "capture.ingestSuccessWithSnippet": "Ingested! Backlink snippet copied to clipboard to paste in note.",
+    "overview.shareCard": "Yearly Recap",
+    "overview.shareCardTitle": "Family Life Yearly Recap Card",
+    "overview.shareCardGenerating": "Gathering data and rendering yearly card…",
+    "overview.shareCardCopyText": "Copy Text Report",
+    "overview.shareCardCopyImage": "Copy Image",
+    "overview.shareCardDownload": "Download PNG",
+    "overview.shareCardImageCopied": "Recap card image copied to clipboard!",
+    "overview.shareCardCopyImageFailed": "Failed to copy image, please download PNG or copy text",
+    "overview.shareCardDownloaded": "Image download started!"
 }

@@ -1875,5 +1875,14 @@
     "capture.ingestInvalidLink": "未检测到有效的思源块 ID（格式如 20261020...）",
     "capture.ingestContentRequired": "请先填写或粘贴块内容",
     "capture.ingestSuccess": "成功将块内容收录至台账！",
-    "capture.ingestSuccessWithSnippet": "成功收录！已复制反向收录标注至剪贴板，可粘贴回笔记形成闭环。"
+    "capture.ingestSuccessWithSnippet": "成功收录！已复制反向收录标注至剪贴板，可粘贴回笔记形成闭环。",
+    "overview.shareCard": "年度回顾长图",
+    "overview.shareCardTitle": "家庭生活年度回顾长图",
+    "overview.shareCardGenerating": "正在聚合数据绘制年度卡片…",
+    "overview.shareCardCopyText": "复制文字简报",
+    "overview.shareCardCopyImage": "复制图片",
+    "overview.shareCardDownload": "下载 PNG",
+    "overview.shareCardImageCopied": "长图已成功复制到剪贴板！",
+    "overview.shareCardCopyImageFailed": "复制图片失败，请使用“下载 PNG”或复制文字",
+    "overview.shareCardDownloaded": "长图下载已开始！"
 }
