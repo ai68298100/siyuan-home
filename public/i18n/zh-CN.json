@@ -1838,5 +1838,10 @@
     "hub.digestThisWeek": "本周",
     "hub.digestCopy": "复制摘要",
     "hub.digestCopyFailed": "复制失败，请手动选择文本复制",
-    "hub.digestFailed": "生成摘要失败：${msg}"
+    "hub.digestFailed": "生成摘要失败：${msg}",
+    "ledger.wasteSchedule": "市政垃圾排期",
+    "ledger.wasteTitle": "家庭垃圾分类与清运日程",
+    "ledger.wasteIntro": "按市政分类指引自动推算未来两周清运节点（厨余/其他/可回收/有害垃圾）。",
+    "ledger.wasteToday": "今天收运",
+    "ledger.wasteTomorrow": "明天收运"
 }

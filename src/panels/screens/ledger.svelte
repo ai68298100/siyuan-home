@@ -1521,6 +1521,16 @@
         }
     }
 
+    // Municipal Waste Schedule & Recycling (316波):
+    async function openWasteScheduleModal() {
+        const { openWasteScheduleDialog } = await import("@/core/waste-dialog");
+        openWasteScheduleDialog({
+            t,
+            DialogCls: Dialog,
+            showMessageFn: showMessage,
+        });
+    }
+
     // Expense Trend & Spikes Analysis (305波):
     // Aggregate all rows with an amount + date field into monthly totals, compute MoM and detect spikes.
     async function openExpenseTrendModal() {
@@ -5322,6 +5332,7 @@
                 {#if active === "food"}<button class="b3-button b3-button--outline" onclick={openMealPlanModal}>{t("ledger.mealPlan")}</button>{/if}
                 {#if active === "medicine"}<button class="b3-button b3-button--outline" onclick={openMedicineSupplyModal}>{t("ledger.medicineSupply")}</button>{/if}
                 {#if active === "house"}<button class="b3-button b3-button--outline" onclick={openUtilityTiersModal}>{t("ledger.utilityTiers")}</button>{/if}
+                {#if active === "house" || active === "chores"}<button class="b3-button b3-button--outline" onclick={openWasteScheduleModal}>{t("ledger.wasteSchedule")}</button>{/if}
                 {#if active !== "members" && active !== "adhoc"}<button class="b3-button b3-button--outline" disabled={printing || exporting} onclick={openCsvImport}>{t("ledger.importCsv")}</button>{/if}
                 <button class="b3-button b3-button--outline" disabled={!ref?.docId}
                     onclick={() => plugin.showTabDocs(ref?.docId)}>{t("ledger.openDoc")} →</button>

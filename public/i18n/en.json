@@ -1838,5 +1838,10 @@
     "hub.digestThisWeek": "This week",
     "hub.digestCopy": "Copy digest",
     "hub.digestCopyFailed": "Copy failed, please select the text manually",
-    "hub.digestFailed": "Failed to build digest: ${msg}"
+    "hub.digestFailed": "Failed to build digest: ${msg}",
+    "ledger.wasteSchedule": "Waste schedule",
+    "ledger.wasteTitle": "Household Waste & Recycling Schedule",
+    "ledger.wasteIntro": "Automatic forecast of pickup days for kitchen, residual, recyclable, and hazardous waste over the next two weeks.",
+    "ledger.wasteToday": "Pickup today",
+    "ledger.wasteTomorrow": "Pickup tomorrow"
 }
