@@ -45,7 +45,8 @@
     "ui:stress": "node scripts/ui-walkthrough/bulk-stress.mjs",
     "ui:activity": "node scripts/ui-walkthrough/check-activity-navigation.mjs",
     "ui:read-recovery": "node scripts/ui-walkthrough/check-ledger-read-recovery.mjs",
-    "ui:history": "node scripts/ui-walkthrough/check-tab-history.mjs"
+    "ui:history": "node scripts/ui-walkthrough/check-tab-history.mjs",
+    "check:bundle": "node scripts/bundle-budget.mjs"
   },
   "devDependencies": {
     "@sveltejs/vite-plugin-svelte": "^7.3.1",

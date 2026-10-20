@@ -1,5 +1,5 @@
 # 小驴管家（Lv Home）· 项目待办总清单
-> **当前事实（2026-10-20）**：本地 `main` 为 v0.5.25（+10 提交未推送），638 项单测（72 测试文件）、类型/Svelte/i18n/meta/audit/build/smoke/loader 全绿（产物 gzip 233,158 字节 / 227.69 KB，<230KB CI 门禁安全预算，余量 2.3 KB）；第 307 波完成家庭时间轴活跃度洞察（`core/timeline-insight.ts`：buildTimelineInsight / formatTimelineInsight），活动流面板接入「活跃度洞察」对话（模块/成员热度、最活跃月、长期空窗预警）；i18n 双语增补至 1798 键。真实 Android WebView、独立窗口、兄弟插件、双端冲突和用户工作区验证待完成；`pnpm test:live` 缺少 `SIYUAN_TOKEN` 时阻断；集市发布继续暂缓。
+> **当前事实（2026-10-20）**：本地 `main` 为 v0.5.25（+11 提交待推），638 项单测（72 测试文件）、类型/Svelte/i18n/meta/audit/build/smoke/loader 全绿（产物 gzip **233,308 字节 / 227.84 KB**，<230KB 门禁，余量 2.2 KB）；第 308 波交付体积归因工具 `pnpm check:bundle`（scripts/bundle-budget.mjs），并实证三项瘦身假设——Terser 激进参数、内联样式集中化、批量正则收敛均**无 gzip 收益或弊大于利**，已全部回滚，避免伪优化。下一步瘦身须走功能级削减（见 309 波计划）。i18n 1798 键对齐。真实 Android WebView、独立窗口、兄弟插件、双端冲突和用户工作区验证待完成；`pnpm test:live` 缺少 `SIYUAN_TOKEN` 时阻断；集市发布继续暂缓。
 
 ## 第 224 波复审行动清单（当前唯一入口）
 
@@ -40,6 +40,7 @@
 - [x] 🟡 **重要证件与合同的个人资产全景时间轴**（2026-10-19 调研，Notion Family OS 印证）：✅ 第二百九十六波完成：成员卡聚合该成员名下的全部证件效期轴与合同履约状态，形成个人数字资产档案
 
 
+| 2026-10-20 | 主线 | 第三百零八波：**产物体积归因工具与瘦身可行性实测（结论：样式收敛无 gzip 收益）** | 新增 scripts/bundle-budget.mjs：输出 dist 体积、源文件体积 Top20、被引用次数 Top15 与目录占比，给出「大头在屏幕层（37%）与 core 层（34%）」的定量依据；实测三项候选方案：①Terser 开启 unsafe/toplevel/lightningcss——gzip 仅从 233,308→233,660（噪声级）；②新建 core/ui-kit.ts 跨文件收敛 54 处重复内联样式——构建产物 gzip 反而 +1.1KB；③批量正则替换导致 Svelte 模板语法破坏（已即时回滚并复验 0 错误）。结论：相对路径压缩已饱和，字符串去重对 gzip 无效，后续瘦身须走功能级削减。门禁预算维持 230KB 不变 |
 | 2026-10-20 | 主线 | 第三百零七波：**家庭时间轴活跃度洞察与长期空窗预警** | core/timeline-insight.ts 新增 buildTimelineInsight / formatTimelineInsight 纯函数，按观察窗口（默认 180 天）统计模块与成员活跃度、最活跃月份分布，并以 gapDays（默认 60 天）识别长期未更新的台账；活动流面板接入「活跃度洞察」对话，支持一键复制洞察报告；+9 单测共 638 项单测全绿；i18n +4 键双语（1798 键）；产物 gzip 233,158 字节（<230KB 预算，余量 2.3 KB，已进入该阈值预警区）；门禁全绿 |
 | 2026-10-20 | 主线 | 第三百零六波：**家庭提醒周期摘要（周报）生成与逾期环比对比** | core/reminder-digest.ts 新增 buildReminderDigest / formatDigestMarkdown 纯函数，按模块归集逾期/7天内/提醒窗口三级分布，输出可直接粘贴的 Markdown 周报（总览、最紧急 TopN、模块分布）；提醒中枢工具栏接入「生成提醒摘要」，支持一键复制并落盘 digestHistory 快照供下期计算逾期增减；同日修正本地时区日期进位导致的 rangeEnd 偏移；+10 单测共 629 项单测全绿；i18n +8 键双语（1794 键）；产物 gzip 231,157 字节（<230KB 预算，余量 4.3 KB）；门禁全绿 |
 | 2026-10-20 | 主线 | 第三百零五波：**家庭支出趋势与异常波动监测** | core/expense-trend.ts 新增 toMonthKey / calculateExpenseTrend / formatExpenseTrendReport 纯函数，按月聚合金额列并计算环比、均值、中位数、近三月推演年度预测，以中位数为基线识别超 50% 突增月份；台账工具栏对具备金额字段的模块接入「支出趋势」分析对话框，支持一键复制报表；+11 单测共 619 项单测全绿；i18n +5 键双语（1787 键）；产物 gzip 230,967 字节（<230KB 预算，余量 4.5 KB）；门禁全绿 |
