@@ -41,6 +41,51 @@
 
 
 | 2026-10-20 | 主线 | 第三百零九波：**修复顶栏图标突然消失（registerEntrypoints 同步登记 + 存活守护）** | 根因：`onload` 在 `await loadSettings/loadRuntime` **之后**才调用 `addTopBar/addTab/addCommand/addStatusBar`，而思源宿主在 onload 返回前完成顶栏与页签装配（上游 issue #15455/#8375），落在 await 后的登记会挂不上或重载/热更新后被丢弃；同时发现三类登记在文件内被重复写了两份（合并遗留）。修法：①新增 `registerEntrypoints()`，把 addIcons/addTab/addTopBar/addCommand/addStatusBar 全部提到 onload 首个 await **之前**同步执行，并删除重复块；②新增 `ensureTopBarIconAlive()`，用 MutationObserver 守护 #toolbar 重建，图标脱离文档时幂等重挂，onunload 断开；③新增 `tests/core/topbar-timing.test.ts` 静态契约测试，禁止日后把登记写回 await 之后。+3 单测共 641 项全绿；gzip 233,485 字节 |
+
+| 2026-10-20 | 调研 | **第二轮同类产品调研 + 待办重整（v0.5.26 发版后）** | 新增 [docs/research/2026-10-20-第二轮同类产品调研与待办梳理.md](docs/research/2026-10-20-第二轮同类产品调研与待办梳理.md)：新增样本 OpenFamily / Oikos·Yuvomi / Donetick / Monica / KitchenOwl / Quicken LifeHub / Everplans / AnnualVault / RemindMe / Warranty Keeper / Dalà / Homsy / OurFamily / 智辰家纪事（共 14 款）；对照现有 31 模块能力矩阵，识别 10 项真实缺口（G1–G10）并按 RICE 排序；结论：不新增模块，全部在既有模块上做能力深化 |
+
+### 第二轮调研缺口清单（2026-10-20，当前执行队列）
+
+| 编号 | 缺口 | 印证产品 | 优先级 | 验收标准 |
+|---|---|---|---|---|
+| - [ ] **G1** | **家务轮换与完成留痕**：指定輪流成员列表，自动判定“本轮该谁做”，并记录每次完成的人与时间，平息“轮到谁”争议 | Donetick / Homsy / OpenFamily | P0 | `core/chores.ts` 纯函数（`nextAssignee` / `recordCompletion` / `buildChoreHistory`）+ chores 模块抽屉接入 + ≥8 单测 |
+| - [ ] **G2** | **多段提醒割点**：年检/保修/续签类事项支持 60/30/7 天三段提醒，而非单一提前量 | AnnualVault / WarrantyVault | P0 | `ReminderRuleSpec.leadStages?: number[]`；提醒卡展示当前所处段位；向后兼容旧 schema（无 leadStages 时回退 leadDays）+ ≥6 单测 |
+| - [ ] **G3** | **购物按分类分组扫货模式**：采购清单按分类分组、可逐项勾选已购，适配超市动线 | OpenFamily / KitchenOwl | P1 | `core/shopping.ts` 新增 `groupShoppingByCategory`；台账 shopping 工具栏接入「扫货模式」弹层 + ≥5 单测 |
+| - [ ] **G4** | **存放位置索引**：聚合全模块 `location`/`copy_location`，形成“东西放哪了”的全局检索视图 | OurFamily / Quora 类需求 | P1 | `core/location-index.ts` 纯函数（`buildLocationIndex`）+ 总览或台账弹层检索 + ≥5 单测 |
+| - [ ] **G5** | **健康读数趋势与用药打卡**：血压/血糖读数时间序列 + 漏服提醒 | 智辰家纪事 / Dalà | P1 | 复用 rowlog 存储读数；`core/vitals.ts` 趋势汇总（均值/极值/趋势方向）+ 抽屉图表 + ≥6 单测 |
+| - [ ] **G6** | **预算分类限额告警**：分类月度限额＋超限提示（与现有支出趋势互补：事前 vs 事后） | OpenFamily | P2 | 设置项新增限额配置；`core/budget-limit.ts` 纯函数判断超限 + 提醒接入 + ≥5 单测 |
+| - [ ] **G7** | **垃圾回收/市政日程订阅**：支持导入市政 ICS，并在日历展示 | Yuvomi | P3 | 复用 `core/ics.ts` 解析 + 日历图层 + ≥3 单测 |
+| - [ ] **G8** | **儿童积分与零花钱闭环**：任务完成 → 积分/零花钱入账 | Yuvomi / OpenFamily | P3 | 依赖 G1 完成记录；allowance 模块 rowlog 入账 + 积分汇总 + ≥5 单测 |
+| - [ ] **G9（观察）** | **分级可见性与身后交接**：按文件夹/字段授予不同家庭成员可见权，及“身后可见”模式 | Quicken LifeHub / Everplans / Dalà | 观察 | **依赖宿主权限模型**；启动前必须先写清用户结果/依赖/停止条件；现有访客模式是过渡方案 |
+| - [ ] **G10（观察）** | **对外读取端点（API / MCP）**：供外部工具与 AI 代理标准化读取家庭数据 | Yuvomi / Oikos | 观察 | **依赖宿主能力**；已有 `window.LvHome` 桥为本地插件间通道，不等同于对外 API |
+
+> 调研全文见 [docs/research/2026-10-20-第二轮同类产品调研与待办梳理.md](docs/research/2026-10-20-第二轮同类产品调研与待办梳理.md)。
+
+### 下一阶段开发计划（v0.5.27 候选，按波次拆解）
+
+| 波次 | 主题 | 交付物 | 单测增量 | 预估 gzip |
+|---|---|---|---|---|
+| 310 | **家务轮换与完成留痕（G1）** | `core/chores.ts`（nextAssignee / recordCompletion / buildChoreHistory / formatChoreHistoryText）；chores 抽屉接入“本周该谁做”卡与历史流水 | +10 → 651 | +1.0 KB |
+| 311 | **多段提醒割点（G2）** | `ReminderRuleSpec.leadStages`；`core/hub/rule.ts` 段位判定；提醒卡段位徽章（60/30/7） | +8 → 659 | +0.6 KB |
+| 312 | **扫货模式（G3）** | `core/shopping.ts` groupShoppingByCategory + 勾选态；shopping 工具栏「🧺 扫货模式」弹层 | +6 → 665 | +0.9 KB |
+| 313 | **存放位置索引（G4）** | `core/location-index.ts`；总览/台账弹层全局检索“东西放哪了” | +6 → 671 | +0.8 KB |
+| 314 | **健康读数与用药打卡（G5）** | `core/vitals.ts`；rowlog 存血压/血糖；抽屉趋势卡片 + 漏服提醒 | +8 → 679 | +1.2 KB |
+| 315 | **预算限额告警（G6）** | 设置项分类限额；`core/budget-limit.ts`；提醒中枢接入 | +6 → 685 | +0.8 KB |
+
+**每个波次的固定门禁（不可跳过）**
+
+1. 纯函数落地 + 单测覆盖（含边界：空数据/非法输入/访客只读）；
+2. `pnpm run check`（tsc / svelte-check / i18n / meta / audit）全绿；
+3. 生产构建 + `smoke` + `verify-loader-semantics` + gzip ≤ 235,520 字节；
+4. i18n 双语同步（中英键位完全对齐）；
+5. TODO.md 登记波次事实与 gzip 实测值；commit 只包含本波相关文件。
+
+**体积红线提醒**：当前 233,485 字节，余量仅 2.0 KB。313 波之后必须执行一次功能级瘦身（候选：`who-refs.ts` 数值精度重生成、`ledger.svelte` 低频模块抽屉代码抽取），否则 314/315 波将撞线。
+
+## 历史波次日志（近程）
+
+| 日期 | 循环 | 波次 | 产出 |
+|---|---|---|---|
 | 2026-10-20 | 主线 | 第三百零八波：**产物体积归因工具与瘦身可行性实测（结论：样式收敛无 gzip 收益）** | 新增 scripts/bundle-budget.mjs（`pnpm check:bundle`）：输出 dist 体积、源文件体积 Top20、被引用次数 Top15 与目录占比，给出「大头在屏幕层 37% / core 层 34%」的定量依据；实测三项候选：①Terser 激进参数——gzip 仅 233,308→233,660（噪声级）；②core/ui-kit.ts 跨文件收敛 54 处重复内联样式——产物 gzip 反增 1.1KB；③批量正则替换破坏 Svelte 模板语法（已回滚）。结论：相对路径压缩已饱和，字符串去重对 gzip 无效，后续瘦身须走功能级削减。门禁预算维持 230KB |
 | 2026-10-20 | 主线 | 第三百零七波：**家庭时间轴活跃度洞察与长期空窗预警** | core/timeline-insight.ts 新增 buildTimelineInsight / formatTimelineInsight 纯函数，按观察窗口（默认 180 天）统计模块与成员活跃度、最活跃月份分布，并以 gapDays（默认 60 天）识别长期未更新的台账；活动流面板接入「活跃度洞察」对话，支持一键复制洞察报告；+9 单测共 638 项单测全绿；i18n +4 键双语（1798 键）；日志记录 |
 | 2026-10-20 | 主线 | 第三百零六波：**家庭提醒周期摘要（周报）生成与逾期环比对比** | core/reminder-digest.ts 新增 buildReminderDigest / formatDigestMarkdown 纯函数，按模块归集逾期/7天内/提醒窗口三级分布，输出可直接粘贴的 Markdown 周报（总览、最紧急 TopN、模块分布）；提醒中枢工具栏接入「生成提醒摘要」，支持一键复制并落盘 digestHistory 快照供下期计算逾期增减；同日修正本地时区日期进位导致的 rangeEnd 偏移；+10 单测共 629 项单测全绿；i18n +8 键双语（1794 键）；产物 gzip 231,157 字节（<230KB 预算，余量 4.3 KB）；门禁全绿 |
@@ -152,7 +197,7 @@
 | 2026-10-05 | 主线 | 第一百八十五波：浏览器真机批尝试（跳过）+ N5 指南英文化全量收官（用户指令"继续开发，解决不了就跳过"） | **浏览器真机批**：IAB 驱动 web 端——锁屏授权页输入 accessAuthCode 解锁成功（凭据链首次验证 ✓），但思源应用壳自举后陷入"点击刷新"循环、整页重载后白屏（快照零节点）——与 65 波登记的"IAB web 壳启动失败（与本插件无关）"一致，二次确认死路，按授权跳过；真机批维持人工 runbook（阶段 1 前置状态未消耗，settings.json 仍不存在，预检"首启即 onboarding"保持原样）；**N5 收官**：六篇指南全部英文化（*.en.md，约 300 行人工翻译，术语对齐 i18n 键位），中文篇头加互链；探针教训沿用 E8（sy 包装器）无关；门禁全绿、部署无变化（纯文档波零代码变更） |
 | 2026-10-05 | 主线 | 第一百八十四波：N3 向导性别引导 + 26.7 移动端 CSS 覆盖修复 + N4 调研闭环（用户指令"继续开发，跳过解决不了的"） | **N3（重估方案 A）**：完成步在选中孩子时显示 `wiz.sexHint` 引导（role=note/accent 色）——"生长带需要成员性别，完成后到成员页补"；方案 B 经核不成立（向导本就不存 childrenSex，grep 零命中）；**26.7 🔴 移动端操作**：实锤 design-system.scss 窄屏块 hover:none 常显规则被后续同特异性 `display:none` 覆盖（触屏操作全隐），且一刀切 display:none 连桌面窄窗 hover/键盘 focus-within 一起杀掉——删 display:none，窄屏沿用宽屏 opacity 显现，仅 hover:none 强制常显（真机设备验收归 UI09）；**N4 调研闭环**：[WHO2007 生长参考 5–19 岁调研](docs/research/2026-10-05-WHO2007生长参考5-19岁调研.md)——可实施 1–2 波、无增量许可风险（官方 expanded LMS 表与 0–60 月管线同构、AnthroPlus 不需要），关键缺口=体重 for-age 仅到 10 岁（BMI 面板=立项决策点）；i18n 772→773、207 测试、部署 28 文件 0 陈旧、预检 11/11、活体 8/8 |
 | 2026-10-05 | 主线 | 第一百八十三波：N7 方案①落地（renderLedgerAll 全量读）+ D06 收尾（同名歧义人工选择）（用户授权自主决策） | **IT-07 探针结案**（一次性探针脚本建 62 行临时库）：render 接受 `page`（第 2 页余量 12/62 首行不同）与 `pageSize`（200→62 一次全量）参数，setter 端点不存在 → **E13** 结论，N7 定方案①；**renderLedgerAll**（200/页逐页累积、跨页去重、100 页上限、越界即止不谎报）接入扫描派生 providers×4/健康检查/成员回填/CSV 导出——**>50 行台账提醒恢复派生（N7 验收达成）**，UI 列表维持单页（PF11）；**D06 收尾**：BackfillResult.ambiguous 升级候选明细（id+角色·生日摘要），设置·关于回填后歧义自动弹人工选择对话框（radio 单选/textContent 安全/确认批量写 avItemId）；探针调试三坑自录（api 双 /api 前缀、j 带引号嵌入、JSON.stringify 后正则匹配转义引号）；i18n 769→772、单测 204→207、**活体 8/8**（新增 E13 真机用例）、部署 28 文件+4 陈旧清理、预检 11/11；**依赖注记**：pnpm-lock.yaml 由 pnpm 12.5.1 自动补 packageManagerDependencies 钉扎段（无版本变更，本地/CI 同绿后入库） |
-| 2026-10-05 | 主线 | 第一百八十二波：**部署队列追平 + 活体 e2e 首跑 7/7 + 端口漂移真相**（用户指令"继续开发，可后台 e2e 实测"+ CI 红灯报告） | **端口漂移真相**：单探 6806 空响应实为 SpeedSwitch E2E 测试内核占用该端口——真机批工作区（小飞驴的SIYUAN）重启后漂移到 14643（进程参数+工作区 conf.json 取现行凭据）→ **窗口实开**；**队列追平**：171–182 波 28 文件 putFile 0 失败、字节一致、热重载、预检 11/11；**活体 e2e 首跑 7/7**（177 波建成后首次真跑，此前仅验证 401-skip），抓三真问题全修：①createAttributeView 固定 400ms 等待在忙实例落空 → 改 insertBlock 响应同步提取块 ID（E9 落地插件）+ SQL 轮询回退；②**E11 新结论**：删行端点只认 render row.id，PK values id 静默无效（D02 两套 ID 空间延伸到删除路径；测试改 render 分页逐页删）；③测试自身两缺陷（IT-05 删的正是规则测试要的逾期行→重建；certs endorsement 规则 due 列 fixture 缺失→H14 缺列报错按设计工作）；**CI 红灯诊断**（用户报告）：179 波 refactor 起 svelte-check 实红（TS6 不收窄 DisplayEntry），6d0d01a 修复已推，CI 41s 转绿；**C6c 收尾**：URL 块菜单二级分流两入口（bookmarks.url / address.address_full，capture 一致），i18n 765→769、204 测试；二次部署 4 陈旧 chunk 清理，预检 11/11 + 活体 7/7 复验；**观察项**：>50 行台账扫描按 H04 如实报错不派生（62 行 fixture 实证——容量边界待产品决策记 §7）
+| 2026-10-05 | 主线 | 第一百八十二波：**部署队列追平 + 活体 e2e 首跑 7/7 + 端口漂移真相**（用户指令"继续开发，可后台 e2e 实测"+ CI 红灯报告） | **端口漂移真相**：单探 6806 空响应实为 SpeedSwitch E2E 测试内核占用该端口——真机批工作区（小飞驴的SIYUAN）重启后漂移到 14643（进程参数+工作区 conf.json 取现行凭据）→ **窗口实开**；**队列追平**：171–182 波 28 文件 putFile 0 失败、字节一致、热重载、预检 11/11；**活体 e2e 首跑 7/7**（177 波建成后首次真跑，此前仅验证 401-skip），抓三真问题全修：①createAttributeView 固定 400ms 等待在忙实例落空 → 改 insertBlock 响应同步提取块 ID（E9 落地插件）+ SQL 轮询回退；②**E11 新结论**：删行端点只认 render row.id，PK values id 静默无效（D02 两套 ID 空间延伸到删除路径；测试改 render 分页逐页删）；③测试自身两缺陷（IT-05 删的正是规则测试要的逾期行→重建；certs endorsement 规则 due 列 fixture 缺失→H14 缺列报错按设计工作）；**CI 红灯诊断**（用户报告）：179 波 refactor 起 svelte-check 实红（TS6 不收窄 DisplayEntry），6d0d01a 修复已推，CI 41s 转绿；**C6c 收尾**：URL 块菜单二级分流两入口（bookmarks.url / address.address_full，capture 一致），i18n 765→769、204 测试；二次部署 4 陈旧 chunk 清理，预检 11/11 + 活体 7/7 复验；**观察项**：>50 行台账扫描按 H04 如实报错不派生（62 行 fixture 实证——容量边界待产品决策记 §7） |
 | 2026-10-05 | 主线 | 第一百八十一波：从未开发池挑批次实做——C8c/C4b 收尾 + svelte-check 红灯修复 + N6 归档治理 | 单探空响应（窗口未开），部署队列 171–181 波继续挂起；**C8c 收尾**：leadOverrides 编辑行按 draft 启用集过滤（25+ 全量行过长），"显示未启用模块规则"折叠展开（未启用行降透明度+注明覆盖值保留），draftLeads 与显示解耦保证关-存-开自定义值不丢；**C4b 收尾**：详情抽屉保留 renderLedger 原始列数组，schema 列后追加"自定义列（在思源视图中维护）"分区（原始列名直出、只读、keyID 判定不冒充 schema 字段）；**修复 179/180 波遗留红灯**：svelte-check（TS6 语言服务）不对 DisplayEntry 可辨识联合在 each key/{:else}/script 三元收窄（tsc 却通过——HEAD 自 179 波起 check:svelte 实红）→ DisplayEntry 平铺化（key/row/items 恒有值，合并语义不变），+1 测试钉形态共 204；**N6**：365 行循环日志主表只留近程（顶部 31 行 + §34 尾 19 行），315 行归档 docs/history/，主文件 392KB→约 300KB；i18n 765 键、check 五重门禁+构建+smoke 全绿 |
 | 2026-10-04 | 主线 | 第一百八十波：从 PL 池筛选实做——PL13/PL04/PL05/PL10 可代码部分（响应用户"筛选未开发待办"指令） | 系统性筛查 1072 条未完成项中离线可交付者，选出 PL 池四项的可代码部分：**PL13** 合并卡/模块卡 role=button 补 **Space 键**（Enter 已有）+ aria-expanded（合并卡）+ aria-label（模块卡）；**PL05** 装饰图标 aria-hidden（合并卡 👪/模块图标/头像）；**PL10** 统计诚实——hero 计数与模块卡 pending 挂 title（来源=最近扫描时间、口径=逾期+7 天+提前量）；**PL04**（成员 chips aria-pressed 顺带）；i18n 760→761（中途编辑断 JSON 已修）、203 测试、全绿；真机部署仍待窗口 |
 | 2026-10-04 | 主线 | 第一百七十九波：buildDisplay 抽纯函数 + 4 单测（质量） | 提醒合并卡分组逻辑从 reminders.svelte 抽至 `core/hub/display.ts`（强类型 MergedEntry/SingleEntry，Reminder 入参）——合并语义（同键首现位/items 输入序/无成员独立/单条不合并/跨日跨成员不合并）首次有测试钉住；组件内保留一行委托；+4 测试共 203；tsc/svelte-check/构建+smoke 绿；单探仍 401 |
@@ -1899,6 +1944,6 @@ v0.3.0 已发 GitHub Release；**集市上架以此批通过为先决条件**。
 | 2026-10-07 | 主线 | 第二百七十五波：**TRUST-01 能力证据矩阵落地** | scripts/trust-matrix.mjs（内核实读 + 源码契约解析）→ docs/capability-matrix.md：31/31 模块 schema 覆盖、8 已启用台账实读全过（members 27 行/certs 359 列等真实行列数）、providerCoverage 缺失 0、labelKey 103 零缺失、横切能力引 e2e 断言、L3 真机残余显性；VALUE-01/02 与 icon/preview 同步勾选（e2e/274 波证据） |
 | 2026-10-07 | 主线 | 第二百七十六波：🏁 **v0.3.9 发版**（250–267 波 UI 对齐原型 + 268–275 波质量/工具/证据 + BRAND-01/REL-02/REL-04） | 见 CHANGELOG v0.3.9；发版清单 1-4 步完成（版本双源/CHANGELOG 定稿/release notes/全门禁）；**不上集市**（disabledInPublish=true 维持，D13 复核） |
 | 2026-10-07 | 主线 | 第二百七十八波：**v0.3.9 Release 正文 + 上架状态复核** | GitHub Release 附润色版 notes（用户视角三段 + 无破坏性变更声明）；disabledInPublish=true 复核维持（D13：本地优先手动安装，集市分发继续暂缓）；发版清单 1-5 步全部完成，第 7 步（发版后预检）本地靶场部署即等价完成 |
-| 2026-10-07 | 主线 | 第二百七十九–二百八十二波：**发布后质量收口与真机批前置修复** | 运行态/settings 归一化、生命周期与 capture/bridge 修复、设置窄容器与 ARIA/键盘交互、Vite `codeSplitting:false` 单文件迁移、桥接空快照与续期日期/写回失败边界；真机批预检改为全 dist 字节校验并参数化 SIYUAN_SY/SIYUAN_CONF；282 单测、check/build/smoke/loader 通过；真实 Android/独立窗口/兄弟插件/双端冲突仍待设备与隔离靶场。
+| 2026-10-07 | 主线 | 第二百七十九–二百八十二波：**发布后质量收口与真机批前置修复** | 运行态/settings 归一化、生命周期与 capture/bridge 修复、设置窄容器与 ARIA/键盘交互、Vite `codeSplitting:false` 单文件迁移、桥接空快照与续期日期/写回失败边界；真机批预检改为全 dist 字节校验并参数化 SIYUAN_SY/SIYUAN_CONF；282 单测、check/build/smoke/loader 通过；真实 Android/独立窗口/兄弟插件/双端冲突仍待设备与隔离靶场。 |
 | 2026-10-07 | 主线 | 第二百八十三波：**v0.3.10 依赖维护与发版** | 合并 pnpm 12.9.1、Vite 8.3.3、Svelte 5.57.1、js-yaml 5.4.3、SiYuan SDK 1.2.9；关闭过时/冲突 Dependabot #11/#14；更新 smoke 解压安全修复与 GitHub 治理文档；保留 `disabledInPublish=true`，集市不上架；真实 Android/宿主 UI 残余仍待设备批 |
 | 2026-10-07 | 主线 | 第二百八十四波：**独立后台 e2e 与 AI 外发边界核验** | `tmp/sy-ui3` 隔离靶场部署 v0.3.10（14680）；`test:live` 11/11、recovery 4/4、VALUE-01 6/6、import 5/5、Chromium device 40/40；修复 Windows Corepack 下 `pnpm test:live` 的 `spawnSync EINVAL`；智谱 `glm-4-flash` 仅做一次性连通性测试，仓库暂无生产 AI 调用，密钥不入仓库；真实 Android/兄弟插件/双端冲突仍待 |
