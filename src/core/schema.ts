@@ -114,6 +114,9 @@ const d = (...keys: string[]): ColumnDef[] => keys.map((k) => FIELD_DICT[k]);
 const cat = (options: string[]): ColumnDef => ({ ...FIELD_DICT.category, options });
 const sta = (options: string[], def = options[0]): ColumnDef => ({ ...FIELD_DICT.status, options, default: def });
 const tbl = (key: string, extra?: Partial<ViewDef>): ViewDef => ({ key, type: "table", ...extra });
+/** 312 波：三个模块共用的视图声明收敛（expiring / by_member），避免重复对象字面量 */
+const VIEW_EXPIRING: ViewDef = tbl("expiring", { sortBy: { key: "expiry", asc: true } });
+const VIEW_BY_MEMBER: ViewDef = tbl("by_member", { groupBy: "member" });
 
 // ── certs 证件管理（02 §4.2①）──────────────────────────────
 
@@ -306,8 +309,8 @@ export const CERTS_SCHEMA: ModuleSchema = {
     ],
     capture: ["name", "member", "category", "expiry", "attachments"],
     views: [
-        tbl("by_member", { groupBy: "member" }),
-        tbl("expiring", { sortBy: { key: "expiry", asc: true } }),
+        VIEW_BY_MEMBER,
+        VIEW_EXPIRING,
     ],
     reminders: [
         rem("expiry", "expiry", 90),
@@ -367,7 +370,7 @@ export const MEDICINE_SCHEMA: ModuleSchema = {
         ...d("location", "note"),
     ],
     capture: ["name", "category", "expiry", "stock_qty", "location"],
-    views: [tbl("expiring", { sortBy: { key: "expiry", asc: true } })],
+    views: [VIEW_EXPIRING],
     reminders: [rem("expiry", "expiry", 30)],
     // H15：低库存双规则之数值侧（效期侧由 expiry 规则承担；阈值逐行 low_stock_at）
     numericRules: [{ key: "low_stock", field: "stock_qty", thresholdField: "low_stock_at" }],
@@ -454,7 +457,7 @@ export const HEALTH_SCHEMA: ModuleSchema = {
     capture: ["name", "member", "category", "date", "attachments"],
     activity: { dateField: "date", detailFields: ["category", "hospital", "department", "diagnosis"] },
     templates: [{ key: "checkup_plan", nameKey: "tpl.checkupPlan", file: "health/checkup-plan.tpl" }],
-    views: [tbl("by_member", { groupBy: "member" })],
+    views: [VIEW_BY_MEMBER],
     reminders: [rem("followup", "followup_date", 7)],
 };
 
@@ -521,7 +524,7 @@ export const ALLOWANCE_SCHEMA: ModuleSchema = {
     ],
     capture: ["name", "category", "amount", "direction", "date"],
     activity: { dateField: "date", detailFields: ["category", "direction", "amount", "source"] },
-    views: [tbl("by_member", { groupBy: "member" })],
+    views: [VIEW_BY_MEMBER],
 };
 
 export const FAVORS_SCHEMA: ModuleSchema = {
@@ -551,7 +554,7 @@ export const STOCK_SCHEMA: ModuleSchema = {
     // 品类分区（Apple Reminders Grocery 印证，26.6）：囤货按品类自动归组
     views: [
         tbl("by_category", { groupBy: "category" }),
-        tbl("expiring", { sortBy: { key: "expiry", asc: true } }),
+        VIEW_EXPIRING,
     ],
     templates: [{ key: "emergency_kit", nameKey: "tpl.emergencyKit", file: "stock/emergency-kit.tpl" }],
     reminders: [rem("expiry", "expiry", 30)],

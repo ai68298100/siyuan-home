@@ -25,6 +25,10 @@
     import { loadRowLogs, updateRowLogs, getEntries, appendEntry, removeEntry } from "@/core/rowlog";
     import type { LogKind } from "@/core/rowlog";
     import { rowLogActivityId, type ActivityTarget } from "@/core/activity";
+    /** 312 波：抽屉内子记录行样式（原 4 处重复字面量收敛） */
+    const substRowCss = "padding:2px 0;font-size:12.5px";
+    import { openStoreModeDialog } from "@/core/store-dialog";
+    import { addChoreRotationSectionImpl } from "@/core/chore-dialog";
     import { onDestroy } from "svelte";
     import UiIcon from "@/ui/icon.svelte";
     import { uiIcon } from "@/ui/icons";
@@ -1613,6 +1617,24 @@
         }
     }
 
+    // 312 波（G3）：扫货模式（实现在 core/store-dialog.ts，页面只做调度）
+    function openStoreModeModal() {
+        const sourceRef = ref;
+        if (!sourceRef?.avId || !sourceRef.columns?.name) return;
+        return openStoreModeDialog({
+            t,
+            DialogCls: Dialog,
+            showMessageFn: showMessage,
+            loadRows: () => renderLedgerAll(sourceRef.avId!),
+            columns: {
+                name: sourceRef.columns.name,
+                category: sourceRef.columns.category,
+                qty: sourceRef.columns.qty,
+                note: sourceRef.columns.note,
+            },
+        });
+    }
+
     // Emergency Kit Checklist & Stock Linking (302波):
     // Compare standard emergency kit items with current stock ledger and import missing rows.
     async function openEmergencyKitModal() {
@@ -2475,7 +2497,7 @@
             for (const h of history) {
                 const line = document.createElement("div");
                 if (active === "vehicles") line.className = "lv-detail-wide";
-                line.style.cssText = "padding:2px 0;font-size:12.5px";
+                line.style.cssText = substRowCss;
                 line.textContent = `${h.from} → ${h.to} · ${h.at.slice(0, 10)}`;
                 body.appendChild(line);
             }
@@ -2923,7 +2945,7 @@
                 section.replaceChildren();
                 for (const e of loaded) {
                     const line = document.createElement("div");
-                    line.style.cssText = "padding:2px 0;font-size:12.5px;display:flex;gap:6px;align-items:center";
+                    line.style.cssText = `${substRowCss};display:flex;gap:6px;align-items:center`;
                     if (opts.kind) {
                         line.dataset.lvActivityId = rowLogActivityId(active, row.itemID, opts.kind, e);
                         if (line.dataset.lvActivityId === activityTarget?.activityId) markActivityLine(line);
@@ -3626,136 +3648,6 @@
             generateQRDataUrl(link, 128).then((url) => { img.src = url; }).catch(() => { wrap.remove(); });
         }
         // Module timelines share the rowlogs storage and are read-only here.
-        // 310 波（G1）：家务轮换——本周该谁做 + 完成留痕（存放在 rowlogs 的 chexecs 分组）
-        async function addChoreRotationSection() {
-            const rl = await import("@/core/rowlog");
-            const api = await import("@/core/chores");
-            const roster = (plugin.settings.members ?? [])
-                .map((m) => ({ id: m.id, name: m.name }));
-            const load = () => rl.loadRowLogs(plugin as any);
-            const readCompletions = (logs: any) =>
-                rl.getEntries<any>(logs, ref!.avId!, row.itemID, "chexecs" as any);
-
-            const head = document.createElement("div");
-            head.className = "ft__on-surface";
-            head.style.cssText = "margin-top:10px;padding-top:8px;border-top:1px solid var(--b3-border-color);font-size:12px";
-            head.textContent = t("ledger.choreRotation");
-            body.appendChild(head);
-
-            const summary = document.createElement("div");
-            summary.style.cssText = "padding:8px 10px;border-radius:8px;background:var(--b3-theme-background-light);margin-top:6px;font-size:12.5px";
-            body.appendChild(summary);
-
-            const list = document.createElement("div");
-            list.style.cssText = "display:flex;flex-direction:column;gap:4px;margin-top:6px;max-height:180px;overflow-y:auto";
-            body.appendChild(list);
-
-            const form = document.createElement("div");
-            form.style.cssText = "display:flex;gap:6px;margin-top:6px;align-items:center;flex-wrap:wrap";
-            const whoSel = document.createElement("select");
-            whoSel.className = "b3-select";
-            whoSel.style.cssText = "font-size:12px;width:110px";
-            for (const m of roster) {
-                const o = document.createElement("option"); o.value = m.id; o.textContent = m.name; whoSel.append(o);
-            }
-            const dateInp = document.createElement("input");
-            dateInp.type = "date";
-            dateInp.className = "b3-text-field";
-            dateInp.style.cssText = "font-size:12px;width:130px";
-            dateInp.value = new Date().toISOString().slice(0, 10);
-            const noteInp = document.createElement("input");
-            noteInp.className = "b3-text-field";
-            noteInp.placeholder = t("ledger.choreNote");
-            noteInp.style.cssText = "font-size:12px;flex:1;min-width:90px";
-            const addBtn = document.createElement("button");
-            addBtn.className = "b3-button b3-button--outline";
-            addBtn.style.cssText = "font-size:12px";
-            addBtn.textContent = t("ledger.choreDone");
-            form.append(whoSel, dateInp, noteInp, addBtn);
-            body.appendChild(form);
-
-            let logs: any;
-            const render = () => {
-                const completions = readCompletions(logs);
-                const today = new Date().toISOString().slice(0, 10);
-                const assignee = api.nextAssignee(roster, completions, today);
-                const history = api.buildChoreHistory(completions, roster);
-
-                summary.replaceChildren();
-                const who = document.createElement("b");
-                who.style.cssText = "font-size:13px;color:var(--lv-accent)";
-                who.textContent = assignee.member
-                    ? `${t("ledger.choreNext")}: ${assignee.member.name}`
-                    : t("ledger.choreNoRoster");
-                const meta = document.createElement("span");
-                meta.className = "lv-caption";
-                meta.style.marginLeft = "8px";
-                meta.textContent = assignee.lastDone
-                    ? `${t("ledger.choreLast")} ${assignee.lastDone}${assignee.daysSince !== undefined ? ` · ${assignee.daysSince} ${t("days.unit")}` : ""} · ${t("ledger.choreTotal")} ${history.total}`
-                    : `${t("ledger.choreTotal")} ${history.total}`;
-                summary.append(who, meta);
-
-                list.replaceChildren();
-                if (history.entries.length === 0) {
-                    const none = document.createElement("div");
-                    none.className = "ft__on-surface";
-                    none.style.cssText = "font-size:12px";
-                    none.textContent = t("ledger.choreEmpty");
-                    list.appendChild(none);
-                    return;
-                }
-                for (const e of history.entries) {
-                    const line = document.createElement("div");
-                    line.style.cssText = "display:flex;gap:6px;align-items:center;font-size:12.5px";
-                    const txt = document.createElement("span");
-                    txt.textContent = `${e.date} · ${e.memberName}${e.note ? ` —— ${e.note}` : ""}`;
-                    const del = document.createElement("button");
-                    del.className = "b3-button b3-button--text";
-                    del.style.cssText = "padding:0 4px;font-size:12px";
-                    del.textContent = t("delete");
-                    del.onclick = async () => {
-                        del.disabled = true;
-                        try {
-                            logs = await rl.updateRowLogs(plugin as any, (cur) => rl.removeEntry(cur, ref!.avId!, row.itemID, "chexecs" as any, e as unknown as Record<string, unknown>));
-                            render();
-                        } catch (err) {
-                            del.disabled = false;
-                            showMessage(t("ledger.logDeleteFailed").replace("${msg}", err instanceof Error ? err.message : String(err)), 5000, "error");
-                        }
-                    };
-                    line.append(txt, del);
-                    list.appendChild(line);
-                }
-            };
-
-            addBtn.onclick = async () => {
-                if (addBtn.disabled) return;
-                if (!dateInp.value) { showMessage(t("ledger.logInvalid"), 3000, "error"); return; }
-                addBtn.disabled = true;
-                try {
-                    logs = await rl.updateRowLogs(plugin as any, (cur) => rl.appendEntry(cur, ref!.avId!, row.itemID, "chexecs" as any, {
-                        date: dateInp.value,
-                        memberId: whoSel.value || undefined,
-                        note: noteInp.value.trim() || undefined,
-                        at: new Date().toISOString(),
-                    }));
-                    noteInp.value = "";
-                    render();
-                } catch (err) {
-                    showMessage(t("ledger.logSavedRefreshFailed").replace("${msg}", err instanceof Error ? err.message : String(err)), 5000, "error");
-                } finally {
-                    addBtn.disabled = false;
-                }
-            };
-
-            try {
-                logs = await load();
-                render();
-            } catch (err) {
-                summary.textContent = t("ledger.logReadFailed").replace("${msg}", err instanceof Error ? err.message : String(err));
-            }
-        }
-
         (async () => {
             const rl = await import("@/core/rowlog");
             const at = () => new Date().toISOString();
@@ -3871,8 +3763,8 @@
                     format: (e) => `${e.date} · ${formatAmount(Number(e.price))}${e.channel ? ` · ${e.channel}` : ""}`,
                 });
             } else if (active === "chores") {
-                // 310 波（G1）：家务轮换与完成留痕
-                await addChoreRotationSection();
+                // 310 波（G1）：家务轮换与完成留痕（实现与 DOM 均在 core/chore-dialog.ts）
+                await addChoreRotationSectionImpl({ t, plugin, avId: ref!.avId!, rowId: row.itemID, body, showMessageFn: showMessage });
             } else if (active === "schooling") {
                 await addRowLogSection({
                     title: t("ledger.transfers"), emptyText: t("ledger.noTransfers"), addLabel: t("ledger.valAdd"), kind: "transfers",
@@ -4839,13 +4731,13 @@
             body.appendChild(head);
             for (const id of forward) {
                 const line = document.createElement("div");
-                line.style.cssText = "padding:2px 0;font-size:12.5px";
+                line.style.cssText = substRowCss;
                 line.textContent = `→ ${nameOf(id)} (${t("ledger.newCert")})`;
                 body.appendChild(line);
             }
             for (const r of backward) {
                 const line = document.createElement("div");
-                line.style.cssText = "padding:2px 0;font-size:12.5px";
+                line.style.cssText = substRowCss;
                 line.textContent = `← ${String(cellText(r.cells[ref!.columns.name]))} (${t("ledger.oldCert")})`;
                 body.appendChild(line);
             }
@@ -5418,6 +5310,7 @@
                 {/if}
                 {#if active === "stock"}<button class="b3-button b3-button--outline" onclick={openShoppingList}>{t("ledger.shoppingList")}</button>{/if}
                 {#if active === "stock"}<button class="b3-button b3-button--outline" onclick={openEmergencyKitModal}>{t("ledger.emergencyKit")}</button>{/if}
+                {#if active === "shopping"}<button class="b3-button b3-button--outline" onclick={openStoreModeModal}>{t("ledger.storeMode")}</button>{/if}
                 {#if ref?.columns?.amount}<button class="b3-button b3-button--outline" onclick={openExpenseTrendModal}>{t("ledger.expenseTrend")}</button>{/if}
                 {#if active === "favors"}<button class="b3-button b3-button--outline" onclick={openFavorsReport}>{t("ledger.favorsReport")}</button>{/if}
                 {#if active === "bookmarks"}<button class="b3-button b3-button--outline" onclick={openBookmarksCheck}>{t("ledger.checkBookmarks")}</button>{/if}
