@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { selectCellValue, selectCellContent } from "../../src/core/avcell";
+import { selectCellValue, selectCellContent, cellContentText } from "../../src/core/avcell";
 
 describe("avcell 内核兼容层（R8 select 写读双形态）", () => {
     it("写入 payload 同时携带 select 单值与 mSelect 数组（新旧内核双命中）", () => {
@@ -23,5 +23,17 @@ describe("avcell 内核兼容层（R8 select 写读双形态）", () => {
         expect(selectCellContent({ type: "select", mSelect: [{ content: "" }] })).toBeUndefined();
         expect(selectCellContent(undefined)).toBeUndefined();
         expect(selectCellContent({})).toBeUndefined();
+    });
+
+    describe("cellContentText 单元格通用文本提取", () => {
+        it("提取 text, block, select, number, date, url 内容", () => {
+            expect(cellContentText({ text: { content: "hello" } })).toBe("hello");
+            expect(cellContentText({ block: { content: "block text" } })).toBe("block text");
+            expect(cellContentText({ select: { content: "choice" } })).toBe("choice");
+            expect(cellContentText({ number: { content: 123.45 } })).toBe("123.45");
+            expect(cellContentText({ url: { content: "https://example.com" } })).toBe("https://example.com");
+            expect(cellContentText(undefined)).toBe("");
+            expect(cellContentText(null)).toBe("");
+        });
     });
 });

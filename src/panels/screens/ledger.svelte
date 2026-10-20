@@ -1504,6 +1504,24 @@
         });
     }
 
+    // 319 波：思源块收录入台账（动态加载 core/block-ingest-dialog.ts）
+    async function openBlockIngestModal() {
+        const { openBlockIngestDialog } = await import("@/core/block-ingest-dialog");
+        return openBlockIngestDialog({
+            t,
+            currentModule: active,
+            plugin,
+            DialogCls: Dialog,
+            showMessageFn: showMessage,
+            addDetachedRowFn: addDetachedRow,
+            setCellFn: setCell,
+            onSuccessCallback: async () => {
+                await load();
+                try { await plugin.refreshHub([active]); } catch { /* ignore */ }
+            },
+        });
+    }
+
     // 312 波（G3）：扫货模式（动态加载 core/store-dialog.ts）
     async function openStoreModeModal() {
         const sourceRef = ref;
@@ -5205,6 +5223,7 @@
                 {#if active === "stock"}<button class="b3-button b3-button--outline" onclick={openEmergencyKitModal}>{t("ledger.emergencyKit")}</button>{/if}
                 {#if active === "shopping"}<button class="b3-button b3-button--outline" onclick={openStoreModeModal}>{t("ledger.storeMode")}</button>{/if}
                 <button class="b3-button b3-button--outline" onclick={openLocationIndexModal}>{t("ledger.locSearch")}</button>
+                <button class="b3-button b3-button--outline" onclick={openBlockIngestModal}>{t("capture.ingestAction")}</button>
                 {#if ref?.columns?.amount}<button class="b3-button b3-button--outline" onclick={openExpenseTrendModal}>{t("ledger.expenseTrend")}</button>{/if}
                 {#if active === "favors"}<button class="b3-button b3-button--outline" onclick={openFavorsReport}>{t("ledger.favorsReport")}</button>{/if}
                 {#if active === "bookmarks"}<button class="b3-button b3-button--outline" onclick={openBookmarksCheck}>{t("ledger.checkBookmarks")}</button>{/if}

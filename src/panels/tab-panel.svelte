@@ -264,6 +264,22 @@
             showMessage(t("ledger.saveFailed"), 4000, "error");
         }
     }
+    async function openEmergencyCardFromGuest() {
+        try {
+            const { openEmergencyCardDialog } = await import("@/core/emergency-card-dialog");
+            const { renderLedgerAll } = await import("@/core/siyuan");
+            const { cellContentText } = await import("@/core/avcell");
+            const { Dialog, showMessage } = await import("siyuan");
+            await openEmergencyCardDialog({
+                t,
+                plugin,
+                DialogCls: Dialog,
+                showMessageFn: showMessage,
+                renderLedgerAllFn: renderLedgerAll,
+                cellTextFn: cellContentText,
+            });
+        } catch { /* ignore */ }
+    }
     // 提醒页签待办红点（version 驱动重算，随扫描更新）
     const pendingTotal = $derived.by(() => {
         void version;
@@ -394,9 +410,14 @@
                 <span class="lv-badge orange" style="font-weight:600;flex-shrink:0">{t("guest.bannerTitle")}</span>
                 <span class="lv-caption" style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{t("guest.bannerDesc")}</span>
             </div>
-            <button class="b3-button b3-button--text" style="font-size:12px;padding:2px 8px;flex-shrink:0" onclick={toggleGuestMode}>
-                {t("guest.exitMode")}
-            </button>
+            <div style="display:flex;align-items:center;gap:6px;flex-shrink:0">
+                <button class="b3-button b3-button--text" style="font-size:12px;padding:2px 8px" onclick={openEmergencyCardFromGuest}>
+                    🚨 {t("overview.emergencyCard")}
+                </button>
+                <button class="b3-button b3-button--text" style="font-size:12px;padding:2px 8px" onclick={toggleGuestMode}>
+                    {t("guest.exitMode")}
+                </button>
+            </div>
         </div>
     {/if}
 
