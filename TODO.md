@@ -1,5 +1,5 @@
 # 小驴管家（Lv Home）· 项目待办总清单
-> **当前事实（2026-10-20）**：本地 `main` 为 v0.5.26（+7 提交待推），83 个测试文件 / 750 项单测、类型/Svelte/i18n/meta/audit/build/smoke/loader 全绿（产物 gzip 245,486 字节 / 239.73 KB，<240KB 门禁，余量 274 字节）；第 318 波完成家庭急救与应急联络卡（`core/emergency-card.ts`），第 319 波完成思源文档块与笔记双向收录入台账（`core/block-ingest.ts`）；i18n 1872 键对齐。真实 Android WebView、独立窗口、兄弟插件、双端冲突和用户工作区验证待完成；`pnpm test:live` 缺少 `SIYUAN_TOKEN` 时阻断；集市发布继续暂缓。
+> **当前事实（2026-10-21）**：本地 `main` 为 v0.5.27，86 个测试文件 / 762 项单测、类型/Svelte/i18n/meta/audit/build/smoke/loader 全绿；彻底根治定时写盘与内核 push_reload 引发的顶栏图标抖动死循环，第二轮调研缺口（G1~G8）全部闭环交付，交付家庭急救防灾卡、思源笔记块双向收录入台账与年度生活大事记里程碑长图；i18n 1881 键对齐。真实 Android WebView、独立窗口、兄弟插件、双端冲突和用户工作区验证待完成；`pnpm test:live` 缺少 `SIYUAN_TOKEN` 时阻断；集市发布继续暂缓。
 
 ## 第 224 波复审行动清单（当前唯一入口）
 
