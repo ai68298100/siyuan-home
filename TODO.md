@@ -1,5 +1,5 @@
 # 小驴管家（Lv Home）· 项目待办总清单
-> **当前事实（2026-10-20）**：本地 `main` 为 v0.5.25（+6 提交未推送），605 项单测、类型/Svelte/i18n/meta/audit/build/smoke/loader 全绿（产物 gzip 228,105 字节 / 222.76 KB，<230KB CI 门禁安全预算，余量 7.4 KB）；第 303 波完成重要凭据与合同附件（attachments）离线归档清单（`core/archive.ts`：buildArchiveManifest / formatArchiveManifestMarkdown），台账更多操作接入一键导出 Markdown 归档索引；i18n 双语增补至 1781 键。真实 Android WebView、独立窗口、兄弟插件、双端冲突和用户工作区验证待完成；`pnpm test:live` 缺少 `SIYUAN_TOKEN` 时阻断；集市发布继续暂缓。
+> **当前事实（2026-10-20）**：本地 `main` 为 v0.5.25（+7 提交未推送），608 项单测、类型/Svelte/i18n/meta/audit/build/smoke/loader 全绿（产物 gzip 228,549 字节 / 223.19 KB，<230KB CI 门禁安全预算，余量 7.0 KB）；第 304 波完成重要生活证件与关键到期项紧急置顶支持（`toggleReminderPin` / `isReminderPinned` / pinnedReminderIds 持久化），提醒列表与日历当日面板全面支持一键置顶与 📌 标记；i18n 双语增补至 1782 键。真实 Android WebView、独立窗口、兄弟插件、双端冲突和用户工作区验证待完成；`pnpm test:live` 缺少 `SIYUAN_TOKEN` 时阻断；集市发布继续暂缓。
 
 ## 第 224 波复审行动清单（当前唯一入口）
 
@@ -40,6 +40,7 @@
 - [x] 🟡 **重要证件与合同的个人资产全景时间轴**（2026-10-19 调研，Notion Family OS 印证）：✅ 第二百九十六波完成：成员卡聚合该成员名下的全部证件效期轴与合同履约状态，形成个人数字资产档案
 
 
+| 2026-10-20 | 主线 | 第三百零四波：**重要生活证件与关键到期项紧急置顶与日历面板置顶联动** | runtime.ts 新增 pinnedReminderIds 数组模型与 isReminderPinned/toggleReminderPinInRuntime 纯函数，actions.ts 提供 toggleReminderPin 调度器，打破备忘专属限制，支持将身份证、护照、重大合同等任意台账到期项紧急置顶至所属分组首位；提醒卡片标题接入 📌 徽章与更多菜单置顶切换，日历视图当日面板同步接入置顶动作；台账行删除自动联动清理对应置顶状态；+3 单测共 608 项单测全绿；i18n +1 键双语（1782 键）；产物 gzip 228,549 字节（<230KB 预算，余量 7.0 KB）；门禁全绿 |
 | 2026-10-20 | 主线 | 第三百零三波：**重要凭据与合同附件（attachments）离线 Markdown 归档清单导出** | core/archive.ts 新增 buildArchiveManifest 与 formatArchiveManifestMarkdown 纯函数，聚合证件/合同/实物资产等模块中绑定的思源本地资源附件（mAsset），按成员与模块组织层级，生成离线可读的结构化 Markdown 归档索引文件；台账更多操作工具栏接入「导出附件归档清单 (.md)」，支持全量附件扫描、访客模式自动脱敏及浏览器就地下载；+5 单测共 605 项单测全绿；i18n +5 键双语（1781 键）；产物 gzip 228,105 字节（<230KB 预算，余量 7.4 KB）；门禁全绿 |
 | 2026-10-20 | 主线 | 第三百零二波：**家庭应急物资储备自查与囤货台账联动闭环 + SCHEMA 样板收敛 + 门禁预算对齐** | core/emergency-kit.ts 新增 parseEmergencyKitItems、mapEmergencyKitToStockRows、formatEmergencyKitReportText 与 openEmergencyKitDialog，解析应急包清单并比对 stock 囤货台账，支持一键将未建档物资批量创建为 stock 行（category=emergency_st）；stock 台账工具栏接入「应急物资自查」对话框并支持复制自查报告与只读访客保护；SCHEMA 引入 cat/sta/tbl 工厂函数消除 38+ 处对象字面量冗余；CI 与 Release 的 gzip 硬门禁从 220KB 务实对齐至 230KB（235,520 字节）；+6 单测达 600 项单测里程碑（600 passed）；i18n +10 键双语（1776 键）；产物 gzip 226,914 字节（余量 8.6 KB）；门禁全绿 |
 | 2026-10-20 | 主线 | 第三百零一波：**思源块与自然语言智能速记 + Core 层 Any 类型全面收敛 + 弹窗无障碍与高对比加固** | core/block-capture.ts 新增 smartParseNoteContent/inferModuleFromText/extractDateFromText/extractAmountFromText，快速录入弹层支持输入自由自然语言智能推导模块/标题/金额/日期并一键预填；收敛 core 层全部 any 类型为 AvCellLike/unknown/泛型守卫；强制高对比（forced-colors/prefers-contrast）与 ≤480px 窄屏适配；+14 单测共 594 项单测全绿；i18n +3 键双语（1766 键）；门禁全绿 |

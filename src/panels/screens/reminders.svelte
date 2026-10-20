@@ -11,7 +11,8 @@
     import { relativeDue, weekdayKey, localDateKey } from "@/core/hub/rule";
     import { addDetachedRow, setCell } from "@/core/siyuan";
     import { provisionModule } from "@/core/provisioner";
-    import { toggleMemoPin } from "@/core/hub/actions";
+    import { toggleReminderPin } from "@/core/hub/actions";
+    import { isReminderPinned } from "@/core/hub/runtime";
     import Calendar from "@/panels/screens/calendar.svelte";
     import UiIcon from "@/ui/icon.svelte";
     import { moduleUiIcon } from "@/ui/icons";
@@ -614,10 +615,9 @@
         titleInput.focus();
     }
 
-    // 246 波（收件箱深化）：备忘置顶——置顶项在所属分组内排最前
+    // 246 波（收件箱深化）& 304 波（重要提醒与证件紧急置顶）：置顶项在所属分组内排最前
     function isPinned(r: Reminder): boolean {
-        const id = r.id.startsWith("adhoc::") ? r.id.slice("adhoc::".length) : r.id;
-        return (plugin.runtime?.pinnedMemoIds ?? []).includes(id);
+        return isReminderPinned(plugin.runtime, r);
     }
     function pinnedFirst(items: Reminder[]): Reminder[] {
         return [...items].sort((a, b) => Number(isPinned(b)) - Number(isPinned(a)));
@@ -878,6 +878,11 @@
         <div class="lv-rem-ic" aria-hidden="true"><UiIcon name={moduleUiIcon(r.moduleId)} size={18} /></div>
         <div class="lv-rem-t" title={(r.autoRenew ? `${t("hub.autoRenew")} · ` : "") + r.dueDate}>
             <b>
+                {#if isPinned(r)}
+                    <span class="lv-plan-badge is-planned-now" style="background:var(--lv-accent);color:#fff;margin-right:4px;padding:1px 6px" title={t("hub.pinned")}>
+                        📌 {t("hub.pinned")}
+                    </span>
+                {/if}
                 {r.title}{r.ruleKey === "reciprocate" ? ` · ${t("rule.reciprocate")}` : ""}
                 {#if plan.hasPlan}
                     <span class="lv-plan-badge" class:is-planned-now={plan.isPlannedNow} title={`${t("hub.planDateLabel")}: ${plan.planDate}`}>
@@ -914,13 +919,13 @@
                         <button class="b3-button b3-button--text" disabled={batchBusy} title={t("act.locate")} onclick={() => plugin.showTabDocs(plugin.settings.dbRefs[r.moduleId].docId)}>{t("act.locate")}</button>
                     {/if}
                     <button class="b3-button b3-button--text" disabled={batchBusy || reminderBusy.has(r.id)} onclick={() => schedulePlanDialog(r)}>{plan.hasPlan ? t("hub.editPlanDate") : t("hub.setPlanDate")}</button>
+                    <!-- 304 波：重要证件与到期项紧急置顶（置顶项组内排最前） -->
+                    <button class="b3-button b3-button--text" title={isPinned(r) ? t("act.unpin") : t("act.pin")}
+                        disabled={batchBusy || reminderBusy.has(r.id)} aria-busy={reminderBusy.has(r.id)}
+                        onclick={() => void runReminderAction(async () => { await toggleReminderPin(plugin, r.id); await plugin.refreshHub(); }, r.id)}>{reminderBusy.has(r.id) ? t("ledger.saving") : (isPinned(r) ? t("act.unpin") : t("act.pin"))}</button>
                     <button class="b3-button b3-button--text" aria-haspopup="menu" disabled={batchBusy || reminderBusy.has(r.id)} aria-busy={reminderBusy.has(r.id)} onclick={(e) => snoozeMenu(r, e)}>{reminderBusy.has(r.id) ? t("ledger.saving") : `${t("act.snooze")} ▾`}</button>
                     <button class="b3-button b3-button--text" disabled={batchBusy || reminderBusy.has(r.id)} aria-busy={reminderBusy.has(r.id)} onclick={() => void runReminderAction(() => plugin.mute(r.id), r.id)}>{reminderBusy.has(r.id) ? t("ledger.saving") : t("act.mute")}</button>
                     {#if r.moduleId === "adhoc"}
-                        <!-- 246 波（收件箱深化）：备忘置顶（置顶项组内排最前） -->
-                        <button class="b3-button b3-button--text" title={isPinned(r) ? t("act.unpin") : t("act.pin")}
-                            disabled={batchBusy || reminderBusy.has(r.id)} aria-busy={reminderBusy.has(r.id)}
-                            onclick={() => void runReminderAction(async () => { await toggleMemoPin(plugin, r.id); await plugin.refreshHub(); }, r.id)}>{reminderBusy.has(r.id) ? t("ledger.saving") : (isPinned(r) ? t("act.unpin") : t("act.pin"))}</button>
                         <!-- 246 波（收件箱深化）：备忘编辑（标题/到期日） -->
                         <button class="b3-button b3-button--text" disabled={batchBusy || reminderBusy.has(r.id)} onclick={() => editMemoDialog(r)}>{t("memo.edit")}</button>
                         <!-- H03：备忘的显式删除（唯一物理删除路径；未处理项不自动清理） -->
@@ -1115,6 +1120,8 @@
     <Calendar items={filtered} {t} {version} initialMode={plugin.runtime.hubCalMode}
         onModeChange={(m: "month" | "week") => { plugin.runtime.hubCalMode = m; saveRuntime(plugin, plugin.runtime).catch((e) => showMessage(t("hub.preferenceSaveFailed").replace("${msg}", e instanceof Error ? e.message : String(e)), 5000, "error")); }}
         onComplete={(r: Reminder) => runReminderAction(() => plugin.complete(r), `calendar:${r.id}`)}
+        onTogglePin={(r: Reminder) => runReminderAction(async () => { await toggleReminderPin(plugin, r.id); await plugin.refreshHub(); }, `calendar:pin:${r.id}`)}
+        isPinnedFn={(r: Reminder) => isPinned(r)}
         onAddMemo={(title: string, due: string) => plugin.addMemo(title, due)}
         onConvert={(r: Reminder) => toLedgerDialog(r)} />
 {:else if filtered.length === 0}

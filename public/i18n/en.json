@@ -405,6 +405,7 @@
     "act.snooze7": "Snooze 7d",
     "act.pin": "Pin",
     "act.unpin": "Unpin",
+    "hub.pinned": "Pinned",
     "act.mute": "Mute",
     "act.renew": "Renew…",
     "act.renewPrompt": "New expiry (YYYY-MM-DD)",
