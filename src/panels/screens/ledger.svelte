@@ -27,8 +27,6 @@
     import { rowLogActivityId, type ActivityTarget } from "@/core/activity";
     /** 312 波：抽屉内子记录行样式（原 4 处重复字面量收敛） */
     const substRowCss = "padding:2px 0;font-size:12.5px";
-    import { openStoreModeDialog } from "@/core/store-dialog";
-    import { addChoreRotationSectionImpl } from "@/core/chore-dialog";
     import { onDestroy } from "svelte";
     import UiIcon from "@/ui/icon.svelte";
     import { uiIcon } from "@/ui/icons";
@@ -1617,10 +1615,24 @@
         }
     }
 
-    // 312 波（G3）：扫货模式（实现在 core/store-dialog.ts，页面只做调度）
-    function openStoreModeModal() {
+    // 313 波（G4）：存放位置全局检索（动态加载 core/location-dialog.ts 减轻初始 bundle）
+    async function openLocationIndexModal() {
+        const { openLocationIndexDialog } = await import("@/core/location-dialog");
+        return openLocationIndexDialog({
+            t,
+            plugin,
+            DialogCls: Dialog,
+            showMessageFn: showMessage,
+            renderLedgerAllFn: renderLedgerAll,
+            cellTextFn: cellText,
+        });
+    }
+
+    // 312 波（G3）：扫货模式（动态加载 core/store-dialog.ts）
+    async function openStoreModeModal() {
         const sourceRef = ref;
         if (!sourceRef?.avId || !sourceRef.columns?.name) return;
+        const { openStoreModeDialog } = await import("@/core/store-dialog");
         return openStoreModeDialog({
             t,
             DialogCls: Dialog,
@@ -3763,7 +3775,8 @@
                     format: (e) => `${e.date} · ${formatAmount(Number(e.price))}${e.channel ? ` · ${e.channel}` : ""}`,
                 });
             } else if (active === "chores") {
-                // 310 波（G1）：家务轮换与完成留痕（实现与 DOM 均在 core/chore-dialog.ts）
+                // 310/313 波：家务轮换（动态加载 core/chore-dialog.ts）
+                const { addChoreRotationSectionImpl } = await import("@/core/chore-dialog");
                 await addChoreRotationSectionImpl({ t, plugin, avId: ref!.avId!, rowId: row.itemID, body, showMessageFn: showMessage });
             } else if (active === "schooling") {
                 await addRowLogSection({
@@ -5311,6 +5324,7 @@
                 {#if active === "stock"}<button class="b3-button b3-button--outline" onclick={openShoppingList}>{t("ledger.shoppingList")}</button>{/if}
                 {#if active === "stock"}<button class="b3-button b3-button--outline" onclick={openEmergencyKitModal}>{t("ledger.emergencyKit")}</button>{/if}
                 {#if active === "shopping"}<button class="b3-button b3-button--outline" onclick={openStoreModeModal}>{t("ledger.storeMode")}</button>{/if}
+                <button class="b3-button b3-button--outline" onclick={openLocationIndexModal}>{t("ledger.locSearch")}</button>
                 {#if ref?.columns?.amount}<button class="b3-button b3-button--outline" onclick={openExpenseTrendModal}>{t("ledger.expenseTrend")}</button>{/if}
                 {#if active === "favors"}<button class="b3-button b3-button--outline" onclick={openFavorsReport}>{t("ledger.favorsReport")}</button>{/if}
                 {#if active === "bookmarks"}<button class="b3-button b3-button--outline" onclick={openBookmarksCheck}>{t("ledger.checkBookmarks")}</button>{/if}
