@@ -90,6 +90,11 @@ export interface ReminderRuleSpec {
     offsetDays?: number;
     /** after：仅当该 select 列值等于 equals 时才派生（favors 只对 direction=in 回礼） */
     onlyIf?: { field: string; equals: string };
+    /**
+     * 多段提醒割点（311 波，G2）：如 [60, 30, 7]——到达每个割点各重现一次（取最近一个已过割点）。
+     * 缺省时行为完全不变（回退 leadDays 单一窗口），向后兼容旧 schema。
+     */
+    leadStages?: number[];
 }
 
 /** 紧急级别：🔴 已逾期 / 🟠 7 天内 / 🟡 提前量内 / ⚪ 更远 */

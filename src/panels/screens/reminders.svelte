@@ -13,6 +13,7 @@
     import { provisionModule } from "@/core/provisioner";
     import { toggleReminderPin } from "@/core/hub/actions";
     import { isReminderPinned } from "@/core/hub/runtime";
+    import { stageBadgeLabel, stageBadge, stagesOf } from "@/core/reminder-stage";
     import Calendar from "@/panels/screens/calendar.svelte";
     import UiIcon from "@/ui/icon.svelte";
     import { moduleUiIcon } from "@/ui/icons";
@@ -615,6 +616,29 @@
         titleInput.focus();
     }
 
+    // 311 波（G2）：多段提醒割点——从 schema 规则查得 leadStages 后算出当前段位
+    const schemaRuleCache = new Map<string, { leadStages?: number[]; leadDays: number }>();
+    function ruleOf(r: Reminder): { leadStages?: number[]; leadDays: number } {
+        const key = `${r.moduleId}.${r.ruleKey}`;
+        const hit = schemaRuleCache.get(key);
+        if (hit) return hit;
+        const spec = (plugin.schemaCatalog?.[r.moduleId]?.reminders ?? []).find((x: any) => x.key === r.ruleKey);
+        const rule = { leadStages: spec?.leadStages, leadDays: typeof spec?.leadDays === "number" ? spec.leadDays : 30 };
+        schemaRuleCache.set(key, rule);
+        return rule;
+    }
+    function stageOf(r: Reminder): { label: string; isUrgent: boolean; stages: number[] } | null {
+        const rule = ruleOf(r);
+        if (!rule.leadStages || rule.leadStages.length === 0) return null;
+        const label = stageBadgeLabel(r.daysLeft, rule, t);
+        if (!label) return null;
+        const badge = stageBadge(r.daysLeft, rule);
+        return { label, isUrgent: badge.isUrgentStage, stages: stagesOf(rule) };
+    }
+    function stageLabelOf(r: Reminder): string {
+        return stageOf(r)?.label ?? "";
+    }
+
     // 246 波（收件箱深化）& 304 波（重要提醒与证件紧急置顶）：置顶项在所属分组内排最前
     function isPinned(r: Reminder): boolean {
         return isReminderPinned(plugin.runtime, r);
@@ -935,6 +959,11 @@
                 {#if isPinned(r)}
                     <span class="lv-plan-badge is-planned-now" style="background:var(--lv-accent);color:#fff;margin-right:4px;padding:1px 6px" title={t("hub.pinned")}>
                         📌 {t("hub.pinned")}
+                    </span>
+                {/if}
+                {#if stageLabelOf(r)}
+                    <span class="lv-plan-badge" class:is-planned-now={stageOf(r)?.isUrgent} style="margin-right:4px;padding:1px 6px" title={t("hub.stageDesc").replace("${stages}", (stageOf(r)?.stages ?? []).join(" / "))}>
+                        ⏱ {stageLabelOf(r)}
                     </span>
                 {/if}
                 {r.title}{r.ruleKey === "reciprocate" ? ` · ${t("rule.reciprocate")}` : ""}

@@ -411,6 +411,8 @@
     "act.pin": "置顶",
     "act.unpin": "取消置顶",
     "hub.pinned": "已置顶",
+    "hub.stageBadge": "第${i}/${n}段",
+    "hub.stageDesc": "多段提醒：${stages} 天前各提醒一次",
     "act.mute": "忽略",
     "act.renew": "续期…",
     "act.renewPrompt": "新的到期日（YYYY-MM-DD）",

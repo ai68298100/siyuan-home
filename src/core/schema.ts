@@ -752,9 +752,10 @@ export const VEHICLES_SCHEMA: ModuleSchema = {
     activity: { dateField: "purchase_date", detailFields: ["plate", "brand_model", "energy_type", "mileage"] },
     reminders: [
         rem("expiry", "expiry", 30),
-        rem("inspection", "inspection_due", 30),
-        rem("insurance", "insurance_due", 30),
-        rem("vehicle_tax", "vehicle_tax_due", 30),
+        // 311 波（G2）：车检/保险/车船税等国家级年审事项设为 60/30/7 三段提醒
+        rem("inspection", "inspection_due", 60, "oneoff", { leadStages: [60, 30, 7] }),
+        rem("insurance", "insurance_due", 60, "oneoff", { leadStages: [60, 30, 7] }),
+        rem("vehicle_tax", "vehicle_tax_due", 60, "oneoff", { leadStages: [60, 30, 7] }),
         rem("battery", "battery_due", 30),
     ],
 };

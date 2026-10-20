@@ -411,6 +411,8 @@
     "act.pin": "Pin",
     "act.unpin": "Unpin",
     "hub.pinned": "Pinned",
+    "hub.stageBadge": "Stage ${i}/${n}",
+    "hub.stageDesc": "Staged reminder: one alert at each of ${stages} days before due",
     "act.mute": "Mute",
     "act.renew": "Renew…",
     "act.renewPrompt": "New expiry (YYYY-MM-DD)",
