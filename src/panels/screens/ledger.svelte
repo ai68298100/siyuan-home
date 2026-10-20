@@ -3778,6 +3778,10 @@
                 // 310/313 波：家务轮换（动态加载 core/chore-dialog.ts）
                 const { addChoreRotationSectionImpl } = await import("@/core/chore-dialog");
                 await addChoreRotationSectionImpl({ t, plugin, avId: ref!.avId!, rowId: row.itemID, body, showMessageFn: showMessage });
+            } else if (active === "health") {
+                // 314 波（G5）：生理指标（血压/血糖/心率）趋势与留痕
+                const { addVitalsSectionImpl } = await import("@/core/vitals-dialog");
+                await addVitalsSectionImpl({ t, plugin: plugin as any, avId: ref!.avId!, rowId: row.itemID, body, showMessageFn: showMessage });
             } else if (active === "schooling") {
                 await addRowLogSection({
                     title: t("ledger.transfers"), emptyText: t("ledger.noTransfers"), addLabel: t("ledger.valAdd"), kind: "transfers",
