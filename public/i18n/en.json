@@ -1779,5 +1779,10 @@
     "ledger.emergencyKitMissing": "Missing",
     "ledger.emergencyKitCopy": "Copy Audit Report",
     "ledger.emergencyKitImport": "Import Missing Items (${n})",
-    "ledger.emergencyKitImportSuccess": "Successfully imported ${n} emergency stock items!"
+    "ledger.emergencyKitImportSuccess": "Successfully imported ${n} emergency stock items!",
+    "ledger.exportArchive": "Export Attachment Manifest (.md)",
+    "ledger.exportArchiveTip": "Scan all records for attachments and certificates, generating an offline Markdown archive index",
+    "ledger.exportArchiveEmpty": "No attachments found in the current module records",
+    "ledger.exportArchiveNoAttCol": "The current module does not have an attachment column",
+    "ledger.exportArchiveSuccess": "Successfully exported manifest with ${n} attachments!"
 }

@@ -1779,5 +1779,10 @@
     "ledger.emergencyKitMissing": "待入库",
     "ledger.emergencyKitCopy": "复制自查报告",
     "ledger.emergencyKitImport": "一键建档缺口 (${n})",
-    "ledger.emergencyKitImportSuccess": "成功建档 ${n} 项应急储备物资！"
+    "ledger.emergencyKitImportSuccess": "成功建档 ${n} 项应急储备物资！",
+    "ledger.exportArchive": "导出附件归档清单 (.md)",
+    "ledger.exportArchiveTip": "扫描当前模块全部记录的附件与凭据（证件照、合同PDF等），生成离线 Markdown 归档索引",
+    "ledger.exportArchiveEmpty": "当前模块所有记录均未上传附件",
+    "ledger.exportArchiveNoAttCol": "当前模块不支持附件字段",
+    "ledger.exportArchiveSuccess": "成功导出含 ${n} 份附件的归档清单！"
 }

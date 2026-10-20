@@ -349,6 +349,67 @@
         void download();
     }
 
+    // Export Attachments & Certificates Archive Manifest (.md) (303波)
+    async function exportArchiveManifest() {
+        const sourceRef = ref;
+        const moduleId = active;
+        if (!sourceRef?.columns || filteredRows.length === 0 || exporting) return;
+        const attCol = sourceRef.columns.attachments;
+        if (!attCol) {
+            showMessage(t("ledger.exportArchiveNoAttCol"), 4000, "info");
+            return;
+        }
+
+        exporting = true;
+        try {
+            const all = await renderLedgerAll(sourceRef.avId!);
+            if (!all.complete) {
+                showMessage(t("ledger.loadIncomplete"), 5000, "error");
+                return;
+            }
+
+            const { buildArchiveManifest, formatArchiveManifestMarkdown } = await import("@/core/archive");
+            const memberMap = new Map((plugin.settings.members ?? []).map((m: any) => [m.avItemId, m.name]));
+
+            const records = all.rows.map((row) => {
+                const title = sourceRef.columns?.name ? cellText(row.cells[sourceRef.columns.name]) : "未命名记录";
+                const memId = sourceRef.columns?.member ? String(row.cells[sourceRef.columns.member]?.relation?.blockIDs?.[0] ?? "") : "";
+                const memberName = memId ? (memberMap.get(memId) ?? "") : "";
+                const attList = row.cells[attCol]?.mAsset ?? [];
+                return {
+                    id: row.itemID,
+                    module: moduleId,
+                    title,
+                    memberName,
+                    date: sourceRef.columns?.date ? cellText(row.cells[sourceRef.columns.date]) : undefined,
+                    expiry: sourceRef.columns?.expiry ? cellText(row.cells[sourceRef.columns.expiry]) : undefined,
+                    attachments: attList,
+                };
+            }).filter((r) => r.attachments.length > 0);
+
+            if (records.length === 0) {
+                showMessage(t("ledger.exportArchiveEmpty"), 4000, "info");
+                return;
+            }
+
+            const manifest = buildArchiveManifest(records, {
+                maskSensitive: Boolean(plugin.runtime?.guestModeActive),
+            });
+            const md = formatArchiveManifestMarkdown(manifest, t);
+            const blob = new Blob([md], { type: "text/markdown;charset=utf-8" });
+            const a = document.createElement("a");
+            a.href = URL.createObjectURL(blob);
+            a.download = `lv-archive-${moduleId}-${new Date().toISOString().slice(0, 10)}.md`;
+            a.click();
+            URL.revokeObjectURL(a.href);
+            showMessage(t("ledger.exportArchiveSuccess").replace("${n}", String(manifest.totalFiles)), 3500, "info");
+        } catch (e) {
+            showMessage(t("ledger.readFailed").replace("${msg}", e instanceof Error ? e.message : String(e)), 5000, "error");
+        } finally {
+            exporting = false;
+        }
+    }
+
     /** Show fuel and charging usage per vehicle without combining hybrid energy types. */
     async function openEnergyDashboard() {
         const sourceRef = ref;
@@ -5153,6 +5214,8 @@
             <div class="lv-ledger-more__menu">
                 <button class="b3-button b3-button--outline" title={t("ledger.exportCsvTip")}
                     disabled={filteredRows.length === 0 || exporting || printing} aria-busy={exporting} onclick={exportCsv}>{exporting ? t("ledger.saving") : t("ledger.exportCsv")}</button>
+                <button class="b3-button b3-button--outline" title={t("ledger.exportArchiveTip")}
+                    disabled={filteredRows.length === 0 || exporting || printing} aria-busy={exporting} onclick={exportArchiveManifest}>{t("ledger.exportArchive")}</button>
                 <button class="b3-button b3-button--outline" title={t("ledger.printLabels")}
                     disabled={filteredRows.length === 0 || printing || exporting} aria-busy={printing} onclick={printLabels}>{printing ? t("ledger.saving") : t("ledger.printLabels")}</button>
                 {#if active === "vehicles"}<button class="b3-button b3-button--outline" onclick={openEnergyDashboard}>{t("fuel.dashboardButton")}</button>{/if}
