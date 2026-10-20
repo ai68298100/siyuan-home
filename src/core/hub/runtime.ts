@@ -103,6 +103,8 @@ export interface HubRuntime {
     pinnedMemoIds?: string[];
     /** 置顶提醒 id 清单（304 波支持任意重要到期项置顶，如证件/合同/台账/备忘） */
     pinnedReminderIds?: string[];
+    /** 上期提醒摘要快照（306 波）：供周报生成逾期数量对比 */
+    digestHistory?: { overdue: number; at: string };
     /** 每日摘要去重：最后通知日期 */
     lastNotifiedDate?: string;
     /** 逾期即时提醒去重：最后提示日期（B3b） */
@@ -293,6 +295,10 @@ export async function loadRuntime(plugin: Plugin): Promise<HubRuntime> {
         memos: Array.isArray(data.memos) ? data.memos.map(normalizeMemo).filter((m): m is AdhocMemo => !!m) : [],
         pinnedMemoIds: Array.isArray(data.pinnedMemoIds) ? data.pinnedMemoIds.filter((id: unknown): id is string => typeof id === "string") : undefined,
         pinnedReminderIds: Array.isArray(data.pinnedReminderIds) ? data.pinnedReminderIds.filter((id: unknown): id is string => typeof id === "string") : undefined,
+        digestHistory:
+            data.digestHistory && typeof data.digestHistory === "object" && typeof data.digestHistory.overdue === "number" && typeof data.digestHistory.at === "string"
+                ? { overdue: data.digestHistory.overdue, at: data.digestHistory.at }
+                : undefined,
         namedViews: Array.isArray(data.namedViews) ? data.namedViews.map(normalizeNamedView).filter((v): v is ReminderNamedView => !!v) : [],
         activeNamedViewId: optionalString("activeNamedViewId"),
         lastNotifiedDate: optionalString("lastNotifiedDate"),

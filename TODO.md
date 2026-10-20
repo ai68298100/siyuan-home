@@ -1,5 +1,5 @@
 # 小驴管家（Lv Home）· 项目待办总清单
-> **当前事实（2026-10-20）**：本地 `main` 为 v0.5.25（+8 提交未推送），619 项单测、类型/Svelte/i18n/meta/audit/build/smoke/loader 全绿（产物 gzip 230,967 字节 / 225.55 KB，<230KB CI 门禁安全预算，余量 4.5 KB）；第 305 波完成家庭支出趋势与异常波动监测（`core/expense-trend.ts`：toMonthKey / calculateExpenseTrend / formatExpenseTrendReport），台账工具栏面向含金额字段的模块提供按月汇总、环比、中位数突增检测与年度预测分析对话框；i18n 双语增补至 1787 键。真实 Android WebView、独立窗口、兄弟插件、双端冲突和用户工作区验证待完成；`pnpm test:live` 缺少 `SIYUAN_TOKEN` 时阻断；集市发布继续暂缓。
+> **当前事实（2026-10-20）**：本地 `main` 为 v0.5.25（+9 提交未推送），72 个测试文件 / 629 项单测、类型/Svelte/i18n/meta/audit/build/smoke/loader 全绿（产物 gzip 231,157 字节 / 225.74 KB，<230KB CI 门禁安全预算，余量 4.3 KB）；第 306 波完成家庭提醒周期摘要（`core/reminder-digest.ts`：buildReminderDigest / formatDigestMarkdown）与提醒中枢一键生成可粘贴 Markdown 周报（含逾期环比、模块分布、最紧急 TopN）；runtime 新增 digestHistory 快照以支持跨期对比；i18n 双语增补至 1794 键。真实 Android WebView、独立窗口、兄弟插件、双端冲突和用户工作区验证待完成；`pnpm test:live` 缺少 `SIYUAN_TOKEN` 时阻断；集市发布继续暂缓。
 
 ## 第 224 波复审行动清单（当前唯一入口）
 
@@ -40,6 +40,7 @@
 - [x] 🟡 **重要证件与合同的个人资产全景时间轴**（2026-10-19 调研，Notion Family OS 印证）：✅ 第二百九十六波完成：成员卡聚合该成员名下的全部证件效期轴与合同履约状态，形成个人数字资产档案
 
 
+| 2026-10-20 | 主线 | 第三百零六波：**家庭提醒周期摘要（周报）生成与逾期环比对比** | core/reminder-digest.ts 新增 buildReminderDigest / formatDigestMarkdown 纯函数，按模块归集逾期/7天内/提醒窗口三级分布，输出可直接粘贴的 Markdown 周报（总览、最紧急 TopN、模块分布）；提醒中枢工具栏接入「生成提醒摘要」，支持一键复制并落盘 digestHistory 快照供下期计算逾期增减；同日修正本地时区日期进位导致的 rangeEnd 偏移；+10 单测共 629 项单测全绿；i18n +8 键双语（1794 键）；产物 gzip 231,157 字节（<230KB 预算，余量 4.3 KB）；门禁全绿 |
 | 2026-10-20 | 主线 | 第三百零五波：**家庭支出趋势与异常波动监测** | core/expense-trend.ts 新增 toMonthKey / calculateExpenseTrend / formatExpenseTrendReport 纯函数，按月聚合金额列并计算环比、均值、中位数、近三月推演年度预测，以中位数为基线识别超 50% 突增月份；台账工具栏对具备金额字段的模块接入「支出趋势」分析对话框，支持一键复制报表；+11 单测共 619 项单测全绿；i18n +5 键双语（1787 键）；产物 gzip 230,967 字节（<230KB 预算，余量 4.5 KB）；门禁全绿 |
 | 2026-10-20 | 主线 | 第三百零四波：**重要生活证件与关键到期项紧急置顶与日历面板置顶联动** | runtime.ts 新增 pinnedReminderIds 数组模型与 isReminderPinned/toggleReminderPinInRuntime 纯函数，actions.ts 提供 toggleReminderPin 调度器，打破备忘专属限制，支持将身份证、护照、重大合同等任意台账到期项紧急置顶至所属分组首位；提醒卡片标题接入 📌 徽章与更多菜单置顶切换，日历视图当日面板同步接入置顶动作；台账行删除自动联动清理对应置顶状态；+3 单测共 608 项单测全绿；i18n +1 键双语（1782 键）；产物 gzip 228,549 字节（<230KB 预算，余量 7.0 KB）；门禁全绿 |
 | 2026-10-20 | 主线 | 第三百零三波：**重要凭据与合同附件（attachments）离线 Markdown 归档清单导出** | core/archive.ts 新增 buildArchiveManifest 与 formatArchiveManifestMarkdown 纯函数，聚合证件/合同/实物资产等模块中绑定的思源本地资源附件（mAsset），按成员与模块组织层级，生成离线可读的结构化 Markdown 归档索引文件；台账更多操作工具栏接入「导出附件归档清单 (.md)」，支持全量附件扫描、访客模式自动脱敏及浏览器就地下载；+5 单测共 605 项单测全绿；i18n +5 键双语（1781 键）；产物 gzip 228,105 字节（<230KB 预算，余量 7.4 KB）；门禁全绿 |

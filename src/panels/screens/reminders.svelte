@@ -832,6 +832,60 @@
         void runReminderAction(() => plugin.toggleTodaySilent(), "today-silent");
     }
 
+    // 306 波：家庭提醒周报/月报摘要——把当前提醒快照汇总为可粘贴的 Markdown 文本
+    let digestBusy = $state(false);
+    async function openDigestDialog() {
+        if (digestBusy) return;
+        digestBusy = true;
+        try {
+            const { buildReminderDigest, formatDigestMarkdown } = await import("@/core/reminder-digest");
+            const input = filtered.map((r) => ({
+                id: r.id,
+                moduleId: r.moduleId,
+                title: r.title,
+                dueDate: r.dueDate,
+                daysLeft: r.daysLeft,
+                level: r.level,
+            }));
+            const history = plugin.runtime?.digestHistory;
+            const digest = buildReminderDigest(input, {
+                periodLabel: t("hub.digestThisWeek"),
+                previousOverdue: typeof history?.overdue === "number" ? history.overdue : null,
+            });
+            const markdown = formatDigestMarkdown(digest, (id) => t(`module.${id}`) !== `module.${id}` ? t(`module.${id}`) : id);
+
+            const dlg = new Dialog({
+                title: t("hub.digestTitle"),
+                content: `<div class="b3-dialog__content lv-dialog-scroll-body"><pre class="lv-caption" style="white-space:pre-wrap;line-height:1.7;margin:0"></pre></div>
+<div class="b3-dialog__action">
+  <button class="b3-button b3-button--cancel">${t("close")}</button>
+  <button class="b3-button" id="lv-digest-copy">${t("hub.digestCopy")}</button>
+</div>`,
+                width: "600px",
+            });
+
+            const pre = dlg.element.querySelector("pre");
+            if (pre) pre.textContent = markdown;
+            (dlg.element.querySelector(".b3-button--cancel") as HTMLButtonElement).onclick = () => dlg.destroy();
+            (dlg.element.querySelector("#lv-digest-copy") as HTMLButtonElement).onclick = async () => {
+                try {
+                    await navigator.clipboard.writeText(markdown);
+                    showMessage(t("overview.lifeIndexCopied"), 2500, "info");
+                } catch {
+                    showMessage(t("hub.digestCopyFailed"), 4000, "error");
+                }
+            };
+
+            // 记录本次快照，供下期生成对比差值
+            plugin.runtime.digestHistory = { overdue: digest.counts.overdue, at: digest.generatedAt };
+            await saveRuntime(plugin, plugin.runtime);
+        } catch (e) {
+            showMessage(t("hub.digestFailed").replace("${msg}", e instanceof Error ? e.message : String(e)), 5000, "error");
+        } finally {
+            digestBusy = false;
+        }
+    }
+
     // 260 波：首扫 loading 态（未知 ≠ "暂无事项"，33.3/13 §3.4）
     const firstScanPending = $derived.by(() => {
         void version;
@@ -1008,6 +1062,9 @@
                 <option value="7">{t("hub.due7")}</option>
                 <option value="30">{t("hub.due30")}</option>
             </select>
+            <!-- 306 波：生成本周期提醒摘要（可粘贴的 Markdown 周报） -->
+            <button class="b3-button b3-button--outline" title={t("hub.digestTip")} disabled={batchBusy || digestBusy || filtered.length === 0}
+                aria-busy={digestBusy} onclick={openDigestDialog}>{digestBusy ? t("ledger.saving") : t("hub.digest")}</button>
             <!-- 243 波（收件箱分诊）：一键切片到备忘项集合（转行/完成/延后集中处理） -->
             <button class="b3-button b3-button--outline" class:is-filtered={filterModule === "adhoc"} disabled={batchBusy}
                 aria-pressed={filterModule === "adhoc"} onclick={() => { filterModule = filterModule === "adhoc" ? undefined : "adhoc"; activeNamedViewId = undefined; persistFilter(); }}>

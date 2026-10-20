@@ -1789,5 +1789,12 @@
     "ledger.expenseTrend": "支出趋势",
     "ledger.expenseTrendTitle": "家庭支出趋势与异常波动分析",
     "ledger.expenseTrendNoCol": "当前模块缺少金额或日期字段，无法进行趋势分析",
-    "ledger.expenseTrendEmpty": "当前模块暂无有效的金额与日期记录"
+    "ledger.expenseTrendEmpty": "当前模块暂无有效的金额与日期记录",
+    "hub.digest": "生成提醒摘要",
+    "hub.digestTip": "将当前提醒汇总为可复制的 Markdown 周报，含逾期对比与模块分布",
+    "hub.digestTitle": "家庭提醒周期摘要",
+    "hub.digestThisWeek": "本周",
+    "hub.digestCopy": "复制摘要",
+    "hub.digestCopyFailed": "复制失败，请手动选择文本复制",
+    "hub.digestFailed": "生成摘要失败：${msg}"
 }

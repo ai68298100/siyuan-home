@@ -1789,5 +1789,12 @@
     "ledger.expenseTrend": "Expense Trend",
     "ledger.expenseTrendTitle": "Household Expense Trend & Spike Analysis",
     "ledger.expenseTrendNoCol": "This module lacks amount or date fields, trend analysis unavailable",
-    "ledger.expenseTrendEmpty": "No valid amount and date records in this module"
+    "ledger.expenseTrendEmpty": "No valid amount and date records in this module",
+    "hub.digest": "Weekly Digest",
+    "hub.digestTip": "Summarize current reminders into a copyable Markdown digest with overdue delta and module breakdown",
+    "hub.digestTitle": "Reminder Period Digest",
+    "hub.digestThisWeek": "This week",
+    "hub.digestCopy": "Copy digest",
+    "hub.digestCopyFailed": "Copy failed, please select the text manually",
+    "hub.digestFailed": "Failed to build digest: ${msg}"
 }
