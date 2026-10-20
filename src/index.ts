@@ -67,6 +67,8 @@ export default class LvHomePlugin extends Plugin {
     private topBarEl?: HTMLElement;
     /** 309 波：顶栏被宿主重建后的重挂守护 */
     private topBarObserver?: MutationObserver;
+    private isUnloading = false;
+    private topBarReviveTimer?: number;
     /** C6c 块菜单监听（onunload 精确解绑用） */
     private captureMenuHandler?: (...args: any[]) => void;
     /** PF06/18 组：他端台账变更（websocket）→ 节流补扫 [待实测] 事件名/频度以实例为准 */
@@ -177,6 +179,7 @@ export default class LvHomePlugin extends Plugin {
      * 309 波：顶栏图标存活守护。宿主会在主题切换/窗口重建/插件热重载时重建 #toolbar，
      * 把已注册的条目元素丢掉——表现为图标“突然消失”。这里用一次轻量 MutationObserver
      * 观察顶栏容器，一旦发现我们的按钮离开文档，就重新调用 addTopBar 登记（同插件内幂等）。
+     * 增加卸载守卫与 300ms 防抖，彻底避免在宿主卸载/销毁插件时与 DOM 清理发生瞬间抢挂与排布闪烁。
      * 只在桌面端生效；卸载时断开观察。
      */
     private ensureTopBarIconAlive(): void {
@@ -185,17 +188,25 @@ export default class LvHomePlugin extends Plugin {
         if (!toolbar) return;
         this.topBarObserver?.disconnect();
         const observer = new MutationObserver(() => {
+            if (this.isUnloading) return;
             if (this.topBarEl && this.topBarEl.isConnected) return;
             if (!document.getElementById("toolbar")) return;
-            try {
-                this.topBarEl = this.addTopBar({
-                    icon: "iconEmoji",
-                    title: String(this.i18n.butler ?? "Lv Home"),
-                    callback: () => this.showTab(),
-                });
-            } catch {
-                // 宿主尚未装配完成：留给下一次 DOM 变更重试
-            }
+            if (this.topBarReviveTimer !== undefined) window.clearTimeout(this.topBarReviveTimer);
+            this.topBarReviveTimer = window.setTimeout(() => {
+                this.topBarReviveTimer = undefined;
+                if (this.isUnloading) return;
+                if (this.topBarEl && this.topBarEl.isConnected) return;
+                if (!document.getElementById("toolbar")) return;
+                try {
+                    this.topBarEl = this.addTopBar({
+                        icon: "iconEmoji",
+                        title: String(this.i18n.butler ?? "Lv Home"),
+                        callback: () => this.showTab(),
+                    });
+                } catch {
+                    // 宿主尚未装配完成：留给下一次 DOM 变更重试
+                }
+            }, 300);
         });
         observer.observe(toolbar, { childList: true });
         this.topBarObserver = observer;
@@ -355,7 +366,21 @@ export default class LvHomePlugin extends Plugin {
         document.addEventListener("visibilitychange", this.visibilityHandler);
 
         // PF06/18 组：他端台账变更（websocket 主通道消息）→ 60 秒节流补扫（多端同步信号）
-        this.wsHandler = () => {
+        // 过滤自身存储写入产生的广播回环事件，杜绝"写盘→收到ws→补扫→再写盘"的自激死循环
+        this.wsHandler = (event?: any) => {
+            const detail = event?.detail;
+            if (detail && typeof detail === "object") {
+                const cmd = detail.cmd;
+                if (cmd === "setAppStorage" || cmd === "push_reload") return;
+                if (detail.data) {
+                    const dataStr = typeof detail.data === "string" ? detail.data : JSON.stringify(detail.data);
+                    if (dataStr.includes("siyuan-home") || dataStr.includes("hub-runtime") || dataStr.includes("petal")) {
+                        return;
+                    }
+                }
+                const isRelevant = cmd === "databaseIndexCommit" || cmd === "transactions" || cmd === "syncing" || cmd === "synced" || cmd === "dataChanges";
+                if (!isRelevant) return;
+            }
             if (Date.now() - this.lastWsRescan < LvHomePlugin.WS_RESCAN_MIN_MS) return;
             this.lastWsRescan = Date.now();
             this.refreshHub().catch((e) => console.warn("[siyuan-home] ws rescan failed:", e));
@@ -951,6 +976,11 @@ export default class LvHomePlugin extends Plugin {
     }
 
     onunload() {
+        this.isUnloading = true;
+        if (this.topBarReviveTimer !== undefined) {
+            window.clearTimeout(this.topBarReviveTimer);
+            this.topBarReviveTimer = undefined;
+        }
         // 309 波：断开顶栏复活观察器，避免卸载后重建条目
         if (this.topBarObserver) {
             this.topBarObserver.disconnect();

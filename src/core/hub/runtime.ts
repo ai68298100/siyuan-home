@@ -328,7 +328,76 @@ export async function loadRuntime(plugin: Plugin): Promise<HubRuntime> {
             .map((item) => ({ itemId: item.itemId as string, name: item.name as string, score: item.score as number })) : [];
         merged.lastCheckinSummary = { items, windowDays: data.lastCheckinSummary.windowDays, pulledAt: data.lastCheckinSummary.pulledAt };
     } else merged.lastCheckinSummary = undefined;
+    lastSerializedByPlugin.set(plugin, semanticRuntimeFingerprint(merged));
     return merged;
+}
+
+/**
+ * 提取 HubRuntime 的业务实质指纹（PF09）：
+ * 剥离纯易变时间戳（scannedAt、byModule[m].at、pulledAt、generatedAt 等），
+ * 确保在台账数据与用户操作无实质变动时指纹严格一致，杜绝后台扫描引起频繁写盘及内核重载抖动。
+ */
+export function semanticRuntimeFingerprint(rt: HubRuntime): string {
+    const byModuleFiltered = rt.cache?.byModule
+        ? Object.fromEntries(
+            Object.entries(rt.cache.byModule).map(([k, v]) => [
+                k,
+                { reminders: v.reminders, rowCount: v.rowCount, memberCounts: v.memberCounts },
+            ])
+        )
+        : undefined;
+
+    return JSON.stringify({
+        schemaVersion: rt.schemaVersion,
+        filterMemberId: rt.filterMemberId,
+        hubFilter: rt.hubFilter,
+        hubMemberId: rt.hubMemberId,
+        hubModuleId: rt.hubModuleId,
+        hubDueWithin: rt.hubDueWithin,
+        hubViewMode: rt.hubViewMode,
+        hubCalMode: rt.hubCalMode,
+        hubQuickModule: rt.hubQuickModule,
+        ledgerSortKey: rt.ledgerSortKey,
+        ledgerSortAsc: rt.ledgerSortAsc,
+        namedViews: rt.namedViews,
+        activeNamedViewId: rt.activeNamedViewId,
+        cache: rt.cache ? {
+            reminders: rt.cache.reminders,
+            counts: rt.cache.counts,
+            errors: rt.cache.errors,
+            derived: rt.cache.derived,
+            byModule: byModuleFiltered,
+        } : undefined,
+        snoozed: rt.snoozed,
+        planDates: rt.planDates,
+        muted: rt.muted,
+        handledYear: rt.handledYear,
+        handledUntil: rt.handledUntil,
+        handled: rt.handled,
+        renewHistory: rt.renewHistory,
+        memos: rt.memos,
+        pinnedMemoIds: rt.pinnedMemoIds,
+        pinnedReminderIds: rt.pinnedReminderIds,
+        digestHistory: rt.digestHistory,
+        lastNotifiedDate: rt.lastNotifiedDate,
+        lastOverdueAlertDate: rt.lastOverdueAlertDate,
+        lastWeeklyDigest: rt.lastWeeklyDigest,
+        todaySilent: rt.todaySilent,
+        lastExamStats: rt.lastExamStats ? {
+            streak: rt.lastExamStats.streak,
+            accuracy: rt.lastExamStats.accuracy,
+            attempts: rt.lastExamStats.attempts,
+        } : undefined,
+        lastCheckinSummary: rt.lastCheckinSummary ? {
+            items: rt.lastCheckinSummary.items,
+            windowDays: rt.lastCheckinSummary.windowDays,
+        } : undefined,
+        favorSyncs: rt.favorSyncs,
+        monthlyCompletions: rt.monthlyCompletions,
+        monthlyDueTotals: rt.monthlyDueTotals,
+        moduleHistory: rt.moduleHistory,
+        guestModeActive: rt.guestModeActive,
+    });
 }
 
 // A plugin instance owns a single storage namespace. Sharing this cache globally can
@@ -361,24 +430,24 @@ function cloneRuntime(rt: HubRuntime): HubRuntime {
 }
 
 export async function saveRuntime(plugin: Plugin, rt: HubRuntime): Promise<void> {
-    // PF09：序列化比对，无变化不落盘（筛选/动作频繁触发的场景减少全量写入）
+    // PF09：业务语义指纹比对，无实质变化不落盘（筛选/动作/后台扫描避免无意义全量写入）
     const snapshot = cloneRuntime(rt);
-    const json = JSON.stringify(snapshot);
-    return withRuntimeSaveLock(plugin, async () => persistRuntimeSnapshot(plugin, snapshot, json));
+    const fingerprint = semanticRuntimeFingerprint(snapshot);
+    return withRuntimeSaveLock(plugin, async () => persistRuntimeSnapshot(plugin, snapshot, fingerprint));
 }
 
 /** Persist while the caller already holds withRuntimeSaveLock. */
 export async function persistRuntimeUnderLock(plugin: Plugin, rt: HubRuntime): Promise<void> {
     const snapshot = cloneRuntime(rt);
-    await persistRuntimeSnapshot(plugin, snapshot, JSON.stringify(snapshot));
+    await persistRuntimeSnapshot(plugin, snapshot, semanticRuntimeFingerprint(snapshot));
 }
 
-async function persistRuntimeSnapshot(plugin: Plugin, snapshot: HubRuntime, json: string): Promise<void> {
-        // Re-check after an earlier queued write: it may already have stored
-        // this exact snapshot while this call was waiting.
-        if (lastSerializedByPlugin.get(plugin) === json) return;
-        await plugin.saveData(RUNTIME_NAME, snapshot);
-        lastSerializedByPlugin.set(plugin, json);
+async function persistRuntimeSnapshot(plugin: Plugin, snapshot: HubRuntime, fingerprint: string): Promise<void> {
+    // Re-check after an earlier queued write: it may already have stored
+    // this exact semantic state while this call was waiting.
+    if (lastSerializedByPlugin.get(plugin) === fingerprint) return;
+    await plugin.saveData(RUNTIME_NAME, snapshot);
+    lastSerializedByPlugin.set(plugin, fingerprint);
 }
 
 /** 已完成运行态记录的保留期（天）：过期后才可被 purgeHandled 清除 */
