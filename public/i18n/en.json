@@ -1843,5 +1843,19 @@
     "ledger.wasteTitle": "Household Waste & Recycling Schedule",
     "ledger.wasteIntro": "Automatic forecast of pickup days for kitchen, residual, recyclable, and hazardous waste over the next two weeks.",
     "ledger.wasteToday": "Pickup today",
-    "ledger.wasteTomorrow": "Pickup tomorrow"
+    "ledger.wasteTomorrow": "Pickup tomorrow",
+    "ledger.chorePoints": "Points",
+    "ledger.chorePointsTip": "Reward points earned upon completion (optional)",
+    "ledger.rewardsSettle": "🌟 Rewards Ledger",
+    "ledger.rewardsTitle": "Household Chores Rewards & Allowance",
+    "ledger.rewardsUnsettledAll": "Unsettled Points",
+    "ledger.rewardsPointsUnit": "pts",
+    "ledger.rewardsTotalEarned": "Total earned",
+    "ledger.rewardsSettleBtn": "Settle to Allowance",
+    "ledger.rewardsEmpty": "No chores reward points logged yet. Record points when completing chores to redeem allowance here.",
+    "ledger.rewardsChoresPending": "Pending chores",
+    "ledger.rewardsAllSettled": "All settled",
+    "ledger.rewardsAllowanceMissing": "Allowance ledger not provisioned, cannot create settlement record",
+    "ledger.rewardsSettleSuccess": "Successfully settled rewards and created allowance records for ${n} member(s)!",
+    "ledger.choresNotProvisioned": "Chores ledger not provisioned"
 }

@@ -19,6 +19,10 @@ export interface ChoreCompletion {
     /** 录入时刻 ISO（排序兜底，同日多次按此定序） */
     at?: string;
     note?: string;
+    /** 317 波（G8）：本次完成获得的激励积分数 */
+    points?: number;
+    /** 是否已结算转入零花钱账本 */
+    settled?: boolean;
 }
 
 export interface ChoreAssignee {
@@ -125,6 +129,8 @@ export function recordCompletion(
         memberId: entry.memberId,
         at: entry.at ?? new Date().toISOString(),
         ...(entry.note ? { note: entry.note } : {}),
+        ...(Number.isFinite(entry.points) && (entry.points as number) > 0 ? { points: entry.points } : {}),
+        ...(entry.settled ? { settled: true } : {}),
     };
     return normalizeCompletions([...base, next]);
 }

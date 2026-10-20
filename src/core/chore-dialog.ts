@@ -56,11 +56,18 @@ export async function addChoreRotationSectionImpl(opts: ChoreSectionOptions): Pr
     noteInp.className = "b3-text-field";
     noteInp.placeholder = t("ledger.choreNote");
     noteInp.style.cssText = "font-size:12px;flex:1;min-width:90px";
+    const pointsInp = document.createElement("input");
+    pointsInp.type = "number";
+    pointsInp.className = "b3-text-field";
+    pointsInp.placeholder = t("ledger.chorePoints");
+    pointsInp.title = t("ledger.chorePointsTip");
+    pointsInp.style.cssText = "font-size:12px;width:60px";
+    pointsInp.min = "0";
     const addBtn = document.createElement("button");
     addBtn.className = "b3-button b3-button--outline";
     addBtn.style.cssText = "font-size:12px";
     addBtn.textContent = t("ledger.choreDone");
-    form.append(whoSel, dateInp, noteInp, addBtn);
+    form.append(whoSel, dateInp, noteInp, pointsInp, addBtn);
     body.appendChild(form);
 
     let logs: rl.RowLogs = {};
@@ -97,7 +104,8 @@ export async function addChoreRotationSectionImpl(opts: ChoreSectionOptions): Pr
             const line = document.createElement("div");
             line.style.cssText = "display:flex;gap:6px;align-items:center;font-size:12.5px";
             const txt = document.createElement("span");
-            txt.textContent = `${e.date} · ${e.memberName}${e.note ? ` —— ${e.note}` : ""}`;
+            const ptsTag = e.points ? ` <span class="lv-badge green">+${e.points}分</span>` : "";
+            txt.innerHTML = `${e.date} · ${e.memberName}${ptsTag}${e.note ? ` —— ${e.note}` : ""}`;
             const del = document.createElement("button");
             del.className = "b3-button b3-button--text";
             del.style.cssText = "padding:0 4px;font-size:12px";
@@ -123,15 +131,18 @@ export async function addChoreRotationSectionImpl(opts: ChoreSectionOptions): Pr
             showMessageFn(t("ledger.logInvalid"), 3000, "error");
             return;
         }
+        const pts = Number(pointsInp.value);
         addBtn.disabled = true;
         try {
             logs = await rl.updateRowLogs(plugin as never, (cur) => rl.appendEntry(cur, avId, rowId, "chexecs", {
                 date: dateInp.value,
                 memberId: whoSel.value || undefined,
                 note: noteInp.value.trim() || undefined,
+                ...(Number.isFinite(pts) && pts > 0 ? { points: pts } : {}),
                 at: new Date().toISOString(),
             }));
             noteInp.value = "";
+            pointsInp.value = "";
             render();
         } catch (err) {
             showMessageFn(t("ledger.logSavedRefreshFailed").replace("${msg}", err instanceof Error ? err.message : String(err)), 5000, "error");

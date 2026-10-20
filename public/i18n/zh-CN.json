@@ -1843,5 +1843,19 @@
     "ledger.wasteTitle": "家庭垃圾分类与清运日程",
     "ledger.wasteIntro": "按市政分类指引自动推算未来两周清运节点（厨余/其他/可回收/有害垃圾）。",
     "ledger.wasteToday": "今天收运",
-    "ledger.wasteTomorrow": "明天收运"
+    "ledger.wasteTomorrow": "明天收运",
+    "ledger.chorePoints": "积分",
+    "ledger.chorePointsTip": "完成后可获得的劳动激励积分（可选）",
+    "ledger.rewardsSettle": "🌟 积分结算",
+    "ledger.rewardsTitle": "家庭劳动积分与零花钱结算",
+    "ledger.rewardsUnsettledAll": "待结算总积分",
+    "ledger.rewardsPointsUnit": "分",
+    "ledger.rewardsTotalEarned": "累积总积分",
+    "ledger.rewardsSettleBtn": "一键结算到零花钱",
+    "ledger.rewardsEmpty": "暂无家务积分记录。每次标记完成家务时登记积分，即可在此兑换零花钱。",
+    "ledger.rewardsChoresPending": "待结算家务",
+    "ledger.rewardsAllSettled": "已全额结算",
+    "ledger.rewardsAllowanceMissing": "未启用或未建库零花钱（allowance）台账，无法直接创建结算记录",
+    "ledger.rewardsSettleSuccess": "成功为 ${n} 位成员结算并创建零花钱记录！",
+    "ledger.choresNotProvisioned": "家务台账尚未建库"
 }
