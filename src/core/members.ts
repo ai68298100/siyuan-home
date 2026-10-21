@@ -8,17 +8,13 @@
 import type { Plugin } from "siyuan";
 import type { FamilyMember, HomeSettings, DbRef, MemberRowCreatePending } from "@/types";
 import { addDetachedRow, setCell, renderLedgerAll, RowIdentityPendingError } from "./siyuan";
-import { saveSettings } from "./settings";
+import { saveSettings, errText } from "./settings";
 import { selectCellValue } from "./avcell";
 
 export function colMsToLocalDate(ms?: number): string | undefined {
     if (!ms) return undefined;
     const d = new Date(ms);
     return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
-}
-
-function errText(e: unknown): string {
-    return e instanceof Error ? e.message : String(e);
 }
 
 /** Serialize member writes per plugin.  Settings and the members AV are a
