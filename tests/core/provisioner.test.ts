@@ -5,7 +5,7 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { setTransport, KernelError } from "@/core/siyuan";
 import {
-    provisionModule, ensureNotebook, bindExistingDoc, isDocMissingError, DEFAULT_NOTEBOOK_NAME, getProvisioningReport,
+    provisionModule, ensureNotebook, bindExistingDoc, discoverAndAdoptAllLedgers, isDocMissingError, DEFAULT_NOTEBOOK_NAME, getProvisioningReport,
     type ProvisionOptions,
 } from "@/core/provisioner";
 import type { HomeSettings, DbRef } from "@/types";
@@ -360,6 +360,25 @@ describe("provisionModule（D07/D08）", () => {
         expect(res.dbRef.avId).toBe(avId);
         expect(res.created).toBe(false);
         expect(settings.dbRefs.health).toBeDefined();
+    });
+
+    it("discoverAndAdoptAllLedgers 智能找回并接管老版本的历史台账", async () => {
+        const s = fakeKernel();
+        const docId = "20261021120000-doccerts";
+        const avId = "20261021120000-avcerts";
+        s.notebooks = [NB];
+        // 模拟历史版本文档：名为 /台账 · 证件档案（历史别名）
+        s.docs = [{ id: docId, hpath: "/台账 · 证件档案", box: NB_ID }];
+        s.avBlocks = [{ id: avId, root_id: docId, seed: "" }];
+        const settings: any = {
+            enabledModules: ["certs"],
+            dbRefs: {},
+        };
+        const catalog: any = { certs: schema };
+        const report = await discoverAndAdoptAllLedgers(settings, catalog);
+        expect(report.adoptedCount).toBe(1);
+        expect(settings.dbRefs.certs.docId).toBe(docId);
+        expect(settings.dbRefs.certs.avId).toBe(avId);
     });
 });
 

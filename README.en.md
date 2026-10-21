@@ -39,27 +39,24 @@ Certificates expire, medicine expires, insurance needs renewal, subscriptions au
 
 Image OCR uses the engine configured in SiYuan Settings → OCR. It runs only when requested and does not require automatic OCR to be enabled. AI OCR asks before each run because the image is sent to the selected AI service. Results are saved to SiYuan OCR text and included in search; re-running replaces the previous result. Encrypted notebook images and PDFs are not supported, and OCR text is never written into ledger fields automatically.
 
-## 🆕 What's new in v0.5.29
+## 🆕 What's new in v0.5.30
 
-This release completely restructures the mental model of Quick Capture, cleanly separating one-time asset registration from high-frequency daily event logs (refueling, blood pressure, grocery to-buy), and delivers Global Life Spotlight search (Ctrl+K), one-click shortages into shopping ledger, and custom notebook binding:
+This release completely re-engineers the ledger provisioning pipeline to eliminate Issue #45, fixes notebook priority inversion with guaranteed activation, removes fragile -409 duplicate conflicts, and delivers the automated legacy ledger adoption engine (`discoverAndAdoptAllLedgers`):
 
-- **Refactored (Quick Capture Dual-Mode Routing)**: Header segmented control provides `[⚡ Quick Event]` vs `[🗂️ Ledger Record]`.
-- **Added (High-Frequency Daily Event Streamline)**: Log fuel/charge directly against existing vehicles (`fuelings`/`chargings`), log blood pressure/glucose against family members (`vitals`), and add to-buy items/notes with one tap.
-- **Added (Global Life Spotlight Search / Ctrl+K)**: Top bar 🔍 search button and `Ctrl+K` shortcut for instant cross-module fuzzy search across names, locations, categories, members, and notes with smart scoring.
-- **Added (Shortage Items Direct to Shopping Ledger)**: One-click batch export of shortage medicines and stock items into the `shopping` ledger.
-- **Added (Bind Existing SiYuan Documents as Ledgers)**: Paste any SiYuan block/doc link or ID to auto-bind as module ledger with auto AttributeView insertion.
-- **Added (Target Notebook Selector)**: Choose any open notebook in Settings as the default ledger notebook.
-- **Improved (Smart Auto-Fill & Sticky Memory)**: Date defaults to today (`YYYY-MM-DD`), quantity defaults to `1`, and sticky memory retains last used member, location, and category per module.
-- **Validation**: 89 test suites, **786 unit tests passing**, TypeScript, Svelte, i18n (1943 keys), metadata, and package smoke all green.
-## 📦 Install (v0.5.29)
+- **Fixed (Core Provisioning Pipeline & Issue #45)**: Fixed notebook selection priority to guarantee that user-specified target notebooks (`targetNotebookId`) always take top precedence. Forced `openNotebook` activation to prevent kernel write failures in closed notebooks.
+- **Fixed (Eliminated -409 Document Abort)**: `findLedgerDoc` now gracefully picks the best existing ledger document (preferring docs with valid AttributeViews and newest update times) instead of throwing a hard -409 failure.
+- **Added (Legacy Ledger Adoption Engine)**: Built-in 31-module alias dictionary (`MODULE_TITLE_ALIASES`) automatically sniffs, adopts, and upgrades existing documents created by earlier versions on startup, preventing duplicate generation and failure loops.
+- **Improved (Diagnostics & Transparent Feedback)**: Added "🔍 Auto-Adopt History Ledgers" one-click button in Settings with clear feedback reports.
+- **Validation**: 89 test suites, **787 unit tests passing**, TypeScript, Svelte, i18n (1946 keys), metadata, and package smoke all green.
+## 📦 Install (v0.5.30)
 
 1. Download `package.zip` from [Releases](https://github.com/ai68298100/siyuan-home/releases/latest)
 2. SiYuan → Settings → Marketplace → Download → **Import** the zip
 3. Enable the plugin → complete the 2-step onboarding (household → module picks and provisioning)
 4. Press `Ctrl+Alt+H` anytime to open the hub
 
-> **Validation status:** core data paths have automated tests and isolated-kernel coverage. The v0.5.29 GitHub Release is available; Android WebView behavior remains host-specific validation. `icon.png` and `preview.png` were redesigned for v0.3.13 (brand-gradient tile + geometric mark; dark overview with sample data).
-> **Version note:** the tagged v0.5.29 package is the current GitHub release; local quality checks report 786 unit tests.
+> **Validation status:** core data paths have automated tests and isolated-kernel coverage. The v0.5.30 GitHub Release is available; Android WebView behavior remains host-specific validation. `icon.png` and `preview.png` were redesigned for v0.3.13 (brand-gradient tile + geometric mark; dark overview with sample data).
+> **Version note:** the tagged v0.5.30 package is the current GitHub release; local quality checks report 787 unit tests.
 >
 > Family sharing depends on SiYuan's collaboration, permissions, sync and conflict behavior. Test with non-sensitive data before sharing; this plugin does not provide a separate permission system.
 >
@@ -117,7 +114,8 @@ The v0.5.1 release is available on GitHub, with static isolated-kernel gates and
 
 | Phase | Content |
 |---|---|
-| ✅ v0.5.29 (current) | Quick capture dual-mode routing (events vs ledger), Spotlight search (Ctrl+K), shortage to shopping ledger, bind existing docs |
+| ✅ v0.5.30 (current) | Re-engineer provisioning pipeline (Issue #45 fix), guaranteed notebook activation, legacy ledger auto-adoption engine |
+| v0.5.29 | Quick capture dual-mode routing (events vs ledger), Spotlight search (Ctrl+K), shortage to shopping ledger, bind existing docs |
 | v0.5.28 | Fix Issue #39 settings save retry failure, default blank ledgers, top bar avatar alignment, quick templates, and batch management |
 | 🔜 Next | Task workbench, evidence center, inbox, health recovery |
 | 🔭 Later | Family collaboration, template packs, yearly family report, AI capabilities |
@@ -136,7 +134,7 @@ pnpm run dev      # dev (app + kernel watch)
 pnpm run build    # dist/ + package.zip
 pnpm run check    # 5-layer gate (types + svelte + i18n + meta + audit)
 pnpm run smoke    # release package and single-file loader smoke checks
-pnpm test         # unit tests (786)
+pnpm test         # unit tests (787)
 ```
 
 - Setup & conventions: [CONTRIBUTING.md](./CONTRIBUTING.md)

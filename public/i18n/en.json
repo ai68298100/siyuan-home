@@ -1946,5 +1946,8 @@
     "capture.pulse": "Pulse (bpm)",
     "capture.glucoseVal": "Glucose (mmol/L)",
     "capture.fasting": "Fasting",
-    "capture.postprandial": "2h Postprandial"
+    "capture.postprandial": "2h Postprandial",
+    "diag.adoptHistory": "🔍 Auto-Adopt History Ledgers",
+    "diag.adoptHistoryDone": "Successfully adopted ${n} existing ledgers: ${modules}!",
+    "diag.adoptHistoryNone": "No orphaned history ledgers found; mappings are up to date."
 }
