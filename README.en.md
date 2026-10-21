@@ -39,22 +39,23 @@ Certificates expire, medicine expires, insurance needs renewal, subscriptions au
 
 Image OCR uses the engine configured in SiYuan Settings → OCR. It runs only when requested and does not require automatic OCR to be enabled. AI OCR asks before each run because the image is sent to the selected AI service. Results are saved to SiYuan OCR text and included in search; re-running replaces the previous result. Encrypted notebook images and PDFs are not supported, and OCR text is never written into ledger fields automatically.
 
-## 🆕 What's new in v0.5.32
+## 🆕 What's new in v0.5.33
 
-This release fixes an obstruction issue where confirmation dialogs in quick capture appeared in the lower left corner and were obscured by the sheet, and globally elevates Dialog z-index with native in-sheet confirmation:
+This release completely eliminates repeated welcome messages, prevents onboarding regressions, and auto-heals onboarding status for existing users:
 
-- **Fixed (Quick Capture In-Sheet Confirmation & Obscured Dialog)**: Replaced external Dialog confirm with a centered in-sheet confirmation overlay (`.lv-sheet-confirm-mask`), completely eliminating off-center placement and obstruction by the capture sheet.
-- **Improved (Global Dialog Z-Index Elevation)**: Elevated native `.b3-dialog` z-index to 1000 globally to guarantee all system dialogs always render on top of all drawers and modals.
-- **Validation**: 89 test suites, **788 unit tests passing**, TypeScript, Svelte, i18n (1946 keys), metadata, and package smoke all green.
-## 📦 Install (v0.5.32)
+- **Improved (Welcome Toast De-duplication & Anti-Disturbance)**: Welcome notification only fires on pristine fresh installs (0 members, 0 ledgers) at most once per session, preventing repeated popups during window reloads.
+- **Improved (Auto-Heal Onboarding Status for Existing Users)**: Existing users with members, household configs, or provisioned ledgers are automatically healed to `onboarded: true`.
+- **Improved (Early Onboarding Persistence)**: Onboarding completion state is eagerly persisted to disk upon finish/skip, preventing state regression due to background network latency.
+- **Validation**: 89 test suites, **789 unit tests passing**, TypeScript, Svelte, i18n (1946 keys), metadata, and package smoke all green.
+## 📦 Install (v0.5.33)
 
 1. Download `package.zip` from [Releases](https://github.com/ai68298100/siyuan-home/releases/latest)
 2. SiYuan → Settings → Marketplace → Download → **Import** the zip
 3. Enable the plugin → complete the 2-step onboarding (household → module picks and provisioning)
 4. Press `Ctrl+Alt+H` anytime to open the hub
 
-> **Validation status:** core data paths have automated tests and isolated-kernel coverage. The v0.5.32 GitHub Release is available; Android WebView behavior remains host-specific validation. `icon.png` and `preview.png` were redesigned for v0.3.13 (brand-gradient tile + geometric mark; dark overview with sample data).
-> **Version note:** the tagged v0.5.32 package is the current GitHub release; local quality checks report 788 unit tests.
+> **Validation status:** core data paths have automated tests and isolated-kernel coverage. The v0.5.33 GitHub Release is available; Android WebView behavior remains host-specific validation. `icon.png` and `preview.png` were redesigned for v0.3.13 (brand-gradient tile + geometric mark; dark overview with sample data).
+> **Version note:** the tagged v0.5.33 package is the current GitHub release; local quality checks report 789 unit tests.
 >
 > Family sharing depends on SiYuan's collaboration, permissions, sync and conflict behavior. Test with non-sensitive data before sharing; this plugin does not provide a separate permission system.
 >
@@ -112,7 +113,8 @@ The v0.5.1 release is available on GitHub, with static isolated-kernel gates and
 
 | Phase | Content |
 |---|---|
-| ✅ v0.5.32 (current) | Fix quick capture confirmation dialog obstruction, elevate global Dialog z-index, native in-sheet confirmation |
+| ✅ v0.5.33 (current) | Eliminate repeated welcome popups, auto-heal onboarding status for existing users, eager state persistence |
+| v0.5.32 | Fix quick capture confirmation dialog obstruction, elevate global Dialog z-index, native in-sheet confirmation |
 | v0.5.31 | Fix browser Headers non-ISO-8859-1 exception that crashed document and notebook creation; GitHub Release published |
 | v0.5.30 | Re-engineer provisioning pipeline (Issue #45 fix), guaranteed notebook activation, legacy ledger auto-adoption engine |
 | v0.5.29 | Quick capture dual-mode routing (events vs ledger), Spotlight search (Ctrl+K), shortage to shopping ledger, bind existing docs |
@@ -134,7 +136,7 @@ pnpm run dev      # dev (app + kernel watch)
 pnpm run build    # dist/ + package.zip
 pnpm run check    # 5-layer gate (types + svelte + i18n + meta + audit)
 pnpm run smoke    # release package and single-file loader smoke checks
-pnpm test         # unit tests (788)
+pnpm test         # unit tests (789)
 ```
 
 - Setup & conventions: [CONTRIBUTING.md](./CONTRIBUTING.md)

@@ -65,6 +65,8 @@ export interface HubRuntime {
     hubCalMode?: "month" | "week";
     /** 267 波：快速记录弹层记住上次模块（启用模块 id；失效回退首个） */
     hubQuickModule?: string;
+    /** 首次运行欢迎提示是否已展示（防重复弹窗） */
+    firstRunWelcomed?: boolean;
     /** 台账页排序偏好（17 组：列 key + 方向，跨会话记忆） */
     ledgerSortKey?: string;
     ledgerSortAsc?: boolean;

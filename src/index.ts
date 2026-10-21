@@ -309,8 +309,13 @@ export default class LvHomePlugin extends Plugin {
             if (errors.length) console.error("[siyuan-home] schema contract violations:", errors);
         }
 
-        if (!this.settings.onboarded) {
-            showMessage(this.i18nText("firstRun"), 6000, "info");
+        // 欢迎提示与初次引导优化：
+        // 1. 仅在全新空白安装且从未提示过时给出温馨提示；
+        // 2. 凡已有成员、已有台账、已完成向导、或当前会话已提示过的，坚决不弹，彻底杜绝重复弹窗打扰
+        const isFreshInstall = !this.settings.onboarded && this.settings.members.length === 0 && Object.keys(this.settings.dbRefs).length === 0;
+        if (isFreshInstall && !this.runtime?.firstRunWelcomed) {
+            if (this.runtime) this.runtime.firstRunWelcomed = true;
+            showMessage(this.i18nText("firstRun"), 5000, "info");
         }
 
         // 15 组：settings.json 损坏已回退默认 → 明确警告（诊断区可见 settings.json.corrupted.json 标记）
@@ -956,6 +961,11 @@ export default class LvHomePlugin extends Plugin {
         this.settings.household = household as any;
         this.settings.enabledModules = Array.from(new Set([...this.settings.enabledModules, ...moduleIds]));
         this.settings.onboarded = true;
+        // 关键防护：立即先行持久化 onboarded: true，确保向导完成状态绝不因后续建库异常而回退丢失
+        try {
+            await saveSettings(this, this.settings);
+        } catch { /* soft persist */ }
+
         // C7c：建库批处理进度提示（31 模块串行需数秒；起止均有反馈，失败落 dbRefs.provisionError 诊断可见）
         showMessage(this.i18nText("wiz.provisioning").replace("${n}", String(moduleIds.length)), 4000, "info");
         const provisioning = await this.ensureCoreLedgers();
