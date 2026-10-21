@@ -453,12 +453,15 @@
 }
 
 // 原生详情/油耗/购物等弹窗挂在 body，无法继承面板里的表面令牌。
+// 思源全局 Dialog 确保始终具有最高堆叠层级，绝不被任何内部抽屉、蒙层或弹层压在下层。
+.b3-dialog {
+    z-index: 1000 !important;
+}
+
 // 只匹配管家专属内容，保持思源和其他插件的弹窗样式独立。
 .b3-dialog:has([id^="lv-"]),
 .b3-dialog:has(.lv-home) {
-    // 思源 Dialog 默认 z-index 较低，可能被插件自身 sticky 顶栏压住；
-    // 管家弹层必须完整覆盖主面板，避免标题栏横跨窗口顶部。
-    z-index: 110 !important;
+    z-index: 1000 !important;
     --lv-surface: var(--b3-theme-surface);
     --lv-surface-2: var(--b3-theme-surface-light);
     --lv-line: var(--b3-border-color);
