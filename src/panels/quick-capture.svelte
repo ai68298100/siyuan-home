@@ -510,6 +510,10 @@
                     plugin.settings, moduleId, plugin.schemaCatalog?.[moduleId] as any, modLabel(moduleId),
                     { resolveName: (k: string) => String(plugin.i18n[`field.${k}`] ?? k) },
                 ));
+                try {
+                    const { saveSettings } = await import("@/core/settings");
+                    await saveSettings(plugin as any, plugin.settings);
+                } catch { /* soft persist */ }
                 r = plugin.settings.dbRefs[moduleId];
                 if (!r?.avId) throw new Error(t("triage.noTarget"));
             }

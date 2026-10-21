@@ -27,6 +27,7 @@ export interface HomePluginLike extends Plugin {
 
     refreshHub(only?: string | string[], force?: boolean): Promise<ScanResult>;
     ensureCoreLedgers(): Promise<ProvisioningReport>;
+    adoptHistoryLedgers?(): Promise<any>;
     showTab(): void;
     showTabDocs(docId?: string): void;
     openSetting(): void;

@@ -1209,6 +1209,7 @@
     async function rebuildLedger() {
         rebuilding = true;
         try {
+            await plugin.adoptHistoryLedgers?.();
             const report = await plugin.ensureCoreLedgers();
             try {
                 // Rebuilding/provisioning changes the set of readable ledgers;
