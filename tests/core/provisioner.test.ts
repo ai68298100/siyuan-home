@@ -5,7 +5,7 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { setTransport, KernelError } from "@/core/siyuan";
 import {
-    provisionModule, ensureNotebook, isDocMissingError, DEFAULT_NOTEBOOK_NAME, getProvisioningReport,
+    provisionModule, ensureNotebook, bindExistingDoc, isDocMissingError, DEFAULT_NOTEBOOK_NAME, getProvisioningReport,
     type ProvisionOptions,
 } from "@/core/provisioner";
 import type { HomeSettings, DbRef } from "@/types";
@@ -192,6 +192,14 @@ describe("ensureNotebook（D07）", () => {
         expect(s.notebookCreated).toEqual([DEFAULT_NOTEBOOK_NAME]);
     });
 
+    it("用户设定了默认目标笔记本 ID 时优先复用该笔记本", async () => {
+        const s = fakeKernel();
+        const customNbId = "20261021000000-custom";
+        s.notebooks = [{ id: customNbId, name: "我的个人生活", closed: false }];
+        expect(await ensureNotebook(undefined, customNbId)).toBe(customNbId);
+        expect(s.notebookCreated).toHaveLength(0);
+    });
+
     it("创建已提交但列表索引延迟 → 短轮询后找回唯一 ID，不重复创建", async () => {
         const s = fakeKernel();
         s.notebookResponseLostOnce = true;
@@ -337,6 +345,21 @@ describe("provisionModule（D07/D08）", () => {
         const res2 = await provisionModule(st, "medicine", schema, "药箱", opts);
         expect(res2.created).toBe(false);
         expect(res2.dbRef.provisionError).toBeTruthy(); // 记录而非抛出
+    });
+
+    it("bindExistingDoc 支持将思源已有文档一键绑定为模块台账", async () => {
+        const s = fakeKernel();
+        const docId = "20261021120000-doc001";
+        const avId = "20261021120000-av0001";
+        s.notebooks = [NB];
+        s.docs = [{ id: docId, hpath: "/已有医保档案", box: NB_ID }];
+        s.avBlocks = [{ id: avId, root_id: docId, seed: "" }];
+        const settings = { dbRefs: {} } as any;
+        const res = await bindExistingDoc(settings, "health", docId, schema);
+        expect(res.dbRef.docId).toBe(docId);
+        expect(res.dbRef.avId).toBe(avId);
+        expect(res.created).toBe(false);
+        expect(settings.dbRefs.health).toBeDefined();
     });
 });
 

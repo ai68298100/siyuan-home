@@ -181,6 +181,8 @@ export interface HomeSettings {
     avatarImage?: string;
     /** 315 波（G6）：预算分类月度限额（分类 key → 限额元） */
     budgetLimits?: Record<string, number>;
+    /** 用户自选的台账建账目标笔记本 ID（未设定则使用或创建默认笔记本） */
+    targetNotebookId?: string;
 }
 
 /** EC09：打卡绑定。metric 显式区分（不把次数当体重）；itemName 为绑定时点快照（展示用） */

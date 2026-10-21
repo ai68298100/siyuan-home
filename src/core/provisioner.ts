@@ -87,7 +87,7 @@ async function createNotebookWithRecovery(name: string): Promise<string> {
  * - 登记值为名称（历史值）→ 按名称匹配；
  * - 命中但已关闭 → openNotebook 恢复；未命中 → createNotebook。
  */
-export async function ensureNotebook(preferred?: string): Promise<string> {
+export async function ensureNotebook(preferred?: string, defaultNotebookId?: string): Promise<string> {
     const notebooks = await listNotebooks();
     const byId = (id: string) => notebooks.find((nb) => nb.id === id);
     const byName = (name: string) => notebooks.find((nb) => nb.name === name);
@@ -96,6 +96,13 @@ export async function ensureNotebook(preferred?: string): Promise<string> {
         if (hit) {
             if (hit.closed) await openNotebook(hit.id, { idempotencyKey: `provision:notebook:open:${hit.id}`, retries: 1 });
             return hit.id;
+        }
+    }
+    if (defaultNotebookId) {
+        const custom = byId(defaultNotebookId) || byName(defaultNotebookId);
+        if (custom) {
+            if (custom.closed) await openNotebook(custom.id, { idempotencyKey: `provision:notebook:open:${custom.id}`, retries: 1 });
+            return custom.id;
         }
     }
     // 首选落空：ID 被删 → 用默认名；名称（含 undefined）→ 原名/默认名
@@ -291,7 +298,7 @@ export async function provisionModule(
         }
     }
     try {
-        const notebookId = await ensureNotebook(existing?.notebook);
+        const notebookId = await ensureNotebook(existing?.notebook, settings.targetNotebookId);
         const hpath = ledgerHPath(titleI18n);
         const found = await findLedgerDoc(notebookId, hpath);
         if (found) {
@@ -312,7 +319,8 @@ export async function provisionModule(
         }
         let docId: string;
         try {
-            docId = await createDocWithMd(notebookId, hpath, `${titleI18n}\n\n{: placeholder-ledger }\n`, {
+            const docHeaderMarkdown = `# ${titleI18n}\n\n> 🏠 **小驴管家 · 专属台账文档**\n> 快捷直达：按 \`Ctrl+Alt+H\` 可在任意界面随时呼出小驴管家；下方为思源原生属性视图数据库（AttributeView），支持双向编辑与同步。\n\n{: placeholder-ledger }\n`;
+            docId = await createDocWithMd(notebookId, hpath, docHeaderMarkdown, {
                 idempotencyKey: `provision:doc:${moduleId}:${notebookId}:${hpath}`,
                 retries: 0,
             });
@@ -350,4 +358,62 @@ export async function provisionModule(
         settings.dbRefs[moduleId] = dbRef;
         return { dbRef, created: false };
     }
+}
+
+/**
+ * 将思源已有文档一键绑定为指定模块的台账（大幅降低用户迁移与建账门槛）：
+ * 1. 验证文档在思源中存在；
+ * 2. 检索文档内已有的 AttributeView 属性视图，若不存在则在文档末尾自动生成一个；
+ * 3. 对齐并校验各业务列；
+ * 4. 写入 settings.dbRefs[moduleId]；
+ * 5. 返回更新后的 DbRef。
+ */
+export async function bindExistingDoc(
+    settings: HomeSettings,
+    moduleId: string,
+    rawDocInput: string,
+    schema: ModuleSchema,
+    opts: ProvisionOptions = {},
+): Promise<ProvisionResult> {
+    const raw = (rawDocInput ?? "").trim();
+    const mBlock = raw.match(/\b\d{14}-[a-z0-9]{7}\b/i);
+    const docId = mBlock ? mBlock[0] : raw;
+    if (!docId) throw new Error("invalid document ID or link");
+
+    let hpath = "";
+    try {
+        hpath = await getHPathByID(docId);
+    } catch (e) {
+        throw new Error(`document not found in SiYuan: ${errText(e)}`);
+    }
+    if (!hpath) throw new Error("document not found in SiYuan");
+
+    const notebookRows = await sql<{ box: string }>(`SELECT box FROM blocks WHERE id='${docId.replace(/'/g, "''")}' LIMIT 1`);
+    const notebookId = notebookRows[0]?.box;
+
+    let avId = await findAvBlockInDoc(docId);
+    let provisional = false;
+    let provisionError: string | undefined;
+
+    if (!avId) {
+        try {
+            avId = await createAttributeView(docId, stableAvSeed(moduleId, docId), { idempotencyKey: `bind:av:${moduleId}:${docId}` });
+        } catch (e) {
+            provisional = true;
+            provisionError = errText(e);
+        }
+    }
+
+    const memberAvId = moduleId === "members" ? undefined : settings.dbRefs.members?.avId;
+    const { columns, error } = await ensureColumns(avId, schema, undefined, moduleId, opts, memberAvId);
+    const dbRef: DbRef = {
+        docId,
+        avId: avId ?? undefined,
+        notebook: notebookId,
+        provisional,
+        columns,
+        provisionError: provisionError ?? error,
+    };
+    settings.dbRefs[moduleId] = dbRef;
+    return { dbRef, created: false };
 }

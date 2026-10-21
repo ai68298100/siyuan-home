@@ -354,6 +354,48 @@
         );
     }
 
+    async function openBindExistingDocModal() {
+        const schema = plugin.schemaCatalog?.[active];
+        if (!schema) return;
+        const dlg = new Dialog({
+            title: t("ledger.bindDocTitle"),
+            content: `
+                <div class="b3-dialog__content" style="display:flex;flex-direction:column;gap:10px">
+                    <span class="lv-caption" style="line-height:1.6">${t("ledger.bindDocHint")}</span>
+                    <label style="display:flex;flex-direction:column;gap:4px">
+                        <span class="lv-caption">${t("ledger.bindDocTitle")}：</span>
+                        <input class="b3-text-field" id="lv-bind-doc-input" placeholder="siyuan://blocks/20261021... 或 ((20261021...))" style="width:100%" />
+                    </label>
+                </div>
+                <div class="b3-dialog__action">
+                    <button class="b3-button b3-button--cancel">${t("cancel")}</button>
+                    <button class="b3-button" id="lv-bind-doc-ok">${t("save")}</button>
+                </div>
+            `,
+            width: "480px",
+        });
+        (dlg.element.querySelector(".b3-button--cancel") as HTMLButtonElement).onclick = () => dlg.destroy();
+        (dlg.element.querySelector("#lv-bind-doc-ok") as HTMLButtonElement).onclick = async function (this: HTMLButtonElement) {
+            const inputVal = (dlg.element.querySelector("#lv-bind-doc-input") as HTMLInputElement).value.trim();
+            if (!inputVal) return;
+            this.disabled = true;
+            try {
+                const { bindExistingDoc } = await import("@/core/provisioner");
+                const { saveSettings } = await import("@/core/settings");
+                await bindExistingDoc(plugin.settings, active, inputVal, schema, {
+                    resolveName: (k: string) => t(`field.${k}`),
+                });
+                await saveSettings(plugin as any, plugin.settings);
+                dlg.destroy();
+                showMessage(t("ledger.bindDocSuccess").replace("${module}", t(`module.${active}`)), 3000, "info");
+                await load();
+            } catch (e) {
+                this.disabled = false;
+                showMessage(String(e), 5000, "error");
+            }
+        };
+    }
+
     async function adjustRowQty(row: any, fieldKey: string, delta: number) {
         if (!ref?.avId || !ref.columns?.[fieldKey]) return;
         const colId = ref.columns[fieldKey];
@@ -2473,7 +2515,7 @@
         const dlg = new Dialog({
             title: detailTitle,
             content: `<div class="b3-dialog__content b3-dialog__content--wrap" id="lv-detail-body" style="max-height:60vh;overflow:auto"></div>
-<div class="b3-dialog__action lv-detail-actions"><button class="b3-button b3-button--text ft__error" id="lv-detail-del" style="color:var(--b3-theme-error)">${t("delete")}</button><button class="b3-button b3-button--text" id="lv-detail-duplicate">📋 ${t("ledger.duplicateRow")}</button><span class="fn__flex-1"></span><details class="lv-detail-more"><summary class="b3-button b3-button--outline">${t("ledger.detailMore")}</summary><div class="lv-detail-more-menu"><button class="b3-button b3-button--cancel" id="lv-detail-card-copy">${t("ledger.copyAsImage")}</button><button class="b3-button b3-button--cancel" id="lv-detail-card-png">${t("ledger.downloadPng")}</button><button class="b3-button b3-button--cancel" id="lv-detail-card-text">${t("ledger.copyAsText")}</button><button class="b3-button b3-button--cancel" id="lv-detail-card-masked-text">${t("ledger.copyAsMaskedText")}</button><button class="b3-button b3-button--cancel" id="lv-detail-open">${t("ledger.openDoc")} →</button></div></details><button class="b3-button b3-button--cancel" id="lv-detail-close">${t("close")}</button><button class="b3-button" id="lv-detail-edit">${t("ledger.detailEditAll")}</button></div>`,
+<div class="b3-dialog__action lv-detail-actions"><button class="b3-button b3-button--text ft__error" id="lv-detail-del" style="color:var(--b3-theme-error)">${t("delete")}</button><button class="b3-button b3-button--text" id="lv-detail-duplicate">📋 ${t("ledger.duplicateRow")}</button><span class="fn__flex-1"></span><details class="lv-detail-more"><summary class="b3-button b3-button--outline">${t("ledger.detailMore")}</summary><div class="lv-detail-more-menu"><button class="b3-button b3-button--cancel" id="lv-detail-card-copy">${t("ledger.copyAsImage")}</button><button class="b3-button b3-button--cancel" id="lv-detail-card-png">${t("ledger.downloadPng")}</button><button class="b3-button b3-button--cancel" id="lv-detail-card-text">${t("ledger.copyAsText")}</button><button class="b3-button b3-button--cancel" id="lv-detail-card-masked-text">${t("ledger.copyAsMaskedText")}</button><button class="b3-button b3-button--cancel" id="lv-detail-copy-ref">🔗 ${t("ledger.copyBlockRef")}</button><button class="b3-button b3-button--cancel" id="lv-detail-open">${t("ledger.openDoc")} →</button></div></details><button class="b3-button b3-button--cancel" id="lv-detail-close">${t("close")}</button><button class="b3-button" id="lv-detail-edit">${t("ledger.detailEditAll")}</button></div>`,
             width: "520px",
         });
         const body = dlg.element.querySelector("#lv-detail-body") as HTMLElement;
@@ -5181,6 +5223,19 @@
                 showMessage(t("ledger.copyAsImageFail") + ` (${e instanceof Error ? e.message : String(e)})`, 5000, "error");
             }
         };
+        // Copy SiYuan block reference ((blockId "title")).
+        const copyRefBtn = dlg.element.querySelector("#lv-detail-copy-ref") as HTMLButtonElement | null;
+        if (copyRefBtn) {
+            copyRefBtn.onclick = async () => {
+                const blockRefText = `((${row.itemID} "${cardTitle}"))`;
+                try {
+                    await navigator.clipboard.writeText(blockRefText);
+                    showMessage(t("ledger.blockRefCopied"), 2500, "info");
+                } catch (e) {
+                    showMessage(String(e), 5000, "error");
+                }
+            };
+        }
         // Copy record as new draft.
         const dupBtn = dlg.element.querySelector("#lv-detail-duplicate") as HTMLButtonElement | null;
         if (dupBtn) {
@@ -5845,6 +5900,9 @@
                 <div style="display:flex;gap:10px;margin-top:8px">
                     <button class="b3-button b3-button--outline" onclick={rebuildLedger} disabled={rebuilding}>
                         🚀 {rebuilding ? t("diag.rebuilding") : t("ledger.buildNow")}
+                    </button>
+                    <button class="b3-button b3-button--outline" onclick={openBindExistingDocModal} disabled={rebuilding}>
+                        {t("ledger.bindDoc")}
                     </button>
                     <button class="lv-btn primary" onclick={openNewRecord} disabled={rebuilding}>
                         + {t("ledger.newRecord")}

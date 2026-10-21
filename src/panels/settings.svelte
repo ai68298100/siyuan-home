@@ -1,5 +1,6 @@
 <script lang="ts">
     import { showMessage, confirm, Dialog } from "siyuan";
+    import { listNotebooks } from "@/core/siyuan";
     import { MODULE_GROUPS, modulesByGroup } from "@/core/modules";
     import { newMember, saveSettings, normalizeCheckinBindings, errText } from "@/core/settings";
     import type { ProvisioningReport } from "@/core/provisioner";
@@ -27,6 +28,13 @@
         plugin: IHomePluginLike;
         settings: HomeSettings;
     } = $props();
+
+    let notebookList = $state<Array<{ id: string; name: string }>>([]);
+    $effect(() => {
+        void listNotebooks().then((list) => {
+            notebookList = (list ?? []).filter((nb) => !nb.closed);
+        }).catch(() => undefined);
+    });
 
     // i18n 取值统一转 string（1.2.8 起 JSONValue）
     const t = (key: string) => String(plugin.i18n[key] ?? key);
@@ -1006,6 +1014,25 @@
         <div class="lv-settings__scroll">
         {#if dataSection === "migration"}
         <!-- 设置导出/导入（跨设备/重装迁移辅助） -->
+        <div class="lv-card lv-setcard">
+            <div class="lv-setcard__title">{t("settings.targetNotebook")}</div>
+            <div class="lv-setcard__hint">{t("settings.targetNotebookHint")}</div>
+            <div style="margin-top:8px">
+                <select class="b3-select" style="max-width:360px;width:100%"
+                    value={plugin.settings.targetNotebookId ?? ""}
+                    onchange={async (e) => {
+                        const val = (e.currentTarget as HTMLSelectElement).value;
+                        plugin.settings.targetNotebookId = val || undefined;
+                        await saveSettings(plugin as any, plugin.settings);
+                        showMessage(t("diag.rebuildAllDone"), 2000, "info");
+                    }}>
+                    <option value="">🏠 默认（使用或自动创建「🏠 小驴管家」笔记本）</option>
+                    {#each notebookList as nb (nb.id)}
+                        <option value={nb.id}>📚 {nb.name}</option>
+                    {/each}
+                </select>
+            </div>
+        </div>
         <div class="lv-card lv-setcard">
             <div class="lv-setcard__title">{t("settings.migrateTitle")}</div>
             <div class="lv-setcard__hint" style="color:var(--lv-warn)">⚠ {t("settings.migratePrivacy")}</div>
