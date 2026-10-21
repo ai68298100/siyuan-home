@@ -39,24 +39,27 @@ Certificates expire, medicine expires, insurance needs renewal, subscriptions au
 
 Image OCR uses the engine configured in SiYuan Settings → OCR. It runs only when requested and does not require automatic OCR to be enabled. AI OCR asks before each run because the image is sent to the selected AI service. Results are saved to SiYuan OCR text and included in search; re-running replaces the previous result. Encrypted notebook images and PDFs are not supported, and OCR text is never written into ledger fields automatically.
 
-## 🆕 What's new in v0.5.28
+## 🆕 What's new in v0.5.29
 
-This release resolves Issue #39 (settings save error during ledger rebuild in SiYuan 3.8.7) with non-blocking soft persistence and introduces default blank ledgers with on-demand provisioning, alongside pixel-perfect vertical alignment for the top bar avatar and pill tabs:
+This release completely restructures the mental model of Quick Capture, cleanly separating one-time asset registration from high-frequency daily event logs (refueling, blood pressure, grocery to-buy), and delivers Global Life Spotlight search (Ctrl+K), one-click shortages into shopping ledger, and custom notebook binding:
 
-- **Fixed (Core Stability & Issue #39)**: Fixed `settings save failed after retry: [object Object]` error during ledger rebuild/initialization in SiYuan 3.8.7. Hardened `errText` error extractor to parse structured kernel responses and wrapped ledger provisioning settings save in non-blocking soft persistence.
-- **Added (Default Blank Ledgers & Lazy Provisioning)**: Unprovisioned modules now render an intuitive blank ledger view, allowing users to experience schema fields immediately and provision on demand via "🚀 Provision in SiYuan" or first record creation.
-- **Improved (Top Bar Avatar & Tabbar Alignment)**: Re-aligned top bar logo, brand title, avatar trigger (`.lv-avatar-trigger`), and pill tabs (`.lv-tabs`). Pill height aligned to 36px with subtle separator, perfectly centered along the horizontal axis to eliminate visual sag.
-- **Added (Batch Actions & Quick Templates)**: Quick record templates (`quick-templates`), floating batch actions (batch update location, batch delete, batch assign members), duplicate record, and Datalist input autocomplete.
-- **Validation**: 87 test suites, **774 unit tests passing**, TypeScript, Svelte, i18n (1908 keys), metadata, and package smoke all green.
-## 📦 Install (v0.5.28)
+- **Refactored (Quick Capture Dual-Mode Routing)**: Header segmented control provides `[⚡ Quick Event]` vs `[🗂️ Ledger Record]`.
+- **Added (High-Frequency Daily Event Streamline)**: Log fuel/charge directly against existing vehicles (`fuelings`/`chargings`), log blood pressure/glucose against family members (`vitals`), and add to-buy items/notes with one tap.
+- **Added (Global Life Spotlight Search / Ctrl+K)**: Top bar 🔍 search button and `Ctrl+K` shortcut for instant cross-module fuzzy search across names, locations, categories, members, and notes with smart scoring.
+- **Added (Shortage Items Direct to Shopping Ledger)**: One-click batch export of shortage medicines and stock items into the `shopping` ledger.
+- **Added (Bind Existing SiYuan Documents as Ledgers)**: Paste any SiYuan block/doc link or ID to auto-bind as module ledger with auto AttributeView insertion.
+- **Added (Target Notebook Selector)**: Choose any open notebook in Settings as the default ledger notebook.
+- **Improved (Smart Auto-Fill & Sticky Memory)**: Date defaults to today (`YYYY-MM-DD`), quantity defaults to `1`, and sticky memory retains last used member, location, and category per module.
+- **Validation**: 89 test suites, **786 unit tests passing**, TypeScript, Svelte, i18n (1943 keys), metadata, and package smoke all green.
+## 📦 Install (v0.5.29)
 
 1. Download `package.zip` from [Releases](https://github.com/ai68298100/siyuan-home/releases/latest)
 2. SiYuan → Settings → Marketplace → Download → **Import** the zip
 3. Enable the plugin → complete the 2-step onboarding (household → module picks and provisioning)
 4. Press `Ctrl+Alt+H` anytime to open the hub
 
-> **Validation status:** core data paths have automated tests and isolated-kernel coverage. The v0.5.28 GitHub Release is available; Android WebView behavior remains host-specific validation. `icon.png` and `preview.png` were redesigned for v0.3.13 (brand-gradient tile + geometric mark; dark overview with sample data).
-> **Version note:** the tagged v0.5.28 package is the current GitHub release; local quality checks report 774 unit tests.
+> **Validation status:** core data paths have automated tests and isolated-kernel coverage. The v0.5.29 GitHub Release is available; Android WebView behavior remains host-specific validation. `icon.png` and `preview.png` were redesigned for v0.3.13 (brand-gradient tile + geometric mark; dark overview with sample data).
+> **Version note:** the tagged v0.5.29 package is the current GitHub release; local quality checks report 786 unit tests.
 >
 > Family sharing depends on SiYuan's collaboration, permissions, sync and conflict behavior. Test with non-sensitive data before sharing; this plugin does not provide a separate permission system.
 >
@@ -114,7 +117,8 @@ The v0.5.1 release is available on GitHub, with static isolated-kernel gates and
 
 | Phase | Content |
 |---|---|
-| ✅ v0.5.28 (current) | Fix Issue #39 settings save retry failure, default blank ledgers, top bar avatar alignment, quick templates, and batch management |
+| ✅ v0.5.29 (current) | Quick capture dual-mode routing (events vs ledger), Spotlight search (Ctrl+K), shortage to shopping ledger, bind existing docs |
+| v0.5.28 | Fix Issue #39 settings save retry failure, default blank ledgers, top bar avatar alignment, quick templates, and batch management |
 | 🔜 Next | Task workbench, evidence center, inbox, health recovery |
 | 🔭 Later | Family collaboration, template packs, yearly family report, AI capabilities |
 
@@ -132,7 +136,7 @@ pnpm run dev      # dev (app + kernel watch)
 pnpm run build    # dist/ + package.zip
 pnpm run check    # 5-layer gate (types + svelte + i18n + meta + audit)
 pnpm run smoke    # release package and single-file loader smoke checks
-pnpm test         # unit tests (774)
+pnpm test         # unit tests (786)
 ```
 
 - Setup & conventions: [CONTRIBUTING.md](./CONTRIBUTING.md)
