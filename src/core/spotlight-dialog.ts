@@ -6,6 +6,15 @@
 import { searchSpotlight, type SpotlightItem } from "./spotlight";
 import { moduleIcon } from "./modules";
 
+function escapeHtml(str: string): string {
+    return str
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;")
+        .replace(/'/g, "&#039;");
+}
+
 export interface SpotlightDialogOptions {
     t: (k: string) => string;
     plugin: {
@@ -109,9 +118,10 @@ export async function openSpotlightDialog(options: SpotlightDialogOptions): Prom
         listEl.innerHTML = "";
 
         if (matched.length === 0) {
+            const safeQ = escapeHtml(query);
             listEl.innerHTML = `
                 <div style="text-align:center;padding:32px 0;color:var(--lv-tx-3);font-size:13px">
-                    未找到与 "${query}" 匹配的生活记录
+                    未找到与 "${safeQ}" 匹配的生活记录
                 </div>
             `;
             return;
@@ -128,9 +138,10 @@ export async function openSpotlightDialog(options: SpotlightDialogOptions): Prom
 
             const left = document.createElement("div");
             left.style.cssText = "display:inline-flex;align-items:center;gap:6px;min-width:0";
+            const safeTitle = escapeHtml(item.title);
             left.innerHTML = `
                 <span style="font-size:15px">${moduleIcon(item.moduleId)}</span>
-                <b style="font-size:13.5px;color:var(--lv-tx);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${item.title}</b>
+                <b style="font-size:13.5px;color:var(--lv-tx);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${safeTitle}</b>
             `;
 
             const badge = document.createElement("span");
