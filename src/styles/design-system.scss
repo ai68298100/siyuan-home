@@ -255,15 +255,31 @@
     strong { color: var(--lv-tx-2); font-weight: 500; margin-right: 3px; } }
   .lv-hero-copy .lv-hero-lead { max-width: 560px; margin-top: 8px; color: var(--lv-tx-2); font-size: 14px; line-height: 1.65; }
   .lv-hero-actions { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-top: 18px; }
-  .lv-hero-art { width: 120px; height: 120px; flex: none; display: grid; place-items: center;
-    border-radius: 28px; background: var(--lv-accent-soft); color: var(--lv-accent); }
-  .lv-hero-art svg { display: block; width: 100%; height: 100%; }
-  .lv-hero-tools { margin-left: auto; display: flex; align-items: center; gap: var(--lv-space-3); flex-wrap: wrap; }
-  .lv-hero-count { display: flex; align-items: baseline; gap: var(--lv-space-2);
-    b { font-size: 34px; font-weight: 650; letter-spacing: 0; }
-    span { color: var(--lv-tx-3); font-size: 12.5px; } }
-  .lv-hero-open { min-height: 44px; padding: 9px 18px; display: inline-flex; align-items: center; gap: 7px;
-    border-radius: 12px; background: var(--lv-accent); border-color: transparent; color: var(--b3-theme-on-primary); font-weight: 600; box-shadow: none;
+  .lv-hero-tools { margin-left: auto; display: flex; align-items: center; gap: var(--lv-space-3); flex: none; }
+  .lv-hero-stat-card {
+    min-width: 150px; padding: 14px 18px; border-radius: var(--lv-r-3);
+    background: var(--lv-surface-2); border: 1px solid var(--lv-line);
+    display: flex; flex-direction: column; gap: 6px; box-shadow: var(--lv-shadow-1);
+    flex: none;
+  }
+  .lv-hero-stat-header {
+    display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--lv-tx-3);
+  }
+  .lv-hero-stat-icon { color: var(--lv-accent); display: flex; align-items: center; }
+  .lv-hero-stat-num { font-size: 32px; font-weight: 700; line-height: 1.15; color: var(--lv-tx); }
+  .lv-hero-action-btn {
+    min-height: 38px; height: 38px; padding: 0 14px; font-size: 13px;
+    border-radius: 10px; display: inline-flex; align-items: center; gap: 6px;
+    background: var(--lv-surface); border-color: var(--lv-line); color: var(--lv-tx-2);
+    box-shadow: none; transition: all var(--lv-t-fast) var(--lv-ease);
+    &:hover { background: var(--lv-surface-2); color: var(--lv-tx); border-color: var(--lv-line-strong); }
+  }
+  .lv-hero-capture-btn {
+    border-color: var(--lv-accent); color: var(--lv-accent);
+    &:hover { background: var(--lv-accent-soft); color: var(--lv-accent); border-color: var(--lv-accent); }
+  }
+  .lv-hero-open { min-height: 38px; height: 38px; padding: 0 16px; display: inline-flex; align-items: center; gap: 7px;
+    border-radius: 10px; background: var(--lv-accent); border-color: transparent; color: var(--b3-theme-on-primary); font-weight: 600; box-shadow: none;
     &:hover { background: var(--lv-accent); color: var(--b3-theme-on-primary); border-color: transparent; filter: brightness(1.05); box-shadow: none; } }
   .lv-hero-capture { min-height: 44px; padding: 9px 16px; display: inline-flex; align-items: center; gap: 7px;
     border-radius: 12px; background: var(--lv-surface); border-color: var(--lv-line); color: var(--lv-tx-2); font-weight: 500; box-shadow: none;
