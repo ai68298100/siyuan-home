@@ -39,23 +39,24 @@ Certificates expire, medicine expires, insurance needs renewal, subscriptions au
 
 Image OCR uses the engine configured in SiYuan Settings → OCR. It runs only when requested and does not require automatic OCR to be enabled. AI OCR asks before each run because the image is sent to the selected AI service. Results are saved to SiYuan OCR text and included in search; re-running replaces the previous result. Encrypted notebook images and PDFs are not supported, and OCR text is never written into ledger fields automatically.
 
-## 🆕 What's new in v0.5.36
+## 🆕 What's new in v0.5.37
 
-This release deeply aligns with the prototype reference design language: Bento dual-temperature focus cards, 7-day Weekly Pulse Strip, and family readiness Achievements Badges:
+This release delivers deep cross-scene UI craftsmanship: Spotlight keyboard navigation, refined inline quantity steppers, enhanced 4px reminder urgency rails, and WCAG 4.5:1 dark mode tuning:
 
-- **Added (7-Day Weekly Pulse Strip)**: Added horizontal week rhythm capsules in Overview, marking completed days with green checks, pulsing today with accent rings, and displaying upcoming due counts.
-- **Added (Family Readiness Achievements Badges)**: Dynamically derived achievement pill badges ("All Clear No Overdue", "Certificates Safe", "Fresh Medicine", "Emergency Ready", "Full Life Butler").
-- **Improved (Bento Dual-Temperature Focus Cards)**: Elevated focus cards with amber warm, lavender indigo, and mint green gradients with soft glow icons and subtle 2px hover elevation.
+- **Improved (Spotlight Keyboard Navigation)**: Search result cards support full arrow key focus and Enter navigation with brand focus rings.
+- **Improved (Inline Quantity Steppers)**: Upgraded raw buttons to rounded number steppers (`.lv-qty-stepper` / `.lv-qty-btn`) to prevent mis-clicks.
+- **Improved (Reminder Urgency Rails)**: Upgraded urgency indicator lines to 4px rounded rails for clearer overdue/imminent scanning.
+- **Improved (Dark Mode Tone Precision)**: Tuned Bento cards, pulse capsules, and badges in dark mode to strictly meet WCAG 4.5:1 contrast standards.
 - **Validation**: 90 test suites, **791 unit tests passing**, TypeScript, Svelte, i18n (1946 keys), metadata, and package smoke all green.
-## 📦 Install (v0.5.36)
+## 📦 Install (v0.5.37)
 
 1. Download `package.zip` from [Releases](https://github.com/ai68298100/siyuan-home/releases/latest)
 2. SiYuan → Settings → Marketplace → Download → **Import** the zip
 3. Enable the plugin → complete the 2-step onboarding (household → module picks and provisioning)
 4. Press `Ctrl+Alt+H` anytime to open the hub
 
-> **Validation status:** core data paths have automated tests and isolated-kernel coverage. The v0.5.36 GitHub Release is available; Android WebView behavior remains host-specific validation. `icon.png` and `preview.png` were redesigned for v0.3.13 (brand-gradient tile + geometric mark; dark overview with sample data).
-> **Version note:** the tagged v0.5.36 package is the current GitHub release; local quality checks report 791 unit tests.
+> **Validation status:** core data paths have automated tests and isolated-kernel coverage. The v0.5.37 GitHub Release is available; Android WebView behavior remains host-specific validation. `icon.png` and `preview.png` were redesigned for v0.3.13 (brand-gradient tile + geometric mark; dark overview with sample data).
+> **Version note:** the tagged v0.5.37 package is the current GitHub release; local quality checks report 791 unit tests.
 >
 > Family sharing depends on SiYuan's collaboration, permissions, sync and conflict behavior. Test with non-sensitive data before sharing; this plugin does not provide a separate permission system.
 >
@@ -113,7 +114,8 @@ The v0.5.1 release is available on GitHub, with static isolated-kernel gates and
 
 | Phase | Content |
 |---|---|
-| ✅ v0.5.36 (current) | Deep prototype design alignment: Bento dual-temp cards, Weekly Pulse Strip, Achievements Badges |
+| ✅ v0.5.37 (current) | Deep cross-scene UI craftsmanship: Spotlight keyboard navigation, inline steppers, 4px urgency rails |
+| v0.5.36 | Deep prototype design alignment: Bento dual-temp cards, Weekly Pulse Strip, Achievements Badges |
 | v0.5.35 | UI/UX deep refinement: vector icon migration, top bar micro-interactions, batch bar frosted glass |
 | v0.5.34 | Break automatic reload loop, fix search button click, refactor overview stat card and settings sidebar |
 | v0.5.33 | Eliminate repeated welcome popups, auto-heal onboarding status for existing users, eager state persistence |

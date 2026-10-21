@@ -6021,12 +6021,12 @@
                             {@const v = r.cells[ref.columns[k]]}
                             <td class="lv-num" style={k === "expiry" || k === "due" ? `color:${toneColor(tone)}` : ""}>
                                 {#if k === "qty" || k === "stock_qty"}
-                                    <div style="display:inline-flex;align-items:center;gap:4px">
-                                        <button type="button" class="b3-button b3-button--text" style="padding:0 3px;font-size:11px;min-height:0;line-height:1"
-                                            title={t("ledger.quickDec")} onclick={(e) => { e.stopPropagation(); adjustRowQty(r, k, -1); }}>－</button>
-                                        <span>{cellText(v, k)}</span>
-                                        <button type="button" class="b3-button b3-button--text" style="padding:0 3px;font-size:11px;min-height:0;line-height:1"
-                                            title={t("ledger.quickInc")} onclick={(e) => { e.stopPropagation(); adjustRowQty(r, k, 1); }}>＋</button>
+                                    <div class="lv-qty-stepper">
+                                        <button type="button" class="lv-qty-btn"
+                                            title={t("ledger.quickDec")} onclick={(e) => { e.stopPropagation(); adjustRowQty(r, k, -1); }}>−</button>
+                                        <span style="min-width:18px;text-align:center">{cellText(v, k)}</span>
+                                        <button type="button" class="lv-qty-btn"
+                                            title={t("ledger.quickInc")} onclick={(e) => { e.stopPropagation(); adjustRowQty(r, k, 1); }}>+</button>
                                     </div>
                                 {:else}
                                     {cellText(v, k)}
