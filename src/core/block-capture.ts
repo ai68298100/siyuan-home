@@ -74,8 +74,7 @@ export function inferModuleFromText(text: string): { moduleId: string; confidenc
  */
 export function extractDateFromText(text: string): { date?: string; cleanText: string } {
     if (!text) return { cleanText: "" };
-    const m = text.match(/\b(20\d{2})[-/.年](0?[1-9]|1[0-2])[-/.月](0?[1-9]|[12]\d|3[01])日?\b/) ||
-              text.match(/(20\d{2})年(0?[1-9]|1[0-2])月(0?[1-9]|[12]\d|3[01])日?/);
+    const m = text.match(/(20\d{2})[-/.年](1[0-2]|0?[1-9])[-/.月]([12]\d|3[01]|0?[1-9])(?:日|号)?/);
     if (m) {
         return {
             date: `${m[1]}-${m[2].padStart(2, "0")}-${m[3].padStart(2, "0")}`,
@@ -97,6 +96,33 @@ export function extractAmountFromText(text: string): { amount?: number; cleanTex
         };
     }
     return { cleanText: text };
+}
+
+/**
+ * 录入标题智能清洗与自动析出（如在名称输入 "2028-10-15 居民身份证" 或 "租房合同 3500元"）
+ * 自动剥离日期与金额供表单联动回填，避免用户反复在输入框之间跳转切换。
+ */
+export function smartExtractFieldsFromTitle(rawTitle: string): {
+    cleanTitle: string;
+    extractedDate?: string;
+    extractedAmount?: number;
+} {
+    let text = (rawTitle ?? "").trim();
+    if (!text) return { cleanTitle: "" };
+
+    const dateRes = extractDateFromText(text);
+    text = dateRes.cleanText;
+
+    const amountRes = extractAmountFromText(text);
+    text = amountRes.cleanText;
+
+    const cleanTitle = text.replace(/^[\s\-–—/、,，:：]+|[\s\-–—/、,，:：]+$/g, "").trim();
+
+    return {
+        cleanTitle: cleanTitle || rawTitle.trim(),
+        extractedDate: dateRes.date,
+        extractedAmount: amountRes.amount,
+    };
 }
 
 /**

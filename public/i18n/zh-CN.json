@@ -1906,5 +1906,7 @@
     "ledger.batchDeleteConfirm": "确定要批量删除选中的 ${n} 条记录吗？此操作无法撤销。",
     "ledger.duplicateRow": "复制为新记录",
     "ledger.duplicateSuccess": "已从「${name}」复制模板数据",
-    "ledger.batchLocationTitle": "批量修改存放位置"
+    "ledger.batchLocationTitle": "批量修改存放位置",
+    "ledger.batchMember": "批量指派成员",
+    "ledger.batchMemberTitle": "批量指派记录归属成员"
 }

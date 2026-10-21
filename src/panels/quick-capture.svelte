@@ -12,7 +12,7 @@
     import type { ColumnDef, ModuleSchema } from "@/core/schema";
     import type { HomeSettings } from "@/types";
     import UiIcon from "@/ui/icon.svelte";
-    import type { ParsedCaptureResult } from "@/core/block-capture";
+    import { smartExtractFieldsFromTitle, type ParsedCaptureResult } from "@/core/block-capture";
 
     interface ICapturePluginLike {
         i18n: Record<string, unknown>;
@@ -232,6 +232,24 @@
         for (const [k, v] of Object.entries(template.values)) {
             values[k] = v;
             clearFieldError(k);
+        }
+    }
+
+    function handleNameBlur() {
+        if (!values.name || typeof values.name !== "string") return;
+        const res = smartExtractFieldsFromTitle(values.name);
+        if (res.cleanTitle !== values.name) {
+            values.name = res.cleanTitle;
+            const dateField = captureFields.find((f) => f.type === "date");
+            if (dateField && res.extractedDate && !values[dateField.key]) {
+                values[dateField.key] = res.extractedDate;
+                clearFieldError(dateField.key);
+            }
+            const numField = captureFields.find((f) => f.type === "number" && ["amount", "price", "cost"].includes(f.key));
+            if (numField && res.extractedAmount !== undefined && !values[numField.key]) {
+                values[numField.key] = res.extractedAmount;
+                clearFieldError(numField.key);
+            }
         }
     }
     const filledCaptureCount = $derived.by(() => captureFields.filter((field: any) => {
@@ -530,6 +548,7 @@
                                 aria-invalid={fieldErrors.name ? "true" : undefined}
                                 aria-describedby={fieldDescriptionIds(f)}
                                 oninput={() => clearFieldError(f.key)}
+                                onblur={handleNameBlur}
                                 onkeydown={(e: KeyboardEvent) => { if (e.key === "Enter" && !e.isComposing) save(false); }} />
                         {:else}
                             <label for="lv-cap-{f.key}">{fieldLabel(f)}{#if fieldRequired(f)} <small class="lv-capture-required">{t("capture.required")}</small>{/if}</label>
