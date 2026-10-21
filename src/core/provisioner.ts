@@ -16,6 +16,7 @@
  */
 import type { HomeSettings, DbRef } from "@/types";
 import type { ModuleSchema } from "./schema";
+import { errText } from "./settings";
 import {
     listNotebooks, createNotebook, openNotebook, createDocWithMd, getHPathByID, sql, newSiYuanId,
     createAttributeView, addAttributeViewColumn, renderLedger, KernelError, isWriteResultUnknown,
@@ -268,10 +269,6 @@ export function isDocMissingError(e: unknown): boolean {
     if (!(e instanceof KernelError)) return false;
     if (e.code !== -1) return true;
     return /not found|不存在/i.test(e.kernelMsg);
-}
-
-function errText(e: unknown): string {
-    return e instanceof Error ? e.message : String(e);
 }
 
 export interface ProvisionResult {
