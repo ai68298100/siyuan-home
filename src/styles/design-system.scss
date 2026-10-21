@@ -227,18 +227,84 @@
     color: var(--lv-tx-3); background: var(--lv-surface);
     box-shadow: none;
     strong { color: var(--lv-tx-2); font-weight: 500; margin-right: 4px; } }
-  .lv-focus { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--lv-space-4); margin: var(--lv-space-5) 2px 2px; }
-  .lv-focus-card { display: flex; align-items: center; justify-content: space-between; gap: var(--lv-space-3); min-width: 0; padding: 16px 20px;
+  .lv-focus { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--lv-space-4); margin: var(--lv-space-5) 2px 14px; }
+  .lv-focus-card {
+    display: flex; align-items: center; justify-content: space-between; gap: var(--lv-space-3); min-width: 0; padding: 18px 20px;
     border: 1px solid var(--lv-line); border-radius: var(--lv-r-3); background: var(--lv-surface);
-    box-shadow: none; cursor: pointer; text-align: left;
-    transition: all var(--lv-t-med) var(--lv-ease);
-    &:hover { border-color: var(--lv-line-strong); transform: translateY(-1px); box-shadow: var(--lv-shadow-1); }
-    .lv-focus-copy { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 3px;
-      .lv-focus-label { font-size: 11.5px; color: var(--lv-tx-3); font-weight: 500; }
-      .lv-focus-num { font-size: 24px; font-weight: 700; line-height: 1.25; color: var(--lv-tx); }
-      .lv-focus-sub { font-size: 11px; color: var(--lv-tx-3); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; } }
-    .lv-focus-icon { width: 38px; height: 38px; border-radius: 12px; display: grid; place-items: center;
-      flex: none; font-size: 16px; color: var(--lv-accent); background: var(--lv-surface-2); border: 1px solid var(--lv-line); } }
+    box-shadow: var(--lv-shadow-1); cursor: pointer; text-align: left;
+    transition: all var(--lv-t-med) var(--lv-ease); position: relative; overflow: hidden;
+    &:hover { border-color: var(--lv-line-strong); transform: translateY(-2px); box-shadow: var(--lv-shadow-2); }
+    &:active { transform: translateY(0); }
+    .lv-focus-copy { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 4px;
+      .lv-focus-label { font-size: 12px; color: var(--lv-tx-3); font-weight: 500; }
+      .lv-focus-num { font-size: 26px; font-weight: 750; line-height: 1.2; color: var(--lv-tx); }
+      .lv-focus-sub { font-size: 11.5px; color: var(--lv-tx-3); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; } }
+    .lv-focus-icon { width: 42px; height: 42px; border-radius: 14px; display: grid; place-items: center;
+      flex: none; font-size: 18px; border: 1px solid transparent; transition: all var(--lv-t-fast) var(--lv-ease); }
+    
+    // Bento 双色温参考图风格（暖橙/浅紫/薄荷绿）
+    &.lv-focus-card--today {
+      background: linear-gradient(135deg, color-mix(in srgb, var(--lv-amber) 8%, var(--lv-surface)), var(--lv-surface));
+      border-color: color-mix(in srgb, var(--lv-amber) 30%, var(--lv-line));
+      .lv-focus-icon { background: var(--lv-amber-soft); color: var(--lv-amber); border-color: color-mix(in srgb, var(--lv-amber) 25%, transparent); }
+      &:hover { border-color: var(--lv-amber); }
+    }
+    &.lv-focus-card--review {
+      background: linear-gradient(135deg, color-mix(in srgb, #818cf8 9%, var(--lv-surface)), var(--lv-surface));
+      border-color: color-mix(in srgb, #818cf8 30%, var(--lv-line));
+      .lv-focus-icon { background: color-mix(in srgb, #818cf8 16%, var(--lv-surface)); color: #6366f1; border-color: color-mix(in srgb, #818cf8 25%, transparent); }
+      &:hover { border-color: #818cf8; }
+    }
+    &.lv-focus-card--health {
+      background: linear-gradient(135deg, color-mix(in srgb, var(--lv-ok) 8%, var(--lv-surface)), var(--lv-surface));
+      border-color: color-mix(in srgb, var(--lv-ok) 30%, var(--lv-line));
+      .lv-focus-icon { background: var(--lv-ok-soft); color: var(--lv-ok); border-color: color-mix(in srgb, var(--lv-ok) 25%, transparent); }
+      &:hover { border-color: var(--lv-ok); }
+    }
+  }
+
+  // ── 3c. 原型参考图生活律动周条（Weekly Pulse Strip）─────────
+  .lv-pulse-strip {
+    display: flex; gap: 8px; margin-bottom: 20px; overflow-x: auto;
+    padding-bottom: 4px; scrollbar-width: none;
+    &::-webkit-scrollbar { display: none; }
+  }
+  .lv-pulse-pill {
+    flex: 1; min-width: 52px; padding: 10px 4px; border-radius: var(--lv-r-3);
+    background: var(--lv-surface); border: 1px solid var(--lv-line);
+    display: flex; flex-direction: column; align-items: center; gap: 5px;
+    cursor: pointer; transition: all var(--lv-t-fast) var(--lv-ease);
+    box-shadow: var(--lv-shadow-1);
+    &:hover { border-color: var(--lv-accent); transform: translateY(-2px); }
+    &.is-today {
+      background: var(--lv-accent); color: #fff; border-color: var(--lv-accent);
+      box-shadow: 0 4px 12px -2px var(--lv-accent-soft);
+      .lv-pulse-weekday, .lv-pulse-day { color: #fff; }
+      .lv-pulse-status { background: rgba(255, 255, 255, 0.25); color: #fff; }
+    }
+  }
+  .lv-pulse-weekday { font-size: 11px; color: var(--lv-tx-3); font-weight: 500; }
+  .lv-pulse-day { font-size: 16px; font-weight: 700; color: var(--lv-tx); line-height: 1.1; }
+  .lv-pulse-status {
+    width: 22px; height: 22px; border-radius: 50%; display: grid; place-items: center;
+    font-size: 11px; background: var(--lv-surface-2); color: var(--lv-tx-2);
+    &.has-due { background: var(--lv-amber-soft); color: var(--lv-amber); font-weight: 600; }
+    &.is-past-ok { background: var(--lv-ok-soft); color: var(--lv-ok); }
+  }
+
+  // ── 3d. 原型参考图成就勋章区（Achievements Grid）───────────
+  .lv-achievements-row {
+    display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-bottom: 24px;
+  }
+  .lv-achievement-chip {
+    display: inline-flex; align-items: center; gap: 6px; padding: 6px 14px;
+    border-radius: 999px; font-size: 12px; font-weight: 500;
+    background: color-mix(in srgb, #818cf8 10%, var(--lv-surface));
+    border: 1px solid color-mix(in srgb, #818cf8 25%, var(--lv-line));
+    color: #4f46e5; transition: all var(--lv-t-fast) var(--lv-ease);
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.03);
+    &:hover { transform: translateY(-1px); border-color: #6366f1; }
+  }
   @media (max-width: 640px) {
     .lv-focus { grid-template-columns: 1fr; }
   }

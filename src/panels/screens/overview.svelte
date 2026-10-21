@@ -13,6 +13,7 @@
     import UiIcon from "@/ui/icon.svelte";
     import ActivityFeed from "../activity-feed.svelte";
     import { moduleUiIcon } from "@/ui/icons";
+    import { getWeeklyPulse, getFamilyAchievements } from "@/core/pulse-and-achievements";
     import type { ModuleGroupId } from "@/types";
 
     let { plugin, t, onGoto, onCapture, version, initialScanError = "", onRetryScan }: {
@@ -44,6 +45,14 @@
     const allReminders = $derived.by(() => {
         void version;
         return plugin.scan?.reminders ?? [];
+    });
+    const weeklyPulse = $derived.by(() => {
+        void version;
+        return getWeeklyPulse(new Date(), allReminders);
+    });
+    const achievements = $derived.by(() => {
+        void version;
+        return getFamilyAchievements(plugin.settings, allReminders);
     });
     const members = $derived.by(() => {
         void version;
@@ -499,35 +508,70 @@
 {/if}
 
 <div class="lv-focus" aria-label={t("dash.focusLabel")}>
-    <button type="button" class="lv-focus-card" onclick={() => onGoto("reminders")} aria-label={`${t("dash.focusToday")}：${overdueCount + soon7Count}`}>
+    <button type="button" class="lv-focus-card lv-focus-card--today" onclick={() => onGoto("reminders")} aria-label={`${t("dash.focusToday")}：${overdueCount + soon7Count}`}>
         <div class="lv-focus-copy">
             <span class="lv-focus-label">{t("dash.focusToday")}</span>
             <strong class="lv-focus-num lv-num">{overdueCount + soon7Count}</strong>
             <span class="lv-focus-sub">{t("dash.focusTodayBody").replace("${od}", String(overdueCount)).replace("${s}", String(soon7Count))}</span>
         </div>
-        <span class="lv-focus-icon" aria-hidden="true"><UiIcon name="clock" size={18} /></span>
+        <span class="lv-focus-icon" aria-hidden="true"><UiIcon name="clock" size={20} /></span>
     </button>
-    <button type="button" class="lv-focus-card" onclick={() => onGoto("members")} aria-label={`${t("dash.focusReview")}：${syncErrCount}`}>
+    <button type="button" class="lv-focus-card lv-focus-card--review" onclick={() => onGoto("members")} aria-label={`${t("dash.focusReview")}：${syncErrCount}`}>
         <div class="lv-focus-copy">
             <span class="lv-focus-label">{t("dash.focusReview")}</span>
-            <strong class="lv-focus-num lv-num" style={syncErrCount > 0 ? "color:var(--lv-warn)" : ""}>{syncErrCount}</strong>
+            <strong class="lv-focus-num lv-num">{syncErrCount}</strong>
             <span class="lv-focus-sub">{syncErrCount > 0 ? t("dash.focusReviewBody").replace("${n}", String(syncErrCount)) : t("dash.focusReviewOk")}</span>
         </div>
-        <span class="lv-focus-icon" aria-hidden="true"><UiIcon name="users" size={18} /></span>
+        <span class="lv-focus-icon" aria-hidden="true"><UiIcon name="users" size={20} /></span>
     </button>
-    <button type="button" class="lv-focus-card" onclick={() => plugin.openSetting()} aria-label={`${t("dash.focusData")}`}>
+    <button type="button" class="lv-focus-card lv-focus-card--health" onclick={() => plugin.openSetting()} aria-label={`${t("dash.focusData")}`}>
         <div class="lv-focus-copy">
             <span class="lv-focus-label">{t("dash.focusData")}</span>
-            <strong class="lv-focus-num" style={scanStale || scanErrors.length ? "color:var(--lv-warn);font-size:20px" : "color:var(--lv-ok);font-size:20px"}>
+            <strong class="lv-focus-num" style="font-size:20px">
                 {scanStale || scanErrors.length ? t("dash.stale") : t("diag.ok")}
             </strong>
             <span class="lv-focus-sub">{scanStale ? t("dash.focusStale") : scanErrors.length > 0 ? t("dash.focusDataErr").replace("${t}", snapshotLabel).replace("${n}", String(scanErrors.length)) : t("dash.focusDataOk").replace("${t}", snapshotLabel)}</span>
         </div>
-        <span class="lv-focus-icon" style={scanStale || scanErrors.length ? "color:var(--lv-warn);background:var(--lv-warn-soft)" : "color:var(--lv-ok);background:var(--lv-ok-soft)"} aria-hidden="true">
-            <UiIcon name={scanStale || scanErrors.length ? "alert" : "check"} size={18} />
+        <span class="lv-focus-icon" aria-hidden="true">
+            <UiIcon name={scanStale || scanErrors.length ? "alert" : "check"} size={20} />
         </span>
     </button>
 </div>
+
+<!-- 原型参考图生活律动周条（Weekly Pulse Strip） -->
+<div class="lv-pulse-strip" role="region" aria-label="本周日程节奏">
+    {#each weeklyPulse as p (p.date)}
+        <button type="button" class="lv-pulse-pill" class:is-today={p.isToday}
+            onclick={() => onGoto("reminders")}
+            title={`${p.date} ${p.weekday}：${p.dueCount} 项待办`}>
+            <span class="lv-pulse-weekday">{p.weekday}</span>
+            <span class="lv-pulse-day lv-num">{p.dayNum}</span>
+            <span class="lv-pulse-status" class:has-due={p.dueCount > 0} class:is-past-ok={p.isPast && p.dueCount === 0}>
+                {#if p.isToday}
+                    ●
+                {:else if p.isPast && p.dueCount === 0}
+                    ✓
+                {:else if p.dueCount > 0}
+                    {p.dueCount}
+                {:else}
+                    ·
+                {/if}
+            </span>
+        </button>
+    {/each}
+</div>
+
+<!-- 原型参考图家庭生活就绪成就勋章（Achievements Badges） -->
+{#if achievements.some((a) => a.achieved)}
+    <div class="lv-achievements-row" aria-label="家庭生活就绪勋章">
+        {#each achievements.filter((a) => a.achieved) as ach (ach.id)}
+            <div class="lv-achievement-chip" title={ach.desc}>
+                <UiIcon name={ach.icon as any} size={15} />
+                <span>{ach.title}</span>
+            </div>
+        {/each}
+    </div>
+{/if}
 
 <div class="lv-members" style="margin-bottom:4px">
     <button class="lv-chip {!memberFilter ? 'on' : ''}" aria-pressed={!memberFilter} onclick={() => setMemberFilter(undefined)}>{t("members.all")}</button>
