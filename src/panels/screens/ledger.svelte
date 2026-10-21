@@ -33,6 +33,7 @@
     import { panelSession, type TableDensity } from "../panel-session";
     import { maskValueForGuest, createDefaultGuestConfig } from "@/core/guest-mode";
     import { getGroupedModules } from "@/core/modules";
+    import { getQuickTemplates, type QuickRecordTemplate } from "@/core/quick-templates";
 
     let { plugin, t, version }: { plugin: HomePluginLike; t: (k: string) => string; version?: number } = $props();
 
@@ -140,9 +141,65 @@
             showMessage(t("ledger.sortSaveFailed").replace("${msg}", e instanceof Error ? e.message : String(e)), 5000, "error");
         }
     }
+    const ref = $derived(ledgers.find((entry) => entry.id === active)?.ref);
+    let filterMemberId = $state("");
+    let filterCategory = $state("");
+
+    const memberCol = $derived(ref?.columns?.member);
+    const categoryCol = $derived(ref?.columns?.category);
+
+    const availableCategories = $derived.by(() => {
+        if (!categoryCol) return [] as string[];
+        const set = new Set<string>();
+        for (const r of rows) {
+            const c = selectCellContent(r.cells?.[categoryCol]);
+            if (c && c !== "—") set.add(c);
+        }
+        return [...set];
+    });
+
+    const currentLedgerTemplates = $derived(getQuickTemplates(active));
+
+    function applyLedgerTemplate(tpl: QuickRecordTemplate) {
+        for (const [k, v] of Object.entries(tpl.values)) {
+            form[k] = v;
+        }
+        if (active === "certs" && tpl.values.category) {
+            handleCertificateCategoryChange(String(tpl.values.category));
+        }
+    }
+
+    async function adjustRowQty(row: any, fieldKey: string, delta: number) {
+        if (!ref?.avId || !ref.columns?.[fieldKey]) return;
+        const colId = ref.columns[fieldKey];
+        const cur = Number(row.cells?.[colId]?.number?.content ?? 0);
+        const next = Math.max(0, cur + delta);
+        try {
+            const { setCell } = await import("@/core/siyuan");
+            await setCell(ref.avId, colId, row.itemID, { type: "number", number: { content: next } });
+            if (!row.cells[colId]) row.cells[colId] = { type: "number", number: {} };
+            row.cells[colId].number.content = next;
+            showMessage(`${delta > 0 ? "+1" : "-1"} (${next})`, 1500, "info");
+        } catch (e) {
+            showMessage(String(e), 3000, "error");
+        }
+    }
+
     const filteredRows = $derived.by(() => {
         const q = searchText.trim().toLowerCase();
         let list = rows;
+        if (filterMemberId && memberCol) {
+            list = list.filter((r) => {
+                const bIds = r.cells?.[memberCol]?.relation?.blockIDs;
+                return Array.isArray(bIds) && bIds.includes(filterMemberId);
+            });
+        }
+        if (filterCategory && categoryCol) {
+            list = list.filter((r) => {
+                const c = selectCellContent(r.cells?.[categoryCol]);
+                return c === filterCategory;
+            });
+        }
         if (q) {
             // Search by full pinyin or initials once the dictionary is ready.
             void pyTick;
@@ -220,7 +277,6 @@
     // Resolve only enabled modules. A disabled module may still have an old
     // dbRef in settings; exposing that ref here would show stale rows after a
     // settings change and make the empty-state actions misleading.
-    const ref = $derived(ledgers.find((entry) => entry.id === active)?.ref);
     const schemaKeys = $derived<string[]>(ref?.columns ? Object.keys(ref.columns) : []);
     // Keep the list useful across all modules. A fixed expiry/status list made
     // travel, shopping and other ledgers render only an empty severity column.
@@ -248,6 +304,8 @@
         }
         if (next !== active && plugin.pendingActivityTarget?.moduleId !== next) plugin.pendingActivityTarget = undefined;
         active = next;
+        filterMemberId = "";
+        filterCategory = "";
         validationAttempted = false;
         saveError = "";
         plugin.activeLedger = active;
@@ -1942,7 +2000,18 @@
     let duplicateConfirmPending = $state(false);
 
     function onNewRecordKeydown(event: KeyboardEvent) {
-        if (!newRecordOpen) return;
+        if (!newRecordOpen) {
+            if (event.key === "/" && !event.ctrlKey && !event.metaKey && !event.altKey) {
+                const target = event.target as HTMLElement | null;
+                const isInput = target && (target.tagName === "INPUT" || target.tagName === "TEXTAREA" || target.tagName === "SELECT" || target.isContentEditable);
+                if (!isInput) {
+                    event.preventDefault();
+                    const searchEl = document.querySelector<HTMLInputElement>(".lv-ledger-toolbar input[type='search']");
+                    searchEl?.focus();
+                }
+            }
+            return;
+        }
         // The host duplicate-confirm dialog owns keyboard focus while it is open.
         if (duplicateConfirmPending) return;
         if (event.key === "Tab" && saving) {
@@ -5261,6 +5330,35 @@
     {/if}
 </div>
 
+{#if (memberCol && (plugin.settings.members?.length ?? 0) > 0) || (categoryCol && availableCategories.length > 0)}
+    <div class="lv-filter-bar" style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin:0 0 10px;font-size:11.5px">
+        {#if memberCol && (plugin.settings.members?.length ?? 0) > 0}
+            <div style="display:inline-flex;gap:3px;align-items:center;padding:2px 6px;background:var(--lv-surface-2);border-radius:12px;border:1px solid var(--lv-line)">
+                <span class="lv-caption" style="font-size:11px;margin-right:2px">👤</span>
+                <button type="button" class="lv-preset-tag" class:active={!filterMemberId} onclick={() => { filterMemberId = ""; }}>{t("ledger.allMembers")}</button>
+                {#each plugin.settings.members ?? [] as m (m.id)}
+                    {#if m.avItemId}
+                        <button type="button" class="lv-preset-tag" class:active={filterMemberId === m.avItemId} onclick={() => { filterMemberId = filterMemberId === m.avItemId ? "" : m.avItemId; }}>
+                            {m.name}
+                        </button>
+                    {/if}
+                {/each}
+            </div>
+        {/if}
+        {#if categoryCol && availableCategories.length > 0}
+            <div style="display:inline-flex;gap:3px;align-items:center;padding:2px 6px;background:var(--lv-surface-2);border-radius:12px;border:1px solid var(--lv-line)">
+                <span class="lv-caption" style="font-size:11px;margin-right:2px">🏷️</span>
+                <button type="button" class="lv-preset-tag" class:active={!filterCategory} onclick={() => { filterCategory = ""; }}>{t("ledger.allCategories")}</button>
+                {#each availableCategories as catVal (catVal)}
+                    <button type="button" class="lv-preset-tag" class:active={filterCategory === catVal} onclick={() => { filterCategory = filterCategory === catVal ? "" : catVal; }}>
+                        {optLabel(t, "category", catVal)}
+                    </button>
+                {/each}
+            </div>
+        {/if}
+    </div>
+{/if}
+
 {#if savedModule}
     <div class="lv-record-save-status" role="status">
         {t("ledger.newRecordSaved").replace("${name}", savedRecordName)} · {t("ledger.savedTo").replace("${module}", t(`module.${savedModule}`) !== `module.${savedModule}` ? t(`module.${savedModule}`) : savedModule)}
@@ -5282,6 +5380,17 @@
         <div class="lv-sheet-body lv-record-body">
             <section class="lv-record-section">
                 <h3>{t("ledger.newRecordBasic")}</h3>
+                {#if currentLedgerTemplates.length > 0}
+                    <div class="lv-template-bar" style="display:flex;gap:5px;flex-wrap:wrap;align-items:center;padding:6px 10px;background:var(--lv-surface-2);border-radius:6px;font-size:11.5px;margin-bottom:12px">
+                        <span class="lv-caption" style="color:var(--lv-tx-3);font-size:11px">✨ {t("capture.frequentTemplates")}:</span>
+                        {#each currentLedgerTemplates as tpl (tpl.id)}
+                            <button type="button" class="lv-preset-tag" onclick={() => applyLedgerTemplate(tpl)} disabled={saving} style="font-size:11.5px;padding:2px 8px">
+                                {#if tpl.icon}<span>{tpl.icon}</span>{/if}
+                                <span>{tpl.label}</span>
+                            </button>
+                        {/each}
+                    </div>
+                {/if}
                 <div class="lv-record-grid">
                     {#each captureCols as e (e.key)}
                         <div class="lv-record-field" class:lv-record-field-wide={e.key === "name" || e.type === "url"}>
@@ -5581,7 +5690,17 @@
                         {#each tableKeys as k (k)}
                             {@const v = r.cells[ref.columns[k]]}
                             <td class="lv-num" style={k === "expiry" || k === "due" ? `color:${toneColor(tone)}` : ""}>
-                                {cellText(v, k)}
+                                {#if k === "qty" || k === "stock_qty"}
+                                    <div style="display:inline-flex;align-items:center;gap:4px">
+                                        <button type="button" class="b3-button b3-button--text" style="padding:0 3px;font-size:11px;min-height:0;line-height:1"
+                                            title={t("ledger.quickDec")} onclick={(e) => { e.stopPropagation(); adjustRowQty(r, k, -1); }}>－</button>
+                                        <span>{cellText(v, k)}</span>
+                                        <button type="button" class="b3-button b3-button--text" style="padding:0 3px;font-size:11px;min-height:0;line-height:1"
+                                            title={t("ledger.quickInc")} onclick={(e) => { e.stopPropagation(); adjustRowQty(r, k, 1); }}>＋</button>
+                                    </div>
+                                {:else}
+                                    {cellText(v, k)}
+                                {/if}
                             </td>
                         {/each}
                     </tr>
