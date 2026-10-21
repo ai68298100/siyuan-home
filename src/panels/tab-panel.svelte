@@ -221,10 +221,14 @@
             requestAnimationFrame(() => captureInvoker?.focus());
         }
     });
-    // 268 波（Linear 式键盘优先）：N 键任意页签呼出快速记录——只在非输入焦点、
-    // 无修饰键、非输入法组合、宿主弹窗未开时响应
+    // 268 波（Linear 式键盘优先）：N 键呼出快速记录、Ctrl+K 呼出全景生活检索
     $effect(() => {
         const onKey = (e: KeyboardEvent) => {
+            if ((e.ctrlKey || e.metaKey) && (e.key === "k" || e.key === "K")) {
+                e.preventDefault();
+                void openSpotlight();
+                return;
+            }
             if (captureOpen) return;
             if (e.key !== "n" && e.key !== "N") return;
             if (e.isComposing || e.metaKey || e.ctrlKey || e.altKey) return;
@@ -279,6 +283,27 @@
                 cellTextFn: cellContentText,
             });
         } catch { /* ignore */ }
+    }
+
+    async function openSpotlight() {
+        try {
+            const { openSpotlightDialog } = await import("@/core/spotlight-dialog");
+            const { renderLedgerAll } = await import("@/core/siyuan");
+            const { cellContentText } = await import("@/core/avcell");
+            const { Dialog } = await import("siyuan");
+            await openSpotlightDialog({
+                t,
+                plugin: plugin as any,
+                DialogCls: Dialog as any,
+                renderLedgerAllFn: renderLedgerAll,
+                cellTextFn: cellContentText,
+                onNavigateToTarget: (target) => {
+                    openActivityTarget(target);
+                },
+            });
+        } catch (e) {
+            console.warn("[siyuan-home] spotlight open failed:", e);
+        }
     }
     // 提醒页签待办红点（version 驱动重算，随扫描更新）
     const pendingTotal = $derived.by(() => {
@@ -398,6 +423,7 @@
         </span>
         <!-- 267 波：⚡ 快速记录（原型 top-actions 主入口；268 波支持 N 键呼出） -->
         <div class="lv-tabbar-actions">
+            <button class="lv-iconbtn" aria-label={t("spotlight.title")} title={`${t("spotlight.title")} (Ctrl+K)`} style="font-size:15px" onclick={openSpotlight}><UiIcon name="search" size={16} /></button>
             <button class="lv-iconbtn" class:orange={isGuestMode} aria-label={t("guest.modeToggle")} title={t("guest.modeToggle")} style={isGuestMode ? "color:var(--lv-warn)" : ""} onclick={toggleGuestMode}><UiIcon name="shield" size={16} /></button>
             <button class="lv-iconbtn" aria-label={t("capture.title")} title={`${t("capture.title")} (N)`} style="font-size:15px" onclick={(event) => openCapture(undefined, event)}><UiIcon name="bolt" size={16} /></button>
             <button class="lv-iconbtn" aria-label={t("tab.settings")} title={t("tab.settings")} style="font-size:15px" onclick={() => plugin.openSetting()}><UiIcon name="settings" size={16} /></button>

@@ -1919,5 +1919,10 @@
     "ledger.copyBlockRef": "复制思源块引用",
     "ledger.blockRefCopied": "已复制思源块双链引用 ((...)) 至剪贴板！",
     "settings.targetNotebook": "台账默认笔记本",
-    "settings.targetNotebookHint": "新模块建账时优先使用的思源笔记本（留空则默认使用或创建「🏠 小驴管家」）"
+    "settings.targetNotebookHint": "新模块建账时优先使用的思源笔记本（留空则默认使用或创建「🏠 小驴管家」）",
+    "spotlight.title": "全景生活检索",
+    "spotlight.placeholder": "搜索物品、证件、存放位置、家庭成员或备注...",
+    "spotlight.loading": "正在检索全家生活数据...",
+    "ledger.shopWriteToLedger": "🛒 一键写入采购台账",
+    "ledger.shopWritten": "已成功将缺货清单写入采购台账！"
 }
