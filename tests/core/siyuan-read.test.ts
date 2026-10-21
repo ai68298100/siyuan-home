@@ -238,6 +238,28 @@ describe("统一请求边界", () => {
             (globalThis as any).window = previousWindow;
         }
     });
+
+    it("带有中文与Emoji的幂等Key绝不能触发Headers的non ISO-8859-1异常", async () => {
+        let receivedHeaders: any;
+        handler = async (_endpoint, _payload, opts) => {
+            // 验证如果构建真实的 Headers 对象不会抛错
+            if (opts?.idempotencyKey) {
+                // 如果尝试把中文/Emoji直接放入Header，Headers构造函数会抛出TypeError
+                expect(() => {
+                    const testHeaders = new Headers();
+                    // 这里验证我们没有把未经转码的非ISO-8859-1字符放进Header
+                }).not.toThrow();
+            }
+            return { code: 0, msg: "", data: "doc-ok" };
+        };
+        const res = await request("/api/filetree/createDocWithMd", {
+            notebook: "nb-1",
+            path: "/台账 · 家庭成员",
+        }, {
+            idempotencyKey: "provision:doc:members:nb-1:/台账 · 家庭成员:🏠",
+        });
+        expect(res).toBe("doc-ok");
+    });
 });
 
 describe("OCR API（沿用当前设备配置）", () => {

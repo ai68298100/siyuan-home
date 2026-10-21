@@ -39,24 +39,21 @@ Certificates expire, medicine expires, insurance needs renewal, subscriptions au
 
 Image OCR uses the engine configured in SiYuan Settings → OCR. It runs only when requested and does not require automatic OCR to be enabled. AI OCR asks before each run because the image is sent to the selected AI service. Results are saved to SiYuan OCR text and included in search; re-running replaces the previous result. Encrypted notebook images and PDFs are not supported, and OCR text is never written into ledger fields automatically.
 
-## 🆕 What's new in v0.5.30
+## 🆕 What's new in v0.5.31
 
-This release completely re-engineers the ledger provisioning pipeline to eliminate Issue #45, fixes notebook priority inversion with guaranteed activation, removes fragile -409 duplicate conflicts, and delivers the automated legacy ledger adoption engine (`discoverAndAdoptAllLedgers`):
+This release fixes an underlying browser Header construction exception (`String contains non ISO-8859-1 code point`) that blocked document creation requests before reaching the kernel:
 
-- **Fixed (Core Provisioning Pipeline & Issue #45)**: Fixed notebook selection priority to guarantee that user-specified target notebooks (`targetNotebookId`) always take top precedence. Forced `openNotebook` activation to prevent kernel write failures in closed notebooks.
-- **Fixed (Eliminated -409 Document Abort)**: `findLedgerDoc` now gracefully picks the best existing ledger document (preferring docs with valid AttributeViews and newest update times) instead of throwing a hard -409 failure.
-- **Added (Legacy Ledger Adoption Engine)**: Built-in 31-module alias dictionary (`MODULE_TITLE_ALIASES`) automatically sniffs, adopts, and upgrades existing documents created by earlier versions on startup, preventing duplicate generation and failure loops.
-- **Improved (Diagnostics & Transparent Feedback)**: Added "🔍 Auto-Adopt History Ledgers" one-click button in Settings with clear feedback reports.
-- **Validation**: 89 test suites, **787 unit tests passing**, TypeScript, Svelte, i18n (1946 keys), metadata, and package smoke all green.
-## 📦 Install (v0.5.30)
+- **Fixed (Underlying Browser Network Construction Failure)**: Completely removed the non-standard `X-Idempotency-Key` header injection in `fetchSyncPost` and `fetch`. Non-ASCII Chinese paths or Emoji characters in operation keys caused the browser's native `new Headers()` to abort with `TypeError: Failed to construct 'Headers': String contains non ISO-8859-1 code point`, preventing all notebook and document creation requests from reaching the SiYuan kernel.
+- **Validation**: 89 test suites, **788 unit tests passing**, TypeScript, Svelte, i18n (1946 keys), metadata, and package smoke all green.
+## 📦 Install (v0.5.31)
 
 1. Download `package.zip` from [Releases](https://github.com/ai68298100/siyuan-home/releases/latest)
 2. SiYuan → Settings → Marketplace → Download → **Import** the zip
 3. Enable the plugin → complete the 2-step onboarding (household → module picks and provisioning)
 4. Press `Ctrl+Alt+H` anytime to open the hub
 
-> **Validation status:** core data paths have automated tests and isolated-kernel coverage. The v0.5.30 GitHub Release is available; Android WebView behavior remains host-specific validation. `icon.png` and `preview.png` were redesigned for v0.3.13 (brand-gradient tile + geometric mark; dark overview with sample data).
-> **Version note:** the tagged v0.5.30 package is the current GitHub release; local quality checks report 787 unit tests.
+> **Validation status:** core data paths have automated tests and isolated-kernel coverage. The v0.5.31 GitHub Release is available; Android WebView behavior remains host-specific validation. `icon.png` and `preview.png` were redesigned for v0.3.13 (brand-gradient tile + geometric mark; dark overview with sample data).
+> **Version note:** the tagged v0.5.31 package is the current GitHub release; local quality checks report 788 unit tests.
 >
 > Family sharing depends on SiYuan's collaboration, permissions, sync and conflict behavior. Test with non-sensitive data before sharing; this plugin does not provide a separate permission system.
 >
@@ -114,7 +111,8 @@ The v0.5.1 release is available on GitHub, with static isolated-kernel gates and
 
 | Phase | Content |
 |---|---|
-| ✅ v0.5.30 (current) | Re-engineer provisioning pipeline (Issue #45 fix), guaranteed notebook activation, legacy ledger auto-adoption engine |
+| ✅ v0.5.31 (current) | Fix browser Headers non-ISO-8859-1 exception that crashed document and notebook creation; GitHub Release published |
+| v0.5.30 | Re-engineer provisioning pipeline (Issue #45 fix), guaranteed notebook activation, legacy ledger auto-adoption engine |
 | v0.5.29 | Quick capture dual-mode routing (events vs ledger), Spotlight search (Ctrl+K), shortage to shopping ledger, bind existing docs |
 | v0.5.28 | Fix Issue #39 settings save retry failure, default blank ledgers, top bar avatar alignment, quick templates, and batch management |
 | 🔜 Next | Task workbench, evidence center, inbox, health recovery |
@@ -134,7 +132,7 @@ pnpm run dev      # dev (app + kernel watch)
 pnpm run build    # dist/ + package.zip
 pnpm run check    # 5-layer gate (types + svelte + i18n + meta + audit)
 pnpm run smoke    # release package and single-file loader smoke checks
-pnpm test         # unit tests (787)
+pnpm test         # unit tests (788)
 ```
 
 - Setup & conventions: [CONTRIBUTING.md](./CONTRIBUTING.md)
