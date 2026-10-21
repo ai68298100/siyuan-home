@@ -1919,5 +1919,10 @@
     "ledger.copyBlockRef": "Copy Block Reference",
     "ledger.blockRefCopied": "Copied SiYuan block reference ((...)) to clipboard!",
     "settings.targetNotebook": "Default Notebook for Ledgers",
-    "settings.targetNotebookHint": "Notebook used when creating new ledger documents (defaults to creating \"🏠 Lv Home\" if unset)"
+    "settings.targetNotebookHint": "Notebook used when creating new ledger documents (defaults to creating \"🏠 Lv Home\" if unset)",
+    "spotlight.title": "Spotlight Search",
+    "spotlight.placeholder": "Search items, certs, locations, members or notes...",
+    "spotlight.loading": "Indexing family data...",
+    "ledger.shopWriteToLedger": "🛒 Add to Shopping Ledger",
+    "ledger.shopWritten": "Successfully added shortage items to shopping ledger!"
 }

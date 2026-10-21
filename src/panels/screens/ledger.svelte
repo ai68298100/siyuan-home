@@ -1246,8 +1246,8 @@
             const dlg = new Dialog({
                 title: t("ledger.shoppingList"),
                 content: `<div class="b3-dialog__content" id="lv-shop-body" style="max-height:60vh;overflow:auto"></div>
-<div class="b3-dialog__action"><span class="lv-caption" id="lv-shop-total" style="flex:1"></span><button class="b3-button b3-button--cancel" id="lv-shop-close">${t("cancel")}</button><button class="b3-button b3-button--text" id="lv-shop-copy" ${items.length === 0 ? "disabled" : ""}>${t("ledger.shopCopy")}</button></div>`,
-                width: "520px",
+<div class="b3-dialog__action"><span class="lv-caption" id="lv-shop-total" style="flex:1"></span><button class="b3-button b3-button--cancel" id="lv-shop-close">${t("cancel")}</button><button class="b3-button b3-button--text" id="lv-shop-copy" ${items.length === 0 ? "disabled" : ""}>${t("ledger.shopCopy")}</button><button class="b3-button" id="lv-shop-write" ${items.length === 0 ? "disabled" : ""}>${t("ledger.shopWriteToLedger")}</button></div>`,
+                width: "560px",
             });
         const body = dlg.element.querySelector("#lv-shop-body") as HTMLElement;
         if (items.length === 0) {
@@ -1295,6 +1295,33 @@
                 showMessage(t("ledger.shopCopyFailed"), 4000, "error");
             }
         };
+        const writeBtn = dlg.element.querySelector("#lv-shop-write") as HTMLButtonElement | null;
+        if (writeBtn) {
+            writeBtn.onclick = async () => {
+                const shoppingRef = plugin.settings.dbRefs?.["shopping"];
+                if (!shoppingRef?.avId || !shoppingRef.columns?.name) {
+                    showMessage(t("capture.ledgerUnavailable").replace("${module}", t("module.shopping")), 5000, "info");
+                    return;
+                }
+                writeBtn.disabled = true;
+                try {
+                    const { addDetachedRow, setCell } = await import("@/core/siyuan");
+                    for (let i = 0; i < items.length; i++) {
+                        const it = items[i];
+                        const buyQty = Math.max(1, Math.floor(Number(qtyInputs[i].value) || 1));
+                        const rowId = await addDetachedRow(shoppingRef.avId, it.name, { idempotencyKey: `stock:to-shop:${it.name}:${Date.now()}` });
+                        if (shoppingRef.columns.qty) {
+                            await setCell(shoppingRef.avId, shoppingRef.columns.qty, rowId, { type: "number", number: { content: buyQty } });
+                        }
+                    }
+                    dlg.destroy();
+                    showMessage(t("ledger.shopWritten"), 3000, "info");
+                } catch (e) {
+                    writeBtn.disabled = false;
+                    showMessage(String(e), 5000, "error");
+                }
+            };
+        }
         } catch (e) {
             showMessage(t("ledger.shoppingFailed").replace("${msg}", e instanceof Error ? e.message : String(e)), 6000, "error");
         }
