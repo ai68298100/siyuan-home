@@ -39,23 +39,24 @@ Certificates expire, medicine expires, insurance needs renewal, subscriptions au
 
 Image OCR uses the engine configured in SiYuan Settings → OCR. It runs only when requested and does not require automatic OCR to be enabled. AI OCR asks before each run because the image is sent to the selected AI service. Results are saved to SiYuan OCR text and included in search; re-running replaces the previous result. Encrypted notebook images and PDFs are not supported, and OCR text is never written into ledger fields automatically.
 
-## 🆕 What's new in v0.5.33
+## 🆕 What's new in v0.5.34
 
-This release completely eliminates repeated welcome messages, prevents onboarding regressions, and auto-heals onboarding status for existing users:
+This release breaks the automatic reload loop, fixes the spotlight search button click failure, and refactors the overview hero stat card and settings sidebar typography:
 
-- **Improved (Welcome Toast De-duplication & Anti-Disturbance)**: Welcome notification only fires on pristine fresh installs (0 members, 0 ledgers) at most once per session, preventing repeated popups during window reloads.
-- **Improved (Auto-Heal Onboarding Status for Existing Users)**: Existing users with members, household configs, or provisioned ledgers are automatically healed to `onboarded: true`.
-- **Improved (Early Onboarding Persistence)**: Onboarding completion state is eagerly persisted to disk upon finish/skip, preventing state regression due to background network latency.
+- **Fixed (Core Stability: Break Reload Loop)**: Removed eager automatic full provisioning from `onLayoutReady()`, eliminating background `settings.json` disk writes that triggered kernel FS Watcher `loaded petals` restart loops.
+- **Fixed (Search Button Unresponsive)**: Removed runtime dynamic `await import("siyuan")`, switching to standard static imports so clicking 🔍 or pressing `Ctrl+K` immediately opens Spotlight search.
+- **Improved (Settings Sidebar Breadcrumb Fix)**: Removed duplicate `settingsTitle` label in the settings sidebar, eliminating multi-line header text stacking.
+- **Improved (Overview Hero Stat Card & Action Layout)**: Replaced fragile overlapping SVGs with a clean modern stat card (`.lv-hero-stat-card`), and normalized button heights to 38px for neat multi-row flow.
 - **Validation**: 89 test suites, **789 unit tests passing**, TypeScript, Svelte, i18n (1946 keys), metadata, and package smoke all green.
-## 📦 Install (v0.5.33)
+## 📦 Install (v0.5.34)
 
 1. Download `package.zip` from [Releases](https://github.com/ai68298100/siyuan-home/releases/latest)
 2. SiYuan → Settings → Marketplace → Download → **Import** the zip
 3. Enable the plugin → complete the 2-step onboarding (household → module picks and provisioning)
 4. Press `Ctrl+Alt+H` anytime to open the hub
 
-> **Validation status:** core data paths have automated tests and isolated-kernel coverage. The v0.5.33 GitHub Release is available; Android WebView behavior remains host-specific validation. `icon.png` and `preview.png` were redesigned for v0.3.13 (brand-gradient tile + geometric mark; dark overview with sample data).
-> **Version note:** the tagged v0.5.33 package is the current GitHub release; local quality checks report 789 unit tests.
+> **Validation status:** core data paths have automated tests and isolated-kernel coverage. The v0.5.34 GitHub Release is available; Android WebView behavior remains host-specific validation. `icon.png` and `preview.png` were redesigned for v0.3.13 (brand-gradient tile + geometric mark; dark overview with sample data).
+> **Version note:** the tagged v0.5.34 package is the current GitHub release; local quality checks report 789 unit tests.
 >
 > Family sharing depends on SiYuan's collaboration, permissions, sync and conflict behavior. Test with non-sensitive data before sharing; this plugin does not provide a separate permission system.
 >
@@ -113,7 +114,8 @@ The v0.5.1 release is available on GitHub, with static isolated-kernel gates and
 
 | Phase | Content |
 |---|---|
-| ✅ v0.5.33 (current) | Eliminate repeated welcome popups, auto-heal onboarding status for existing users, eager state persistence |
+| ✅ v0.5.34 (current) | Break automatic reload loop, fix search button click, refactor overview stat card and settings sidebar |
+| v0.5.33 | Eliminate repeated welcome popups, auto-heal onboarding status for existing users, eager state persistence |
 | v0.5.32 | Fix quick capture confirmation dialog obstruction, elevate global Dialog z-index, native in-sheet confirmation |
 | v0.5.31 | Fix browser Headers non-ISO-8859-1 exception that crashed document and notebook creation; GitHub Release published |
 | v0.5.30 | Re-engineer provisioning pipeline (Issue #45 fix), guaranteed notebook activation, legacy ledger auto-adoption engine |

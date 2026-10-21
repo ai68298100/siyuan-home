@@ -803,8 +803,7 @@
 <div class="lv-home lv-settings">
     <!-- 左侧主分类；模块和提醒等复杂页面在右侧继续细分。 -->
     <nav class="lv-setnav" aria-label={t("settingsTitle")} inert={saving || migrationBusy || demoBusy}>
-        <div class="lv-setnav__brand"><span class="lv-setnav__brand-mark" aria-hidden="true">⌂</span><div><b>{t("butler")}</b><span>{t("settingsTitle")}</span></div></div>
-        <div class="lv-setnav__label">{t("settingsTitle")}</div>
+        <div class="lv-setnav__brand"><span class="lv-setnav__brand-mark" aria-hidden="true">⌂</span><div><b>{t("butler")}</b><span>LV HOME</span></div></div>
         <button class="lv-setnav__item {area === 'modules' ? 'on' : ''}" aria-current={area === 'modules' ? 'true' : undefined} onclick={() => (area = "modules")}><span class="lv-setnav__icon" aria-hidden="true">▦</span>{t("tabModules")}</button>
         <button class="lv-setnav__item {area === 'members' ? 'on' : ''}" aria-current={area === 'members' ? 'true' : undefined} onclick={() => (area = "members")}><span class="lv-setnav__icon" aria-hidden="true">♧</span>{t("tabMembers")}</button>
         <button class="lv-setnav__item {area === 'reminders' ? 'on' : ''}" aria-current={area === 'reminders' ? 'true' : undefined} onclick={() => (area = "reminders")}><span class="lv-setnav__icon" aria-hidden="true">◷</span>{t("tabReminders")}</button>

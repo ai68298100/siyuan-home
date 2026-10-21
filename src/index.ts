@@ -558,14 +558,13 @@ export default class LvHomePlugin extends Plugin {
         }
     }
 
-    /** 布局就绪后：首次引导数据准备 + 智能找回历史台账 + 建库 + 扫描（不阻塞启动） */
+    /** 布局就绪后：首次引导数据准备 + 智能找回历史台账 + 扫描（不阻塞启动，不强制全量建库） */
     async onLayoutReady() {
         try {
             await this.adoptHistoryLedgers();
-            await this.ensureCoreLedgers();
             await this.refreshHub(undefined, true);
         } catch (e) {
-            console.warn("[siyuan-home] initial provision/scan deferred:", e instanceof Error ? e.message : e);
+            console.warn("[siyuan-home] initial adopt/scan deferred:", e instanceof Error ? e.message : e);
         }
     }
 

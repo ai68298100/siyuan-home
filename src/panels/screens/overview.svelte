@@ -425,19 +425,31 @@
             {/if}
         </p>
         <div class="lv-hero-actions">
-            <button class="b3-button lv-hero-open" onclick={() => onGoto("reminders")}><UiIcon name="clock" size={17} />{t("dash.heroOpen")}</button>
-            <button class="b3-button b3-button--outline lv-hero-life-index" onclick={openLifeIndexModal} style="display:inline-flex;align-items:center;gap:5px"><UiIcon name="shield" size={16} />{t("overview.lifeIndex")}</button>
-            <button class="b3-button b3-button--outline lv-hero-emergency-card" onclick={openEmergencyCardModal} style="display:inline-flex;align-items:center;gap:5px"><UiIcon name="alert" size={16} />{t("overview.emergencyCard")}</button>
-            <button class="b3-button b3-button--outline lv-hero-share-card" onclick={openShareCardModal} style="display:inline-flex;align-items:center;gap:5px"><UiIcon name="camera" size={16} />{t("overview.shareCard")}</button>
-            {#if onCapture}<button class="b3-button b3-button--outline lv-hero-capture" onclick={() => onCapture()}><UiIcon name="add" size={16} />{t("dash.quickRecord")}</button>{/if}
+            <button class="b3-button lv-hero-open" onclick={() => onGoto("reminders")}><UiIcon name="clock" size={16} />{t("dash.heroOpen")}</button>
+            <button class="b3-button b3-button--outline lv-hero-action-btn" onclick={openLifeIndexModal}><UiIcon name="shield" size={15} />{t("overview.lifeIndex")}</button>
+            <button class="b3-button b3-button--outline lv-hero-action-btn" onclick={openEmergencyCardModal}><UiIcon name="alert" size={15} />{t("overview.emergencyCard")}</button>
+            <button class="b3-button b3-button--outline lv-hero-action-btn" onclick={openShareCardModal}><UiIcon name="camera" size={15} />{t("overview.shareCard")}</button>
+            {#if onCapture}
+                <button class="b3-button b3-button--outline lv-hero-action-btn lv-hero-capture-btn" onclick={() => onCapture()}><UiIcon name="add" size={15} />{t("dash.quickRecord")}</button>
+            {/if}
         </div>
         {#if monthlyDone > 0}<p><span class="lv-badge green">✓ {t("dash.monthlyDone").replace("${n}", monthlyDueTotal > 0 ? `${monthlyDone}/${monthlyDueTotal}` : String(monthlyDone))}</span></p>{/if}
     </div>
     <div class="lv-hero-tools">
-        <div class="lv-hero-count" title={t("dash.statScope").replace("${t}", snapshotLabel)}>
-            <b class="lv-num" use:countUp={reminders.length}>{reminders.length}</b><span>{reminders.length === 1 ? t("dash.needAttentionOne") : t("dash.needAttention")}</span>
+        <div class="lv-hero-stat-card" title={t("dash.statScope").replace("${t}", snapshotLabel)}>
+            <div class="lv-hero-stat-header">
+                <span class="lv-hero-stat-icon" aria-hidden="true"><UiIcon name="clock" size={16} /></span>
+                <span class="lv-hero-stat-label">{reminders.length === 1 ? t("dash.needAttentionOne") : t("dash.needAttention")}</span>
+            </div>
+            <div class="lv-hero-stat-body">
+                <b class="lv-num lv-hero-stat-num" use:countUp={reminders.length}>{reminders.length}</b>
+            </div>
+            <div class="lv-hero-stat-footer">
+                <span class="lv-badge {reminders.length > 0 ? 'orange' : 'green'}" style="font-size:11px">
+                    {reminders.length > 0 ? `${reminders.length} 项需留意` : '全家就绪 · 暂无到期'}
+                </span>
+            </div>
         </div>
-        <svg class="lv-hero-art" viewBox="0 0 184 130" aria-hidden="true"><rect x="9" y="12" width="166" height="106" rx="28" fill="currentColor" opacity=".08"/><rect x="24" y="25" width="76" height="88" rx="12" fill="var(--lv-surface)" stroke="currentColor" stroke-opacity=".25"/><path d="M40 48h43M40 61h32M40 76h20M40 91h29" stroke="currentColor" stroke-width="4" stroke-linecap="round" opacity=".25"/><rect x="94" y="42" width="64" height="65" rx="14" fill="var(--lv-surface)" stroke="currentColor" stroke-opacity=".25"/><path d="m107 67 19-16 19 16M113 63v24h26V63M122 87V74h8v13" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/><circle cx="153" cy="33" r="14" fill="var(--lv-amber-soft)"/><path d="m147 33 4 4 8-8" fill="none" stroke="var(--lv-amber)" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
     </div>
 </div>
 

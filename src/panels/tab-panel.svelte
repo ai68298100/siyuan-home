@@ -1,7 +1,7 @@
 <script lang="ts">
     import { onMount } from "svelte";
     import type { Component } from "svelte";
-    import { showMessage } from "siyuan";
+    import { showMessage, Dialog } from "siyuan";
     import AvatarSettings from "./avatar-settings.svelte";
     import ErrorBoundary from "./error-boundary.svelte";
     import UiIcon from "@/ui/icon.svelte";
@@ -273,7 +273,6 @@
             const { openEmergencyCardDialog } = await import("@/core/emergency-card-dialog");
             const { renderLedgerAll } = await import("@/core/siyuan");
             const { cellContentText } = await import("@/core/avcell");
-            const { Dialog, showMessage } = await import("siyuan");
             await openEmergencyCardDialog({
                 t,
                 plugin,
@@ -290,7 +289,6 @@
             const { openSpotlightDialog } = await import("@/core/spotlight-dialog");
             const { renderLedgerAll } = await import("@/core/siyuan");
             const { cellContentText } = await import("@/core/avcell");
-            const { Dialog } = await import("siyuan");
             await openSpotlightDialog({
                 t,
                 plugin: plugin as any,
