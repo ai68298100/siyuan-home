@@ -101,21 +101,19 @@ async function createNotebookWithRecovery(name: string): Promise<string> {
     try {
         return await createNotebook(name, { idempotencyKey: `provision:notebook:create:${name}`, retries: 0 });
     } catch (error) {
-        if (!isWriteResultUnknown(error)) throw error;
-        // The create request may have committed before its response was lost.
-        // Re-read by exact name before reporting an unresolved result; never
-        // blindly submit a second create request. The list endpoint can lag
-        // the committed create, so poll briefly before deciding the result is
-        // unknown.
+        // The create request may have committed before its response was lost,
+        // or a notebook with this name already exists.
         let matches: Awaited<ReturnType<typeof listNotebooks>> = [];
         for (let attempt = 0; attempt < NOTEBOOK_RECOVERY_ATTEMPTS; attempt++) {
             if (attempt > 0) await new Promise((resolve) => setTimeout(resolve, NOTEBOOK_RECOVERY_DELAY_MS));
             matches = (await listNotebooks()).filter((notebook) => notebook.name === name);
             if (matches.length > 0) break;
         }
-        if (matches.length === 1) return matches[0].id;
-        throw new KernelError("/api/notebook/createNotebook", -408,
-            matches.length > 1 ? `notebook creation is ambiguous for "${name}"` : `notebook creation result is unknown for "${name}"`);
+        if (matches.length > 0) {
+            const chosen = matches.find((n) => !n.closed) || matches[0];
+            return chosen.id;
+        }
+        throw error;
     }
 }
 
@@ -191,6 +189,11 @@ function stableAvSeed(moduleId: string, docId: string): string {
     return `${timestamp}-${(hash >>> 0).toString(36).padStart(7, "0")}`;
 }
 
+export interface FoundLedgerDoc {
+    id: string;
+    box: string;
+}
+
 /**
  * 健壮找回台账文档（消除历史脆弱的 rows.length > 1 抛 409 异常）：
  * 1. 优先在指定的 notebookId 找精确 hpath；
@@ -198,31 +201,31 @@ function stableAvSeed(moduleId: string, docId: string): string {
  * 3. 如果指定笔记本没有找到，按模块历史别名扩展查找；
  * 4. 如果仍未找到，全局跨所有笔记本搜寻带有该模块台账特征的文档（自动自愈历史版本）。
  */
-export async function findLedgerDoc(notebookId: string, hpath: string, moduleId?: string): Promise<string | null> {
+export async function findLedgerDoc(notebookId: string, hpath: string, moduleId?: string): Promise<FoundLedgerDoc | null> {
     try {
         const escapedHpath = hpath.replace(/'/g, "''");
         const escapedBox = notebookId.replace(/'/g, "''");
         // 1. 指定笔记本内精确匹配
-        const rows = await sql<{ id: string; updated: string }>(
-            `SELECT id, updated FROM blocks WHERE type='d' AND box='${escapedBox}' AND hpath='${escapedHpath}' ORDER BY updated DESC LIMIT 5`,
+        const rows = await sql<{ id: string; box: string; updated: string }>(
+            `SELECT id, box, updated FROM blocks WHERE type='d' AND box='${escapedBox}' AND hpath='${escapedHpath}' ORDER BY updated DESC LIMIT 5`,
         );
-        if (rows.length === 1) return rows[0].id;
+        if (rows.length === 1) return { id: rows[0].id, box: rows[0].box || notebookId };
         if (rows.length > 1) {
             for (const r of rows) {
                 const av = await findAvBlockInDoc(r.id);
-                if (av) return r.id;
+                if (av) return { id: r.id, box: r.box || notebookId };
             }
-            return rows[0].id;
+            return { id: rows[0].id, box: rows[0].box || notebookId };
         }
 
         // 2. 指定笔记本内历史别名匹配
         if (moduleId && MODULE_TITLE_ALIASES[moduleId]) {
             for (const alias of MODULE_TITLE_ALIASES[moduleId]) {
                 const aliasHpath = `/${DOC_TITLE_PREFIX}${alias}`.replace(/'/g, "''");
-                const aliasRows = await sql<{ id: string }>(
-                    `SELECT id FROM blocks WHERE type='d' AND box='${escapedBox}' AND hpath='${aliasHpath}' ORDER BY updated DESC LIMIT 2`,
+                const aliasRows = await sql<{ id: string; box: string }>(
+                    `SELECT id, box FROM blocks WHERE type='d' AND box='${escapedBox}' AND hpath='${aliasHpath}' ORDER BY updated DESC LIMIT 2`,
                 );
-                if (aliasRows.length > 0) return aliasRows[0].id;
+                if (aliasRows.length > 0) return { id: aliasRows[0].id, box: aliasRows[0].box || notebookId };
             }
         }
 
@@ -230,14 +233,14 @@ export async function findLedgerDoc(notebookId: string, hpath: string, moduleId?
         const globalRows = await sql<{ id: string; box: string }>(
             `SELECT id, box FROM blocks WHERE type='d' AND hpath='${escapedHpath}' ORDER BY updated DESC LIMIT 2`,
         );
-        if (globalRows.length > 0) return globalRows[0].id;
+        if (globalRows.length > 0) return { id: globalRows[0].id, box: globalRows[0].box };
 
         if (moduleId && MODULE_TITLE_ALIASES[moduleId]) {
             for (const alias of MODULE_TITLE_ALIASES[moduleId]) {
-                const globalAliasRows = await sql<{ id: string }>(
-                    `SELECT id FROM blocks WHERE type='d' AND hpath LIKE '%${alias.replace(/'/g, "''")}%' ORDER BY updated DESC LIMIT 1`,
+                const globalAliasRows = await sql<{ id: string; box: string }>(
+                    `SELECT id, box FROM blocks WHERE type='d' AND hpath LIKE '%${alias.replace(/'/g, "''")}%' ORDER BY updated DESC LIMIT 1`,
                 );
-                if (globalAliasRows.length > 0) return globalAliasRows[0].id;
+                if (globalAliasRows.length > 0) return { id: globalAliasRows[0].id, box: globalAliasRows[0].box };
             }
         }
     } catch { /* SQL 异常回退 null */ }
@@ -412,40 +415,42 @@ export async function provisionModule(
         const hpath = ledgerHPath(titleI18n);
         const found = await findLedgerDoc(notebookId, hpath, moduleId);
         if (found) {
+            const actualNotebookId = found.box || notebookId;
+            try {
+                await openNotebook(actualNotebookId, { retries: 1 });
+            } catch { /* ignore */ }
             // 补登记：优先找回文档内既有 av 块（D08），找不回才建新库
-            let avId = await findAvBlockInDoc(found);
+            let avId = await findAvBlockInDoc(found.id);
             if (!avId) {
                 try {
-                    avId = await createAttributeView(found, stableAvSeed(moduleId, found), { idempotencyKey: `provision:av:${moduleId}:${found}` });
+                    avId = await createAttributeView(found.id, stableAvSeed(moduleId, found.id), { idempotencyKey: `provision:av:${moduleId}:${found.id}` });
                 } catch {
                     avId = null; // av 创建失败 → provisional 落库，诊断可见
                 }
             }
             const memberAvId = moduleId === "members" ? undefined : settings.dbRefs.members?.avId;
             const { columns, error } = await ensureColumns(avId, schema, existing?.columns, moduleId, opts, memberAvId);
-            const dbRef: DbRef = { ...existing, docId: found, avId: avId ?? undefined, notebook: notebookId, provisional: !avId, columns, provisionError: error };
+            const dbRef: DbRef = { ...existing, docId: found.id, avId: avId ?? undefined, notebook: actualNotebookId, provisional: !avId, columns, provisionError: error };
             settings.dbRefs[moduleId] = dbRef;
             return { dbRef, created: false };
         }
         let docId: string;
         try {
             const docHeaderMarkdown = `# ${titleI18n}\n\n> 🏠 **小驴管家 · 专属台账文档**\n> 快捷直达：按 \`Ctrl+Alt+H\` 可在任意界面随时呼出小驴管家；下方为思源原生属性视图数据库（AttributeView），支持双向编辑与同步。\n\n{: placeholder-ledger }\n`;
-            const createdRes = await createDocWithMd(notebookId, hpath, docHeaderMarkdown, {
+            docId = await createDocWithMd(notebookId, hpath, docHeaderMarkdown, {
                 idempotencyKey: `provision:doc:${moduleId}:${notebookId}:${hpath}`,
                 retries: 0,
             });
-            docId = typeof createdRes === "string" ? createdRes.replace(/^"|"$/g, "").trim() : String(createdRes);
         } catch (error) {
-            let recovered: string | null = null;
+            let recovered: FoundLedgerDoc | null = null;
             for (let attempt = 0; attempt < 6 && !recovered; attempt++) {
                 if (attempt > 0) await new Promise((resolve) => setTimeout(resolve, 200 * attempt));
                 recovered = await findLedgerDoc(notebookId, hpath, moduleId);
             }
             if (recovered) {
-                docId = recovered;
+                docId = recovered.id;
             } else {
-                const kernelMsg = errText(error);
-                throw new KernelError("/api/filetree/createDocWithMd", -408, `document creation deferred for "${hpath}": ${kernelMsg}`);
+                throw error;
             }
         }
         const avIdSeed = stableAvSeed(moduleId, docId);
@@ -580,11 +585,16 @@ export async function discoverAndAdoptAllLedgers(
         const found = await findLedgerDoc(existing?.notebook || defaultNbId, hpath, moduleId);
 
         if (found) {
-            let avId = await findAvBlockInDoc(found);
+            const actualNb = found.box || existing?.notebook || defaultNbId;
+            try {
+                await openNotebook(actualNb, { retries: 1 });
+            } catch { /* ignore */ }
+
+            let avId = await findAvBlockInDoc(found.id);
             if (!avId) {
                 try {
-                    avId = await createAttributeView(found, stableAvSeed(moduleId, found), {
-                        idempotencyKey: `adopt:av:${moduleId}:${found}`,
+                    avId = await createAttributeView(found.id, stableAvSeed(moduleId, found.id), {
+                        idempotencyKey: `adopt:av:${moduleId}:${found.id}`,
                     });
                 } catch {
                     // provisional
@@ -594,9 +604,9 @@ export async function discoverAndAdoptAllLedgers(
             const { columns, error } = await ensureColumns(avId, schema, existing?.columns, moduleId, { resolveName }, memberAvId);
             settings.dbRefs[moduleId] = {
                 ...existing,
-                docId: found,
+                docId: found.id,
                 avId: avId ?? undefined,
-                notebook: existing?.notebook || defaultNbId,
+                notebook: actualNb,
                 columns,
                 provisional: !avId,
                 provisionError: error,

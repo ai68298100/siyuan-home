@@ -216,7 +216,13 @@ export function isPermissionDenied(e: unknown): e is PermissionDeniedError {
 /** A write may have reached the kernel even though its response was lost. */
 export function isWriteResultUnknown(e: unknown): boolean {
     if (e instanceof RequestAbortedError) return e.mayHaveReachedServer;
-    if (e instanceof KernelError) return e.code === -1 || e.code === -408;
+    if (e instanceof KernelError) {
+        // -408: 客户端等待超时，请求已发出可能已达内核
+        if (e.code === -408) return true;
+        // 仅在完全没有收到合法信封时视作未知网络中断，绝不将内核返回的明确业务拒绝(-1带msg)误判为未知
+        if (e.code === -1 && e.kernelMsg === "malformed response envelope") return true;
+        return false;
+    }
     if (e instanceof TypeError) return true;
     return typeof DOMException !== "undefined" && e instanceof DOMException && e.name === "AbortError";
 }
@@ -437,9 +443,28 @@ export function openNotebook(notebookId: string, options?: RequestOptions): Prom
     return post("/api/notebook/openNotebook", { notebook: notebookId }, options).then(() => undefined);
 }
 
+/**
+ * 归一化 createDocWithMd 的返回值。
+ * 兼容裸 ID 字符串、外层带引号的字符串、以及部分版本返回的包含 id/rootID 的对象结构。
+ */
+export function docIdFromCreateResponse(data: unknown): string {
+    if (typeof data === "string" && data) return data.replace(/^"|"$/g, "").trim();
+    if (data && typeof data === "object") {
+        const obj = data as Record<string, unknown>;
+        const id = obj.id ?? obj.rootID ?? obj.rootId ?? obj.docId ?? obj.docID ?? obj.data;
+        if (typeof id === "string" && id) return id.replace(/^"|"$/g, "").trim();
+    }
+    return "";
+}
+
 /** path 为 hpath；返回 docID */
-export function createDocWithMd(notebook: string, hpath: string, markdown: string, options?: RequestOptions): Promise<string> {
-    return post<string>("/api/filetree/createDocWithMd", { notebook, path: hpath, markdown }, options);
+export async function createDocWithMd(notebook: string, hpath: string, markdown: string, options?: RequestOptions): Promise<string> {
+    const data = await post<unknown>("/api/filetree/createDocWithMd", { notebook, path: hpath, markdown }, options);
+    const docId = docIdFromCreateResponse(data);
+    if (!docId) {
+        throw new KernelError("/api/filetree/createDocWithMd", -3, "invalid doc id in response");
+    }
+    return docId;
 }
 
 export function getHPathByID(id: string, options?: RequestOptions): Promise<string> {
@@ -518,12 +543,17 @@ export async function createAttributeView(docId: string, avIdSeed: string, optio
     const div = `<div data-type="NodeAttributeView" data-av-id="${avIdSeed}" data-av-type="table"></div>`;
     const readOptions: RequestOptions = { timeoutMs: options?.timeoutMs, signal: options?.signal, retries: 1 };
     const findBySeed = async () => {
-        const rows = await sql<{ id: string }>(
-            `SELECT id FROM blocks WHERE type='av' AND root_id='${docId.replace(/'/g, "''")}' AND markdown LIKE '%${avIdSeed.replace(/'/g, "''")}%' LIMIT 2`,
-            readOptions,
-        );
-        if (rows.length > 1) throw new KernelError("av.createAttributeView", -409, "attribute view seed is ambiguous");
-        return rows[0]?.id ?? "";
+        try {
+            const rows = await sql<{ id: string; markdown?: string }>(
+                `SELECT id, markdown FROM blocks WHERE type='av' AND root_id='${docId.replace(/'/g, "''")}' LIMIT 5`,
+                readOptions,
+            );
+            if (rows.length === 0) return "";
+            const matched = rows.find((r) => r.markdown && r.markdown.includes(avIdSeed));
+            return (matched ?? rows[0]).id;
+        } catch {
+            return "";
+        }
     };
     // A prior attempt may have inserted the block but lost its response.
     let blockId = await findBySeed();

@@ -757,6 +757,10 @@
             if (!ref?.avId) {
                 ok.textContent = t("triage.provisioning");
                 await provisionModule(plugin.settings, mod, plugin.schemaCatalog?.[mod], t(`module.${mod}`), { resolveName: (key: string) => String(plugin.i18n[`field.${key}`] ?? key) });
+                try {
+                    const { saveSettings } = await import("@/core/settings");
+                    await saveSettings(plugin as any, plugin.settings);
+                } catch { /* soft persist */ }
                 ref = plugin.settings.dbRefs[mod];
                 if (!ref?.avId) { showMessage(t("triage.noTarget"), 3000, "error"); return; }
             }
