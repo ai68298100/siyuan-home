@@ -1899,5 +1899,12 @@
     "ledger.allMembers": "All Members",
     "ledger.allCategories": "All Categories",
     "ledger.quickInc": "+1",
-    "ledger.quickDec": "-1"
+    "ledger.quickDec": "-1",
+    "ledger.batchSelected": "${n} selected",
+    "ledger.batchLocation": "Batch Location",
+    "ledger.batchDelete": "Batch Delete",
+    "ledger.batchDeleteConfirm": "Are you sure you want to delete ${n} selected records? This cannot be undone.",
+    "ledger.duplicateRow": "Duplicate Record",
+    "ledger.duplicateSuccess": "Copied template from \"${name}\"",
+    "ledger.batchLocationTitle": "Batch Update Location"
 }

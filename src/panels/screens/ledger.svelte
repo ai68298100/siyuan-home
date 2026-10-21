@@ -144,6 +144,52 @@
     const ref = $derived(ledgers.find((entry) => entry.id === active)?.ref);
     let filterMemberId = $state("");
     let filterCategory = $state("");
+    let selectedItemIds = $state<string[]>([]);
+
+    function toggleRowSelect(id: string) {
+        if (selectedItemIds.includes(id)) {
+            selectedItemIds = selectedItemIds.filter((x) => x !== id);
+        } else {
+            selectedItemIds = [...selectedItemIds, id];
+        }
+    }
+
+    const columnSuggestions = $derived.by(() => {
+        const map: Record<string, string[]> = {};
+        if (!ref?.columns) return map;
+        for (const [colKey, colId] of Object.entries(ref.columns)) {
+            if (["name", "location", "store_place", "copy_location", "brand_model", "channel", "hospital", "doctor", "party", "unit"].includes(colKey)) {
+                const valuesSet = new Set<string>();
+                for (const r of rows) {
+                    const txt = String(cellText(r.cells?.[colId], colKey) ?? "").trim();
+                    if (txt && txt !== "—" && txt.length <= 40) {
+                        valuesSet.add(txt);
+                    }
+                }
+                if (valuesSet.size > 0) {
+                    map[colKey] = Array.from(valuesSet).slice(0, 15);
+                }
+            }
+        }
+        return map;
+    });
+
+    const dynamicLocations = $derived.by(() => {
+        const set = new Set<string>();
+        for (const l of ["主卧抽屉", "客厅药箱", "玄关柜", "书房书架", "储藏室", "冰箱冷藏", "厨房吊柜"]) {
+            set.add(l);
+        }
+        const locCols = [ref?.columns?.location, ref?.columns?.store_place, ref?.columns?.copy_location].filter(Boolean);
+        for (const colId of locCols) {
+            for (const r of rows) {
+                const txt = String(cellText(r.cells?.[colId as string]) ?? "").trim();
+                if (txt && txt !== "—" && txt.length <= 20) {
+                    set.add(txt);
+                }
+            }
+        }
+        return Array.from(set).slice(0, 12);
+    });
 
     const memberCol = $derived(ref?.columns?.member);
     const categoryCol = $derived(ref?.columns?.category);
@@ -167,6 +213,83 @@
         if (active === "certs" && tpl.values.category) {
             handleCertificateCategoryChange(String(tpl.values.category));
         }
+    }
+
+    async function openBatchLocationModal() {
+        if (!selectedItemIds.length || !ref?.avId || !ref?.columns?.location) return;
+        const targetCol = ref.columns.location;
+        const locOptions = dynamicLocations;
+        const dlg = new Dialog({
+            title: t("ledger.batchLocationTitle"),
+            content: `
+                <div class="b3-dialog__content" style="display:flex;flex-direction:column;gap:10px">
+                    <label class="lv-caption">${t("ledger.batchLocationTitle")}：</label>
+                    <input class="b3-text-field" id="lv-batch-loc-input" style="width:100%" placeholder="${t("capture.presetLocations")}" />
+                    <div style="display:flex;gap:4px;flex-wrap:wrap">
+                        ${locOptions.map((loc) => `<button type="button" class="lv-preset-tag lv-batch-loc-tag" data-loc="${loc}">${loc}</button>`).join("")}
+                    </div>
+                </div>
+                <div class="b3-dialog__action">
+                    <button class="b3-button b3-button--cancel">${t("cancel")}</button>
+                    <button class="b3-button" id="lv-batch-loc-ok">${t("save")}</button>
+                </div>
+            `,
+            width: "420px",
+        });
+        const inp = dlg.element.querySelector("#lv-batch-loc-input") as HTMLInputElement;
+        dlg.element.querySelectorAll(".lv-batch-loc-tag").forEach((btn) => {
+            (btn as HTMLButtonElement).onclick = () => {
+                inp.value = btn.getAttribute("data-loc") ?? "";
+            };
+        });
+        (dlg.element.querySelector(".b3-button--cancel") as HTMLButtonElement).onclick = () => dlg.destroy();
+        (dlg.element.querySelector("#lv-batch-loc-ok") as HTMLButtonElement).onclick = async function (this: HTMLButtonElement) {
+            const locVal = inp.value.trim();
+            if (!locVal) return;
+            this.disabled = true;
+            try {
+                const { setCell } = await import("@/core/siyuan");
+                const count = selectedItemIds.length;
+                for (const rowId of selectedItemIds) {
+                    await setCell(ref!.avId!, targetCol, rowId, { type: "text", text: { content: locVal } });
+                }
+                dlg.destroy();
+                selectedItemIds = [];
+                showMessage(t("ledger.batchLocation") + ` (${count})`, 3000, "info");
+                await load();
+            } catch (e) {
+                showMessage(String(e), 5000, "error");
+            }
+        };
+    }
+
+    function batchDelete() {
+        if (!selectedItemIds.length || !ref?.avId) return;
+        const count = selectedItemIds.length;
+        confirm(
+            t("ledger.batchDelete"),
+            t("ledger.batchDeleteConfirm").replace("${n}", String(count)),
+            async () => {
+                try {
+                    const { removeLedgerRows } = await import("@/core/siyuan");
+                    const { cleanupRowRuntimeData, saveRuntime } = await import("@/core/hub/runtime");
+                    await removeLedgerRows(ref!.avId!, selectedItemIds, {
+                        idempotencyKey: `ledger:batch-del:${ref!.avId!}:${Date.now()}`,
+                        retries: 1,
+                    });
+                    for (const id of selectedItemIds) {
+                        cleanupRowRuntimeData(plugin.runtime, id);
+                    }
+                    await saveRuntime(plugin, plugin.runtime);
+                    selectedItemIds = [];
+                    showMessage(t("ledger.delDone") + ` (${count})`, 3000, "info");
+                    await load();
+                    try { await plugin.refreshHub?.([active]); } catch { /* ignore */ }
+                } catch (e) {
+                    showMessage(t("ledger.delFailed").replace("${msg}", e instanceof Error ? e.message : String(e)), 5000, "error");
+                }
+            }
+        );
     }
 
     async function adjustRowQty(row: any, fieldKey: string, delta: number) {
@@ -209,6 +332,13 @@
         const keyType = sortKey ? plugin.schemaCatalog?.[active]?.columns?.find((column: any) => column.key === sortKey)?.type : undefined;
         return sortRows(list, keyID, sortAsc, keyType);
     });
+
+    const allSelected = $derived(filteredRows.length > 0 && selectedItemIds.length === filteredRows.length);
+
+    function toggleSelectAll() {
+        if (allSelected) selectedItemIds = [];
+        else selectedItemIds = filteredRows.map((r) => r.itemID);
+    }
     function sortRows(list: any[], keyID?: string, ascending = true, keyType?: string) {
         if (!keyID) return list;
         return [...list].sort((a, b) => {
@@ -306,6 +436,7 @@
         active = next;
         filterMemberId = "";
         filterCategory = "";
+        selectedItemIds = [];
         validationAttempted = false;
         saveError = "";
         plugin.activeLedger = active;
@@ -2280,7 +2411,7 @@
         const dlg = new Dialog({
             title: detailTitle,
             content: `<div class="b3-dialog__content b3-dialog__content--wrap" id="lv-detail-body" style="max-height:60vh;overflow:auto"></div>
-<div class="b3-dialog__action lv-detail-actions"><button class="b3-button b3-button--text ft__error" id="lv-detail-del" style="color:var(--b3-theme-error)">${t("delete")}</button><span class="fn__flex-1"></span><details class="lv-detail-more"><summary class="b3-button b3-button--outline">${t("ledger.detailMore")}</summary><div class="lv-detail-more-menu"><button class="b3-button b3-button--cancel" id="lv-detail-card-copy">${t("ledger.copyAsImage")}</button><button class="b3-button b3-button--cancel" id="lv-detail-card-png">${t("ledger.downloadPng")}</button><button class="b3-button b3-button--cancel" id="lv-detail-card-text">${t("ledger.copyAsText")}</button><button class="b3-button b3-button--cancel" id="lv-detail-card-masked-text">${t("ledger.copyAsMaskedText")}</button><button class="b3-button b3-button--cancel" id="lv-detail-open">${t("ledger.openDoc")} →</button></div></details><button class="b3-button b3-button--cancel" id="lv-detail-close">${t("close")}</button><button class="b3-button" id="lv-detail-edit">${t("ledger.detailEditAll")}</button></div>`,
+<div class="b3-dialog__action lv-detail-actions"><button class="b3-button b3-button--text ft__error" id="lv-detail-del" style="color:var(--b3-theme-error)">${t("delete")}</button><button class="b3-button b3-button--text" id="lv-detail-duplicate">📋 ${t("ledger.duplicateRow")}</button><span class="fn__flex-1"></span><details class="lv-detail-more"><summary class="b3-button b3-button--outline">${t("ledger.detailMore")}</summary><div class="lv-detail-more-menu"><button class="b3-button b3-button--cancel" id="lv-detail-card-copy">${t("ledger.copyAsImage")}</button><button class="b3-button b3-button--cancel" id="lv-detail-card-png">${t("ledger.downloadPng")}</button><button class="b3-button b3-button--cancel" id="lv-detail-card-text">${t("ledger.copyAsText")}</button><button class="b3-button b3-button--cancel" id="lv-detail-card-masked-text">${t("ledger.copyAsMaskedText")}</button><button class="b3-button b3-button--cancel" id="lv-detail-open">${t("ledger.openDoc")} →</button></div></details><button class="b3-button b3-button--cancel" id="lv-detail-close">${t("close")}</button><button class="b3-button" id="lv-detail-edit">${t("ledger.detailEditAll")}</button></div>`,
             width: "520px",
         });
         const body = dlg.element.querySelector("#lv-detail-body") as HTMLElement;
@@ -4988,6 +5119,30 @@
                 showMessage(t("ledger.copyAsImageFail") + ` (${e instanceof Error ? e.message : String(e)})`, 5000, "error");
             }
         };
+        // Copy record as new draft.
+        const dupBtn = dlg.element.querySelector("#lv-detail-duplicate") as HTMLButtonElement | null;
+        if (dupBtn) {
+            dupBtn.onclick = () => {
+                const rowName = cellText(row.cells[ref.columns.name]) || "";
+                const cloneName = rowName ? `${rowName} (副本)` : "";
+                const copiedValues: Record<string, any> = { name: cloneName };
+                for (const col of schemaCols) {
+                    if (col.key === "name" || ["asset", "mAsset", "relation"].includes(col.type)) continue;
+                    const v = row.cells[ref.columns[col.key]];
+                    if (v) {
+                        if (col.type === "select") copiedValues[col.key] = selectCellContent(v);
+                        else if (col.type === "number") copiedValues[col.key] = v.number?.content;
+                        else if (col.type === "date") copiedValues[col.key] = v.date?.content ? localDateKey(new Date(v.date.content)) : "";
+                        else if (col.type === "checkbox") copiedValues[col.key] = v.checkbox?.checked;
+                        else copiedValues[col.key] = cellText(v, col.key);
+                    }
+                }
+                dlg.destroy();
+                openNewRecord();
+                form = copiedValues;
+                showMessage(t("ledger.duplicateSuccess").replace("${name}", cloneName || rowName), 3000, "info");
+            };
+        }
         // Row deletion is explicit and confirmed before mutation.
         (dlg.element.querySelector("#lv-detail-del") as HTMLButtonElement).onclick = () => {
             if (plugin.runtime?.guestModeActive) {
@@ -5429,10 +5584,17 @@
                             {:else if ["note", "violations", "diagnosis"].includes(e.key)}
                                 <textarea id="lv-new-{e.key}" class="b3-text-field lv-record-textarea" rows="3" placeholder={fieldMetaText(e.placeholderKey) || fieldLabel(e.key)} bind:value={form[e.key]} disabled={saving || identityPending} aria-invalid={!!formFieldError(e)} aria-describedby={formFieldError(e) ? `lv-new-${e.key}-error` : undefined}></textarea>
                             {:else}
-                                <input id="lv-new-{e.key}" class="b3-text-field" type="text" placeholder={fieldMetaText(e.placeholderKey) || fieldLabel(e.key)} bind:value={form[e.key]} disabled={saving || identityPending} aria-invalid={!!formFieldError(e)} aria-describedby={formFieldError(e) ? `lv-new-${e.key}-error` : undefined} />
+                                <input id="lv-new-{e.key}" class="b3-text-field" type="text" list={columnSuggestions[e.key] ? `lv-datalist-${e.key}` : undefined} placeholder={fieldMetaText(e.placeholderKey) || fieldLabel(e.key)} bind:value={form[e.key]} disabled={saving || identityPending} aria-invalid={!!formFieldError(e)} aria-describedby={formFieldError(e) ? `lv-new-${e.key}-error` : undefined} />
+                                {#if columnSuggestions[e.key]}
+                                    <datalist id="lv-datalist-{e.key}">
+                                        {#each columnSuggestions[e.key] as suggestion (suggestion)}
+                                            <option value={suggestion}></option>
+                                        {/each}
+                                    </datalist>
+                                {/if}
                                 {#if e.key === "location" || e.key === "store_place" || e.key === "copy_location"}
                                     <div class="lv-preset-tags">
-                                        {#each ["主卧抽屉", "客厅药箱", "玄关柜", "书房书架", "储藏室", "冰箱冷藏", "厨房吊柜"] as loc (loc)}
+                                        {#each dynamicLocations as loc (loc)}
                                             <button type="button" class="lv-preset-tag" onclick={() => { form[e.key] = loc; }}>{loc}</button>
                                         {/each}
                                     </div>
@@ -5662,6 +5824,9 @@
     <div class="lv-card lv-table-wrap lv-table" class:lv-table--compact={tableDensity === "compact"} style="margin-top:12px">
         <table bind:this={ledgerTableEl}>
             <thead><tr>
+                <th style="width:36px;padding:4px 6px;text-align:center">
+                    <input type="checkbox" class="b3-switch" style="transform:scale(0.8);margin:0" checked={allSelected} onclick={toggleSelectAll} title="全选/取消全选" />
+                </th>
                 <!-- Severity indicator column. -->
                 <th class="lv-sev-col"></th>
                 {#each tableKeys as k (k)}
@@ -5675,12 +5840,15 @@
             </tr></thead>
             <tbody>
                 {#if virtualRange.start > 0}
-                    <tr class="lv-virtual-spacer" aria-hidden="true"><td colspan={tableKeys.length + 1} style={`height:${virtualRange.start * virtualRowHeight}px`}></td></tr>
+                    <tr class="lv-virtual-spacer" aria-hidden="true"><td colspan={tableKeys.length + 2} style={`height:${virtualRange.start * virtualRowHeight}px`}></td></tr>
                 {/if}
                 {#each virtualRows as r (r.itemID)}
                     {@const tone = ledgerTone(r)}
                     {@const rowName = cellText(r.cells[ref.columns.name], "name") || cellText(r.cells[ref.columns.title], "title") || t("ledger.detail")}
                     <tr class="lv-row-link" onclick={() => openDetail(r)} title={t("ledger.detail")}>
+                        <td style="width:36px;padding:4px 6px;text-align:center" onclick={(e) => e.stopPropagation()}>
+                            <input type="checkbox" class="b3-switch" style="transform:scale(0.8);margin:0" checked={selectedItemIds.includes(r.itemID)} onclick={() => toggleRowSelect(r.itemID)} />
+                        </td>
                         <td class="lv-sev-cell">
                             <button type="button" class="lv-table-open" aria-label={`${t("ledger.detail")}：${rowName}`} title={t("ledger.detail")}
                                 onclick={(e) => { e.stopPropagation(); openDetail(r); }}>
@@ -5706,12 +5874,12 @@
                     </tr>
                 {/each}
                 {#if virtualRange.end < visibleRows.length}
-                    <tr class="lv-virtual-spacer" aria-hidden="true"><td colspan={tableKeys.length + 1} style={`height:${(visibleRows.length - virtualRange.end) * virtualRowHeight}px`}></td></tr>
+                    <tr class="lv-virtual-spacer" aria-hidden="true"><td colspan={tableKeys.length + 2} style={`height:${(visibleRows.length - virtualRange.end) * virtualRowHeight}px`}></td></tr>
                 {/if}
                 {#if filteredRows.length > visibleRows.length}
                     <!-- Progressive rendering load-more row. -->
                     <tr class="lv-more">
-                        <td colspan={tableKeys.length + 1}>
+                        <td colspan={tableKeys.length + 2}>
                             <button class="b3-button b3-button--outline" style="margin:0 auto;display:block"
                                 onclick={() => (renderLimit += RENDER_PAGE)}>
                                 {t("ledger.loadMore").replace("${n}", String(filteredRows.length - visibleRows.length))}
@@ -5722,4 +5890,22 @@
             </tbody>
         </table>
     </div>
+    {#if selectedItemIds.length > 0}
+        <div class="lv-batch-bar" role="toolbar" aria-label="批量操作">
+            <span class="lv-caption" style="font-weight:600;color:var(--lv-tx)">
+                {t("ledger.batchSelected").replace("${n}", String(selectedItemIds.length))}
+            </span>
+            {#if ref?.columns?.location}
+                <button type="button" class="b3-button b3-button--outline" style="font-size:12px;padding:3px 10px" onclick={openBatchLocationModal}>
+                    📍 {t("ledger.batchLocation")}
+                </button>
+            {/if}
+            <button type="button" class="b3-button b3-button--text ft__error" style="font-size:12px;padding:3px 10px;color:var(--b3-theme-error)" onclick={batchDelete}>
+                🗑️ {t("ledger.batchDelete")}
+            </button>
+            <button type="button" class="b3-button b3-button--text" style="font-size:12px;padding:3px 6px" onclick={() => { selectedItemIds = []; }} title={t("close")}>
+                ✕
+            </button>
+        </div>
+    {/if}
 {/if}

@@ -47,13 +47,13 @@ jobs:
       - name: Package smoke test
         run: pnpm run smoke
 
-      # 思源加载器要求单文件 bundle；320 波扩展 Canvas 年度长图后对齐 250KB 预算门禁（256,000 字节）。
-      - name: Bundle size gate (index.js gzip < 250KB, single-file mandatory)
+      # 思源加载器要求单文件 bundle；321 波扩展批量管理/智能模板/分类增强后对齐 255KB 预算门禁（261,120 字节）。
+      - name: Bundle size gate (index.js gzip < 255KB, single-file mandatory)
         run: |
           SIZE=$(gzip -c dist/index.js | wc -c)
           echo "index.js gzip: $SIZE bytes"
-          if [ "$SIZE" -gt 256000 ]; then
-            echo "::error::index.js gzip exceeds 250KB budget"
+          if [ "$SIZE" -gt 261120 ]; then
+            echo "::error::index.js gzip exceeds 255KB budget"
             exit 1
           fi
 

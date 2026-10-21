@@ -640,6 +640,14 @@
     cursor: pointer; transition: all var(--lv-t-fast) var(--lv-ease); user-select: none; line-height: 1.2;
     &:hover { background: var(--lv-accent-soft); border-color: var(--lv-accent); color: var(--lv-accent); }
   }
+  .lv-batch-bar {
+    position: sticky; bottom: 16px; margin: 16px auto 0;
+    width: fit-content; max-width: calc(100% - 32px);
+    display: flex; align-items: center; gap: 8px; padding: 6px 14px;
+    background: var(--lv-surface); border: 1px solid var(--lv-line-strong);
+    border-radius: var(--lv-r-full, 999px); box-shadow: var(--lv-shadow-3);
+    z-index: 10; animation: lvFadeInUp 0.2s var(--lv-ease);
+  }
   .lv-cap-body .lv-frow { align-items: center; }
   .lv-cap-body .b3-select,
   .lv-cap-body .b3-text-field { width: 100%; min-width: 0; min-height: var(--lv-control-sm); padding: 6px 10px; font-size: 13px;
