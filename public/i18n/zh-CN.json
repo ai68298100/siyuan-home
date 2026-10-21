@@ -1946,5 +1946,8 @@
     "capture.pulse": "脉搏(次/分)",
     "capture.glucoseVal": "血糖值(mmol/L)",
     "capture.fasting": "空腹",
-    "capture.postprandial": "餐后2小时"
+    "capture.postprandial": "餐后2小时",
+    "diag.adoptHistory": "🔍 智能找回历史台账",
+    "diag.adoptHistoryDone": "成功找回并重新绑定 ${n} 个历史模块台账：${modules}！",
+    "diag.adoptHistoryNone": "未发现遗留的孤儿历史台账，当前映射已是最新。"
 }

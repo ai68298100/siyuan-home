@@ -553,14 +553,28 @@ export default class LvHomePlugin extends Plugin {
         }
     }
 
-    /** 布局就绪后：首次引导数据准备 + 建库 + 扫描（不阻塞启动） */
+    /** 布局就绪后：首次引导数据准备 + 智能找回历史台账 + 建库 + 扫描（不阻塞启动） */
     async onLayoutReady() {
         try {
+            await this.adoptHistoryLedgers();
             await this.ensureCoreLedgers();
             await this.refreshHub(undefined, true);
         } catch (e) {
             console.warn("[siyuan-home] initial provision/scan deferred:", e instanceof Error ? e.message : e);
         }
+    }
+
+    /** 智能扫描并找回思源中已有的全部历史台账（老版本平滑升级匹配） */
+    async adoptHistoryLedgers() {
+        const { discoverAndAdoptAllLedgers } = await import("@/core/provisioner");
+        const resolveName = (key: string) => String(this.i18n[`field.${key}`] ?? this.i18nText(key));
+        const report = await discoverAndAdoptAllLedgers(this.settings, this.schemaCatalog, resolveName);
+        if (report.adoptedCount > 0) {
+            try {
+                await saveSettings(this, this.settings);
+            } catch { /* soft persist */ }
+        }
+        return report;
     }
 
     /** members 先建（relation 目标），其余按需；幂等。启用模块才建库（P4）。

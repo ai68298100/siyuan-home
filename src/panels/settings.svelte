@@ -19,6 +19,8 @@
         refreshHub?: (only?: string | string[], force?: boolean) => Promise<unknown>;
         /** C8b：新启用模块立即建库 */
         ensureCoreLedgers?: () => Promise<ProvisioningReport>;
+        /** 智能找回并接管思源中已有历史台账 */
+        adoptHistoryLedgers?: () => Promise<any>;
         /** UG03/DL07：导入前备份探测与恢复 */
         loadData?: (name: string) => Promise<unknown>;
         saveData?: (name: string, data: unknown) => Promise<void>;
@@ -77,7 +79,7 @@
     let draftWebhookUrl = $state(settings.webhookUrl ?? "");
     let testingWebhook = $state(false);
     let rerunBusy = $state(false);
-    let diagnosticsBusy = $state<"backfill" | "duplicates" | "health" | "rebuild" | null>(null);
+    let diagnosticsBusy = $state<"backfill" | "duplicates" | "health" | "rebuild" | "adopt" | null>(null);
     let exportingDiagnostics = $state(false);
     let demoBusy = $state(false);
     let demoAction = $state<"generate" | "clear" | null>(null);
@@ -483,6 +485,7 @@
         if (diagnosticsBusy) return;
         diagnosticsBusy = "rebuild";
         try {
+            await plugin.adoptHistoryLedgers?.();
             const report = await plugin.ensureCoreLedgers();
             try {
                 await plugin.refreshHub?.(undefined, true);
@@ -498,6 +501,26 @@
             }
         } catch (error) {
             showMessage(`${t("ledger.rebuildFailed").replace("${msg}", errText(error))}`, 6000, "error");
+        } finally {
+            diagnosticsBusy = null;
+        }
+    }
+
+    async function runAdoptHistoryLedgers() {
+        if (diagnosticsBusy) return;
+        diagnosticsBusy = "adopt";
+        try {
+            const report = await plugin.adoptHistoryLedgers?.();
+            try {
+                await plugin.refreshHub?.(undefined, true);
+            } catch { /* ignore */ }
+            if (report && report.adoptedCount > 0) {
+                showMessage(t("diag.adoptHistoryDone").replace("${n}", String(report.adoptedCount)).replace("${modules}", report.adoptedModules.join("、")), 7000, "info");
+            } else {
+                showMessage(t("diag.adoptHistoryNone"), 4000, "info");
+            }
+        } catch (e) {
+            showMessage(errText(e), 5000, "error");
         } finally {
             diagnosticsBusy = null;
         }
@@ -1136,6 +1159,10 @@
                             aria-busy={diagnosticsBusy === "health"}
                             onclick={runDeepHealthCheck}>{diagnosticsBusy === "health" ? t("ledger.saving") : t("diag.health")}</button>
                         <!-- §15 一键重建全部启用台账文档与视图 -->
+                        <button class="b3-button b3-button--outline"
+                            disabled={diagnosticsBusy !== null || exportingDiagnostics}
+                            aria-busy={diagnosticsBusy === "adopt"}
+                            onclick={runAdoptHistoryLedgers}>{diagnosticsBusy === "adopt" ? t("ledger.saving") : t("diag.adoptHistory")}</button>
                         <button class="b3-button b3-button--outline"
                             disabled={diagnosticsBusy !== null || exportingDiagnostics}
                             aria-busy={diagnosticsBusy === "rebuild"}
