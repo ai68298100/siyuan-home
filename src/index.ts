@@ -577,7 +577,11 @@ export default class LvHomePlugin extends Plugin {
             if (!enabled.has(id)) continue;
             await provisionModule(this.settings, id, schema, this.i18nText("module." + id), { resolveName });
         }
-        await saveSettings(this, this.settings);
+        try {
+            await saveSettings(this, this.settings);
+        } catch (e) {
+            console.warn("[siyuan-home] saveSettings in provision failed:", e);
+        }
     }
 
     /** 扫描 → 运行态合并 → 缓存 → 每日摘要 → 通知面板。

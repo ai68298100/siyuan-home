@@ -222,6 +222,24 @@ export async function loadSettings(plugin: Plugin): Promise<HomeSettings> {
     return result;
 }
 
+export function errText(e: unknown): string {
+    if (!e) return "unknown error";
+    if (e instanceof Error) return e.message;
+    if (typeof e === "string") return e;
+    if (typeof e === "object") {
+        const obj = e as Record<string, unknown>;
+        if (typeof obj.msg === "string" && obj.msg) return obj.msg;
+        if (typeof obj.message === "string" && obj.message) return obj.message;
+        if (typeof obj.error === "string" && obj.error) return obj.error;
+        try {
+            return JSON.stringify(e);
+        } catch {
+            return String(e);
+        }
+    }
+    return String(e);
+}
+
 const lastSerializedSettingsByPlugin = new WeakMap<object, string>();
 
 export async function saveSettings(plugin: Plugin, settings: HomeSettings): Promise<void> {
@@ -244,7 +262,7 @@ export async function saveSettings(plugin: Plugin, settings: HomeSettings): Prom
                 await plugin.saveData(SETTINGS_NAME, snapshot);
                 lastSerializedSettingsByPlugin.set(plugin, json);
             } catch {
-                throw new Error(`settings save failed after retry: ${e1 instanceof Error ? e1.message : String(e1)}`);
+                throw new Error(`settings save failed after retry: ${errText(e1)}`);
             }
         }
     });

@@ -5837,7 +5837,21 @@
             <button class="lv-btn primary" style="margin-top:4px" onclick={() => plugin.openSetting()}>{t("startGuide.openSettings")}</button>
         </div></div>
     {:else if !ref?.avId}
-        <div class="lv-card"><div class="lv-empty" role="status"><div class="eic"><UiIcon name="archive" size={22} /></div><b>{t("ledger.notProvisioned")}</b><span>{t("ledger.notProvisionedHint")}</span></div></div>
+        <div class="lv-card">
+            <div class="lv-empty" role="status">
+                <div class="eic"><UiIcon name="archive" size={24} /></div>
+                <b>{t("ledger.defaultBlankTitle")}</b>
+                <span style="max-width:480px;line-height:1.6">{t("ledger.defaultBlankDesc")}</span>
+                <div style="display:flex;gap:10px;margin-top:8px">
+                    <button class="b3-button b3-button--outline" onclick={rebuildLedger} disabled={rebuilding}>
+                        🚀 {rebuilding ? t("diag.rebuilding") : t("ledger.buildNow")}
+                    </button>
+                    <button class="lv-btn primary" onclick={openNewRecord} disabled={rebuilding}>
+                        + {t("ledger.newRecord")}
+                    </button>
+                </div>
+            </div>
+        </div>
     {:else if rows.length > 0}
         <!-- Empty state for a search with no matches. -->
         <div class="lv-card"><div class="lv-empty" role="status"><div class="eic"><UiIcon name="search" size={22} /></div><b>{t("ledger.searchEmpty")}</b><span>{t("ledger.searchEmptyHint").replace("${q}", searchText.trim())}</span></div></div>

@@ -1908,5 +1908,8 @@
     "ledger.duplicateSuccess": "Copied template from \"${name}\"",
     "ledger.batchLocationTitle": "Batch Update Location",
     "ledger.batchMember": "Batch Member",
-    "ledger.batchMemberTitle": "Batch Assign Member"
+    "ledger.batchMemberTitle": "Batch Assign Member",
+    "ledger.defaultBlankTitle": "Default Blank Ledger (Not Provisioned)",
+    "ledger.defaultBlankDesc": "This module has standard schema configured. You can use it as a blank ledger, provision it in SiYuan anytime, or add a record to auto-provision.",
+    "ledger.buildNow": "Provision in SiYuan"
 }

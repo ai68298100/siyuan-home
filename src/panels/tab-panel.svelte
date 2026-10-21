@@ -368,7 +368,10 @@
                 <b>{t("butler")}</b>
                 <span>LV HOME</span>
             </div>
-            <AvatarSettings {plugin} {t} />
+            <span class="lv-appbrand-sep" aria-hidden="true"></span>
+            <div class="lv-avatar-wrap">
+                <AvatarSettings {plugin} {t} />
+            </div>
         </div>
         <div class="lv-tabs" bind:this={navEl} style="position:relative" role="tablist" aria-label={t("tab.title")}>
             <!-- 252 波：首次定位不带过渡（pill.w===0 时挂 init），避免挂载瞬间胶囊从左滑入 -->
