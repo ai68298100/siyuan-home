@@ -1911,5 +1911,13 @@
     "ledger.batchMemberTitle": "Batch Assign Member",
     "ledger.defaultBlankTitle": "Default Blank Ledger (Not Provisioned)",
     "ledger.defaultBlankDesc": "This module has standard schema configured. You can use it as a blank ledger, provision it in SiYuan anytime, or add a record to auto-provision.",
-    "ledger.buildNow": "Provision in SiYuan"
+    "ledger.buildNow": "Provision in SiYuan",
+    "ledger.bindDoc": "🔗 Bind Existing Doc",
+    "ledger.bindDocTitle": "Bind Existing SiYuan Doc",
+    "ledger.bindDocHint": "Enter a SiYuan doc link (siyuan://... or ((docId))) to bind it as this module's ledger. An AttributeView will be auto-inserted if not present.",
+    "ledger.bindDocSuccess": "Successfully bound doc to \"${module}\" ledger!",
+    "ledger.copyBlockRef": "Copy Block Reference",
+    "ledger.blockRefCopied": "Copied SiYuan block reference ((...)) to clipboard!",
+    "settings.targetNotebook": "Default Notebook for Ledgers",
+    "settings.targetNotebookHint": "Notebook used when creating new ledger documents (defaults to creating \"🏠 Lv Home\" if unset)"
 }

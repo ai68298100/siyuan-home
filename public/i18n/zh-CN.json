@@ -1911,5 +1911,13 @@
     "ledger.batchMemberTitle": "批量指派记录归属成员",
     "ledger.defaultBlankTitle": "默认空白台账（尚未在思源中建库）",
     "ledger.defaultBlankDesc": "当前模块已配置标准字段结构，支持作为默认空白台账先行使用。你可以随时在思源中建立专属文档，或直接新建记录自动建库。",
-    "ledger.buildNow": "在思源中建立此台账"
+    "ledger.buildNow": "在思源中建立此台账",
+    "ledger.bindDoc": "🔗 绑定已有文档",
+    "ledger.bindDocTitle": "绑定已有思源文档为台账",
+    "ledger.bindDocHint": "输入思源文档链接（siyuan://... 或 ((docId))），将该文档绑定为此模块的台账。若文档内未包含属性视图数据表，系统将自动插入。",
+    "ledger.bindDocSuccess": "成功将文档绑定为「${module}」台账！",
+    "ledger.copyBlockRef": "复制思源块引用",
+    "ledger.blockRefCopied": "已复制思源块双链引用 ((...)) 至剪贴板！",
+    "settings.targetNotebook": "台账默认笔记本",
+    "settings.targetNotebookHint": "新模块建账时优先使用的思源笔记本（留空则默认使用或创建「🏠 小驴管家」）"
 }

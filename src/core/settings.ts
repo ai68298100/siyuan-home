@@ -217,6 +217,7 @@ export async function loadSettings(plugin: Plugin): Promise<HomeSettings> {
         avatar: normalizeAvatarText(data.avatar),
         avatarImage: normalizeAvatarImage(data.avatarImage),
         budgetLimits,
+        targetNotebookId: typeof data.targetNotebookId === "string" && data.targetNotebookId ? data.targetNotebookId : undefined,
     };
     lastSerializedSettingsByPlugin.set(plugin, JSON.stringify(result));
     return result;
