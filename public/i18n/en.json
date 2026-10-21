@@ -1906,5 +1906,7 @@
     "ledger.batchDeleteConfirm": "Are you sure you want to delete ${n} selected records? This cannot be undone.",
     "ledger.duplicateRow": "Duplicate Record",
     "ledger.duplicateSuccess": "Copied template from \"${name}\"",
-    "ledger.batchLocationTitle": "Batch Update Location"
+    "ledger.batchLocationTitle": "Batch Update Location",
+    "ledger.batchMember": "Batch Member",
+    "ledger.batchMemberTitle": "Batch Assign Member"
 }

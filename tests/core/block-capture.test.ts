@@ -3,6 +3,7 @@ import {
     inferModuleFromText,
     extractDateFromText,
     extractAmountFromText,
+    smartExtractFieldsFromTitle,
     smartParseNoteContent,
 } from "@/core/block-capture";
 
@@ -120,6 +121,28 @@ describe("core/block-capture 思源块内容与笔记智能速记（301波）", 
             const parsed = smartParseNoteContent("");
             expect(parsed.title).toBe("");
             expect(parsed.confidence).toBe(0);
+        });
+    });
+
+    describe("smartExtractFieldsFromTitle 标题智能日期与金额自动析出", () => {
+        it("从复合标题中析出日期并净化标题", () => {
+            const res = smartExtractFieldsFromTitle("2028-11-20 居民身份证");
+            expect(res.extractedDate).toBe("2028-11-20");
+            expect(res.cleanTitle).toBe("居民身份证");
+        });
+
+        it("从复合标题中析出金额与日期", () => {
+            const res = smartExtractFieldsFromTitle("租房合同 3500元 2027年10月01日");
+            expect(res.extractedAmount).toBe(3500);
+            expect(res.extractedDate).toBe("2027-10-01");
+            expect(res.cleanTitle).toBe("租房合同");
+        });
+
+        it("普通标题原样返回", () => {
+            const res = smartExtractFieldsFromTitle("清风原木纯品抽纸");
+            expect(res.cleanTitle).toBe("清风原木纯品抽纸");
+            expect(res.extractedDate).toBeUndefined();
+            expect(res.extractedAmount).toBeUndefined();
         });
     });
 });

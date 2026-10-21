@@ -34,6 +34,7 @@
     import { maskValueForGuest, createDefaultGuestConfig } from "@/core/guest-mode";
     import { getGroupedModules } from "@/core/modules";
     import { getQuickTemplates, type QuickRecordTemplate } from "@/core/quick-templates";
+    import { smartExtractFieldsFromTitle } from "@/core/block-capture";
 
     let { plugin, t, version }: { plugin: HomePluginLike; t: (k: string) => string; version?: number } = $props();
 
@@ -213,6 +214,67 @@
         if (active === "certs" && tpl.values.category) {
             handleCertificateCategoryChange(String(tpl.values.category));
         }
+    }
+
+    function handleNewRecordNameBlur() {
+        if (!form.name || typeof form.name !== "string") return;
+        const res = smartExtractFieldsFromTitle(form.name);
+        if (res.cleanTitle !== form.name) {
+            form.name = res.cleanTitle;
+            const dateCol = schemaCols.find((c) => c.type === "date" && ["expiry", "due", "date"].includes(c.key));
+            if (dateCol && res.extractedDate && !form[dateCol.key]) {
+                form[dateCol.key] = res.extractedDate;
+            }
+            const numCol = schemaCols.find((c) => c.type === "number" && ["amount", "price", "deposit"].includes(c.key));
+            if (numCol && res.extractedAmount !== undefined && !form[numCol.key]) {
+                form[numCol.key] = res.extractedAmount;
+            }
+        }
+    }
+
+    async function openBatchMemberModal() {
+        if (!selectedItemIds.length || !ref?.avId || !memberCol) return;
+        const targetCol = memberCol;
+        const membersList = (plugin.settings.members ?? []).filter((m) => !!m.avItemId);
+        if (!membersList.length) {
+            showMessage(t("members.notLinked"), 4000, "info");
+            return;
+        }
+        const dlg = new Dialog({
+            title: t("ledger.batchMemberTitle"),
+            content: `
+                <div class="b3-dialog__content" style="display:flex;flex-direction:column;gap:10px">
+                    <label class="lv-caption">${t("ledger.batchMemberTitle")}：</label>
+                    <div style="display:flex;gap:6px;flex-wrap:wrap">
+                        ${membersList.map((m) => `<button type="button" class="lv-preset-tag lv-batch-mem-tag" data-id="${m.avItemId}">${m.name}</button>`).join("")}
+                    </div>
+                </div>
+                <div class="b3-dialog__action">
+                    <button class="b3-button b3-button--cancel">${t("cancel")}</button>
+                </div>
+            `,
+            width: "380px",
+        });
+        (dlg.element.querySelector(".b3-button--cancel") as HTMLButtonElement).onclick = () => dlg.destroy();
+        dlg.element.querySelectorAll(".lv-batch-mem-tag").forEach((btn) => {
+            (btn as HTMLButtonElement).onclick = async () => {
+                const memId = btn.getAttribute("data-id");
+                if (!memId) return;
+                dlg.destroy();
+                const count = selectedItemIds.length;
+                try {
+                    const { setCell } = await import("@/core/siyuan");
+                    for (const rowId of selectedItemIds) {
+                        await setCell(ref!.avId!, targetCol, rowId, { type: "relation", relation: { blockIDs: [memId] } });
+                    }
+                    selectedItemIds = [];
+                    showMessage(t("ledger.batchMember") + ` (${count})`, 3000, "info");
+                    await load();
+                } catch (e) {
+                    showMessage(String(e), 5000, "error");
+                }
+            };
+        });
     }
 
     async function openBatchLocationModal() {
@@ -5580,7 +5642,7 @@
                             {:else if e.type === "checkbox"}
                                 <label class="lv-record-check"><input id="lv-new-{e.key}" type="checkbox" class="b3-switch" bind:checked={form[e.key]} disabled={saving || identityPending} aria-invalid={!!formFieldError(e)} aria-describedby={formFieldError(e) ? `lv-new-${e.key}-error` : undefined} />{fieldLabel(e.key)}{e.required ? " *" : ""}</label>
                             {:else if e.key === "name"}
-                                <input bind:this={nameInput} id="lv-new-{e.key}" class="b3-text-field" type="text" placeholder={fieldMetaText(e.placeholderKey) || t("ledger.newName")} bind:value={form[e.key]} disabled={saving || identityPending} aria-invalid={!!formFieldError(e)} aria-describedby={formFieldError(e) ? `lv-new-${e.key}-error` : undefined} onkeydown={(event: KeyboardEvent) => { if (event.key === "Enter" && !event.isComposing) saveNewRecord(false); }} />
+                                <input bind:this={nameInput} id="lv-new-{e.key}" class="b3-text-field" type="text" placeholder={fieldMetaText(e.placeholderKey) || t("ledger.newName")} bind:value={form[e.key]} disabled={saving || identityPending} aria-invalid={!!formFieldError(e)} aria-describedby={formFieldError(e) ? `lv-new-${e.key}-error` : undefined} onblur={handleNewRecordNameBlur} onkeydown={(event: KeyboardEvent) => { if (event.key === "Enter" && !event.isComposing) saveNewRecord(false); }} />
                             {:else if ["note", "violations", "diagnosis"].includes(e.key)}
                                 <textarea id="lv-new-{e.key}" class="b3-text-field lv-record-textarea" rows="3" placeholder={fieldMetaText(e.placeholderKey) || fieldLabel(e.key)} bind:value={form[e.key]} disabled={saving || identityPending} aria-invalid={!!formFieldError(e)} aria-describedby={formFieldError(e) ? `lv-new-${e.key}-error` : undefined}></textarea>
                             {:else}
@@ -5898,6 +5960,11 @@
             {#if ref?.columns?.location}
                 <button type="button" class="b3-button b3-button--outline" style="font-size:12px;padding:3px 10px" onclick={openBatchLocationModal}>
                     📍 {t("ledger.batchLocation")}
+                </button>
+            {/if}
+            {#if memberCol && (plugin.settings.members?.length ?? 0) > 0}
+                <button type="button" class="b3-button b3-button--outline" style="font-size:12px;padding:3px 10px" onclick={openBatchMemberModal}>
+                    👤 {t("ledger.batchMember")}
                 </button>
             {/if}
             <button type="button" class="b3-button b3-button--text ft__error" style="font-size:12px;padding:3px 10px;color:var(--b3-theme-error)" onclick={batchDelete}>
