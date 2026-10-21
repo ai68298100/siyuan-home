@@ -122,10 +122,11 @@ async function defaultTransport(endpoint: string, payload: object, options?: Tra
     const { fetchSyncPost } = require("siyuan") as {
         fetchSyncPost: (url: string, data: object, headers?: Record<string, string>, process?: boolean, signal?: AbortSignal) => Promise<IRawResponse>;
     };
-    // Pass the operation key as a diagnostic/correlation header. The plugin
-    // cannot assume that the host enforces server-side idempotency.
-    const headers = options?.idempotencyKey ? { "X-Idempotency-Key": options.idempotencyKey } : undefined;
-    return fetchSyncPost(endpoint, payload, headers, undefined, options?.signal) as unknown as Promise<IRawResponse>;
+    // 思源内核接口为纯同源或本地 HTTP API，不需要 X-Idempotency-Key 自定义标头。
+    // 幂等去重与防并发由插件内部的 inFlight 和 completedIdempotent 内存机制可靠保证。
+    // 严禁将包含中文或 Emoji 的 idempotencyKey 作为 HTTP Header 传递，避免浏览器底层抛出
+    // "Failed to construct 'Headers': String contains non ISO-8859-1 code point" 导致请求直接崩溃。
+    return fetchSyncPost(endpoint, payload, undefined, undefined, options?.signal) as unknown as Promise<IRawResponse>;
 }
 
 async function withTimeout<T>(promise: Promise<T>, timeoutMs: number, endpoint: string, signal?: AbortSignal, onTimeout?: () => void, mayHaveReachedServer?: () => boolean): Promise<T> {
@@ -695,8 +696,8 @@ export function setUploadTransport(t: UploadTransport | null): void {
 }
 
 async function defaultUploadTransport(formData: FormData, options?: TransportOptions): Promise<IRawResponse> {
-    const headers = options?.idempotencyKey ? { "X-Idempotency-Key": options.idempotencyKey } : undefined;
-    const res = await fetch("/api/asset/upload", { method: "POST", body: formData, headers, signal: options?.signal });
+    // 严禁传递包含非 ASCII 字符的自定义 Header，避免浏览器 Headers 构造抛出 non ISO-8859-1 异常
+    const res = await fetch("/api/asset/upload", { method: "POST", body: formData, signal: options?.signal });
     if (res.status === 401 || res.status === 403) return { code: res.status, msg: "token expired" };
     return (await res.json()) as IRawResponse;
 }
