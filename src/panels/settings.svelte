@@ -803,12 +803,12 @@
 <div class="lv-home lv-settings">
     <!-- 左侧主分类；模块和提醒等复杂页面在右侧继续细分。 -->
     <nav class="lv-setnav" aria-label={t("settingsTitle")} inert={saving || migrationBusy || demoBusy}>
-        <div class="lv-setnav__brand"><span class="lv-setnav__brand-mark" aria-hidden="true">⌂</span><div><b>{t("butler")}</b><span>LV HOME</span></div></div>
-        <button class="lv-setnav__item {area === 'modules' ? 'on' : ''}" aria-current={area === 'modules' ? 'true' : undefined} onclick={() => (area = "modules")}><span class="lv-setnav__icon" aria-hidden="true">▦</span>{t("tabModules")}</button>
-        <button class="lv-setnav__item {area === 'members' ? 'on' : ''}" aria-current={area === 'members' ? 'true' : undefined} onclick={() => (area = "members")}><span class="lv-setnav__icon" aria-hidden="true">♧</span>{t("tabMembers")}</button>
-        <button class="lv-setnav__item {area === 'reminders' ? 'on' : ''}" aria-current={area === 'reminders' ? 'true' : undefined} onclick={() => (area = "reminders")}><span class="lv-setnav__icon" aria-hidden="true">◷</span>{t("tabReminders")}</button>
-        <button class="lv-setnav__item {area === 'data' ? 'on' : ''}" aria-current={area === 'data' ? 'true' : undefined} onclick={() => (area = "data")}><span class="lv-setnav__icon" aria-hidden="true">▤</span>{t("settings.dataTitle")}</button>
-        <button class="lv-setnav__item {area === 'about' ? 'on' : ''}" aria-current={area === 'about' ? 'true' : undefined} onclick={() => (area = "about")}><span class="lv-setnav__icon" aria-hidden="true">ⓘ</span>{t("tabAbout")}</button>
+        <div class="lv-setnav__brand"><span class="lv-setnav__brand-mark" aria-hidden="true"><UiIcon name="home" size={16} /></span><div><b>{t("butler")}</b><span>LV HOME</span></div></div>
+        <button class="lv-setnav__item {area === 'modules' ? 'on' : ''}" aria-current={area === 'modules' ? 'true' : undefined} onclick={() => (area = "modules")}><span class="lv-setnav__icon" aria-hidden="true"><UiIcon name="archive" size={15} /></span>{t("tabModules")}</button>
+        <button class="lv-setnav__item {area === 'members' ? 'on' : ''}" aria-current={area === 'members' ? 'true' : undefined} onclick={() => (area = "members")}><span class="lv-setnav__icon" aria-hidden="true"><UiIcon name="users" size={15} /></span>{t("tabMembers")}</button>
+        <button class="lv-setnav__item {area === 'reminders' ? 'on' : ''}" aria-current={area === 'reminders' ? 'true' : undefined} onclick={() => (area = "reminders")}><span class="lv-setnav__icon" aria-hidden="true"><UiIcon name="bell" size={15} /></span>{t("tabReminders")}</button>
+        <button class="lv-setnav__item {area === 'data' ? 'on' : ''}" aria-current={area === 'data' ? 'true' : undefined} onclick={() => (area = "data")}><span class="lv-setnav__icon" aria-hidden="true"><UiIcon name="bank" size={15} /></span>{t("settings.dataTitle")}</button>
+        <button class="lv-setnav__item {area === 'about' ? 'on' : ''}" aria-current={area === 'about' ? 'true' : undefined} onclick={() => (area = "about")}><span class="lv-setnav__icon" aria-hidden="true"><UiIcon name="info" size={15} /></span>{t("tabAbout")}</button>
     </nav>
 
     <div class="lv-setpane" aria-busy={saving || migrationBusy || demoBusy} inert={saving || migrationBusy || demoBusy}>
@@ -1085,7 +1085,7 @@
             <div class="lv-setcard__hint">{t("settings.ecoHint")} · {t("settings.ecoPlanned")}</div>
             {#each ["qiandao", "contacts", "glean", "exam", "flashcard", "leiqie"] as eco (eco)}
                 <div class="fn__flex lv-settings__row">
-                    <span class="lv-setnav__icon" aria-hidden="true">◇</span>
+                    <span class="lv-setnav__icon" aria-hidden="true"><UiIcon name="repeat" size={14} /></span>
                     <span class="fn__flex-1">{t(`eco.${eco}`)}</span>
                     <span class="lv-badge gray">{t("settings.ecoPlanned")}</span>
                 </div>
