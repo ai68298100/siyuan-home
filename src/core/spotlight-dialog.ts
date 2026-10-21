@@ -167,6 +167,14 @@ export async function openSpotlightDialog(options: SpotlightDialogOptions): Prom
 
             card.onmouseenter = () => { card.style.borderColor = "var(--lv-accent)"; card.style.background = "var(--lv-surface-2)"; };
             card.onmouseleave = () => { card.style.borderColor = "var(--lv-line)"; card.style.background = "var(--lv-surface)"; };
+            card.onfocus = () => { card.style.borderColor = "var(--lv-accent)"; card.style.background = "var(--lv-surface-2)"; card.style.outline = "2px solid var(--lv-accent)"; };
+            card.onblur = () => { card.style.borderColor = "var(--lv-line)"; card.style.background = "var(--lv-surface)"; card.style.outline = "none"; };
+            card.onkeydown = (e) => {
+                if (e.key === "Enter") {
+                    dlg.destroy();
+                    onNavigateToTarget({ moduleId: item.moduleId, rowId: item.rowId });
+                }
+            };
             card.onclick = () => {
                 dlg.destroy();
                 onNavigateToTarget({ moduleId: item.moduleId, rowId: item.rowId });

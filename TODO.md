@@ -1,5 +1,5 @@
 # 小驴管家（Lv Home）· 项目待办总清单
-> **当前事实（2026-10-21）**：本地 `main` 为 v0.5.36，90 个测试文件 / 791 项单测、类型/Svelte/i18n/meta/audit/build/smoke/loader 全绿；深度对齐原型参考图设计语言：双色温 Bento 重点卡、7 天生活律动周条与就绪成就勋章；i18n 1946 键对齐。真实 Android WebView、独立窗口、兄弟插件、双端冲突和用户工作区验证待完成；`pnpm test:live` 缺少 `SIYUAN_TOKEN` 时阻断；集市发布继续暂缓。
+> **当前事实（2026-10-21）**：本地 `main` 为 v0.5.37，90 个测试文件 / 791 项单测、类型/Svelte/i18n/meta/audit/build/smoke/loader 全绿；全场景 UI 细节深度雕琢：全景检索键盘直达、台账行内步进器、紧急程度左轨圆角与暗色模式色温精调；i18n 1946 键对齐。真实 Android WebView、独立窗口、兄弟插件、双端冲突和用户工作区验证待完成；`pnpm test:live` 缺少 `SIYUAN_TOKEN` 时阻断；集市发布继续暂缓。
 
 ## 第 224 波复审行动清单（当前唯一入口）
 
