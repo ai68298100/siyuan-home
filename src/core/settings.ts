@@ -196,17 +196,26 @@ export async function loadSettings(plugin: Plugin): Promise<HomeSettings> {
     const demoRows = isPlainObject(data.demoRows)
         ? Object.fromEntries(Object.entries(data.demoRows).filter((entry): entry is [string, string[]] => Array.isArray(entry[1])).map(([id, rows]) => [id, rows.filter((row): row is string => typeof row === "string")]))
         : undefined;
+    const normalizedDbRefs = normalizeDbRefs(data.dbRefs, defaults.dbRefs);
+    // 智能自愈老版本用户：凡已登记家庭成员、家庭角色或已建立台账文档的用户，绝不重复回退至未引导状态
+    const hasHistoricalData = members.length > 0
+        || (validHousehold && (validHousehold.roles?.length ?? 0) > 0)
+        || Object.values(normalizedDbRefs).some((r) => !!r?.docId);
+    const onboarded = typeof data.onboarded === "boolean"
+        ? data.onboarded
+        : (hasHistoricalData || defaults.onboarded);
+
     const result: HomeSettings = {
         ...defaults,
         ...data,
         enabledModules: enabled,
         members,
         leadOverrides: overrides,
-        dbRefs: normalizeDbRefs(data.dbRefs, defaults.dbRefs),
+        dbRefs: normalizedDbRefs,
         notifyHour: clampHour(data.notifyHour, defaults.notifyHour),
         silentFrom: clampHour(data.silentFrom, defaults.silentFrom),
         silentTo: clampHour(data.silentTo, defaults.silentTo),
-        onboarded: typeof data.onboarded === "boolean" ? data.onboarded : defaults.onboarded,
+        onboarded,
         household: validHousehold,
         demoRows,
         demoMemberIds: Array.isArray(data.demoMemberIds) ? data.demoMemberIds.filter((id: unknown): id is string => typeof id === "string") : undefined,

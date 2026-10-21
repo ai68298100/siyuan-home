@@ -455,4 +455,14 @@ describe("导入钳制（229 波恢复 e2e 发现）", () => {
         expect(settings.silentFrom).toBe(0);
         expect(settings.silentTo).toBe(8); // 非数值回退默认
     });
+
+    it("已有历史成员或台账的老用户自愈 onboarded 为 true", async () => {
+        const plugin = pluginWithSettings({
+            enabledModules: ["certs"],
+            members: [{ id: "m1", name: "爸爸", role: "self", createdAt: "2026-10-21T00:00:00Z" }],
+            dbRefs: {},
+        });
+        const s = await loadSettings(plugin);
+        expect(s.onboarded).toBe(true);
+    });
 });
