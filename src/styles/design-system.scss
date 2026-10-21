@@ -651,6 +651,34 @@
     border-radius: var(--lv-r-full, 999px); box-shadow: var(--lv-shadow-3);
     z-index: 10; animation: lvFadeInUp 0.2s var(--lv-ease);
   }
+  .lv-capture-mode-bar {
+    display: flex; gap: 4px; padding: 3px; background: var(--lv-surface-2);
+    border: 1px solid var(--lv-line); border-radius: var(--lv-r-2); margin-bottom: 12px;
+  }
+  .lv-capture-mode-btn {
+    flex: 1; padding: 6px 12px; font-size: 13px; font-weight: 500;
+    border: none; background: transparent; color: var(--lv-tx-2);
+    border-radius: var(--lv-r-1); cursor: pointer; transition: all 0.15s ease;
+    display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+    &.active {
+      background: var(--lv-surface); color: var(--lv-tx); font-weight: 600;
+      box-shadow: var(--lv-shadow-1);
+    }
+  }
+  .lv-event-subnav {
+    display: flex; gap: 5px; flex-wrap: wrap; margin-bottom: 12px;
+  }
+  .lv-event-subbtn {
+    display: inline-flex; align-items: center; gap: 4px; padding: 4px 10px; font-size: 12px;
+    border-radius: var(--lv-r-full, 999px); background: var(--lv-surface-2); color: var(--lv-tx-2);
+    border: 1px solid var(--lv-line); cursor: pointer; transition: all var(--lv-t-fast) var(--lv-ease);
+    &:hover { background: var(--lv-accent-soft); border-color: var(--lv-accent); color: var(--lv-accent); }
+    &.active { background: var(--lv-accent); color: #fff; border-color: var(--lv-accent); font-weight: 500; }
+  }
+  .lv-event-card {
+    padding: 14px 16px; border: 1px solid var(--lv-line); border-radius: var(--lv-r-2);
+    background: var(--lv-surface); display: flex; flex-direction: column; gap: 12px;
+  }
   .lv-cap-body .lv-frow { align-items: center; }
   .lv-cap-body .b3-select,
   .lv-cap-body .b3-text-field { width: 100%; min-width: 0; min-height: var(--lv-control-sm); padding: 6px 10px; font-size: 13px;
