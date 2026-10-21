@@ -1,7 +1,7 @@
 <script lang="ts">
     // 267 波：快速记录弹层（原型 .sheet 生产化）——480px 中央弹层，schema.capture 列集驱动，
     // 未建库自动建库（triage 同链路）。常驻挂载：关闭仅收起弹层，草稿保留到下次打开（对齐原型）。
-    import { confirm, showMessage } from "siyuan";
+    import { showMessage } from "siyuan";
     import { tick } from "svelte";
     import { addDetachedRow, RowIdentityPendingError, setCell, renderLedgerAll } from "@/core/siyuan";
     import { saveRuntime } from "@/core/hub/runtime";
@@ -638,22 +638,23 @@
         plugin.showTabDocs(docId);
     }
 
+    let showDiscardConfirm = $state(false);
+
     function discardUncertainDraft() {
         if (!identityChecked || saving) return;
-        confirm(
-            t("capture.discardUncertain"),
-            t("capture.discardUncertainConfirm").replace("${module}", modLabel(pendingModuleId ?? moduleId)),
-            () => {
-                values = {};
-                pendingRowId = undefined;
-                pendingModuleId = undefined;
-                saveOperationKey = undefined;
-                identityPending = false;
-                identityChecked = false;
-                saveError = "";
-                showMessage(t("capture.uncertainDraftDiscarded"), 6000, "info");
-            },
-        );
+        showDiscardConfirm = true;
+    }
+
+    function confirmDiscardUncertain() {
+        values = {};
+        pendingRowId = undefined;
+        pendingModuleId = undefined;
+        saveOperationKey = undefined;
+        identityPending = false;
+        identityChecked = false;
+        saveError = "";
+        showDiscardConfirm = false;
+        showMessage(t("capture.uncertainDraftDiscarded"), 6000, "info");
     }
 </script>
 
@@ -663,6 +664,26 @@
 <div class="lv-mask" class:open aria-hidden="true" onclick={close}></div>
 <div class="lv-modal" class:open role="dialog" aria-modal="true" aria-labelledby="lv-capture-title" aria-busy={saving} tabindex="-1" inert={!open}>
     <div class="lv-sheet">
+        {#if showDiscardConfirm}
+            <div class="lv-sheet-confirm-mask" role="dialog" aria-modal="true">
+                <div class="lv-sheet-confirm-card">
+                    <b style="font-size:14px;color:var(--lv-tx);display:flex;align-items:center;gap:6px">
+                        <UiIcon name="alert" size={16} /> {t("capture.discardUncertain")}
+                    </b>
+                    <p class="lv-caption" style="margin:10px 0 16px;color:var(--lv-tx-2);line-height:1.5">
+                        {t("capture.discardUncertainConfirm").replace("${module}", modLabel(pendingModuleId ?? moduleId))}
+                    </p>
+                    <div style="display:flex;gap:8px;justify-content:flex-end">
+                        <button type="button" class="b3-button b3-button--cancel" onclick={() => { showDiscardConfirm = false; }}>
+                            {t("cancel")}
+                        </button>
+                        <button type="button" class="b3-button b3-button--text" style="color:var(--lv-danger);font-weight:600" onclick={confirmDiscardUncertain}>
+                            {t("capture.discardUncertain")}
+                        </button>
+                    </div>
+                </div>
+            </div>
+        {/if}
         <div class="lv-sheet-head">
             <b id="lv-capture-title" style="font-size:14px;display:inline-flex;align-items:center;gap:6px"><UiIcon name="bolt" size={15} /> {t("capture.title")}</b>
             {#if captureTab === "ledger"}
