@@ -321,8 +321,9 @@
     &.sm { min-height: var(--lv-control-sm); padding: 4px 10px; font-size: 12px; } }
   .lv-iconbtn { width: 36px; height: 36px; min-width: 36px; min-height: var(--lv-control-md); border-radius: 10px; display: grid; place-items: center; background: transparent; cursor: pointer;
     color: var(--lv-tx-2); border: 1px solid transparent; transition: all var(--lv-t-med) var(--lv-ease);
-    &:hover { background: var(--lv-surface-2); color: var(--lv-tx); border-color: var(--lv-line); }
-    &:active { transform: scale(.94); } }
+    &:hover { background: var(--lv-surface-2); color: var(--lv-tx); border-color: var(--lv-line); box-shadow: var(--lv-shadow-1); }
+    &:active { transform: scale(.92); }
+    &:focus-visible { outline: 2px solid var(--lv-accent); outline-offset: 1px; } }
 
   // ── 5b. 工具条（筛选/台账头/成员录入条等控件排）────────
   // b3 原生控件使用同一 36px 高度、白面、细描边与控件圆角。
@@ -655,10 +656,10 @@
   // ── 10b. 快速记录弹层表单（267 波）：frow 行 + b3 控件统一进 lv 体系（同 .lv-toolbar 观感）
   .lv-quick-chips { display: flex; gap: 5px; flex-wrap: wrap; margin-bottom: 8px; }
   .lv-quick-chip {
-    display: inline-flex; align-items: center; gap: 4px; padding: 3px 9px; font-size: 11.5px;
+    display: inline-flex; align-items: center; gap: 5px; padding: 4px 10px; font-size: 12px;
     border-radius: var(--lv-r-full, 999px); background: var(--lv-surface-2); color: var(--lv-tx-2);
     border: 1px solid var(--lv-line); cursor: pointer; transition: all var(--lv-t-fast) var(--lv-ease);
-    user-select: none; line-height: 1.2;
+    user-select: none; line-height: 1.25;
     &:hover { background: var(--lv-accent-soft); border-color: var(--lv-accent); color: var(--lv-accent); }
     &.active { background: var(--lv-accent); color: #fff; border-color: var(--lv-accent); font-weight: 500; }
   }
@@ -672,9 +673,12 @@
   .lv-batch-bar {
     position: sticky; bottom: 16px; margin: 16px auto 0;
     width: fit-content; max-width: calc(100% - 32px);
-    display: flex; align-items: center; gap: 8px; padding: 6px 14px;
-    background: var(--lv-surface); border: 1px solid var(--lv-line-strong);
-    border-radius: var(--lv-r-full, 999px); box-shadow: var(--lv-shadow-3);
+    display: flex; align-items: center; gap: 8px; padding: 6px 16px;
+    background: color-mix(in srgb, var(--lv-surface) 85%, transparent);
+    backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px);
+    border: 1px solid var(--lv-line-strong);
+    border-radius: var(--lv-r-full, 999px);
+    box-shadow: 0 8px 24px -4px rgba(0, 0, 0, 0.16), 0 2px 8px -2px rgba(0, 0, 0, 0.08);
     z-index: 10; animation: lvFadeInUp 0.2s var(--lv-ease);
   }
   .lv-capture-mode-bar {

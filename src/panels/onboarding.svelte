@@ -1,5 +1,6 @@
 <script lang="ts">
     import type { HomePluginLike } from "@/types/plugin";
+    import UiIcon from "@/ui/icon.svelte";
     let { plugin, t, onGoto, onCapture }: {
         plugin: HomePluginLike;
         t: (k: string) => string;
@@ -83,7 +84,7 @@
 <section class="lv-card lv-aura lv-onboarding" aria-labelledby="lv-wiz-title">
     <div class="lv-wiz">
         <div class="lv-wiz__intro">
-            <div class="lv-wiz__intro-icon" aria-hidden="true">⌂</div>
+            <div class="lv-wiz__intro-icon" aria-hidden="true"><UiIcon name="home" size={20} /></div>
             <div class="lv-wiz__intro-main">
                 <div class="lv-wiz__eyebrow">{t("wiz.welcomeEyebrow")}</div>
                 <h2 class="lv-wiz__welcome">{t("wiz.welcomeTitle")}</h2>
@@ -103,15 +104,15 @@
                 <p>{t("wiz.intro")}</p>
                 <div class="lv-wiz__features" aria-label={t("wiz.featuresLabel")}>
                     <div class="lv-wiz__feature">
-                        <span class="lv-wiz__feature-icon" aria-hidden="true">▣</span>
+                        <span class="lv-wiz__feature-icon" aria-hidden="true"><UiIcon name="archive" size={15} /></span>
                         <div><b>{t("wiz.featureRecordsTitle")}</b><span>{t("wiz.featureRecordsBody")}</span></div>
                     </div>
                     <div class="lv-wiz__feature">
-                        <span class="lv-wiz__feature-icon" aria-hidden="true">♧</span>
+                        <span class="lv-wiz__feature-icon" aria-hidden="true"><UiIcon name="users" size={15} /></span>
                         <div><b>{t("wiz.featureMembersTitle")}</b><span>{t("wiz.featureMembersBody")}</span></div>
                     </div>
                     <div class="lv-wiz__feature">
-                        <span class="lv-wiz__feature-icon" aria-hidden="true">◷</span>
+                        <span class="lv-wiz__feature-icon" aria-hidden="true"><UiIcon name="bell" size={15} /></span>
                         <div><b>{t("wiz.featureRemindersTitle")}</b><span>{t("wiz.featureRemindersBody")}</span></div>
                     </div>
                 </div>

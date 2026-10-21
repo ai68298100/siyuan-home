@@ -39,24 +39,23 @@ Certificates expire, medicine expires, insurance needs renewal, subscriptions au
 
 Image OCR uses the engine configured in SiYuan Settings → OCR. It runs only when requested and does not require automatic OCR to be enabled. AI OCR asks before each run because the image is sent to the selected AI service. Results are saved to SiYuan OCR text and included in search; re-running replaces the previous result. Encrypted notebook images and PDFs are not supported, and OCR text is never written into ledger fields automatically.
 
-## 🆕 What's new in v0.5.34
+## 🆕 What's new in v0.5.35
 
-This release breaks the automatic reload loop, fixes the spotlight search button click failure, and refactors the overview hero stat card and settings sidebar typography:
+This release delivers deep UI/UX refinement: complete icon vectorization, subtle micro-interactions on top bar buttons, frosted glass backdrop blur on the batch action bar, and elevated filter chip ergonomics:
 
-- **Fixed (Core Stability: Break Reload Loop)**: Removed eager automatic full provisioning from `onLayoutReady()`, eliminating background `settings.json` disk writes that triggered kernel FS Watcher `loaded petals` restart loops.
-- **Fixed (Search Button Unresponsive)**: Removed runtime dynamic `await import("siyuan")`, switching to standard static imports so clicking 🔍 or pressing `Ctrl+K` immediately opens Spotlight search.
-- **Improved (Settings Sidebar Breadcrumb Fix)**: Removed duplicate `settingsTitle` label in the settings sidebar, eliminating multi-line header text stacking.
-- **Improved (Overview Hero Stat Card & Action Layout)**: Replaced fragile overlapping SVGs with a clean modern stat card (`.lv-hero-stat-card`), and normalized button heights to 38px for neat multi-row flow.
+- **Improved (Full Vector Icon Migration)**: Replaced special text symbols (`⌂`, `▦`, `♧`, `◷`, `▤`, `ⓘ`, `◇`) across Settings sidebar and Onboarding with unified `UiIcon` SVG paths (`home`, `archive`, `users`, `bell`, `bank`, `info`, `repeat`), ensuring cross-platform rendering parity.
+- **Improved (Top Bar Action Micro-Interactions)**: Added subtle elevation, hover backdrops, responsive `transform: scale(0.92)` press feedback, and accessibility focus rings.
+- **Improved (Floating Batch Bar & Filter Chips)**: Added `backdrop-filter: blur(14px)` and layered soft drop-shadows to the floating `.lv-batch-bar`, alongside refined padding on Filter Chips.
 - **Validation**: 89 test suites, **789 unit tests passing**, TypeScript, Svelte, i18n (1946 keys), metadata, and package smoke all green.
-## 📦 Install (v0.5.34)
+## 📦 Install (v0.5.35)
 
 1. Download `package.zip` from [Releases](https://github.com/ai68298100/siyuan-home/releases/latest)
 2. SiYuan → Settings → Marketplace → Download → **Import** the zip
 3. Enable the plugin → complete the 2-step onboarding (household → module picks and provisioning)
 4. Press `Ctrl+Alt+H` anytime to open the hub
 
-> **Validation status:** core data paths have automated tests and isolated-kernel coverage. The v0.5.34 GitHub Release is available; Android WebView behavior remains host-specific validation. `icon.png` and `preview.png` were redesigned for v0.3.13 (brand-gradient tile + geometric mark; dark overview with sample data).
-> **Version note:** the tagged v0.5.34 package is the current GitHub release; local quality checks report 789 unit tests.
+> **Validation status:** core data paths have automated tests and isolated-kernel coverage. The v0.5.35 GitHub Release is available; Android WebView behavior remains host-specific validation. `icon.png` and `preview.png` were redesigned for v0.3.13 (brand-gradient tile + geometric mark; dark overview with sample data).
+> **Version note:** the tagged v0.5.35 package is the current GitHub release; local quality checks report 789 unit tests.
 >
 > Family sharing depends on SiYuan's collaboration, permissions, sync and conflict behavior. Test with non-sensitive data before sharing; this plugin does not provide a separate permission system.
 >
@@ -114,7 +113,8 @@ The v0.5.1 release is available on GitHub, with static isolated-kernel gates and
 
 | Phase | Content |
 |---|---|
-| ✅ v0.5.34 (current) | Break automatic reload loop, fix search button click, refactor overview stat card and settings sidebar |
+| ✅ v0.5.35 (current) | UI/UX deep refinement: vector icon migration, top bar micro-interactions, batch bar frosted glass |
+| v0.5.34 | Break automatic reload loop, fix search button click, refactor overview stat card and settings sidebar |
 | v0.5.33 | Eliminate repeated welcome popups, auto-heal onboarding status for existing users, eager state persistence |
 | v0.5.32 | Fix quick capture confirmation dialog obstruction, elevate global Dialog z-index, native in-sheet confirmation |
 | v0.5.31 | Fix browser Headers non-ISO-8859-1 exception that crashed document and notebook creation; GitHub Release published |
