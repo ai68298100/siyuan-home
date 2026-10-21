@@ -1894,5 +1894,10 @@
     "capture.presetNextYear": "1年后",
     "capture.presetLocations": "常用存放位置",
     "ledger.matchCount": "匹配 ${n} 条",
-    "clear": "清空"
+    "clear": "清空",
+    "capture.frequentTemplates": "常用模板",
+    "ledger.allMembers": "全部成员",
+    "ledger.allCategories": "全部分类",
+    "ledger.quickInc": "增加 1",
+    "ledger.quickDec": "减少 1"
 }

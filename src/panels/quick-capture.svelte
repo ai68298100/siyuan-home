@@ -8,6 +8,7 @@
     import { captureCellValue, getCaptureFields, validateCaptureInput } from "@/core/capture";
     import { getGroupedModules, moduleIcon } from "@/core/modules";
     import { localDateKey } from "@/core/hub/rule";
+    import { getQuickTemplates, type QuickRecordTemplate } from "@/core/quick-templates";
     import type { ColumnDef, ModuleSchema } from "@/core/schema";
     import type { HomeSettings } from "@/types";
     import UiIcon from "@/ui/icon.svelte";
@@ -225,6 +226,14 @@
     }
 
     const activeTarget = $derived(plugin.settings.dbRefs?.[moduleId]);
+    const currentTemplates = $derived(getQuickTemplates(moduleId));
+
+    function applyTemplate(template: QuickRecordTemplate) {
+        for (const [k, v] of Object.entries(template.values)) {
+            values[k] = v;
+            clearFieldError(k);
+        }
+    }
     const filledCaptureCount = $derived.by(() => captureFields.filter((field: any) => {
         const value = values[field.key];
         return value !== undefined && value !== null && value !== "" && value !== false;
@@ -501,6 +510,17 @@
                             : t("capture.noTarget").replace("${module}", modLabel(moduleId))}
                     </span>
                 </div>
+                {#if currentTemplates.length > 0}
+                    <div class="lv-template-bar" style="display:flex;gap:5px;flex-wrap:wrap;align-items:center;padding:6px 10px;background:var(--lv-surface-2);border-radius:6px;font-size:11.5px;margin-bottom:6px">
+                        <span class="lv-caption" style="color:var(--lv-tx-3);font-size:11px">✨ {t("capture.frequentTemplates") || "常用模板"}:</span>
+                        {#each currentTemplates as tpl (tpl.id)}
+                            <button type="button" class="lv-preset-tag" onclick={() => applyTemplate(tpl)} disabled={saving} style="font-size:11.5px;padding:2px 8px">
+                                {#if tpl.icon}<span>{tpl.icon}</span>{/if}
+                                <span>{tpl.label}</span>
+                            </button>
+                        {/each}
+                    </div>
+                {/if}
                 {#each captureFields as f (f.key)}
                     <div class="lv-frow">
                         {#if f.key === "name"}

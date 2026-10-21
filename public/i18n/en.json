@@ -1894,5 +1894,10 @@
     "capture.presetNextYear": "1 Year",
     "capture.presetLocations": "Frequent Locations",
     "ledger.matchCount": "${n} matched",
-    "clear": "Clear"
+    "clear": "Clear",
+    "capture.frequentTemplates": "Templates",
+    "ledger.allMembers": "All Members",
+    "ledger.allCategories": "All Categories",
+    "ledger.quickInc": "+1",
+    "ledger.quickDec": "-1"
 }
