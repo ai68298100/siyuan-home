@@ -19,3 +19,5 @@ tmp
 output/
 coverage
 .jeikcode/codegraph/
+# JeikCode user uploads (not project source)
+.jeikcode_store/

@@ -1,7 +1,7 @@
 <script lang="ts">
     import { showMessage, confirm, Dialog } from "siyuan";
     import { MODULE_GROUPS, modulesByGroup } from "@/core/modules";
-    import { newMember, saveSettings, normalizeCheckinBindings } from "@/core/settings";
+    import { newMember, saveSettings, normalizeCheckinBindings, errText } from "@/core/settings";
     import type { ProvisioningReport } from "@/core/provisioner";
     import type { HomeSettings, MemberRole, FamilyMember, CheckinBinding, ModuleGroupId } from "@/types";
     import { formatLocalDateTime } from "@/core/date-display";
@@ -479,7 +479,7 @@
             try {
                 await plugin.refreshHub?.(undefined, true);
             } catch (error) {
-                showMessage(`${t("ledger.rebuildRefreshFailed").replace("${msg}", error instanceof Error ? error.message : String(error))}`, 6000, "error");
+                showMessage(`${t("ledger.rebuildRefreshFailed").replace("${msg}", errText(error))}`, 6000, "error");
                 return;
             }
             if (report.issues.length > 0) {
@@ -489,7 +489,7 @@
                 showMessage(t("diag.rebuildAllDone"), 3000, "info");
             }
         } catch (error) {
-            showMessage(`${t("ledger.rebuildFailed").replace("${msg}", error instanceof Error ? error.message : String(error))}`, 6000, "error");
+            showMessage(`${t("ledger.rebuildFailed").replace("${msg}", errText(error))}`, 6000, "error");
         } finally {
             diagnosticsBusy = null;
         }

@@ -177,45 +177,48 @@
 
   // ── 3. 页头与节奏 ───────────────────────────────────────
   // 主导航使用白面与细描边，普通工作面不依赖浮起阴影。
-  .lv-tabbar { display: flex; align-items: center; gap: var(--lv-space-3); padding: var(--lv-space-3) var(--lv-space-4); margin-bottom: var(--lv-space-5);
+  .lv-tabbar { display: flex; align-items: center; gap: var(--lv-space-3); padding: 8px 16px; margin-bottom: var(--lv-space-5);
+    min-height: 52px; box-sizing: border-box;
     // 长台账/提醒列表滚动时保留主导航和快速记录入口；窄屏在下方容器断点
     // 复用同一 sticky 语义，避免侧栏场景导航消失。
     position: sticky; top: 0; z-index: var(--lv-z-topbar);
     background: var(--lv-surface);
     border: 1px solid var(--lv-line); border-radius: var(--lv-r-3);
     box-shadow: none; }
-  .lv-appbrand { display: flex; align-items: center; gap: var(--lv-space-2); flex: none; }
+  .lv-appbrand { display: flex; align-items: center; gap: var(--lv-space-2); flex: none; height: 36px; }
+  .lv-appbrand-sep { width: 1px; height: 18px; background: var(--lv-line); margin: 0 4px; opacity: 0.7; }
+  .lv-avatar-wrap { display: inline-flex; align-items: center; justify-content: center; height: 36px; }
   // R54：品牌标记保留单一实体色，把渐变和阴影留给真正的浮层，顶栏因此更安静。
   .lv-logo { width: 34px; height: 34px; border-radius: 10px; display: grid; place-items: center; font-size: 17px;
     background: var(--lv-accent); color: #fff;
     box-shadow: inset 0 1px 0 rgba(255, 255, 255, .28); }
   .lv-logo-mark { display: block; transform: translateY(-1px); font-size: 20px; line-height: 1; font-weight: 500; }
-  .lv-appbrand-t { display: flex; flex-direction: column; min-width: 0; line-height: 1.18;
+  .lv-appbrand-t { display: flex; flex-direction: column; justify-content: center; min-width: 0; line-height: 1.18;
     // 品牌名来自插件标题/内测标记，窄面板下允许它收缩，避免挤压页签和右侧动作。
     b { display: block; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
       font-size: 14px; font-weight: 600; letter-spacing: 0; }
     span { font-size: 9.5px; font-weight: 600; letter-spacing: .16em; color: var(--lv-tx-3); } }
   .lv-tabbar__title { font-size: 15px; font-weight: 600; }
   .lv-tabbar__meta { display: flex; gap: 6px; align-items: center; }
-  .lv-tabbar-actions { display: flex; align-items: center; gap: var(--lv-space-1); flex: none; }
+  .lv-tabbar-actions { display: flex; align-items: center; gap: var(--lv-space-1); flex: none; height: 36px; }
   // ⚙ 等顶栏图标按钮：幽灵风（对齐原型 iconbtn——无描边、hover 才浮出底色），命中区 ≥34px（26.7 回归项）
   .lv-tabbar > .b3-button { min-height: 34px; min-width: 34px; display: inline-flex; align-items: center; justify-content: center;
     border: none; background: none; box-shadow: none; color: var(--lv-tx-2); font-size: 15px;
     transition: background var(--lv-t-med) var(--lv-ease), color var(--lv-t-med) var(--lv-ease);
     &:hover { background: var(--lv-surface-2); color: var(--lv-tx); } }
-  .lv-tabs { display: flex; gap: 2px; background: var(--lv-surface-2); border: 1px solid var(--lv-line);
-    border-radius: 999px; padding: 4px; }
-  .lv-nav-pill { position: absolute; top: 4px; left: 0; height: calc(100% - 8px); border-radius: 999px;
+  .lv-tabs { display: flex; align-items: center; gap: 2px; background: var(--lv-surface-2); border: 1px solid var(--lv-line);
+    border-radius: 999px; padding: 2px 3px; height: 36px; box-sizing: border-box; }
+  .lv-nav-pill { position: absolute; top: 2px; left: 0; height: calc(100% - 4px); border-radius: 999px;
     background: var(--lv-surface); box-shadow: 0 1px 3px rgba(0, 0, 0, .04);
     transition: transform var(--lv-t-sheet) var(--lv-spring), width var(--lv-t-sheet) var(--lv-spring); z-index: 0;
     &.init { transition: none; } }
-  .lv-tabs__item { position: relative; z-index: 1; padding: var(--lv-space-2) 16px; border-radius: 999px; font-size: 13px;
-    display: inline-flex; align-items: center; justify-content: center; min-height: 34px;
+  .lv-tabs__item { position: relative; z-index: 1; padding: 0 14px; border-radius: 999px; font-size: 13px;
+    display: inline-flex; align-items: center; justify-content: center; min-height: 30px; height: 30px; line-height: 30px;
     color: var(--lv-tx-2); background: none; border: none; cursor: pointer; transition: color var(--lv-t-med) var(--lv-ease);
     &:hover { color: var(--lv-tx); } &.on { color: var(--lv-tx); font-weight: 500; }
     // 待办红点（提醒页签，扫描计数 > 0 时出现）
-    .lv-dot { position: absolute; top: 6px; right: 8px; width: 6px; height: 6px; border-radius: 50%;
-      background: var(--lv-danger); box-shadow: 0 0 0 3px var(--lv-danger-soft); } }
+    .lv-dot { position: absolute; top: 5px; right: 7px; width: 6px; height: 6px; border-radius: 50%;
+      background: var(--lv-danger); box-shadow: 0 0 0 2px var(--lv-danger-soft); } }
   .lv-people { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(250px, 100%), 1fr)); gap: 20px; }
   /* 171 波（对齐原型质感，不低于）：context-strip 状态条 + focus-row 三重点卡 */
   .lv-strip { display: flex; flex-wrap: wrap; gap: var(--lv-space-1) 18px; align-items: center; margin: 0 2px;

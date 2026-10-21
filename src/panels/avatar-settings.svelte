@@ -335,12 +335,13 @@
 </dialog>
 
 <style>
-    .lv-avatar-trigger { width: 34px; height: 34px; flex: none; display: grid; place-items: center; padding: 2px; overflow: hidden;
-        border: 1px solid var(--lv-line); border-radius: 50%; background: var(--lv-surface-2); color: var(--lv-accent);
-        font-size: 12px; font-weight: 650; cursor: pointer; transition: border-color var(--lv-t-med) var(--lv-ease), transform var(--lv-t-med) var(--lv-ease); }
+    .lv-avatar-trigger { width: 32px; height: 32px; min-width: 32px; min-height: 32px; margin: 0; padding: 0; box-sizing: border-box;
+        display: inline-flex; align-items: center; justify-content: center; vertical-align: middle; overflow: hidden;
+        border: 1.5px solid var(--lv-line-strong); border-radius: 50%; background: var(--lv-surface-2); color: var(--lv-accent);
+        font-size: 13px; font-weight: 650; cursor: pointer; line-height: 1; transition: border-color var(--lv-t-med) var(--lv-ease), transform var(--lv-t-med) var(--lv-ease); }
     .lv-avatar-trigger:hover { border-color: var(--lv-accent); transform: translateY(-1px); }
-    .lv-avatar-trigger img { width: 100%; height: 100%; border-radius: inherit; object-fit: cover; }
-    .lv-avatar-trigger span { display: grid; place-items: center; width: 100%; height: 100%; border-radius: inherit; background: var(--lv-accent-soft); }
+    .lv-avatar-trigger img { width: 100%; height: 100%; border-radius: 50%; object-fit: cover; }
+    .lv-avatar-trigger span { display: flex; align-items: center; justify-content: center; width: 100%; height: 100%; border-radius: 50%; background: var(--lv-accent-soft); line-height: 1; text-align: center; }
     .lv-avatar-dialog { width: min(460px, calc(100vw - 28px)); max-height: min(680px, calc(100dvh - 28px)); overflow: auto; padding: 20px;
         border: 1px solid var(--lv-line-strong); border-radius: var(--lv-r-3); background: var(--lv-surface); color: var(--lv-tx);
         box-shadow: var(--lv-shadow-3); }

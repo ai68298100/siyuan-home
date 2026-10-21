@@ -1908,5 +1908,8 @@
     "ledger.duplicateSuccess": "已从「${name}」复制模板数据",
     "ledger.batchLocationTitle": "批量修改存放位置",
     "ledger.batchMember": "批量指派成员",
-    "ledger.batchMemberTitle": "批量指派记录归属成员"
+    "ledger.batchMemberTitle": "批量指派记录归属成员",
+    "ledger.defaultBlankTitle": "默认空白台账（尚未在思源中建库）",
+    "ledger.defaultBlankDesc": "当前模块已配置标准字段结构，支持作为默认空白台账先行使用。你可以随时在思源中建立专属文档，或直接新建记录自动建库。",
+    "ledger.buildNow": "在思源中建立此台账"
 }
