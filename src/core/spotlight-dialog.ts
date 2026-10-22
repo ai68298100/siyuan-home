@@ -5,6 +5,7 @@
  */
 import { searchSpotlight, type SpotlightItem } from "./spotlight";
 import { moduleIcon } from "./modules";
+import { showMessage } from "siyuan";
 
 function escapeHtml(str: string): string {
     return str
@@ -144,12 +145,30 @@ export async function openSpotlightDialog(options: SpotlightDialogOptions): Prom
                 <b style="font-size:13.5px;color:var(--lv-tx);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${safeTitle}</b>
             `;
 
+            const rightOps = document.createElement("div");
+            rightOps.style.cssText = "display:inline-flex;align-items:center;gap:6px;flex-shrink:0";
+
+            const copyRef = document.createElement("button");
+            copyRef.className = "b3-button b3-button--text";
+            copyRef.style.cssText = "font-size:11px;padding:1px 6px;line-height:1;color:var(--lv-tx-3)";
+            copyRef.title = "复制思源块引用 ((id \"title\")) (Alt+C)";
+            copyRef.textContent = "🔗 引用";
+            copyRef.onclick = async (e) => {
+                e.stopPropagation();
+                const blockRefText = `((${item.rowId} "${item.title}"))`;
+                try {
+                    await navigator.clipboard.writeText(blockRefText);
+                    showMessage("已复制思源块引用", 2500, "info");
+                } catch { /* soft fallback */ }
+            };
+
             const badge = document.createElement("span");
             badge.className = "lv-badge";
             badge.style.cssText = "font-size:11px;padding:1px 6px;flex-shrink:0";
             badge.textContent = modLabel(item.moduleId);
 
-            top.append(left, badge);
+            rightOps.append(copyRef, badge);
+            top.append(left, rightOps);
 
             const meta = document.createElement("div");
             meta.className = "lv-caption";
@@ -173,6 +192,9 @@ export async function openSpotlightDialog(options: SpotlightDialogOptions): Prom
                 if (e.key === "Enter") {
                     dlg.destroy();
                     onNavigateToTarget({ moduleId: item.moduleId, rowId: item.rowId });
+                } else if ((e.key === "c" || e.key === "C") && (e.altKey || e.metaKey)) {
+                    e.preventDefault();
+                    copyRef.click();
                 }
             };
             card.onclick = () => {

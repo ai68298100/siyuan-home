@@ -1918,6 +1918,8 @@
     "ledger.bindDocSuccess": "成功将文档绑定为「${module}」台账！",
     "ledger.copyBlockRef": "复制思源块引用",
     "ledger.blockRefCopied": "已复制思源块双链引用 ((...)) 至剪贴板！",
+    "ledger.copyBlockEmbed": "复制嵌入块语法",
+    "ledger.blockEmbedCopied": "已复制思源嵌入块语法 {{...}} 至剪贴板！",
     "settings.targetNotebook": "台账默认笔记本",
     "settings.targetNotebookHint": "新模块建账时优先使用的思源笔记本（留空则默认使用或创建「🏠 小驴管家」）",
     "spotlight.title": "全景生活检索",
