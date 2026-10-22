@@ -568,6 +568,21 @@ export default class LvHomePlugin extends Plugin {
         }
     }
 
+    /**
+     * 覆盖思源官方生命周期钩子（根治重载死循环的终极钥匙）：
+     * 思源官方规范明确说明：未覆盖 onDataChanged 方法的插件在收到存储变更时会强制重载整个插件（卸载并重新加载）。
+     * 覆盖此方法后，思源内核在存储数据更新时将直接回调本方法，绝不重载插件，彻底根除顶栏闪烁、页面抖动与向导重启循环！
+     */
+    async onDataChanged(_reason?: any): Promise<void> {
+        try {
+            const nextSettings = await loadSettings(this);
+            this.settings = nextSettings;
+            this.hubListeners.forEach((fn) => fn());
+        } catch (e) {
+            console.warn("[siyuan-home] onDataChanged sync failed:", e);
+        }
+    }
+
     /** 智能扫描并找回思源中已有的全部历史台账（老版本平滑升级匹配） */
     async adoptHistoryLedgers() {
         const { discoverAndAdoptAllLedgers } = await import("@/core/provisioner");
@@ -959,15 +974,10 @@ export default class LvHomePlugin extends Plugin {
     async finishOnboarding(household: { roles: string[]; children: number }, moduleIds: string[]) {
         this.settings.household = household as any;
         this.settings.enabledModules = Array.from(new Set([...this.settings.enabledModules, ...moduleIds]));
-        this.settings.onboarded = true;
-        // 关键防护：立即先行持久化 onboarded: true，确保向导完成状态绝不因后续建库异常而回退丢失
-        try {
-            await saveSettings(this, this.settings);
-        } catch { /* soft persist */ }
-
         // C7c：建库批处理进度提示（31 模块串行需数秒；起止均有反馈，失败落 dbRefs.provisionError 诊断可见）
         showMessage(this.i18nText("wiz.provisioning").replace("${n}", String(moduleIds.length)), 4000, "info");
         const provisioning = await this.ensureCoreLedgers();
+        this.settings.onboarded = true;
         await saveSettings(this, this.settings);
         // C7c 收尾：建库失败浮出（此前只进诊断区，向导完成后用户无感）
         const failed = provisioning.issues.map(({ moduleId }) => this.i18nText(`module.${moduleId}`));
