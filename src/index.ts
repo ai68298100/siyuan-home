@@ -194,11 +194,80 @@ export default class LvHomePlugin extends Plugin {
         this.topBarEl = this.addTopBar(this.createTopBarOptions());
         this.ensureTopBarIconAlive();
 
+        const butlerLabel = String(this.i18n.butler ?? "小驴管家");
+
+        // 1. 命令面板：打开小驴管家主面板
         this.addCommand({
             langKey: "openButler",
-            // 26.7 默认热键策略：Alt+H（H=Home，避开常见组合；用户可在设置-快捷键改）
+            langText: `${butlerLabel}：${this.i18nText("openButler")}`,
             hotkey: "Ctrl+Alt+H",
             callback: () => this.showTab(),
+        });
+
+        // 2. 命令面板：⚡ 快速记录流水/便签/档案
+        this.addCommand({
+            langKey: "quickCapture",
+            langText: `${butlerLabel}：${this.i18n["faq.quickCapture"] ?? "快速记录流水/便签"}`,
+            hotkey: "Ctrl+Alt+N",
+            callback: () => {
+                this.showTab();
+                window.dispatchEvent(new CustomEvent("siyuan-home:open-capture"));
+            },
+        });
+
+        // 3. 命令面板：🔍 全景生活检索
+        this.addCommand({
+            langKey: "spotlightSearch",
+            langText: `${butlerLabel}：${this.i18n["spotlight.title"] ?? "全景生活检索"}`,
+            hotkey: "Ctrl+Alt+F",
+            callback: () => {
+                this.showTab();
+                window.dispatchEvent(new CustomEvent("siyuan-home:open-spotlight"));
+            },
+        });
+
+        // 4. 命令面板：⏰ 到期提醒中枢
+        this.addCommand({
+            langKey: "openReminders",
+            langText: `${butlerLabel}：${this.i18n.tabReminders ?? "到期提醒中枢"}`,
+            hotkey: "Ctrl+Alt+R",
+            callback: () => this.openRemindersScreen(),
+        });
+
+        // 5. 命令面板：🗂️ 家庭台账列表
+        this.addCommand({
+            langKey: "openLedger",
+            langText: `${butlerLabel}：${this.i18n.tabLedger ?? "家庭台账列表"}`,
+            hotkey: "Ctrl+Alt+L",
+            callback: () => this.openModuleTab(this.activeLedger),
+        });
+
+        // 6. 命令面板：🚨 家庭急救卡与医疗资料
+        this.addCommand({
+            langKey: "openEmergencyCard",
+            langText: `${butlerLabel}：${this.i18n["overview.emergencyCard"] ?? "家庭急救卡与医疗资料"}`,
+            callback: () => {
+                this.showTab();
+                window.dispatchEvent(new CustomEvent("siyuan-home:open-emergency"));
+            },
+        });
+
+        // 7. 命令面板：👥 家庭成员档案管理
+        this.addCommand({
+            langKey: "openMembers",
+            langText: `${butlerLabel}：${this.i18n.tabMembers ?? "家庭成员档案"}`,
+            callback: () => {
+                this.pendingScreen = "members";
+                if (this.panelScreenSwitch) this.panelScreenSwitch("members");
+                this.showTab();
+            },
+        });
+
+        // 8. 命令面板：⚙️ 管家设置选项
+        this.addCommand({
+            langKey: "openSettings",
+            langText: `${butlerLabel}：${this.i18n.settingsTitle ?? "管家设置选项"}`,
+            callback: () => this.openSetting(),
         });
 
         // 28 组：状态栏「今日到期 N」角标（点击打开管家并预选提醒页）
