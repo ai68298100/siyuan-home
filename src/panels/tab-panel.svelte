@@ -221,6 +221,14 @@
             requestAnimationFrame(() => captureInvoker?.focus());
         }
     });
+    $effect(() => {
+        const handler = (e: Event) => {
+            const detail = (e as CustomEvent<{ module?: string }>)?.detail;
+            openCapture(detail?.module);
+        };
+        window.addEventListener("siyuan-home:open-capture", handler);
+        return () => window.removeEventListener("siyuan-home:open-capture", handler);
+    });
     // 268 波（Linear 式键盘优先）：N 键呼出快速记录、Ctrl+K 呼出全景生活检索
     $effect(() => {
         const onKey = (e: KeyboardEvent) => {
