@@ -192,10 +192,14 @@ export default class LvHomePlugin extends Plugin {
             },
         });
 
-        // 启动前排查并清除任何残留的历史顶栏节点，确保全局唯一
+        // 启动前排查并清除任何残留的历史顶栏与状态栏节点，确保全局唯一
         if (typeof document !== "undefined") {
             const staleIcons = document.querySelectorAll('#toolbar [data-id="siyuan-home-topbar"], #toolbar [id*="siyuan-home"], #toolbar [aria-label*="小驴管家"], #toolbar [aria-label*="Lv Home"]');
             staleIcons.forEach((el) => el.remove());
+            const staleStatus = document.querySelectorAll('#status .lv-statusbar, .lv-statusbar');
+            staleStatus.forEach((el) => el.remove());
+            const staleMobile = document.querySelectorAll("#lvHomeMobileTopBarButton");
+            staleMobile.forEach((el) => el.remove());
         }
 
         // 顶栏入口（桌面端图标 + 点击开面板，支持固定 id 幂等注册与原生右键菜单）
@@ -1116,7 +1120,17 @@ export default class LvHomePlugin extends Plugin {
             }, 800);
             return;
         }
-        if (this.mobileTopBarBtn?.isConnected || topBar.querySelector("#lvHomeMobileTopBarButton")) return;
+        const existing = topBar.querySelectorAll("#lvHomeMobileTopBarButton");
+        if (existing.length > 1) {
+            for (let i = 1; i < existing.length; i++) existing[i].remove();
+            this.mobileTopBarBtn = existing[0] as HTMLElement;
+            return;
+        }
+        if (existing.length === 1) {
+            this.mobileTopBarBtn = existing[0] as HTMLElement;
+            return;
+        }
+        if (this.mobileTopBarBtn?.isConnected) return;
         const button = document.createElement("button");
         button.type = "button";
         button.id = "lvHomeMobileTopBarButton";
@@ -1310,6 +1324,9 @@ export default class LvHomePlugin extends Plugin {
         }
         this.mobileTopBarBtn?.remove();
         this.mobileTopBarBtn = undefined;
+        if (typeof document !== "undefined") {
+            document.querySelectorAll("#lvHomeMobileTopBarButton").forEach((b) => b.remove());
+        }
         if (this.mobileDialog) {
             try { this.mobileDialog.destroy(); } catch { /* 已销毁 */ }
             this.mobileDialog = undefined;
@@ -1361,6 +1378,9 @@ export default class LvHomePlugin extends Plugin {
         }
         this.statusbarEl?.remove();
         this.statusbarEl = undefined;
+        if (typeof document !== "undefined") {
+            document.querySelectorAll(".lv-statusbar").forEach((el) => el.remove());
+        }
         this.hubListeners.clear();
         this.scanSeq++;
     }

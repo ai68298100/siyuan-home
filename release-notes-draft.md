@@ -1,13 +1,11 @@
-# v0.5.43 · 小驴管家（内测版）紧急修复重载思源后顶栏出现两个图标问题，强化 DOM 排重守护与 onunload 清理闭环
+# v0.5.44 · 小驴管家（内测版）全仓系统性排查多端顶栏、状态栏与浮层生命周期，建立全局唯一性闭环与幽灵节点主动收敛机制
 
 ## 变更
 
-- **紧急修复重载后顶栏出现两个图标问题**：
-  - **根因锁定**：在思源重载插件时，旧插件实例卸载时未显式调用 `removeTopBar` 且未将 DOM 节点清除；同时 `ensureTopBarIconAlive` 中的查询选择器与思源官方真实生成的 `[data-id="siyuan-home-topbar"]` 属性不匹配，导致误判“图标丢失”后再次执行 `addTopBar`，在顶栏累加了第二颗重复图标；
-  - **根本解决**：
-    1. 启动注册前自动排查并彻底清除任何残留的历史顶栏节点（`querySelectorAll('#toolbar ...').forEach(el => el.remove())`）；
-    2. 存活守护引入**自动排重收敛逻辑**：一旦发现 toolbar 中管家图标数量 > 1，立即自动清除多余节点严格仅留 1 个；数量 == 1 时坚决不重复调用 `addTopBar`；
-    3. `onunload` 卸载时严格执行 `removeTopBar("siyuan-home-topbar")` 并清理 DOM 引用，彻底闭合生命周期，保证视觉上永远只有唯一 1 个顶栏图标。
+- **全仓系统性排查多端顶栏与状态栏生命周期**：
+  - **启动注册前主动清幽灵**：在 `registerEntrypoints()` 中，启动注册前不仅对 `#toolbar` 桌面顶栏，同时对 `#status .lv-statusbar` 状态栏及 `#mobileTopBar #lvHomeMobileTopBarButton` 移动端顶栏实施全局历史残留扫描与清空，确保初始化环境处于纯净状态；
+  - **移动端顶栏主动排重守护**：`ensureMobileTopBarButton` 增加对 `#mobileTopBar` 中同名按钮的实时数量检测，一旦发现数量 > 1 立即自愈清除多余节点，严格维持有且仅有 1 个按钮；
+  - **onunload 卸载彻底清理闭环**：卸载与重载时对桌面顶栏、移动端顶栏与状态栏节点实施彻底的 DOM `remove()`，从机制层面彻底根除重载后任何 UI 元素的叠加与重影风险。
 
 ## 验证
 

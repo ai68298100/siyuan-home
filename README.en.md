@@ -39,24 +39,24 @@ Certificates expire, medicine expires, insurance needs renewal, subscriptions au
 
 Image OCR uses the engine configured in SiYuan Settings → OCR. It runs only when requested and does not require automatic OCR to be enabled. AI OCR asks before each run because the image is sent to the selected AI service. Results are saved to SiYuan OCR text and included in search; re-running replaces the previous result. Encrypted notebook images and PDFs are not supported, and OCR text is never written into ledger fields automatically.
 
-## 🆕 What's new in v0.5.43
+## 🆕 What's new in v0.5.44
 
-This release provides an emergency fix for duplicate top bar icons after reloading SiYuan, introducing strict DOM presence deduplication and cleanup closure in `onunload`:
+This release performs a comprehensive lifecycle audit across desktop/mobile toolbars, status bar, and overlays, implementing global uniqueness and active ghost node convergence:
 
-- **Fixed (Emergency: Eliminate Duplicate Top Bar Icons)**:
-  - Added startup sweep to clear any orphan/stale top bar nodes before registration;
-  - Added active deduplication in `ensureTopBarIconAlive`: if more than one Butler icon is detected in `#toolbar`, excess nodes are immediately purged, ensuring strictly 1 icon;
-  - Explicitly invokes `removeTopBar("siyuan-home-topbar")` and DOM node removal in `onunload`.
+- **Improved (Global Uniqueness Closure for Status Bar and Toolbars)**:
+  - Added pre-registration sweep to eliminate any stale nodes in `#toolbar`, `#status .lv-statusbar`, and `#mobileTopBar #lvHomeMobileTopBarButton`;
+  - Added active deduplication in `ensureMobileTopBarButton` to force strictly 1 button on mobile;
+  - Closes the lifecycle with complete DOM `remove()` calls on all UI elements in `onunload`.
 - **Validation**: 90 test suites, **791 unit tests passing**, TypeScript, Svelte, i18n (1948 keys), metadata, and package smoke all green.
-## 📦 Install (v0.5.43)
+## 📦 Install (v0.5.44)
 
 1. Download `package.zip` from [Releases](https://github.com/ai68298100/siyuan-home/releases/latest)
 2. SiYuan → Settings → Marketplace → Download → **Import** the zip
 3. Enable the plugin → complete the 2-step onboarding (household → module picks and provisioning)
 4. Press `Ctrl+Alt+H` anytime to open the hub
 
-> **Validation status:** core data paths have automated tests and isolated-kernel coverage. The v0.5.43 GitHub Release is available; Android WebView behavior remains host-specific validation. `icon.png` and `preview.png` were redesigned for v0.3.13 (brand-gradient tile + geometric mark; dark overview with sample data).
-> **Version note:** the tagged v0.5.43 package is the current GitHub release; local quality checks report 791 unit tests.
+> **Validation status:** core data paths have automated tests and isolated-kernel coverage. The v0.5.44 GitHub Release is available; Android WebView behavior remains host-specific validation. `icon.png` and `preview.png` were redesigned for v0.3.13 (brand-gradient tile + geometric mark; dark overview with sample data).
+> **Version note:** the tagged v0.5.44 package is the current GitHub release; local quality checks report 791 unit tests.
 >
 > Family sharing depends on SiYuan's collaboration, permissions, sync and conflict behavior. Test with non-sensitive data before sharing; this plugin does not provide a separate permission system.
 >
@@ -114,7 +114,8 @@ The v0.5.1 release is available on GitHub, with static isolated-kernel gates and
 
 | Phase | Content |
 |---|---|
-| ✅ v0.5.43 (current) | Fix duplicate top bar icons after reload, active DOM deduplication, onunload cleanup |
+| ✅ v0.5.44 (current) | Multi-platform toolbar & status bar lifecycle closure, active ghost node convergence |
+| v0.5.43 | Fix duplicate top bar icons after reload, active DOM deduplication, onunload cleanup |
 | v0.5.42 | Deep SiYuan editor integration: Slash commands (/), block icon ingest, block embeds |
 | v0.5.41 | Command Palette suite (8 commands), clean single top bar entry with right-click menu |
 | v0.5.40 | Official lifecycle contract alignment, top bar context menu, URL scheme, AttributeView integration |
