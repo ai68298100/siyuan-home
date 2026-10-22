@@ -222,12 +222,20 @@
         }
     });
     $effect(() => {
-        const handler = (e: Event) => {
+        const captureHandler = (e: Event) => {
             const detail = (e as CustomEvent<{ module?: string }>)?.detail;
             openCapture(detail?.module);
         };
-        window.addEventListener("siyuan-home:open-capture", handler);
-        return () => window.removeEventListener("siyuan-home:open-capture", handler);
+        const spotlightHandler = () => void openSpotlight();
+        const emergencyHandler = () => void openEmergencyCardFromGuest();
+        window.addEventListener("siyuan-home:open-capture", captureHandler);
+        window.addEventListener("siyuan-home:open-spotlight", spotlightHandler);
+        window.addEventListener("siyuan-home:open-emergency", emergencyHandler);
+        return () => {
+            window.removeEventListener("siyuan-home:open-capture", captureHandler);
+            window.removeEventListener("siyuan-home:open-spotlight", spotlightHandler);
+            window.removeEventListener("siyuan-home:open-emergency", emergencyHandler);
+        };
     });
     // 268 波（Linear 式键盘优先）：N 键呼出快速记录、Ctrl+K 呼出全景生活检索
     $effect(() => {

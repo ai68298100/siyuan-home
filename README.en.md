@@ -39,22 +39,22 @@ Certificates expire, medicine expires, insurance needs renewal, subscriptions au
 
 Image OCR uses the engine configured in SiYuan Settings → OCR. It runs only when requested and does not require automatic OCR to be enabled. AI OCR asks before each run because the image is sent to the selected AI service. Results are saved to SiYuan OCR text and included in search; re-running replaces the previous result. Encrypted notebook images and PDFs are not supported, and OCR text is never written into ledger fields automatically.
 
-## 🆕 What's new in v0.5.40
+## 🆕 What's new in v0.5.41
 
-This release deeply aligns with SiYuan's latest official Petal Lifecycle contract, introduces a native top bar context menu, custom URL scheme navigation, and deep AttributeView database integration:
+This release implements a comprehensive Command Palette suite for SiYuan, registering 8 core command shortcuts while preserving a single clean top bar entry:
 
-- **Aligned (Official Lifecycle Contract & Debounce)**: Strictly honors the 5-second timeout and serialized pipeline (`onload` -> `onLayoutReady` -> `onDataChanged` -> `onunload`); `onDataChanged` detects cloud sync (`reason === "sync"`) for silent background rescan without restarting the plugin; declared official stable `id: "siyuan-home-topbar"` in `addTopBar` to prevent toolbar layout shift.
-- **Added (Deep Official Feature Integration)**: Native right-click context menu on the top bar icon (⚡ Quick Capture, ⏰ Reminders, 🗂️ Ledgers, 👥 Members, ⚙️ Settings); native custom protocol routing (`siyuan://plugins/siyuan-home/...`); AttributeView database row context menu integration; `showTabDocs` natively passes `cb-get-hl` and `cb-get-focus` for block highlighting in SiYuan's native editor.
+- **Added (Command Palette Suite)**: Registered 8 official commands searchable via `Ctrl+P`: Open Butler (Ctrl+Alt+H), Quick Capture (Ctrl+Alt+N), Spotlight Search (Ctrl+Alt+F), Reminders Hub (Ctrl+Alt+R), Ledgers List (Ctrl+Alt+L), Emergency Medical Card, Household Members, and Settings.
+- **Improved (Clean Top Bar)**: Retained a single official top bar icon with right-click context menu shortcuts, avoiding toolbar crowding.
 - **Validation**: 90 test suites, **791 unit tests passing**, TypeScript, Svelte, i18n (1946 keys), metadata, and package smoke all green.
-## 📦 Install (v0.5.40)
+## 📦 Install (v0.5.41)
 
 1. Download `package.zip` from [Releases](https://github.com/ai68298100/siyuan-home/releases/latest)
 2. SiYuan → Settings → Marketplace → Download → **Import** the zip
 3. Enable the plugin → complete the 2-step onboarding (household → module picks and provisioning)
 4. Press `Ctrl+Alt+H` anytime to open the hub
 
-> **Validation status:** core data paths have automated tests and isolated-kernel coverage. The v0.5.40 GitHub Release is available; Android WebView behavior remains host-specific validation. `icon.png` and `preview.png` were redesigned for v0.3.13 (brand-gradient tile + geometric mark; dark overview with sample data).
-> **Version note:** the tagged v0.5.40 package is the current GitHub release; local quality checks report 791 unit tests.
+> **Validation status:** core data paths have automated tests and isolated-kernel coverage. The v0.5.41 GitHub Release is available; Android WebView behavior remains host-specific validation. `icon.png` and `preview.png` were redesigned for v0.3.13 (brand-gradient tile + geometric mark; dark overview with sample data).
+> **Version note:** the tagged v0.5.41 package is the current GitHub release; local quality checks report 791 unit tests.
 >
 > Family sharing depends on SiYuan's collaboration, permissions, sync and conflict behavior. Test with non-sensitive data before sharing; this plugin does not provide a separate permission system.
 >
@@ -112,7 +112,8 @@ The v0.5.1 release is available on GitHub, with static isolated-kernel gates and
 
 | Phase | Content |
 |---|---|
-| ✅ v0.5.40 (current) | Official lifecycle contract alignment, top bar context menu, URL scheme, AttributeView integration |
+| ✅ v0.5.41 (current) | Command Palette suite (8 commands), clean single top bar entry with right-click menu |
+| v0.5.40 | Official lifecycle contract alignment, top bar context menu, URL scheme, AttributeView integration |
 | v0.5.39 | Top bar & UI debounce hardening, native interactive doc card, block-level editor highlight |
 | v0.5.38 | Official onDataChanged hook implementation, eliminate reload loops on wizard provisioning |
 | v0.5.37 | Deep cross-scene UI craftsmanship: Spotlight keyboard navigation, inline steppers, 4px urgency rails |
