@@ -42,7 +42,7 @@ export async function runHealthCheck(
                 // 文档根块 id 即 docId；回收站/删除的文档已退出 blocks 索引。
                 // 索引延迟（E5）可致瞬时查空——判缺失前延迟复检一次，避免误报。
                 const exists = async () =>
-                    (await sql<{ id: string }>(`SELECT id FROM blocks WHERE id='${ref.docId}' LIMIT 1`)).length > 0;
+                    (await sql<{ id: string }>(`SELECT id FROM blocks WHERE id='${ref.docId!.replace(/'/g, "''")}' LIMIT 1`)).length > 0;
                 if (!(await exists())) {
                     await new Promise((r) => setTimeout(r, 600));
                     if (!(await exists())) {

@@ -1,11 +1,12 @@
-# v0.5.44 · 小驴管家（内测版）全仓系统性排查多端顶栏、状态栏与浮层生命周期，建立全局唯一性闭环与幽灵节点主动收敛机制
+# v0.5.45 · 小驴管家（内测版）全方位代码防抖与安全健壮性审查：全仓SQL防注入转义加固、状态栏/移动端顶栏启动前清零与深度自愈
 
 ## 变更
 
-- **全仓系统性排查多端顶栏与状态栏生命周期**：
-  - **启动注册前主动清幽灵**：在 `registerEntrypoints()` 中，启动注册前不仅对 `#toolbar` 桌面顶栏，同时对 `#status .lv-statusbar` 状态栏及 `#mobileTopBar #lvHomeMobileTopBarButton` 移动端顶栏实施全局历史残留扫描与清空，确保初始化环境处于纯净状态；
-  - **移动端顶栏主动排重守护**：`ensureMobileTopBarButton` 增加对 `#mobileTopBar` 中同名按钮的实时数量检测，一旦发现数量 > 1 立即自愈清除多余节点，严格维持有且仅有 1 个按钮；
-  - **onunload 卸载彻底清理闭环**：卸载与重载时对桌面顶栏、移动端顶栏与状态栏节点实施彻底的 DOM `remove()`，从机制层面彻底根除重载后任何 UI 元素的叠加与重影风险。
+- **全仓 SQL 查询转义防注入加固**：
+  - 对 `health.ts`、`provisioner.ts`、`ledger.svelte` 中的全部 `sql<T>` 块查询参数（`docId`、`existing.docId`、`root_id`）统一实施严格的单引号转义过滤（`.replace(/'/g, "''")`），杜绝任何潜在的 SQL 语法截断或注入异常；
+- **全生命周期幽灵节点彻底根绝**：
+  - 启动阶段不仅清理桌面顶栏，同时对 `#status .lv-statusbar` 状态栏及 `#mobileTopBar #lvHomeMobileTopBarButton` 移动端顶栏实施启动前清零扫描；
+  - 完善移动端与状态栏在 `onunload` 卸载时的全量节点 `remove()` 闭环，确保多次重载或多窗口切换时零残留、零叠影、零抖动。
 
 ## 验证
 

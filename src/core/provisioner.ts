@@ -252,7 +252,7 @@ export async function findLedgerDoc(notebookId: string, hpath: string, moduleId?
 export async function findAvBlockInDoc(docId: string): Promise<string | null> {
     try {
         const rows = await sql<{ id: string }>(
-            `SELECT id FROM blocks WHERE type='av' AND root_id='${docId}' LIMIT 1`,
+            `SELECT id FROM blocks WHERE type='av' AND root_id='${docId.replace(/'/g, "''")}' LIMIT 1`,
         );
         return rows[0]?.id ?? null;
     } catch {
@@ -402,7 +402,7 @@ export async function provisionModule(
             // 自愈追踪：核对文档当前最新的真实笔记本所属（防止用户在思源中移动了文档导致错位）
             let actualNotebook = existing.notebook;
             try {
-                const boxRows = await sql<{ box: string }>(`SELECT box FROM blocks WHERE id='${existing.docId}' LIMIT 1`);
+                const boxRows = await sql<{ box: string }>(`SELECT box FROM blocks WHERE id='${existing.docId.replace(/'/g, "''")}' LIMIT 1`);
                 if (boxRows[0]?.box) {
                     actualNotebook = boxRows[0].box;
                     await openNotebook(actualNotebook, { retries: 1 });
