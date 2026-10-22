@@ -5198,7 +5198,7 @@
         }
         (dlg.element.querySelector("#lv-detail-close") as HTMLButtonElement).onclick = () => dlg.destroy();
         (dlg.element.querySelector("#lv-detail-edit") as HTMLButtonElement).onclick = () => buildEdit();
-        (dlg.element.querySelector("#lv-detail-open") as HTMLButtonElement).onclick = () => { dlg.destroy(); plugin.showTabDocs(ref?.docId); };
+        (dlg.element.querySelector("#lv-detail-open") as HTMLButtonElement).onclick = () => { dlg.destroy(); plugin.showTabDocs(ref?.docId, row.itemID); };
         // R7 资料强化：分享卡（复制为图片 / 下载 PNG）——kv 用当前显示文本（掩码态即导出掩码态）
         const nameKeyForCard = ref?.columns?.name;
         const nameValForCard = nameKeyForCard ? row.cells?.[nameKeyForCard] : undefined;

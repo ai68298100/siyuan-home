@@ -399,10 +399,20 @@ export async function provisionModule(
             docMissing = true; // 内核明确报错 → 文档已被删除，落到下方重建流程
         }
         if (!docMissing) {
+            // 自愈追踪：核对文档当前最新的真实笔记本所属（防止用户在思源中移动了文档导致错位）
+            let actualNotebook = existing.notebook;
+            try {
+                const boxRows = await sql<{ box: string }>(`SELECT box FROM blocks WHERE id='${existing.docId}' LIMIT 1`);
+                if (boxRows[0]?.box) {
+                    actualNotebook = boxRows[0].box;
+                    await openNotebook(actualNotebook, { retries: 1 });
+                }
+            } catch { /* soft heal */ }
+
             // D08：复用原库 + 补列续跑（成功后清除旧 provisionError）
             const memberAvId = moduleId === "members" ? undefined : settings.dbRefs.members?.avId;
             const { columns, error } = await ensureColumns(existing.avId, schema, existing.columns, moduleId, opts, memberAvId);
-            const dbRef: DbRef = { ...existing, columns, provisionError: error };
+            const dbRef: DbRef = { ...existing, notebook: actualNotebook, columns, provisionError: error };
             settings.dbRefs[moduleId] = dbRef;
             return { dbRef, created: false };
         }
@@ -433,7 +443,7 @@ export async function provisionModule(
         }
         let docId: string;
         try {
-            const docHeaderMarkdown = `# ${titleI18n}\n\n> 🏠 **小驴管家 · 专属台账文档**\n> 快捷直达：按 \`Ctrl+Alt+H\` 可在任意界面随时呼出小驴管家；下方为思源原生属性视图数据库（AttributeView），支持双向编辑与同步。\n\n{: placeholder-ledger }\n`;
+            const docHeaderMarkdown = `# ${titleI18n}\n\n> 🏠 **小驴管家 · ${titleI18n}台账**\n> 💡 快捷直达：按 \`Ctrl+Alt+H\` 可在任意界面随时呼出管家面板；下方为思源原生属性视图数据库（AttributeView），支持直接编辑、增减行与双向同步。\n\n`;
             docId = await createDocWithMd(notebookId, hpath, docHeaderMarkdown, {
                 idempotencyKey: `provision:doc:${moduleId}:${notebookId}:${hpath}`,
                 retries: 0,

@@ -190,12 +190,15 @@ export default class LvHomePlugin extends Plugin {
         const observer = new MutationObserver(() => {
             if (this.isUnloading) return;
             if (this.topBarEl && this.topBarEl.isConnected) return;
+            // 严格防抖：检查 DOM 树中是否已经存在小驴管家图标，杜绝重复调用 addTopBar 引起顶栏重新排布闪烁
+            if (toolbar.querySelector('[data-topbar-entry="siyuan-home"], [data-id="siyuan-home"], [aria-label*="小驴管家"]')) return;
             if (!document.getElementById("toolbar")) return;
             if (this.topBarReviveTimer !== undefined) window.clearTimeout(this.topBarReviveTimer);
             this.topBarReviveTimer = window.setTimeout(() => {
                 this.topBarReviveTimer = undefined;
                 if (this.isUnloading) return;
                 if (this.topBarEl && this.topBarEl.isConnected) return;
+                if (toolbar.querySelector('[data-topbar-entry="siyuan-home"], [data-id="siyuan-home"], [aria-label*="小驴管家"]')) return;
                 if (!document.getElementById("toolbar")) return;
                 try {
                     this.topBarEl = this.addTopBar({
@@ -210,6 +213,17 @@ export default class LvHomePlugin extends Plugin {
         });
         observer.observe(toolbar, { childList: true });
         this.topBarObserver = observer;
+    }
+
+    private hubChangedScheduled = false;
+    /** 微任务级合并广播：多次数据变更自动合为一次 UI 响应，彻底杜绝短时间内高频 re-render 引起的页面抖动 */
+    emitHubChanged(): void {
+        if (this.hubChangedScheduled) return;
+        this.hubChangedScheduled = true;
+        queueMicrotask(() => {
+            this.hubChangedScheduled = false;
+            this.hubListeners.forEach((fn) => fn());
+        });
     }
 
     async onload() {
@@ -242,7 +256,7 @@ export default class LvHomePlugin extends Plugin {
                 const errors = (this.scan.errors ?? []).filter((error) => error.moduleId !== "auth");
                 this.scan = { ...this.scan, stale: true, errors: [...errors, { moduleId: "auth", message: this.i18nText("auth.expired") }] };
             }
-            this.hubListeners.forEach((listener) => listener());
+            this.emitHubChanged();
             showMessage(this.i18nText("auth.expired"), 7000, "error");
             const authPath = "/check-auth";
             if (!this.authRedirectScheduled && location.pathname !== authPath && !location.pathname.startsWith(`${authPath}/`)) {
@@ -271,7 +285,7 @@ export default class LvHomePlugin extends Plugin {
                 const errors = (this.scan.errors ?? []).filter((error) => error.moduleId !== "permission");
                 this.scan = { ...this.scan, stale: true, errors: [...errors, { moduleId: "permission", message }] };
             }
-            this.hubListeners.forEach((listener) => listener());
+            this.emitHubChanged();
             showMessage(message, 7000, "error");
         };
         window.addEventListener("siyuan-home:permission-denied", this.permissionDeniedHandler);
@@ -420,7 +434,7 @@ export default class LvHomePlugin extends Plugin {
             if (![streak, accuracy, attempts, generatedAt].every((n) => Number.isFinite(n))) return;
             this.runtime.lastExamStats = {streak, accuracy, attempts, generatedAt};
             import("@/core/hub/runtime").then((m) => m.saveRuntime(this, this.runtime)).catch(() => undefined);
-            this.hubListeners.forEach((fn) => fn());
+            this.emitHubChanged();
         };
         window.addEventListener("lv-exam:stats", this.examStatsHandler);
 
@@ -428,7 +442,7 @@ export default class LvHomePlugin extends Plugin {
         this.cardsReviewedHandler = (e: Event) => {
             const detail = (e as CustomEvent).detail as Record<string, unknown> | undefined;
             if (!detail || typeof detail !== "object") return;
-            this.hubListeners.forEach((fn) => fn());
+            this.emitHubChanged();
         };
         window.addEventListener("lv-cards:reviewed", this.cardsReviewedHandler);
 
@@ -466,7 +480,7 @@ export default class LvHomePlugin extends Plugin {
             };
             const { saveRuntime } = await import("@/core/hub/runtime");
             await saveRuntime(this, this.runtime);
-            this.hubListeners.forEach((fn) => fn());
+            this.emitHubChanged();
         } catch (e) {
             console.warn("[siyuan-home] checkin summary pull failed:", e instanceof Error ? e.message : e);
         }
@@ -577,7 +591,7 @@ export default class LvHomePlugin extends Plugin {
         try {
             const nextSettings = await loadSettings(this);
             this.settings = nextSettings;
-            this.hubListeners.forEach((fn) => fn());
+            this.emitHubChanged();
         } catch (e) {
             console.warn("[siyuan-home] onDataChanged sync failed:", e);
         }
@@ -629,7 +643,7 @@ export default class LvHomePlugin extends Plugin {
         if (!onlySet && !force && this.lastScanAt && Date.now() - this.lastScanAt < LvHomePlugin.FULL_SCAN_MIN_MS) {
             const cached = this.scan;
             if (cached) {
-                this.hubListeners.forEach((fn) => fn());
+                this.emitHubChanged();
                 return cached;
             }
         }
@@ -712,7 +726,7 @@ export default class LvHomePlugin extends Plugin {
         try { performance.measure(perfMark, `${perfMark}-start`, `${perfMark}-end`); } catch { /* PF01 测量标记 */ }
         const todayDue = scan.reminders.filter((r) => r.daysLeft <= 0).length;
         this.updateStatusbar(todayDue);
-        this.hubListeners.forEach((fn) => fn());
+        this.emitHubChanged();
         return scan;
     }
 
@@ -754,7 +768,7 @@ export default class LvHomePlugin extends Plugin {
             showMessage(message, 6500, "error");
         }
         this.updateStatusbar(reminders.filter((r) => r.daysLeft <= 0).length);
-        this.hubListeners.forEach((fn) => fn());
+        this.emitHubChanged();
     }
 
     /**
@@ -913,11 +927,11 @@ export default class LvHomePlugin extends Plugin {
         this.mobileDialog = dialog;
     }
 
-    /** 打开台账文档（R5 降级定位） */
-    showTabDocs(docId?: string) {
-        const docId0 = docId ?? this.settings.dbRefs[this.activeLedger]?.docId;
-        if (!docId0) return;
-        openTab({ app: this.app, doc: { id: docId0 } });
+    /** 打开台账文档或定位具体块（R5 降级定位） */
+    showTabDocs(docId?: string, blockId?: string) {
+        const targetId = blockId ?? docId ?? this.settings.dbRefs[this.activeLedger]?.docId;
+        if (!targetId) return;
+        openTab({ app: this.app, doc: { id: targetId }, keepCursor: true });
     }
 
     activeLedger = "certs";
