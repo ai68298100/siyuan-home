@@ -29,7 +29,7 @@ export interface HomePluginLike extends Plugin {
     ensureCoreLedgers(): Promise<ProvisioningReport>;
     adoptHistoryLedgers?(): Promise<any>;
     showTab(): void;
-    showTabDocs(docId?: string): void;
+    showTabDocs(docId?: string, blockId?: string): void;
     openSetting(): void;
     setActiveLedger(id: string): void;
     listHandled(): HandledEntry[];
