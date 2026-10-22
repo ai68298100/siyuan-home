@@ -4585,7 +4585,7 @@
                         const { sql, createDocWithMd } = await import("@/core/siyuan");
                         const file = getTemplate(tp.file);
                         if (!file) throw new Error("template missing: " + tp.file);
-                        const rows = await sql<{ box: string }>(`SELECT box FROM blocks WHERE id='${ref!.docId}' LIMIT 1`);
+                        const rows = await sql<{ box: string }>(`SELECT box FROM blocks WHERE id='${ref!.docId.replace(/'/g, "''")}' LIMIT 1`);
                         const notebook = rows[0]?.box;
                         if (!notebook) throw new Error("notebook not found for " + ref!.docId);
                         const vars: Record<string, string> = { name: String(cellText(row.cells[ref!.columns.name])), date: localDateKey(new Date()) };
