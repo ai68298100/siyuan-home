@@ -39,24 +39,22 @@ Certificates expire, medicine expires, insurance needs renewal, subscriptions au
 
 Image OCR uses the engine configured in SiYuan Settings → OCR. It runs only when requested and does not require automatic OCR to be enabled. AI OCR asks before each run because the image is sent to the selected AI service. Results are saved to SiYuan OCR text and included in search; re-running replaces the previous result. Encrypted notebook images and PDFs are not supported, and OCR text is never written into ledger fields automatically.
 
-## 🆕 What's new in v0.5.39
+## 🆕 What's new in v0.5.40
 
-This release hardens top bar and UI debounce safeguards to permanently eliminate potential jitter, upgrades the native ledger document interactive card, and adds block-level highlight linkage with SiYuan documents:
+This release deeply aligns with SiYuan's latest official Petal Lifecycle contract, introduces a native top bar context menu, custom URL scheme navigation, and deep AttributeView database integration:
 
-- **Improved (Top Bar & UI Debounce Hardening)**: Added DOM presence deduplication in `ensureTopBarIconAlive` to prevent self-triggered `addTopBar()` re-registrations; unified UI updates under `emitHubChanged()` with microtask coalescing debounce to eliminate high-frequency layout re-renders.
-- **Improved (Native Document Head Interactive Card)**: Upgraded ledger document header Markdown with clean positioning cards and quick shortcuts, avoiding invalid placeholder attributes.
-- **Improved (Self-Healing Notebook Relocation Tracking)**: Dynamically checks and updates the actual notebook `box` when users move or rename ledger documents in SiYuan, ensuring seamless persistence.
-- **Improved (Block-Level Document Jump in Detail Drawer)**: Upgraded `showTabDocs` to accept both `docId` and `blockId`, allowing one-click opening and highlighting of specific record rows directly in SiYuan's native editor.
+- **Aligned (Official Lifecycle Contract & Debounce)**: Strictly honors the 5-second timeout and serialized pipeline (`onload` -> `onLayoutReady` -> `onDataChanged` -> `onunload`); `onDataChanged` detects cloud sync (`reason === "sync"`) for silent background rescan without restarting the plugin; declared official stable `id: "siyuan-home-topbar"` in `addTopBar` to prevent toolbar layout shift.
+- **Added (Deep Official Feature Integration)**: Native right-click context menu on the top bar icon (⚡ Quick Capture, ⏰ Reminders, 🗂️ Ledgers, 👥 Members, ⚙️ Settings); native custom protocol routing (`siyuan://plugins/siyuan-home/...`); AttributeView database row context menu integration; `showTabDocs` natively passes `cb-get-hl` and `cb-get-focus` for block highlighting in SiYuan's native editor.
 - **Validation**: 90 test suites, **791 unit tests passing**, TypeScript, Svelte, i18n (1946 keys), metadata, and package smoke all green.
-## 📦 Install (v0.5.39)
+## 📦 Install (v0.5.40)
 
 1. Download `package.zip` from [Releases](https://github.com/ai68298100/siyuan-home/releases/latest)
 2. SiYuan → Settings → Marketplace → Download → **Import** the zip
 3. Enable the plugin → complete the 2-step onboarding (household → module picks and provisioning)
 4. Press `Ctrl+Alt+H` anytime to open the hub
 
-> **Validation status:** core data paths have automated tests and isolated-kernel coverage. The v0.5.39 GitHub Release is available; Android WebView behavior remains host-specific validation. `icon.png` and `preview.png` were redesigned for v0.3.13 (brand-gradient tile + geometric mark; dark overview with sample data).
-> **Version note:** the tagged v0.5.39 package is the current GitHub release; local quality checks report 791 unit tests.
+> **Validation status:** core data paths have automated tests and isolated-kernel coverage. The v0.5.40 GitHub Release is available; Android WebView behavior remains host-specific validation. `icon.png` and `preview.png` were redesigned for v0.3.13 (brand-gradient tile + geometric mark; dark overview with sample data).
+> **Version note:** the tagged v0.5.40 package is the current GitHub release; local quality checks report 791 unit tests.
 >
 > Family sharing depends on SiYuan's collaboration, permissions, sync and conflict behavior. Test with non-sensitive data before sharing; this plugin does not provide a separate permission system.
 >
@@ -114,7 +112,8 @@ The v0.5.1 release is available on GitHub, with static isolated-kernel gates and
 
 | Phase | Content |
 |---|---|
-| ✅ v0.5.39 (current) | Top bar & UI debounce hardening, native interactive doc card, block-level editor highlight |
+| ✅ v0.5.40 (current) | Official lifecycle contract alignment, top bar context menu, URL scheme, AttributeView integration |
+| v0.5.39 | Top bar & UI debounce hardening, native interactive doc card, block-level editor highlight |
 | v0.5.38 | Official onDataChanged hook implementation, eliminate reload loops on wizard provisioning |
 | v0.5.37 | Deep cross-scene UI craftsmanship: Spotlight keyboard navigation, inline steppers, 4px urgency rails |
 | v0.5.36 | Deep prototype design alignment: Bento dual-temp cards, Weekly Pulse Strip, Achievements Badges |

@@ -71,6 +71,10 @@ export default class LvHomePlugin extends Plugin {
     private topBarReviveTimer?: number;
     /** C6c 块菜单监听（onunload 精确解绑用） */
     private captureMenuHandler?: (...args: any[]) => void;
+    /** 思源插件自定义 URL 协议跳转监听（siyuan://plugins/siyuan-home/...） */
+    private siyuanUrlHandler?: (...args: any[]) => void;
+    /** 思源属性视图（AttributeView 原生数据库）行右键菜单扩展 */
+    private avMenuHandler?: (...args: any[]) => void;
     /** PF06/18 组：他端台账变更（websocket）→ 节流补扫 [待实测] 事件名/频度以实例为准 */
     private wsHandler?: (...args: any[]) => void;
     private lastWsRescan = 0;
@@ -111,6 +115,51 @@ export default class LvHomePlugin extends Plugin {
         return String(this.i18n[key] ?? key);
     }
 
+    private createTopBarOptions() {
+        return {
+            id: "siyuan-home-topbar",
+            icon: "iconEmoji",
+            title: String(this.i18n.butler ?? "Lv Home"),
+            callback: () => this.showTab(),
+            contextMenu: (menu: any) => {
+                if (!menu || typeof menu.addItem !== "function") return;
+                menu.addItem({
+                    icon: "iconZap",
+                    label: "⚡ " + (this.i18n["faq.quickCapture"] ?? "快速记录"),
+                    click: () => {
+                        this.showTab();
+                        window.dispatchEvent(new CustomEvent("siyuan-home:open-capture"));
+                    },
+                });
+                menu.addItem({
+                    icon: "iconClock",
+                    label: "⏰ " + (this.i18n.tabReminders ?? "到期提醒"),
+                    click: () => this.openRemindersScreen(),
+                });
+                menu.addItem({
+                    icon: "iconFolder",
+                    label: "🗂️ " + (this.i18n.tabLedger ?? "家庭台账"),
+                    click: () => this.openModuleTab(this.activeLedger),
+                });
+                menu.addItem({
+                    icon: "iconUser",
+                    label: "👥 " + (this.i18n.tabMembers ?? "家庭成员"),
+                    click: () => {
+                        this.pendingScreen = "members";
+                        if (this.panelScreenSwitch) this.panelScreenSwitch("members");
+                        this.showTab();
+                    },
+                });
+                if (typeof menu.addSeparator === "function") menu.addSeparator();
+                menu.addItem({
+                    icon: "iconSettings",
+                    label: "⚙️ " + (this.i18n.settingsTitle ?? "管家设置"),
+                    click: () => this.openSetting(),
+                });
+            },
+        };
+    }
+
     /**
      * 309 波：所有思源 UI 入口的同步登记（页签/顶栏/命令/状态栏/图标）。
      * 必须在 onload 的首个 await 之前调用：宿主在 onload 返回前完成顶栏与页签装配，
@@ -141,12 +190,8 @@ export default class LvHomePlugin extends Plugin {
             },
         });
 
-        // 顶栏入口（桌面端图标 + 点击开面板）
-        this.topBarEl = this.addTopBar({
-            icon: "iconEmoji",
-            title: String(this.i18n.butler ?? "Lv Home"),
-            callback: () => this.showTab(),
-        });
+        // 顶栏入口（桌面端图标 + 点击开面板，支持固定 id 幂等注册与原生右键菜单）
+        this.topBarEl = this.addTopBar(this.createTopBarOptions());
         this.ensureTopBarIconAlive();
 
         this.addCommand({
@@ -201,11 +246,7 @@ export default class LvHomePlugin extends Plugin {
                 if (toolbar.querySelector('[data-topbar-entry="siyuan-home"], [data-id="siyuan-home"], [aria-label*="小驴管家"]')) return;
                 if (!document.getElementById("toolbar")) return;
                 try {
-                    this.topBarEl = this.addTopBar({
-                        icon: "iconEmoji",
-                        title: String(this.i18n.butler ?? "Lv Home"),
-                        callback: () => this.showTab(),
-                    });
+                    this.topBarEl = this.addTopBar(this.createTopBarOptions());
                 } catch {
                     // 宿主尚未装配完成：留给下一次 DOM 变更重试
                 }
@@ -373,6 +414,54 @@ export default class LvHomePlugin extends Plugin {
             });
         }) as any;
         this.eventBus.on("open-menu-content", this.captureMenuHandler);
+
+        // 思源插件自定义 URL Scheme 协议监听（siyuan://plugins/siyuan-home?...）
+        this.siyuanUrlHandler = (event?: any) => {
+            const rawUrl = event?.detail?.url;
+            if (!rawUrl || typeof rawUrl !== "string") return;
+            try {
+                const urlObj = new URL(rawUrl.startsWith("siyuan://") ? rawUrl.replace("siyuan://", "http://") : rawUrl);
+                const screen = urlObj.searchParams.get("screen");
+                const mod = urlObj.searchParams.get("module");
+                const action = urlObj.searchParams.get("action");
+                if (action === "capture") {
+                    this.showTab();
+                    window.dispatchEvent(new CustomEvent("siyuan-home:open-capture", { detail: { module: mod } }));
+                    return;
+                }
+                if (mod) this.setActiveLedger(mod);
+                if (screen === "reminders") {
+                    this.openRemindersScreen();
+                } else if (screen) {
+                    this.pendingScreen = screen;
+                    if (this.panelScreenSwitch) this.panelScreenSwitch(screen);
+                    this.showTab();
+                } else {
+                    this.showTab();
+                }
+            } catch { /* ignore malformed urls */ }
+        };
+        this.eventBus.on("open-siyuan-url-plugin", this.siyuanUrlHandler);
+
+        // 思源属性视图（AttributeView 原生数据库）行右键菜单扩展
+        this.avMenuHandler = (event?: any) => {
+            const menu = event?.detail?.menu;
+            if (!menu || typeof menu.addItem !== "function") return;
+            menu.addItem({
+                icon: "iconEmoji",
+                label: "🏠 " + (this.i18n.butler ?? "小驴管家") + " · 打开管理面板",
+                click: () => this.showTab(),
+            });
+            menu.addItem({
+                icon: "iconZap",
+                label: "⚡ " + (this.i18n["faq.quickCapture"] ?? "快速记录"),
+                click: () => {
+                    this.showTab();
+                    window.dispatchEvent(new CustomEvent("siyuan-home:open-capture"));
+                },
+            });
+        };
+        this.eventBus.on("open-menu-av", this.avMenuHandler);
 
         // 28 组：状态栏已移至 registerEntrypoints()（同步登记）
 
@@ -587,11 +676,17 @@ export default class LvHomePlugin extends Plugin {
      * 思源官方规范明确说明：未覆盖 onDataChanged 方法的插件在收到存储变更时会强制重载整个插件（卸载并重新加载）。
      * 覆盖此方法后，思源内核在存储数据更新时将直接回调本方法，绝不重载插件，彻底根除顶栏闪烁、页面抖动与向导重启循环！
      */
-    async onDataChanged(_reason?: any): Promise<void> {
+    async onDataChanged(reason?: any): Promise<void> {
+        if (this.isUnloading) return;
         try {
             const nextSettings = await loadSettings(this);
             this.settings = nextSettings;
+            this.runtime = await loadRuntime(this);
             this.emitHubChanged();
+            // 契约延伸：若是云端跨设备同步 (sync) 带来的变更，触发只读补扫更新到期提醒，实现多端感知
+            if (reason === "sync") {
+                this.refreshHub(undefined, false).catch(() => undefined);
+            }
         } catch (e) {
             console.warn("[siyuan-home] onDataChanged sync failed:", e);
         }
@@ -931,7 +1026,14 @@ export default class LvHomePlugin extends Plugin {
     showTabDocs(docId?: string, blockId?: string) {
         const targetId = blockId ?? docId ?? this.settings.dbRefs[this.activeLedger]?.docId;
         if (!targetId) return;
-        openTab({ app: this.app, doc: { id: targetId }, keepCursor: true });
+        openTab({
+            app: this.app,
+            doc: {
+                id: targetId,
+                action: blockId ? ["cb-get-focus", "cb-get-hl"] : ["cb-get-focus"],
+            },
+            keepCursor: false,
+        });
     }
 
     activeLedger = "certs";
@@ -1063,6 +1165,10 @@ export default class LvHomePlugin extends Plugin {
         // 块菜单监听与状态栏角标解绑/移除；可见性补扫解绑；ws 补扫解绑
         if (this.captureMenuHandler) this.eventBus.off("open-menu-content", this.captureMenuHandler);
         this.captureMenuHandler = undefined;
+        if (this.siyuanUrlHandler) this.eventBus.off("open-siyuan-url-plugin", this.siyuanUrlHandler);
+        this.siyuanUrlHandler = undefined;
+        if (this.avMenuHandler) this.eventBus.off("open-menu-av", this.avMenuHandler);
+        this.avMenuHandler = undefined;
         if (this.visibilityHandler) document.removeEventListener("visibilitychange", this.visibilityHandler);
         this.visibilityHandler = undefined;
         if (this.wsHandler) this.eventBus.off("ws-main", this.wsHandler);
