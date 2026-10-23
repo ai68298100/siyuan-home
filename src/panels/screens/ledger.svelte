@@ -1217,8 +1217,8 @@
                 await plugin.refreshHub(undefined, true);
             } catch (e) {
                 showMessage(t("ledger.rebuildRefreshFailed").replace("${msg}", e instanceof Error ? e.message : String(e)), 6000, "error");
-                return;
             }
+            await load(); // 立即重新拉取当前模块的数据
             if (report.issues.length > 0) {
                 const modules = report.issues.map(({ moduleId }) => t(`module.${moduleId}`)).join(", ");
                 showMessage(t("ledger.rebuildPartial").replace("${modules}", modules), 7000, "error");
@@ -5938,7 +5938,12 @@
                 <div class="eic"><UiIcon name="archive" size={24} /></div>
                 <b>{t("ledger.defaultBlankTitle")}</b>
                 <span style="max-width:480px;line-height:1.6">{t("ledger.defaultBlankDesc")}</span>
-                <div style="display:flex;gap:10px;margin-top:8px">
+                {#if ref?.provisionError}
+                    <div class="lv-caption" style="color:var(--lv-warn);margin-top:4px;max-width:520px;line-height:1.4">
+                        ⚠️ {ref.provisionError}
+                    </div>
+                {/if}
+                <div style="display:flex;gap:10px;margin-top:10px;flex-wrap:wrap;justify-content:center">
                     <button class="b3-button b3-button--outline" onclick={rebuildLedger} disabled={rebuilding}>
                         🚀 {rebuilding ? t("diag.rebuilding") : t("ledger.buildNow")}
                     </button>
