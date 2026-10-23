@@ -146,6 +146,7 @@
     let filterMemberId = $state("");
     let filterCategory = $state("");
     let selectedItemIds = $state<string[]>([]);
+    let batchBusy = $state(false);
 
     function toggleRowSelect(id: string) {
         if (selectedItemIds.includes(id)) {
@@ -326,12 +327,13 @@
     }
 
     function batchDelete() {
-        if (!selectedItemIds.length || !ref?.avId) return;
+        if (!selectedItemIds.length || !ref?.avId || batchBusy) return;
         const count = selectedItemIds.length;
         confirm(
             t("ledger.batchDelete"),
             t("ledger.batchDeleteConfirm").replace("${n}", String(count)),
             async () => {
+                batchBusy = true;
                 try {
                     const { removeLedgerRows } = await import("@/core/siyuan");
                     const { cleanupRowRuntimeData, saveRuntime } = await import("@/core/hub/runtime");
@@ -349,6 +351,8 @@
                     try { await plugin.refreshHub?.([active]); } catch { /* ignore */ }
                 } catch (e) {
                     showMessage(t("ledger.delFailed").replace("${msg}", e instanceof Error ? e.message : String(e)), 5000, "error");
+                } finally {
+                    batchBusy = false;
                 }
             }
         );
@@ -655,13 +659,14 @@
                 if (query) list = list.filter((r) => rowMatchesSearch(r, query, sourceRef.columns));
                 const sortType = sortKey ? plugin.schemaCatalog?.[moduleId]?.columns?.find((column: any) => column.key === sortKey)?.type : undefined;
                 list = sortRows(list, sortField, ascending, sortType);
-                const cols = (plugin.schemaCatalog?.[moduleId]?.columns ?? []).filter((c: any) => sourceRef.columns![c.key]);
+                const cols = (plugin.schemaCatalog?.[moduleId]?.columns ?? []).filter((c: any) => sourceRef.columns?.[c.key]);
                 const label = (c: any) => (t(`field.${c.key}`) !== `field.${c.key}` ? t(`field.${c.key}`) : c.key);
-                const csv = buildCsv(cols.map(label), list.map((r) => cols.map((c: any) => cellText(r.cells[sourceRef.columns![c.key]], c.key, true))));
+                const csv = buildCsv(cols.map(label), list.map((r) => cols.map((c: any) => cellText(r.cells?.[sourceRef.columns![c.key]], c.key, true))));
                 const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
                 const a = document.createElement("a");
                 a.href = URL.createObjectURL(blob);
-                a.download = `lv-${moduleId}-${new Date().toISOString().slice(0, 10)}.csv`;
+                const moduleTitle = t(`module.${moduleId}`) !== `module.${moduleId}` ? t(`module.${moduleId}`) : moduleId;
+                a.download = `小驴管家-${moduleTitle}-${new Date().toISOString().slice(0, 10)}.csv`;
                 a.click();
                 URL.revokeObjectURL(a.href);
             } finally {
@@ -2119,6 +2124,14 @@
         return getCaptureFields(plugin.schemaCatalog?.[active]);
     });
     const schemaCols = $derived(plugin.schemaCatalog?.[active]?.columns ?? []);
+    const missingSchemaCols = $derived.by(() => {
+        if (!ref?.columns || avCols.length === 0) return [] as ColumnDef[];
+        const existingIds = new Set(avCols.map((c: any) => c?.id));
+        return schemaCols.filter((sc) => {
+            const registeredId = ref.columns?.[sc.key];
+            return !registeredId || !existingIds.has(registeredId);
+        });
+    });
     const supportableCols = $derived(getFormFields(plugin.schemaCatalog?.[active]).filter((field) =>
         !(active === "certs" && field.key.startsWith("x_cert_"))
         && !(field.type === "relation" && field.key !== "member")));
@@ -6025,6 +6038,17 @@
         {/if}
     </div>
 {:else}
+    {#if missingSchemaCols.length > 0 && ref?.avId}
+        <div class="lv-card" style="display:flex;align-items:center;gap:10px;padding:8px 14px;background:color-mix(in srgb, var(--lv-amber) 8%, var(--lv-surface));border:1px solid color-mix(in srgb, var(--lv-amber) 30%, var(--lv-line));border-radius:var(--lv-r-2);margin:8px 0;font-size:12px">
+            <span style="color:var(--lv-amber)">⚠️</span>
+            <span style="color:var(--lv-tx-2);flex:1">
+                {t("ledger.missingColumnsPrompt")} <b>{missingSchemaCols.map((c) => fieldLabel(c.key)).join("、")}</b>
+            </span>
+            <button class="b3-button b3-button--outline" style="font-size:11.5px;padding:2px 8px" disabled={rebuilding} onclick={rebuildLedger}>
+                {rebuilding ? t("diag.rebuilding") : t("ledger.autoFixColumns")}
+            </button>
+        </div>
+    {/if}
     <div class="lv-card lv-table-wrap lv-table" class:lv-table--compact={tableDensity === "compact"} style="margin-top:12px">
         <table bind:this={ledgerTableEl}>
             <thead><tr>
@@ -6100,16 +6124,16 @@
                 {t("ledger.batchSelected").replace("${n}", String(selectedItemIds.length))}
             </span>
             {#if ref?.columns?.location}
-                <button type="button" class="b3-button b3-button--outline" style="font-size:12px;padding:3px 10px" onclick={openBatchLocationModal}>
+                <button type="button" class="b3-button b3-button--outline" style="font-size:12px;padding:3px 10px" disabled={batchBusy} onclick={openBatchLocationModal}>
                     📍 {t("ledger.batchLocation")}
                 </button>
             {/if}
             {#if memberCol && (plugin.settings.members?.length ?? 0) > 0}
-                <button type="button" class="b3-button b3-button--outline" style="font-size:12px;padding:3px 10px" onclick={openBatchMemberModal}>
+                <button type="button" class="b3-button b3-button--outline" style="font-size:12px;padding:3px 10px" disabled={batchBusy} onclick={openBatchMemberModal}>
                     👤 {t("ledger.batchMember")}
                 </button>
             {/if}
-            <button type="button" class="b3-button b3-button--text ft__error" style="font-size:12px;padding:3px 10px;color:var(--b3-theme-error)" onclick={batchDelete}>
+            <button type="button" class="b3-button b3-button--text ft__error" style="font-size:12px;padding:3px 10px;color:var(--b3-theme-error)" disabled={batchBusy} onclick={batchDelete}>
                 🗑️ {t("ledger.batchDelete")}
             </button>
             <button type="button" class="b3-button b3-button--text" style="font-size:12px;padding:3px 6px" onclick={() => { selectedItemIds = []; }} title={t("close")}>
