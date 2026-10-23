@@ -1274,7 +1274,11 @@
 
     // Shopping suggestions aggregate low-stock items and support copying the list.
     async function openShoppingList() {
-        if (!ref?.avId || !ref.columns?.name || !ref.columns.qty || !ref.columns.low_stock_at) return;
+        if (!ref?.avId || !ref.columns?.name || !ref.columns.qty || !ref.columns.low_stock_at) {
+            if (!ref?.avId) showMessage(t("diag.missing"), 3000, "info");
+            else showMessage(t("ledger.missingColumnsPrompt") + " " + (t("field.low_stock_at") || "low_stock_at"), 3000, "info");
+            return;
+        }
         try {
             const all = await renderLedgerAll(ref.avId);
             if (!all.complete) {
@@ -1383,7 +1387,11 @@
 
     // Check validity of URLs in bookmarks ledger and highlight broken links.
     async function openBookmarksCheck() {
-        if (!ref?.avId || !ref.columns?.url) return;
+        if (!ref?.avId || !ref.columns?.url) {
+            if (!ref?.avId) showMessage(t("diag.missing"), 3000, "info");
+            else showMessage(t("ledger.missingColumnsPrompt") + " " + (t("field.url") || "url"), 3000, "info");
+            return;
+        }
         try {
             const all = await renderLedgerAll(ref.avId);
             if (!all.complete) {
@@ -1514,7 +1522,11 @@
 
     // Calculate subscription expenses normalized to monthly and annual projections.
     async function openSubscriptionStats() {
-        if (!ref?.avId || !ref.columns?.amount) return;
+        if (!ref?.avId || !ref.columns?.amount) {
+            if (!ref?.avId) showMessage(t("diag.missing"), 3000, "info");
+            else showMessage(t("ledger.expenseTrendNoCol"), 4000, "info");
+            return;
+        }
         try {
             const all = await renderLedgerAll(ref.avId);
             if (!all.complete) {
@@ -1536,7 +1548,11 @@
 
     // Asset valuation report summarizing initial costs and current appraised values.
     async function openAssetValuationModal() {
-        if (!ref?.avId || !ref.columns?.amount) return;
+        if (!ref?.avId || !ref.columns?.amount) {
+            if (!ref?.avId) showMessage(t("diag.missing"), 3000, "info");
+            else showMessage(t("ledger.expenseTrendNoCol"), 4000, "info");
+            return;
+        }
         try {
             const all = await renderLedgerAll(ref.avId);
             if (!all.complete) {
@@ -1651,7 +1667,10 @@
 
     // Media reading/viewing annual report and status analysis.
     async function openMediaReport() {
-        if (!ref?.avId || !ref.columns) return;
+        if (!ref?.avId || !ref.columns) {
+            showMessage(t("diag.missing"), 3000, "info");
+            return;
+        }
         try {
             const all = await renderLedgerAll(ref.avId);
             if (!all.complete) {
@@ -1674,7 +1693,10 @@
     // Weekly Meal Plan & Grocery Deficit Analysis (295波):
     // Select recipes from food ledger, aggregate ingredients, compare against stock, and generate shopping list.
     async function openMealPlanModal() {
-        if (!ref?.avId || !ref.columns?.name) return;
+        if (!ref?.avId || !ref.columns?.name) {
+            showMessage(t("diag.missing"), 3000, "info");
+            return;
+        }
         try {
             const allFood = await renderLedgerAll(ref.avId);
             if (!allFood.complete) {
@@ -1725,7 +1747,10 @@
     // Medicine Supply & Runout Estimation (298波):
     // Analyze dosing instructions, estimate days of supply, predict runout date, and check expiry inversion.
     async function openMedicineSupplyModal() {
-        if (!ref?.avId || !ref.columns?.name) return;
+        if (!ref?.avId || !ref.columns?.name) {
+            showMessage(t("diag.missing"), 3000, "info");
+            return;
+        }
         try {
             const allMed = await renderLedgerAll(ref.avId);
             if (!allMed.complete) {
@@ -1888,7 +1913,10 @@
     // 312 波（G3）：扫货模式（动态加载 core/store-dialog.ts）
     async function openStoreModeModal() {
         const sourceRef = ref;
-        if (!sourceRef?.avId || !sourceRef.columns?.name) return;
+        if (!sourceRef?.avId || !sourceRef.columns?.name) {
+            showMessage(t("diag.missing"), 3000, "info");
+            return;
+        }
         const { openStoreModeDialog } = await import("@/core/store-dialog");
         return openStoreModeDialog({
             t,
@@ -1907,7 +1935,10 @@
     // Emergency Kit Checklist & Stock Linking (302波):
     // Compare standard emergency kit items with current stock ledger and import missing rows.
     async function openEmergencyKitModal() {
-        if (!ref?.avId || !ref.columns?.name) return;
+        if (!ref?.avId || !ref.columns?.name) {
+            showMessage(t("diag.missing"), 3000, "info");
+            return;
+        }
         try {
             const allStock = await renderLedgerAll(ref.avId);
             if (!allStock.complete) {
