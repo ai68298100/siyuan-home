@@ -673,7 +673,7 @@ function openReassignDialog(fromMember?: FamilyMember) {
                         <span style="flex:1"></span>
                         <button class="b3-button b3-button--text" disabled={!!contactBusy[m.id]} onclick={() => void unlinkContact(m)}>{t("members.contactUnlink")}</button>
                     </div>
-                {:else}
+                {:else if getContactsBridge()}
                     <div style="display:flex;gap:8px;align-items:center">
                         <span class="lv-caption">{t("members.contactLink")}</span>
                         <span style="flex:1"></span>
