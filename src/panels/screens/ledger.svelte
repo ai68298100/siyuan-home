@@ -15,7 +15,7 @@
     import { saveRuntime } from "@/core/hub/runtime";
     import { saveSettings } from "@/core/settings";
     import { ensurePinyin, pinyinReady, searchMatch } from "@/core/pinyin";
-    import { openContactPicker } from "@/libs/contact-picker";
+    import { openContactPicker, getContactsBridge } from "@/libs/contact-picker";
     import { getCertificateProfile, getCertificateReminderField } from "@/core/schema";
     import type { ColumnDef } from "@/core/schema";
     import { getCaptureFields, getFormFields, validateCaptureInput, type CaptureInputError } from "@/core/capture";
@@ -2657,7 +2657,7 @@
             cancel.textContent = t("cancel");
             actions.append(save, cancel);
             editor.append(control);
-            if (col.key === "contact" && control instanceof HTMLInputElement) {
+            if (col.key === "contact" && control instanceof HTMLInputElement && getContactsBridge()) {
                 const pick = document.createElement("button");
                 pick.type = "button";
                 pick.className = "b3-button b3-button--outline";
@@ -5085,7 +5085,7 @@
                 control.setAttribute("aria-label", colLabel(col));
                 wrap.append(control);
                 // Contact fields can use the shared contacts picker when available.
-                if (col.key === "contact" && control instanceof HTMLInputElement) {
+                if (col.key === "contact" && control instanceof HTMLInputElement && getContactsBridge()) {
                     const pick = document.createElement("button");
                     pick.className = "b3-button b3-button--outline";
                     pick.style.cssText = "flex-shrink:0;font-size:12px";
