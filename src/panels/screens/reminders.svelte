@@ -446,7 +446,7 @@
                     ok++;
                 } catch (e) {
                     failed.push((r as any).title || id);
-                    console.warn("[siyuan-home] batch item failed:", e instanceof Error ? e.message : e);
+                    console.warn("[LvHome] batch item failed:", e instanceof Error ? e.message : e);
                 }
             }
             if (failed.length > 0) {
@@ -823,7 +823,7 @@
             // does not contain it, so this refresh must bypass the debounce.
             try { await plugin.refreshHub(undefined, true); }
             catch (e) {
-                console.warn("[siyuan-home] triage saved but refresh failed:", e);
+                console.warn("[LvHome] triage saved but refresh failed:", e);
                 showMessage(t("triage.refreshFailed"), 5000, "error");
             }
         };

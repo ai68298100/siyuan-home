@@ -39,22 +39,23 @@ Certificates expire, medicine expires, insurance needs renewal, subscriptions au
 
 Image OCR uses the engine configured in SiYuan Settings → OCR. It runs only when requested and does not require automatic OCR to be enabled. AI OCR asks before each run because the image is sent to the selected AI service. Results are saved to SiYuan OCR text and included in search; re-running replaces the previous result. Encrypted notebook images and PDFs are not supported, and OCR text is never written into ledger fields automatically.
 
-## 🆕 What's new in v0.5.45
+## 🆕 What's new in v0.5.46
 
-This release performs a comprehensive code stability and security review: global SQL single-quote injection protection, startup sweep for status bar / mobile toolbar, and deep lifecycle self-healing:
+This release fully implements the **Ecosystem Integration Directive**: 4-alias federation mounting, replacing `iconEmoji` with `iconLvHome`, mobile keyboard avoidance, and Raikiri component registration:
 
-- **Security (Global SQL Parameter Sanitization)**: Wrapped all query parameters in `health.ts`, `provisioner.ts`, and `ledger.svelte` with `.replace(/'/g, "''")` to prevent query truncation;
-- **Improved (Full Lifecycle Ghost Node Elimination)**: Added pre-registration cleanup sweep for desktop/mobile toolbars and status bar, permanently preventing duplicate icon or status overlay artifacts.
+- **Ecosystem Federation (Epoch 6)**: 4-alias mounting (`LvHome`, `lvHome`, `xiaolvHome`, `siyuanHome`) with `hasCapability` negotiation; graceful contacts picker fallback; safe check-in event logging (`home:<module>:<rowId>:<today>`); Raikiri home expiry widget registration;
+- **Top Bar Icon Upgrade**: Replaced default smile `iconEmoji` with the unified `iconLvHome` SVG mark across desktop and mobile;
+- **Bento Palette & Engineering Hardening**: Added brand tokens `--lv-brand: #D97706` and `--lv-accent-ruby: #E11D48`; cleaned up un-namespaced top-level CSS; updated `plugin.json` with brand keywords and `settingsWindow: true`; mobile `visualViewport` bottom offset compensation.
 - **Validation**: 90 test suites, **791 unit tests passing**, TypeScript, Svelte, i18n (1948 keys), metadata, and package smoke all green.
-## 📦 Install (v0.5.45)
+## 📦 Install (v0.5.46)
 
 1. Download `package.zip` from [Releases](https://github.com/ai68298100/siyuan-home/releases/latest)
 2. SiYuan → Settings → Marketplace → Download → **Import** the zip
 3. Enable the plugin → complete the 2-step onboarding (household → module picks and provisioning)
 4. Press `Ctrl+Alt+H` anytime to open the hub
 
-> **Validation status:** core data paths have automated tests and isolated-kernel coverage. The v0.5.45 GitHub Release is available; Android WebView behavior remains host-specific validation. `icon.png` and `preview.png` were redesigned for v0.3.13 (brand-gradient tile + geometric mark; dark overview with sample data).
-> **Version note:** the tagged v0.5.45 package is the current GitHub release; local quality checks report 791 unit tests.
+> **Validation status:** core data paths have automated tests and isolated-kernel coverage. The v0.5.46 GitHub Release is available; Android WebView behavior remains host-specific validation. `icon.png` and `preview.png` were redesigned for v0.3.13 (brand-gradient tile + geometric mark; dark overview with sample data).
+> **Version note:** the tagged v0.5.46 package is the current GitHub release; local quality checks report 791 unit tests.
 >
 > Family sharing depends on SiYuan's collaboration, permissions, sync and conflict behavior. Test with non-sensitive data before sharing; this plugin does not provide a separate permission system.
 >
@@ -112,7 +113,8 @@ The v0.5.1 release is available on GitHub, with static isolated-kernel gates and
 
 | Phase | Content |
 |---|---|
-| ✅ v0.5.45 (current) | Code stability review: global SQL injection sanitization, pre-registration cleanup |
+| ✅ v0.5.46 (current) | Ecosystem Integration Directive: 4 aliases, iconLvHome mark, mobile keyboard avoidance |
+| v0.5.45 | Code stability review: global SQL injection sanitization, pre-registration cleanup |
 | v0.5.44 | Multi-platform toolbar & status bar lifecycle closure, active ghost node convergence |
 | v0.5.43 | Fix duplicate top bar icons after reload, active DOM deduplication, onunload cleanup |
 | v0.5.42 | Deep SiYuan editor integration: Slash commands (/), block icon ingest, block embeds |

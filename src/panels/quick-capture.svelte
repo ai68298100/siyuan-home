@@ -402,6 +402,27 @@
         }
     });
 
+    let keyboardOffset = $state(0);
+    $effect(() => {
+        if (!open || typeof window === "undefined" || !window.visualViewport) {
+            keyboardOffset = 0;
+            return;
+        }
+        const vv = window.visualViewport;
+        const onResize = () => {
+            const heightDiff = window.innerHeight - vv.height;
+            keyboardOffset = heightDiff > 120 ? Math.max(0, heightDiff - 20) : 0;
+        };
+        vv.addEventListener("resize", onResize);
+        vv.addEventListener("scroll", onResize);
+        onResize();
+        return () => {
+            vv.removeEventListener("resize", onResize);
+            vv.removeEventListener("scroll", onResize);
+            keyboardOffset = 0;
+        };
+    });
+
     const groupedMods = $derived(getGroupedModules(modules));
     const FREQUENT_MODULE_CANDIDATES = ["medicine", "stock", "certs", "shopping", "chores", "contracts", "vehicles", "food", "house", "schooling"];
     const frequentModules = $derived(FREQUENT_MODULE_CANDIDATES.filter((id) => modules.includes(id)).slice(0, 7));
@@ -588,7 +609,7 @@
                 await plugin.refreshHub?.(undefined, true);
             } catch (e) {
                 refreshFailed = true;
-                console.warn("[siyuan-home] quick capture saved but refresh failed:", e);
+                console.warn("[LvHome] quick capture saved but refresh failed:", e);
                 showMessage(t("capture.savedRefreshFailed").replace("${module}", modLabel(moduleId)), 5000, "error");
             }
             if (values.member && typeof values.member === "string") {
@@ -663,7 +684,7 @@
 <!-- 267 波：.lv-mask/.lv-modal（07 §10）首次投产；常驻挂载 + .open 切换保住出入场过渡与草稿 -->
 <div class="lv-mask" class:open aria-hidden="true" onclick={close}></div>
 <div class="lv-modal" class:open role="dialog" aria-modal="true" aria-labelledby="lv-capture-title" aria-busy={saving} tabindex="-1" inert={!open}>
-    <div class="lv-sheet">
+    <div class="lv-sheet" style={keyboardOffset > 0 ? `transform:translateY(-${Math.min(keyboardOffset, 200)}px)` : undefined}>
         {#if showDiscardConfirm}
             <div class="lv-sheet-confirm-mask" role="dialog" aria-modal="true">
                 <div class="lv-sheet-confirm-card">

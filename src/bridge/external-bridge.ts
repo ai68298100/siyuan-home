@@ -66,6 +66,8 @@ export interface LvHomeBridgeApi {
     readonly capabilities: readonly string[];
     /** 就绪信号（桥挂载即代表设置已加载、可调用）；对齐打卡/雷切 whenReady 惯例 */
     whenReady(): Promise<boolean>;
+    /** 能力协商查询 */
+    hasCapability(name: string): boolean;
     /** 打开管家总览 */
     openButler(): void;
     /** 打开提醒中枢（预选提醒页签） */
@@ -92,20 +94,26 @@ export interface BridgeHost {
 }
 
 export function buildLvHomeBridge(host: BridgeHost): LvHomeBridgeApi {
+    const capabilities = [
+        "whenReady",
+        "hasCapability",
+        "openButler",
+        "openReminders",
+        "addMemo",
+        "summary",
+        "openModule",
+        "getOverview",
+    ];
     return {
         protocol: LVHOME_BRIDGE_PROTOCOL,
-        capabilities: [
-            "whenReady",
-            "openButler",
-            "openReminders",
-            "addMemo",
-            "summary",
-            "openModule",
-            "getOverview",
-        ],
+        capabilities,
 
         whenReady() {
             return Promise.resolve(true);
+        },
+
+        hasCapability(name: string) {
+            return capabilities.includes(name);
         },
 
         openButler() {

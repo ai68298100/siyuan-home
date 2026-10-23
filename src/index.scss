@@ -5,6 +5,9 @@
 // Body 级 Dialog 不在 .lv-home 的继承树中，提供同一套令牌的安全默认值，
 // 保证详情、油耗和设置弹窗在暗色与浅色主题下都不会因为变量缺失而退化。
 :root {
+    --lv-brand: #D97706; /* 威尼斯暖木金 */
+    --lv-brand-soft: color-mix(in srgb, var(--lv-brand) 12%, transparent);
+    --lv-accent-ruby: #E11D48; /* 鸽血红宝石火种点缀 */
     --lv-space-1: 4px; --lv-space-2: 8px; --lv-space-3: 12px; --lv-space-4: 16px;
     --lv-space-5: 20px; --lv-space-6: 24px; --lv-space-7: 32px; --lv-space-8: 40px;
     --lv-font-xs: 11px; --lv-font-sm: 12px; --lv-font-md: 13px;
@@ -446,22 +449,21 @@
 // 269 波：svelteDialog 宿主的 .dialog-content 是 display:flex（row），而 .lv-home 带
 // container-type:inline-size（尺寸包含）——flex item 无法从内容推导宽度，设置面板
 // 塌缩成 226px 竖条（真机审计截图实锤）。显式撑满：flex 拉伸 + 宽度 100%
-.dialog-content .lv-home {
+.dialog-content:has(.lv-home) .lv-home {
     flex: 1 1 auto;
     width: 100%;
     min-width: 0;
 }
 
 // 原生详情/油耗/购物等弹窗挂在 body，无法继承面板里的表面令牌。
-// 思源全局 Dialog 确保始终具有最高堆叠层级，绝不被任何内部抽屉、蒙层或弹层压在下层。
-.b3-dialog {
-    z-index: 1000 !important;
-}
-
-// 只匹配管家专属内容，保持思源和其他插件的弹窗样式独立。
+// 只匹配管家专属内容，保持思源和其他插件的弹窗样式独立，绝不全局污染 .b3-dialog。
 .b3-dialog:has([id^="lv-"]),
-.b3-dialog:has(.lv-home) {
+.b3-dialog:has(.lv-home),
+.b3-dialog--lvmobile {
     z-index: 1000 !important;
+    --lv-brand: #D97706;
+    --lv-brand-soft: color-mix(in srgb, var(--lv-brand) 12%, transparent);
+    --lv-accent-ruby: #E11D48;
     --lv-surface: var(--b3-theme-surface);
     --lv-surface-2: var(--b3-theme-surface-light);
     --lv-line: var(--b3-border-color);
@@ -829,6 +831,15 @@
     flex-direction: column;
     gap: 6px;
     font-size: 12px;
+}
+
+.lv-dialog-title-wrap {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 15px;
+    font-weight: 600;
+    color: var(--lv-tx, var(--b3-theme-on-background));
 }
 
 .lv-dialog-scroll-body {
