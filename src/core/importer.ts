@@ -105,7 +105,24 @@ export function planImport(
     return plan;
 }
 
-/** 从 CSV 首列表头猜测映射：表头等于列 key 或其 i18n 标签（不区分大小写）→ 该列；否则 undefined（跳过） */
+const IMPORTER_ALIASES: Record<string, string[]> = {
+    name: ["名称", "姓名", "标题", "物品名称", "证件名称", "合同名称", "药名", "药品名称", "书名", "name", "title"],
+    qty: ["数量", "库存", "库存量", "现存数量", "件数", "qty", "stock_qty"],
+    stock_qty: ["数量", "库存", "库存量", "现存数量", "qty", "stock_qty"],
+    expiry: ["到期日", "有效期", "过期时间", "到期时间", "截止日期", "保质期至", "有效期至", "expiry", "due"],
+    due: ["到期日", "有效期", "过期时间", "到期时间", "截止日期", "expiry", "due"],
+    amount: ["金额", "价格", "花费", "费用", "额度", "单价", "总价", "amount", "price", "cost"],
+    note: ["备注", "说明", "详情", "notes", "note", "remark"],
+    category: ["分类", "类型", "类别", "分组", "category", "type"],
+    date: ["日期", "记录日期", "发生日期", "业务日期", "购买日期", "date"],
+    location: ["存放位置", "存放地点", "位置", "地点", "存放地", "location", "store_place"],
+    store_place: ["存放位置", "存放地点", "位置", "地点", "location", "store_place"],
+    member: ["家庭成员", "成员", "归属人", "所属人", "联系人", "member", "owner"],
+    person: ["联系人", "姓名", "往来对象", "对象", "person"],
+    status: ["状态", "当前状态", "status"],
+};
+
+/** 从 CSV 首列表头猜测映射：支持精确列键、本地化标签以及全景常用中文别名模糊对齐 */
 export function guessMapping(
     headers: string[],
     schemaColumns: { key: string; type: string; options?: string[] }[],
@@ -114,7 +131,13 @@ export function guessMapping(
     const map: Record<number, string | undefined> = {};
     for (let i = 0; i < headers.length; i++) {
         const h = headers[i].trim().toLowerCase();
-        const hit = schemaColumns.find((c) => c.key.toLowerCase() === h || labelOf(c.key).toLowerCase() === h);
+        const hit = schemaColumns.find((c) => {
+            const keyLower = c.key.toLowerCase();
+            const labelLower = labelOf(c.key).toLowerCase();
+            if (keyLower === h || labelLower === h) return true;
+            const aliases = (IMPORTER_ALIASES[c.key] ?? []).map((a) => a.toLowerCase());
+            return aliases.includes(h) || aliases.some((a) => h.includes(a));
+        });
         map[i] = hit?.key;
     }
     return map;

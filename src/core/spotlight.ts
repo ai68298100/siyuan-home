@@ -28,7 +28,15 @@ export interface SpotlightResult {
  */
 export function searchSpotlight(items: SpotlightItem[], query: string, limit = 40): SpotlightItem[] {
     const q = (query ?? "").trim().toLowerCase();
-    if (!q) return items.slice(0, limit);
+    if (!q) {
+        // 空搜索时优先展示带有到期日且临近的重点事项，次按原序返回
+        return [...items].sort((a, b) => {
+            if (a.dueDate && !b.dueDate) return -1;
+            if (!a.dueDate && b.dueDate) return 1;
+            if (a.dueDate && b.dueDate) return a.dueDate.localeCompare(b.dueDate);
+            return 0;
+        }).slice(0, limit);
+    }
 
     const scored: SpotlightResult[] = [];
 
@@ -63,6 +71,11 @@ export function searchSpotlight(items: SpotlightItem[], query: string, limit = 4
 
         // 5. 备注匹配
         if (item.note && searchMatch(item.note, q)) {
+            score += 10;
+        }
+
+        // 6. 模块 ID 匹配（例如搜 medicine 或 certs）
+        if (item.moduleId.toLowerCase().includes(q)) {
             score += 10;
         }
 
