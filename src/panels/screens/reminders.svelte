@@ -1003,7 +1003,7 @@
                     <button class="b3-button b3-button--text" disabled={batchBusy || reminderBusy.has(r.id)} onclick={() => renewDialog(r)}>{t("act.renew")}</button>
                     {/if}
                     {#if r.moduleId !== "adhoc" && plugin.settings.dbRefs[r.moduleId]?.docId}
-                        <button class="b3-button b3-button--text" disabled={batchBusy} title={t("act.locate")} onclick={() => plugin.showTabDocs(plugin.settings.dbRefs[r.moduleId].docId)}>{t("act.locate")}</button>
+                        <button class="b3-button b3-button--text" disabled={batchBusy} title={t("act.locate")} onclick={() => plugin.showTabDocs(plugin.settings.dbRefs[r.moduleId]?.docId, r.rowId)}>{t("act.locate")}</button>
                     {/if}
                     <button class="b3-button b3-button--text" disabled={batchBusy || reminderBusy.has(r.id)} onclick={() => schedulePlanDialog(r)}>{plan.hasPlan ? t("hub.editPlanDate") : t("hub.setPlanDate")}</button>
                     <!-- 304 波：重要证件与到期项紧急置顶（置顶项组内排最前） -->
@@ -1046,7 +1046,7 @@
                 {#if r.moduleId !== "adhoc" && plugin.settings.dbRefs[r.moduleId]?.docId}
                     <div class="lv-rem-summary__item">
                         <button class="b3-button b3-button--text" style="padding:0 4px;font-size:12px;color:var(--lv-accent)"
-                            onclick={() => plugin.showTabDocs(plugin.settings.dbRefs[r.moduleId].docId)}>
+                            onclick={() => plugin.showTabDocs(plugin.settings.dbRefs[r.moduleId]?.docId, r.rowId)}>
                             {t("act.locate")} →
                         </button>
                     </div>
