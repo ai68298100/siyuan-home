@@ -577,7 +577,7 @@ export default class LvHomePlugin extends Plugin {
             if (!text) return;
 
             menu.addItem({
-                icon: "iconEmoji",
+                icon: "iconLvHome",
                 label: "🏠 " + (this.i18n.butler ?? "小驴管家") + " · 收录本块",
                 submenu: ([
                     { id: "snippets", labelKey: "capture.toSnippets", icon: "iconPaperclip" },
@@ -627,7 +627,7 @@ export default class LvHomePlugin extends Plugin {
             const menu = event?.detail?.menu;
             if (!menu || typeof menu.addItem !== "function") return;
             menu.addItem({
-                icon: "iconEmoji",
+                icon: "iconLvHome",
                 label: "🏠 " + (this.i18n.butler ?? "小驴管家") + " · 打开管理面板",
                 click: () => this.showTab(),
             });
