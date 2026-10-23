@@ -1920,6 +1920,8 @@
     "ledger.blockRefCopied": "Copied SiYuan block reference ((...)) to clipboard!",
     "ledger.copyBlockEmbed": "Copy Embed Syntax",
     "ledger.blockEmbedCopied": "Copied SiYuan embed syntax {{...}} to clipboard!",
+    "ledger.missingColumnsPrompt": "Missing columns in SiYuan database:",
+    "ledger.autoFixColumns": "⚡ Auto Fix Columns",
     "settings.targetNotebook": "Default Notebook for Ledgers",
     "settings.targetNotebookHint": "Notebook used when creating new ledger documents (defaults to creating \"🏠 Lv Home\" if unset)",
     "spotlight.title": "Spotlight Search",

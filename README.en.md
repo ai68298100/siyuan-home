@@ -39,23 +39,23 @@ Certificates expire, medicine expires, insurance needs renewal, subscriptions au
 
 Image OCR uses the engine configured in SiYuan Settings → OCR. It runs only when requested and does not require automatic OCR to be enabled. AI OCR asks before each run because the image is sent to the selected AI service. Results are saved to SiYuan OCR text and included in search; re-running replaces the previous result. Encrypted notebook images and PDFs are not supported, and OCR text is never written into ledger fields automatically.
 
-## 🆕 What's new in v0.5.49
+## 🆕 What's new in v0.5.50
 
-This release delivers end-to-end ledger self-healing: per-module instant repair, intelligent candidate document sensing in binding modals, and comprehensive cell data tolerance:
+This release reinforces ledger schema integrity and batch interaction: real-time missing column perception with one-click auto-repair, batch concurrency debounce protection (`batchBusy`), and safe CSV export:
 
-- **Added (Per-Module Instant Repair repairModule)**: Provides millisecond-level targeted self-healing for the active ledger without running a full 31-module scan;
-- **Improved (Smart Candidate Document Sensing)**: Modal automatically retrieves suspected related documents in SiYuan and presents one-click buttons, eliminating manual ID copying;
-- **Improved (Full-Spectrum Cell Data Tolerance)**: Upgraded `cellContentText` to seamlessly tolerate ISO dates, string timestamps, numbers, and checkboxes without blanks or parsing crashes.
-- **Validation**: 90 test suites, **791 unit tests passing**, TypeScript, Svelte, i18n (1948 keys), metadata, and package smoke all green.
-## 📦 Install (v0.5.49)
+- **Added (Missing Column Perception & Auto-Repair)**: Dynamically computes differences between actual SiYuan table columns and schema definitions, prompting a gentle banner with "⚡ Auto Fix Columns" on deletions;
+- **Improved (Batch Concurrency Debounce Protection)**: Wrapped batch deletions, location migrations, and member reassignments in `batchBusy` locks to eliminate rapid click collisions;
+- **Improved (Safe CSV Export & Localized Filenames)**: Enhanced optional-chaining access for incomplete row data and formatted export filenames to localized conventions (e.g., `小驴管家-模块名-日期.csv`).
+- **Validation**: 90 test suites, **791 unit tests passing**, TypeScript, Svelte, i18n (1950 keys), metadata, and package smoke all green.
+## 📦 Install (v0.5.50)
 
 1. Download `package.zip` from [Releases](https://github.com/ai68298100/siyuan-home/releases/latest)
 2. SiYuan → Settings → Marketplace → Download → **Import** the zip
 3. Enable the plugin → complete the 2-step onboarding (household → module picks and provisioning)
 4. Press `Ctrl+Alt+H` anytime to open the hub
 
-> **Validation status:** core data paths have automated tests and isolated-kernel coverage. The v0.5.49 GitHub Release is available; Android WebView behavior remains host-specific validation. `icon.png` and `preview.png` were redesigned for v0.3.13 (brand-gradient tile + geometric mark; dark overview with sample data).
-> **Version note:** the tagged v0.5.49 package is the current GitHub release; local quality checks report 791 unit tests.
+> **Validation status:** core data paths have automated tests and isolated-kernel coverage. The v0.5.50 GitHub Release is available; Android WebView behavior remains host-specific validation. `icon.png` and `preview.png` were redesigned for v0.3.13 (brand-gradient tile + geometric mark; dark overview with sample data).
+> **Version note:** the tagged v0.5.50 package is the current GitHub release; local quality checks report 791 unit tests.
 >
 > Family sharing depends on SiYuan's collaboration, permissions, sync and conflict behavior. Test with non-sensitive data before sharing; this plugin does not provide a separate permission system.
 >
@@ -113,7 +113,8 @@ The v0.5.1 release is available on GitHub, with static isolated-kernel gates and
 
 | Phase | Content |
 |---|---|
-| ✅ v0.5.49 (current) | Per-module instant repair, smart candidate document sensing, full cell data tolerance |
+| ✅ v0.5.50 (current) | Missing column perception & auto-repair, batch debounce protection, safe CSV export |
+| v0.5.49 | Per-module instant repair, smart candidate document sensing, full cell data tolerance |
 | v0.5.48 | Eliminate first-step provisioning failures, multi-level path self-healing, column alias compatibility |
 | v0.5.47 | Dual-track contacts picker fallback, standalone stability, marketplace cadence |
 | v0.5.46 | Ecosystem Integration Directive: 4 aliases, iconLvHome mark, mobile keyboard avoidance |
