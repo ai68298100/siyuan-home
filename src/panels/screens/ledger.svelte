@@ -432,14 +432,23 @@
     async function adjustRowQty(row: any, fieldKey: string, delta: number) {
         if (!ref?.avId || !ref.columns?.[fieldKey]) return;
         const colId = ref.columns[fieldKey];
-        const cur = Number(row.cells?.[colId]?.number?.content ?? 0);
+        const cell = row.cells?.[colId];
+        let cur = 0;
+        if (typeof cell?.number?.content === "number" && !isNaN(cell.number.content)) {
+            cur = cell.number.content;
+        } else if (cell?.text?.content) {
+            const parsed = parseFloat(cell.text.content);
+            if (!isNaN(parsed)) cur = parsed;
+        }
         const next = Math.max(0, cur + delta);
         try {
             const { setCell } = await import("@/core/siyuan");
             await setCell(ref.avId, colId, row.itemID, { type: "number", number: { content: next } });
             if (!row.cells[colId]) row.cells[colId] = { type: "number", number: {} };
-            row.cells[colId].number.content = next;
+            row.cells[colId].number = { content: next, isNotEmpty: true };
             showMessage(`${delta > 0 ? "+1" : "-1"} (${next})`, 1500, "info");
+            // 库存变动后轻量触发单模块重扫，自动更新/解除到期与低库存提醒
+            void plugin.refreshHub?.(active);
         } catch (e) {
             showMessage(String(e), 3000, "error");
         }
@@ -2496,7 +2505,11 @@
                 if (!revealSensitive && ["holder_no", "x_cert_birth_registration_no_last4", "x_cert_vocational_registration_last4", "x_cert_professional_registration_last4", "x_cert_graduation_no_last4", "x_cert_degree_no_last4"].includes(colKey ?? "") && content !== "—") return maskCredentialNumber(content);
                 return content;
             }
-            case "date": return v.date?.isNotEmpty ? localDateKey(new Date(v.date.content)) : "—";
+            case "date": {
+                if (!v.date?.isNotEmpty || v.date.content === undefined || v.date.content === null) return "—";
+                const d = new Date(v.date.content);
+                return isNaN(d.getTime()) ? "—" : localDateKey(d);
+            }
             case "select": {
                 // Select values can be stored as either scalar or mSelect cells.
                 const s = selectCellContent(v) ?? "—";
@@ -2506,7 +2519,7 @@
                 const list = v.mSelect?.length ? v.mSelect.map((o: any) => o.content).join(", ") : "—";
                 return colKey && list !== "—" ? optLabelText(t, colKey, list) : list;
             }
-            case "number": return v.number?.isNotEmpty ? String(v.number.content) : "—";
+            case "number": return v.number?.isNotEmpty && typeof v.number.content === "number" && !isNaN(v.number.content) ? String(v.number.content) : "—";
             case "url": return v.url?.content ?? "—";
             case "checkbox": return v.checkbox?.checked ? "是" : "—";
             case "block": return v.block?.content ?? "—";
