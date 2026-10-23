@@ -63,7 +63,7 @@
             // A host may keep a non-cloneable state object. Session restore still
             // works in that case, while plugin navigation itself remains usable.
             try { sessionStorage.setItem("siyuan-home:last-screen", target); } catch { /* Storage can be disabled by the host. */ }
-            console.warn("[siyuan-home] Could not add plugin tab to browser history:", error);
+            console.warn("[LvHome] Could not add plugin tab to browser history:", error);
         }
     }
     function saveCurrentScroll() {
@@ -316,7 +316,7 @@
                 },
             });
         } catch (e) {
-            console.warn("[siyuan-home] spotlight open failed:", e);
+            console.warn("[LvHome] spotlight open failed:", e);
         }
     }
     // 提醒页签待办红点（version 驱动重算，随扫描更新）

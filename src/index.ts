@@ -17,6 +17,7 @@ import { addDetachedRow, setCell } from "@/core/siyuan";
 import { loadRowLogs } from "@/core/rowlog";
 import { compactUserMessage, sameOriginReturnPath } from "@/core/auth";
 import { mountLvHomeBridge } from "@/bridge/external-bridge";
+import { logCheckinEventSafely, registerRaikiriModuleSafely } from "@/libs/ecosystem-bridge-kit";
 import { SCHEMA_CATALOG, validateSchema } from "@/core/schema";
 import type { HomeSettings } from "@/types";
 
@@ -120,7 +121,7 @@ export default class LvHomePlugin extends Plugin {
     private createTopBarOptions() {
         return {
             id: "siyuan-home-topbar",
-            icon: "iconEmoji",
+            icon: "iconLvHome",
             title: String(this.i18n.butler ?? "Lv Home"),
             callback: () => this.showTab(),
             contextMenu: (menu: any) => {
@@ -170,11 +171,15 @@ export default class LvHomePlugin extends Plugin {
     private registerEntrypoints(): void {
         const self = this;
 
-        // 移动前端：自定义图标符号必须在任何使用前同步注册
+        // 全端无条件注册官方统一山墙小屋+烟囱火种矢量图标 (iconLvHome)
         this.isMobileFrontend = getFrontend() === "mobile" || getFrontend() === "browser-mobile";
-        if (this.isMobileFrontend) {
-            this.addIcons(`<symbol id="iconLvHomeApp" viewBox="0 0 32 32">
-                <path d="M5 14 16 4l11 10v13a1.5 1.5 0 0 1-1.5 1.5h-6V20h-7v8.5h-6A1.5 1.5 0 0 1 5 27V14Z" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linejoin="round"/>
+        if (typeof this.addIcons === "function") {
+            this.addIcons(`<symbol id="iconLvHome" viewBox="0 0 32 32">
+                <path d="M20 9V6h3v5.5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+                <path d="M4 14 16 4.5 28 14" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>
+                <path d="M7 13.5V26c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V13.5" fill="none" stroke="currentColor" stroke-width="2"/>
+                <path d="M13 28v-6c0-1.7 1.3-3 3-3s3 1.3 3 3v6" fill="currentColor"/>
+                <circle cx="21.5" cy="4" r="2.5" fill="currentColor"/>
             </symbol>`);
         }
 
@@ -220,7 +225,7 @@ export default class LvHomePlugin extends Plugin {
         this.addCommand({
             langKey: "quickCapture",
             langText: `${butlerLabel}：${this.i18n["faq.quickCapture"] ?? "快速记录流水/便签"}`,
-            hotkey: "Ctrl+Alt+N",
+            hotkey: "",
             callback: () => {
                 this.showTab();
                 window.dispatchEvent(new CustomEvent("siyuan-home:open-capture"));
@@ -231,7 +236,7 @@ export default class LvHomePlugin extends Plugin {
         this.addCommand({
             langKey: "spotlightSearch",
             langText: `${butlerLabel}：${this.i18n["spotlight.title"] ?? "全景生活检索"}`,
-            hotkey: "Ctrl+Alt+F",
+            hotkey: "",
             callback: () => {
                 this.showTab();
                 window.dispatchEvent(new CustomEvent("siyuan-home:open-spotlight"));
@@ -242,7 +247,7 @@ export default class LvHomePlugin extends Plugin {
         this.addCommand({
             langKey: "openReminders",
             langText: `${butlerLabel}：${this.i18n.tabReminders ?? "到期提醒中枢"}`,
-            hotkey: "Ctrl+Alt+R",
+            hotkey: "",
             callback: () => this.openRemindersScreen(),
         });
 
@@ -250,7 +255,7 @@ export default class LvHomePlugin extends Plugin {
         this.addCommand({
             langKey: "openLedger",
             langText: `${butlerLabel}：${this.i18n.tabLedger ?? "家庭台账列表"}`,
-            hotkey: "Ctrl+Alt+L",
+            hotkey: "",
             callback: () => this.openModuleTab(this.activeLedger),
         });
 
@@ -480,10 +485,35 @@ export default class LvHomePlugin extends Plugin {
         // 309 波：页签/顶栏/命令/图标的注册已全部移到 registerEntrypoints()，
         // 在 onload 的首个 await 之前同步完成（宿主装配窗口内）——此处不再重复登记。
 
+        // 向小驴雷切工作台安全注册到期提醒小组件（Epoch 6 联邦规范）
+        const unregRaikiri = registerRaikiriModuleSafely({
+            moduleId: "home-expiry-reminders",
+            title: "家庭到期提醒",
+            icon: "iconLvHome",
+            category: "life",
+            description: "展示小驴管家汇总的家庭各类证件、合同、账单、药品到期与超期事项",
+            source: { pluginId: "siyuan-home", name: "小驴管家", version: PLUGIN_VERSION },
+            read: async () => {
+                const rems = this.scan?.reminders ?? [];
+                const overdue = rems.filter((r) => r.daysLeft < 0);
+                const soon = rems.filter((r) => r.daysLeft >= 0 && r.daysLeft <= 7);
+                const items = [...overdue, ...soon].slice(0, 5).map((r) => ({
+                    label: r.title || "待办事项",
+                    value: r.daysLeft < 0 ? `逾期 ${Math.abs(r.daysLeft)} 天` : r.daysLeft === 0 ? "今天到期" : `${r.daysLeft} 天后到期`,
+                }));
+                return {
+                    title: `家庭提醒 (${overdue.length} 项逾期 · ${soon.length} 项临期)`,
+                    items: items.length > 0 ? items : [{ label: "近期无紧急到期事项", value: "✓" }],
+                };
+            },
+            open: () => this.openRemindersScreen(),
+        });
+        if (unregRaikiri) this.speedSwitchDisposers.push(unregRaikiri);
+
         // schema 契约门禁（33.2；193 波收口 SCHEMA_CATALOG 单源）：开发期发现违规立即暴露
         for (const [id, schema] of Object.entries(SCHEMA_CATALOG)) {
             const errors = validateSchema(id, schema);
-            if (errors.length) console.error("[siyuan-home] schema contract violations:", errors);
+            if (errors.length) console.error("[LvHome] schema contract violations:", errors);
         }
 
         // 欢迎提示与初次引导优化：
@@ -505,7 +535,7 @@ export default class LvHomePlugin extends Plugin {
 
         // B2d 降级定案（kernel.js 无定时器 API）：前端心跳 30min 驱动定时扫描
         this.heartbeat = window.setInterval(() => {
-            this.refreshHub().catch((e) => console.warn("[siyuan-home] heartbeat scan failed:", e));
+            this.refreshHub().catch((e) => console.warn("[LvHome] heartbeat scan failed:", e));
         }, 30 * 60 * 1000);
 
         // C6c：块菜单入口——选中文字 → 存入（URL 命中二级菜单分流：存为网址/存为地址；其余进常用语）
@@ -618,7 +648,7 @@ export default class LvHomePlugin extends Plugin {
         this.visibilityHandler = () => {
             if (document.visibilityState !== "visible") return;
             if (Date.now() - this.lastScanAt < LvHomePlugin.WAKE_RESCAN_MIN_MS) return;
-            this.refreshHub(undefined, true).catch((e) => console.warn("[siyuan-home] wake rescan failed:", e));
+            this.refreshHub(undefined, true).catch((e) => console.warn("[LvHome] wake rescan failed:", e));
         };
         document.addEventListener("visibilitychange", this.visibilityHandler);
 
@@ -640,7 +670,7 @@ export default class LvHomePlugin extends Plugin {
             }
             if (Date.now() - this.lastWsRescan < LvHomePlugin.WS_RESCAN_MIN_MS) return;
             this.lastWsRescan = Date.now();
-            this.refreshHub().catch((e) => console.warn("[siyuan-home] ws rescan failed:", e));
+            this.refreshHub().catch((e) => console.warn("[LvHome] ws rescan failed:", e));
         };
         this.eventBus.on("ws-main", this.wsHandler);
 
@@ -720,7 +750,7 @@ export default class LvHomePlugin extends Plugin {
             await saveRuntime(this, this.runtime);
             this.emitHubChanged();
         } catch (e) {
-            console.warn("[siyuan-home] checkin summary pull failed:", e instanceof Error ? e.message : e);
+            console.warn("[LvHome] checkin summary pull failed:", e instanceof Error ? e.message : e);
         }
     }
 
@@ -748,7 +778,7 @@ export default class LvHomePlugin extends Plugin {
             };
         } catch (e) {
             // 雷切约定：错误降级为空态快照 + 重试提示，不抛（见摘录 §4.1）
-            console.warn("[siyuan-home] summary snapshot failed:", e instanceof Error ? e.message : e);
+            console.warn("[LvHome] summary snapshot failed:", e instanceof Error ? e.message : e);
             return {title: this.i18nText("butler"), items: [], emptyHint: this.i18nText("hub.stale")};
         }
     }
@@ -816,7 +846,7 @@ export default class LvHomePlugin extends Plugin {
             await this.adoptHistoryLedgers();
             await this.refreshHub(undefined, true);
         } catch (e) {
-            console.warn("[siyuan-home] initial adopt/scan deferred:", e instanceof Error ? e.message : e);
+            console.warn("[LvHome] initial adopt/scan deferred:", e instanceof Error ? e.message : e);
         }
     }
 
@@ -837,7 +867,7 @@ export default class LvHomePlugin extends Plugin {
                 this.refreshHub(undefined, false).catch(() => undefined);
             }
         } catch (e) {
-            console.warn("[siyuan-home] onDataChanged sync failed:", e);
+            console.warn("[LvHome] onDataChanged sync failed:", e);
         }
     }
 
@@ -871,7 +901,7 @@ export default class LvHomePlugin extends Plugin {
         try {
             await saveSettings(this, this.settings);
         } catch (e) {
-            console.warn("[siyuan-home] saveSettings in provision failed:", e);
+            console.warn("[LvHome] saveSettings in provision failed:", e);
         }
     }
 
@@ -1138,7 +1168,7 @@ export default class LvHomePlugin extends Plugin {
         const label = this.i18nText("entry.mobile");
         button.setAttribute("aria-label", label);
         button.setAttribute("title", label);
-        button.innerHTML = `<svg aria-hidden="true"><use xlink:href="#iconLvHomeApp"></use></svg>`;
+        button.innerHTML = `<svg aria-hidden="true"><use xlink:href="#iconLvHome"></use></svg>`;
         button.addEventListener("click", () => this.openMobilePanel());
         topBar.appendChild(button);
         this.mobileTopBarBtn = button;
@@ -1219,7 +1249,21 @@ export default class LvHomePlugin extends Plugin {
     }
 
     // ── 提醒动作（B4 + H05/H07，转发 actions.ts；动作后 notifyHubChanged 即时刷新）──
-    async complete(r: any) { await complete(this, r); await this.notifyHubChanged(); }
+    async complete(r: any) {
+        await complete(this, r);
+        // 事务完成联动打卡（Epoch 6 联邦规范）
+        try {
+            const today = new Date().toISOString().slice(0, 10);
+            const rowId = r.rowId || r.id || "item";
+            const modId = r.moduleId || "general";
+            await logCheckinEventSafely({
+                itemId: `home_${modId}`,
+                externalRef: `home:${modId}:${rowId}:${today}`,
+                note: r.title ? `办结家庭事项：${r.title}` : `办结家庭事项（${modId}）`,
+            });
+        } catch { /* 零强依赖优雅降级 */ }
+        await this.notifyHubChanged();
+    }
     async snooze(id: string, days: number) { await snooze(this, id, days); await this.notifyHubChanged(); }
     async mute(id: string) { await mute(this, id); await this.notifyHubChanged(); }
     async unmute(id: string) { await unmute(this, id); await this.notifyHubChanged(); }

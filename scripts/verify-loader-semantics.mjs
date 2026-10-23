@@ -37,6 +37,7 @@ globalThis.location = globalThis.window.location;
 const calls = [];
 class PluginStub {
     eventBus = { on() {}, off() {} };
+    addIcons() {}
     addTab(o) { calls.push(["addTab", o?.type]); }
     addTopBar(o) { calls.push(["addTopBar", o?.title]); }
     addCommand(o) { calls.push(["addCommand", o?.langKey]); }

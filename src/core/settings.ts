@@ -70,7 +70,7 @@ export async function loadDataSafe<T = unknown>(plugin: Plugin, name: string): P
         const msg = e instanceof Error ? e.message : String(e);
         // 内核对缺失存储文件抛 not found 系错误——首次安装的正常路径，不是损坏
         if (/not found|no such|missing|enoent|不存在/i.test(msg)) return { data: null, corrupted: false };
-        console.warn(`[siyuan-home] loadData(${name}) failed: ${msg}`);
+        console.warn(`[LvHome] loadData(${name}) failed: ${msg}`);
         await backupCorruptMarker(plugin, name, msg);
         return { data: null, corrupted: true, reason: msg };
     }

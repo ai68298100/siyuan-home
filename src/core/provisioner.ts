@@ -366,7 +366,7 @@ async function ensureColumns(
             }
             // 补列失败不阻断建库（可重跑续补，33.2）
             error = `column "${col.key}": ${errText(e)}`;
-            console.warn(`[siyuan-home] column "${col.key}" on "${moduleId}" deferred:`, error);
+            console.warn(`[LvHome] column "${col.key}" on "${moduleId}" deferred:`, error);
         }
     }
     return { columns, error };
@@ -469,7 +469,7 @@ export async function provisionModule(
         } catch (e) {
             provisional = true;
             provisionError = errText(e);
-            console.warn(`[siyuan-home] module "${moduleId}" provisioned provisionally:`, provisionError);
+            console.warn(`[LvHome] module "${moduleId}" provisioned provisionally:`, provisionError);
         }
         const memberAvId = moduleId === "members" ? undefined : settings.dbRefs.members?.avId;
         const { columns, error } = await ensureColumns(avId, schema, undefined, moduleId, opts, memberAvId);
@@ -479,7 +479,7 @@ export async function provisionModule(
     } catch (e) {
         // D07：笔记本/文档创建失败（含瞬态）→ 记录，不向上抛（不中断其他模块建库）
         const msg = errText(e);
-        console.warn(`[siyuan-home] provision "${moduleId}" failed:`, msg);
+        console.warn(`[LvHome] provision "${moduleId}" failed:`, msg);
         const dbRef: DbRef = { ...existing, provisionError: msg };
         settings.dbRefs[moduleId] = dbRef;
         return { dbRef, created: false };

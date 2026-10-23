@@ -4,6 +4,7 @@
  * 降级：人脉未装/未初始化/搜索失败各有提示；快照格式 `名称 [docId]`。
  */
 import { Dialog } from "siyuan";
+import { getBridgeSafely } from "./ecosystem-bridge-kit";
 
 export interface ContactPickHandle {
     showMessage(msg: string, timeout: number, type: "info" | "error"): void;
@@ -11,13 +12,11 @@ export interface ContactPickHandle {
 }
 
 interface LvContactsSearch {
-    searchPeople: (keyword: string) => Promise<{ docId: string; name: string }[]>;
+    searchPeople?: (keyword: string) => Promise<{ docId: string; name: string }[]>;
 }
 
 export function getContactsBridge(): LvContactsSearch | undefined {
-    if (typeof window === "undefined") return undefined;
-    const w = window as unknown as Record<string, unknown>;
-    return (w.LvContacts || w.xiaolvContacts || w.siyuanContacts || w.lvContacts) as LvContactsSearch | undefined;
+    return getBridgeSafely<LvContactsSearch>("contacts");
 }
 
 /** 打开选人对话框；选中回调收到快照串 `名称 [docId]` */

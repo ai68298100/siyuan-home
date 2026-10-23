@@ -54,7 +54,7 @@ export async function sendWebhook(settings: HomeSettings, p: WebhookPayload): Pr
         else await fetch(req.url, { method: req.method, body: req.body, headers: req.headers, signal: ctrl.signal });
         return "ok";
     } catch (e) {
-        console.warn("[siyuan-home] webhook push failed:", e instanceof Error ? e.message : e);
+        console.warn("[LvHome] webhook push failed:", e instanceof Error ? e.message : e);
         return "error";
     } finally {
         clearTimeout(timer);

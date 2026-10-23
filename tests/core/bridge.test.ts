@@ -39,6 +39,7 @@ describe("LvHome 服务桥（EC03/v0.3 + Epoch 6）", () => {
         expect(api.protocol).toBe(LVHOME_BRIDGE_PROTOCOL);
         expect(api.capabilities).toEqual([
             "whenReady",
+            "hasCapability",
             "openButler",
             "openReminders",
             "addMemo",
@@ -46,6 +47,9 @@ describe("LvHome 服务桥（EC03/v0.3 + Epoch 6）", () => {
             "openModule",
             "getOverview",
         ]);
+        expect(api.hasCapability("whenReady")).toBe(true);
+        expect(api.hasCapability("openButler")).toBe(true);
+        expect(api.hasCapability("nonExistent")).toBe(false);
     });
 
     it("summary：overdue/soon/today 计数正确", () => {
