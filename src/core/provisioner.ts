@@ -31,15 +31,17 @@ export interface DuplicateFinding {
 export async function findDuplicateLedgers(settings: HomeSettings): Promise<DuplicateFinding[]> {
     const notebookId = settings.dbRefs.members?.notebook ?? settings.dbRefs.certs?.notebook;
     if (!notebookId) return [];
+    const escapedBox = notebookId.replace(/'/g, "''");
+    const escapedPrefix = DOC_TITLE_PREFIX.replace(/'/g, "''");
     const rows = await sql<{ hpath: string; cnt: number }>(
         `SELECT hpath, COUNT(id) AS cnt FROM blocks
-         WHERE type='d' AND box='${notebookId.replace(/'/g, "''")}' AND hpath LIKE '${DOC_TITLE_PREFIX}%'
+         WHERE type='d' AND box='${escapedBox}' AND (hpath LIKE '%/${escapedPrefix}%' OR hpath LIKE '/${escapedPrefix}%')
          GROUP BY hpath HAVING cnt > 1`,
     );
     const out: DuplicateFinding[] = [];
     for (const r of rows) {
         const ids = await sql<{ id: string }>(
-            `SELECT id FROM blocks WHERE type='d' AND box='${notebookId}' AND hpath='${r.hpath.replace(/'/g, "''")}'`,
+            `SELECT id FROM blocks WHERE type='d' AND box='${escapedBox}' AND hpath='${r.hpath.replace(/'/g, "''")}'`,
         );
         out.push({ hpath: r.hpath, docIds: ids.map((x) => x.id) });
     }
@@ -206,9 +208,9 @@ export async function findLedgerDoc(notebookId: string, hpath: string, moduleId?
     try {
         const escapedHpath = hpath.replace(/'/g, "''");
         const escapedBox = notebookId.replace(/'/g, "''");
-        // 1. 指定笔记本内精确匹配
+        // 1. 指定笔记本内精确匹配或子层级路径匹配（支持用户将台账放在子目录中）
         const rows = await sql<{ id: string; box: string; updated: string }>(
-            `SELECT id, box, updated FROM blocks WHERE type='d' AND box='${escapedBox}' AND hpath='${escapedHpath}' ORDER BY updated DESC LIMIT 5`,
+            `SELECT id, box, updated FROM blocks WHERE type='d' AND box='${escapedBox}' AND (hpath='${escapedHpath}' OR hpath LIKE '%${escapedHpath}') ORDER BY updated DESC LIMIT 5`,
         );
         if (rows.length === 1) return { id: rows[0].id, box: rows[0].box || notebookId };
         if (rows.length > 1) {
@@ -224,7 +226,7 @@ export async function findLedgerDoc(notebookId: string, hpath: string, moduleId?
             for (const alias of MODULE_TITLE_ALIASES[moduleId]) {
                 const aliasHpath = `/${DOC_TITLE_PREFIX}${alias}`.replace(/'/g, "''");
                 const aliasRows = await sql<{ id: string; box: string }>(
-                    `SELECT id, box FROM blocks WHERE type='d' AND box='${escapedBox}' AND hpath='${aliasHpath}' ORDER BY updated DESC LIMIT 2`,
+                    `SELECT id, box FROM blocks WHERE type='d' AND box='${escapedBox}' AND (hpath='${aliasHpath}' OR hpath LIKE '%${aliasHpath}') ORDER BY updated DESC LIMIT 2`,
                 );
                 if (aliasRows.length > 0) return { id: aliasRows[0].id, box: aliasRows[0].box || notebookId };
             }
@@ -232,16 +234,28 @@ export async function findLedgerDoc(notebookId: string, hpath: string, moduleId?
 
         // 3. 全局跨笔记本自愈找回（针对历史版本建在其他笔记本的情况）
         const globalRows = await sql<{ id: string; box: string }>(
-            `SELECT id, box FROM blocks WHERE type='d' AND hpath='${escapedHpath}' ORDER BY updated DESC LIMIT 2`,
+            `SELECT id, box FROM blocks WHERE type='d' AND (hpath='${escapedHpath}' OR hpath LIKE '%${escapedHpath}') ORDER BY updated DESC LIMIT 5`,
         );
-        if (globalRows.length > 0) return { id: globalRows[0].id, box: globalRows[0].box };
+        if (globalRows.length > 0) {
+            for (const r of globalRows) {
+                const av = await findAvBlockInDoc(r.id);
+                if (av) return { id: r.id, box: r.box };
+            }
+            return { id: globalRows[0].id, box: globalRows[0].box };
+        }
 
         if (moduleId && MODULE_TITLE_ALIASES[moduleId]) {
             for (const alias of MODULE_TITLE_ALIASES[moduleId]) {
                 const globalAliasRows = await sql<{ id: string; box: string }>(
-                    `SELECT id, box FROM blocks WHERE type='d' AND hpath LIKE '%${alias.replace(/'/g, "''")}%' ORDER BY updated DESC LIMIT 1`,
+                    `SELECT id, box FROM blocks WHERE type='d' AND hpath LIKE '%${alias.replace(/'/g, "''")}%' ORDER BY updated DESC LIMIT 3`,
                 );
-                if (globalAliasRows.length > 0) return { id: globalAliasRows[0].id, box: globalAliasRows[0].box };
+                if (globalAliasRows.length > 0) {
+                    for (const r of globalAliasRows) {
+                        const av = await findAvBlockInDoc(r.id);
+                        if (av) return { id: r.id, box: r.box };
+                    }
+                    return { id: globalAliasRows[0].id, box: globalAliasRows[0].box };
+                }
             }
         }
     } catch { /* SQL 异常回退 null */ }
@@ -251,8 +265,10 @@ export async function findLedgerDoc(notebookId: string, hpath: string, moduleId?
 /** 在文档内找既有 av 块（D08 补登记：文档在、登记丢 → 找回原库而非重建第二套） */
 export async function findAvBlockInDoc(docId: string): Promise<string | null> {
     try {
+        const escapedDocId = docId.replace(/'/g, "''");
+        // 兼容 type='av' 以及 markdown 中带有 NodeAttributeView 的块
         const rows = await sql<{ id: string }>(
-            `SELECT id FROM blocks WHERE type='av' AND root_id='${docId.replace(/'/g, "''")}' LIMIT 1`,
+            `SELECT id FROM blocks WHERE (type='av' OR markdown LIKE '%data-type="NodeAttributeView"%') AND root_id='${escapedDocId}' LIMIT 3`,
         );
         return rows[0]?.id ?? null;
     } catch {
@@ -290,6 +306,24 @@ export function getProvisioningReport(settings: Pick<HomeSettings, "enabledModul
     return { issues };
 }
 
+/** 常见列定义多语言与历史别名映射库，彻底解决列名不匹配与重复建列问题 */
+export const COMMON_COLUMN_ALIASES: Record<string, string[]> = {
+    name: ["名称", "姓名", "标题", "物品名称", "证件名称", "合同名称", "name", "title"],
+    qty: ["数量", "库存", "库存量", "现存数量", "qty", "stock_qty"],
+    stock_qty: ["数量", "库存", "库存量", "现存数量", "qty", "stock_qty"],
+    expiry: ["到期日", "有效期", "过期时间", "到期时间", "截止日期", "保质期至", "expiry", "due"],
+    due: ["到期日", "有效期", "过期时间", "到期时间", "截止日期", "expiry", "due"],
+    amount: ["金额", "价格", "花费", "费用", "额度", "amount", "price", "cost"],
+    note: ["备注", "说明", "详情", "notes", "note", "remark"],
+    category: ["分类", "类型", "类别", "分组", "category", "type"],
+    date: ["日期", "记录日期", "发生日期", "业务日期", "date"],
+    location: ["存放位置", "存放地点", "位置", "地点", "location", "store_place"],
+    store_place: ["存放位置", "存放地点", "位置", "地点", "location", "store_place"],
+    member: ["家庭成员", "成员", "归属人", "所属人", "联系人", "member", "owner"],
+    person: ["联系人", "姓名", "往来对象", "对象", "person"],
+    status: ["状态", "当前状态", "status"],
+};
+
 export interface ProvisionOptions {
     /** 列名解析（i18n）：列 key → 显示名（缺省用 key 本身） */
     resolveName?: (colKey: string) => string;
@@ -317,18 +351,27 @@ async function ensureColumns(
         if (columns[col.key]) continue; // 已登记 → 不删不改（ensureColumns 约束，15/33.2）
         const keyID = newSiYuanId();
         const columnName = opts.resolveName?.(col.key) ?? col.key;
-        // Settings can be lost while the AV still contains the column. Reuse
-        // the one preflight snapshot so existing columns are restored without
-        // issuing another read for every field.
+        // 别名与跨语言双向匹配池（中文、英文、历史别名全量覆盖）
+        const colAliases = new Set([
+            columnName,
+            col.key,
+            ...(COMMON_COLUMN_ALIASES[col.key] ?? []),
+        ]);
         const currentMatches = knownColumns.filter((candidate: any) =>
-            candidate?.id === keyID || candidate?.name === columnName || candidate?.keyName === columnName,
+            candidate?.id === keyID || colAliases.has(candidate?.name) || colAliases.has(candidate?.keyName),
         );
         if (currentMatches.length === 1 && currentMatches[0]?.id) {
             columns[col.key] = String(currentMatches[0].id);
             continue;
         }
         if (currentMatches.length > 1) {
-            error = `column "${col.key}" has multiple matching keys`;
+            // 优选第一个有效匹配，确保映射不落空
+            columns[col.key] = String(currentMatches[0].id);
+            continue;
+        }
+        // 如果是 relation 列但成员目标库尚未就绪，不直接发起可能导致负数错误码的请求
+        if (col.type === "relation" && !memberAvId) {
+            error = `relation column "${col.key}" deferred: members ledger pending`;
             continue;
         }
         try {
@@ -350,14 +393,13 @@ async function ensureColumns(
                 try {
                     const recoveredView = await renderLedger(avId);
                     const matches = (recoveredView.columns ?? []).filter((candidate: any) =>
-                        candidate?.id === keyID || candidate?.name === columnName || candidate?.keyName === columnName,
+                        candidate?.id === keyID || colAliases.has(candidate?.name) || colAliases.has(candidate?.keyName),
                     );
-                    if (matches.length === 1) {
+                    if (matches.length >= 1) {
                         recovered = matches[0];
                         knownColumns = recoveredView.columns ?? [];
+                        break;
                     }
-                    if (matches.length > 1) error = `column "${col.key}" recovery is ambiguous`;
-                    if (matches.length > 0) break;
                 } catch { /* keep trying briefly only when the write result is unknown */ }
             }
             if (recovered?.id) {
@@ -442,8 +484,8 @@ export async function provisionModule(
             return { dbRef, created: false };
         }
         let docId: string;
+        const docHeaderMarkdown = `# ${titleI18n}\n\n> 🏠 **小驴管家 · ${titleI18n}台账**\n> 💡 快捷直达：按 \`Ctrl+Alt+H\` 可在任意界面随时呼出管家面板；下方为思源原生属性视图数据库（AttributeView），支持直接编辑、增减行与双向同步。\n\n`;
         try {
-            const docHeaderMarkdown = `# ${titleI18n}\n\n> 🏠 **小驴管家 · ${titleI18n}台账**\n> 💡 快捷直达：按 \`Ctrl+Alt+H\` 可在任意界面随时呼出管家面板；下方为思源原生属性视图数据库（AttributeView），支持直接编辑、增减行与双向同步。\n\n`;
             docId = await createDocWithMd(notebookId, hpath, docHeaderMarkdown, {
                 idempotencyKey: `provision:doc:${moduleId}:${notebookId}:${hpath}`,
                 retries: 0,
@@ -457,7 +499,14 @@ export async function provisionModule(
             if (recovered) {
                 docId = recovered.id;
             } else {
-                throw error;
+                // 自愈降级：若创建文档报冲突或已存在异常，生成带自愈后缀的新路径，保障建库流程绝不卡死
+                const errStr = String(error);
+                if (errStr.includes("409") || errStr.includes("exist") || errStr.includes("conflict")) {
+                    const fallbackHPath = `${hpath}_${Date.now().toString(36)}`;
+                    docId = await createDocWithMd(notebookId, fallbackHPath, docHeaderMarkdown, { retries: 1 });
+                } else {
+                    throw error;
+                }
             }
         }
         const avIdSeed = stableAvSeed(moduleId, docId);
