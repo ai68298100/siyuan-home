@@ -488,8 +488,8 @@
     function sortRows(list: any[], keyID?: string, ascending = true, keyType?: string) {
         if (!keyID) return list;
         return [...list].sort((a, b) => {
-            const av = cellText(a.cells[keyID]);
-            const bv = cellText(b.cells[keyID]);
+            const av = cellText(a.cells?.[keyID]);
+            const bv = cellText(b.cells?.[keyID]);
             const an = Number(av);
             const bn = Number(bv);
             // Only numeric schema columns use numeric comparison. Date strings
@@ -513,7 +513,9 @@
             : 0;
         const first = Math.max(0, Math.floor((ledgerScrollTop - tableTop) / virtualRowHeight) - VIRTUAL_OVERSCAN);
         const count = Math.ceil(ledgerViewportHeight / virtualRowHeight) + VIRTUAL_OVERSCAN * 2;
-        return { start: Math.min(first, Math.max(0, total - count)), end: Math.min(total, first + count) };
+        const start = Math.max(0, Math.min(first, Math.max(0, total - count)));
+        const end = Math.min(total, start + count);
+        return { start, end };
     });
     const virtualRows = $derived(visibleRows.slice(virtualRange.start, virtualRange.end));
 
@@ -6092,7 +6094,7 @@
                 {/if}
                 {#each virtualRows as r (r.itemID)}
                     {@const tone = ledgerTone(r)}
-                    {@const rowName = cellText(r.cells[ref.columns.name], "name") || cellText(r.cells[ref.columns.title], "title") || t("ledger.detail")}
+                    {@const rowName = cellText(r.cells?.[ref?.columns?.name], "name") || cellText(r.cells?.[ref?.columns?.title], "title") || t("ledger.detail")}
                     <tr class="lv-row-link" onclick={() => openDetail(r)} title={t("ledger.detail")}>
                         <td style="width:36px;padding:4px 6px;text-align:center" onclick={(e) => e.stopPropagation()}>
                             <input type="checkbox" class="b3-switch" style="transform:scale(0.8);margin:0" checked={selectedItemIds.includes(r.itemID)} onclick={() => toggleRowSelect(r.itemID)} />
@@ -6104,7 +6106,7 @@
                             </button>
                         </td>
                         {#each tableKeys as k (k)}
-                            {@const v = r.cells[ref.columns[k]]}
+                            {@const v = r.cells?.[ref?.columns?.[k]]}
                             <td class="lv-num" style={k === "expiry" || k === "due" ? `color:${toneColor(tone)}` : ""}>
                                 {#if k === "qty" || k === "stock_qty"}
                                     <div class="lv-qty-stepper">
