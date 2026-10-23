@@ -1,11 +1,11 @@
-# v0.5.53 · 小驴管家（内测版）虚拟滚动视口防抖防跳动与全场景空值引用加固
+# v0.5.54 · 小驴管家（内测版）全场景网络写未知判定加固与详情抽屉空指针全景防御
 
 ## 变更
 
-- **表格虚拟滚动视口防抖防跳动（Virtual Scrolling Bounds）**：
-  - 重构 `virtualRange` 边界约束公式（`start = Math.max(0, Math.min(first, Math.max(0, total - count)))`, `end = Math.min(total, start + count)`），确保视口高度与上下占位垫片总和严格守恒，彻底消除在快速滚动至台账底部时滚动条跳动与视觉频闪；
-- **全场景单元格空值防御强化**：
-  - 对行记录属性视图单元格访问全面增加安全可选链保护（`r.cells?.[ref?.columns?.[k]]`），杜绝极端残缺行或列配置加载未就绪时的潜在空指针报错。
+- **网络超时与未知写入判定加固（isWriteResultUnknown）**：
+  - `isWriteResultUnknown` 补充对现代浏览器与运行环境中 `DOMException.TimeoutError` 的兼容识别，防止请求在超时情况下被误判为内核明确失败而引发不必要的状态不一致；
+- **台账详情抽屉 openDetail 空指针全景防御**：
+  - 对归档导出清单、育儿疫苗剂量统计、消费趋势分析以及详情抽屉复刻/删除确认等全链路中的 `row.cells` 与 `ref.columns` 访问增加深度安全可选链保护，杜绝残缺数据导致的未捕获 TypeError。
 
 ## 验证
 
