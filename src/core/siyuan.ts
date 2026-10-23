@@ -225,7 +225,7 @@ export function isWriteResultUnknown(e: unknown): boolean {
         return false;
     }
     if (e instanceof TypeError) return true;
-    return typeof DOMException !== "undefined" && e instanceof DOMException && e.name === "AbortError";
+    return typeof DOMException !== "undefined" && e instanceof DOMException && (e.name === "AbortError" || e.name === "TimeoutError");
 }
 
 function looksLikeAuthFailure(res: IRawResponse): boolean {

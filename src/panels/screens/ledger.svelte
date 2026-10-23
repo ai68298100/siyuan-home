@@ -714,17 +714,17 @@
             const memberMap = new Map((plugin.settings.members ?? []).map((m: any) => [m.avItemId, m.name]));
 
             const records = all.rows.map((row) => {
-                const title = sourceRef.columns?.name ? cellText(row.cells[sourceRef.columns.name]) : "未命名记录";
-                const memId = sourceRef.columns?.member ? String(row.cells[sourceRef.columns.member]?.relation?.blockIDs?.[0] ?? "") : "";
+                const title = sourceRef.columns?.name ? cellText(row.cells?.[sourceRef.columns.name]) : "未命名记录";
+                const memId = sourceRef.columns?.member ? String(row.cells?.[sourceRef.columns.member]?.relation?.blockIDs?.[0] ?? "") : "";
                 const memberName = memId ? (memberMap.get(memId) ?? "") : "";
-                const attList = row.cells[attCol]?.mAsset ?? [];
+                const attList = row.cells?.[attCol]?.mAsset ?? [];
                 return {
                     id: row.itemID,
                     module: moduleId,
                     title,
                     memberName,
-                    date: sourceRef.columns?.date ? cellText(row.cells[sourceRef.columns.date]) : undefined,
-                    expiry: sourceRef.columns?.expiry ? cellText(row.cells[sourceRef.columns.expiry]) : undefined,
+                    date: sourceRef.columns?.date ? cellText(row.cells?.[sourceRef.columns.date]) : undefined,
+                    expiry: sourceRef.columns?.expiry ? cellText(row.cells?.[sourceRef.columns.expiry]) : undefined,
                     attachments: attList,
                 };
             }).filter((r) => r.attachments.length > 0);
@@ -1024,14 +1024,14 @@
                 // 收集该孩子在 parenting 里的已接种记录
                 const givenRecords: GivenDose[] = [];
                 for (const r of all.rows) {
-                    const mBlock = ref.columns.member ? r.cells[ref.columns.member]?.relation?.blockIDs?.[0] : undefined;
+                    const mBlock = ref?.columns?.member ? r.cells?.[ref.columns.member]?.relation?.blockIDs?.[0] : undefined;
                     if (mBlock && child.avItemId && mBlock !== child.avItemId) continue;
 
-                    const vname = ref.columns.vaccine_name ? cellText(r.cells[ref.columns.vaccine_name]) : (ref.columns.name ? cellText(r.cells[ref.columns.name]) : "");
-                    const doseRaw = ref.columns.dose_no ? cellText(r.cells[ref.columns.dose_no]) : "";
-                    const dateVal = ref.columns.date ? cellText(r.cells[ref.columns.date]) : "";
-                    const batchVal = ref.columns.vaccine_batch ? cellText(r.cells[ref.columns.vaccine_batch]) : "";
-                    const siteVal = ref.columns.vaccine_site ? cellText(r.cells[ref.columns.vaccine_site]) : "";
+                    const vname = ref?.columns?.vaccine_name ? cellText(r.cells?.[ref.columns.vaccine_name]) : (ref?.columns?.name ? cellText(r.cells?.[ref.columns.name]) : "");
+                    const doseRaw = ref?.columns?.dose_no ? cellText(r.cells?.[ref.columns.dose_no]) : "";
+                    const dateVal = ref?.columns?.date ? cellText(r.cells?.[ref.columns.date]) : "";
+                    const batchVal = ref?.columns?.vaccine_batch ? cellText(r.cells?.[ref.columns.vaccine_batch]) : "";
+                    const siteVal = ref?.columns?.vaccine_site ? cellText(r.cells?.[ref.columns.vaccine_site]) : "";
 
                     if (vname && vname !== "—") {
                         givenRecords.push({
@@ -1796,9 +1796,9 @@
 
             const entries = all.rows
                 .map((row) => ({
-                    date: cellText(row.cells[dateCol]),
-                    amount: Number(cellText(row.cells[amountCol]).replace(/[^\d.-]/g, "")),
-                    category: sourceRef.columns?.category ? cellText(row.cells[sourceRef.columns.category]) : undefined,
+                    date: cellText(row.cells?.[dateCol]),
+                    amount: Number(cellText(row.cells?.[amountCol]).replace(/[^\d.-]/g, "")),
+                    category: sourceRef.columns?.category ? cellText(row.cells?.[sourceRef.columns.category]) : undefined,
                 }))
                 .filter((e) => e.date && Number.isFinite(e.amount) && e.amount > 0);
 
@@ -2591,7 +2591,7 @@
     function openDetail(row: any, vehicleAction?: "fuel" | "charging" | "maintenance" | "edit", activityTarget?: ActivityTarget) {
         if (!ref?.columns) return;
         // Show the row name in the drawer header, with a generic fallback.
-        const detailTitle = (ref.columns.name && cellText(row.cells[ref.columns.name], "name")) || t("ledger.detail");
+        const detailTitle = (ref.columns.name && cellText(row.cells?.[ref.columns.name], "name")) || t("ledger.detail");
         const dlg = new Dialog({
             title: detailTitle,
             content: `<div class="b3-dialog__content b3-dialog__content--wrap" id="lv-detail-body" style="max-height:60vh;overflow:auto"></div>
@@ -2632,7 +2632,7 @@
             showVehicleActionError(detail);
         };
         body.classList.toggle("lv-detail-body-vehicle", active === "vehicles");
-        const rowCategory = active === "certs" ? selectCellContent(row.cells[ref.columns.category ?? ""]) : undefined;
+        const rowCategory = active === "certs" ? selectCellContent(row.cells?.[ref.columns.category ?? ""]) : undefined;
         const activeCertFields = active === "certs" ? new Set(getCertificateProfile(rowCategory).fieldKeys) : null;
         const schemaCols: any[] = (plugin.schemaCatalog?.[active]?.columns ?? []).filter((col: any) =>
             active !== "certs" || !String(col.key).startsWith("x_cert_") || activeCertFields?.has(col.key));
@@ -5340,12 +5340,12 @@
         const dupBtn = dlg.element.querySelector("#lv-detail-duplicate") as HTMLButtonElement | null;
         if (dupBtn) {
             dupBtn.onclick = () => {
-                const rowName = cellText(row.cells[ref.columns.name]) || "";
+                const rowName = (ref.columns.name && cellText(row.cells?.[ref.columns.name])) || "";
                 const cloneName = rowName ? `${rowName} (副本)` : "";
                 const copiedValues: Record<string, any> = { name: cloneName };
                 for (const col of schemaCols) {
                     if (col.key === "name" || ["asset", "mAsset", "relation"].includes(col.type)) continue;
-                    const v = row.cells[ref.columns[col.key]];
+                    const v = ref.columns[col.key] ? row.cells?.[ref.columns[col.key]] : undefined;
                     if (v) {
                         if (col.type === "select") copiedValues[col.key] = selectCellContent(v);
                         else if (col.type === "number") copiedValues[col.key] = v.number?.content;
@@ -5366,7 +5366,7 @@
                 showMessage(t("guest.writeBlocked"), 4000, "info");
                 return;
             }
-            confirm(t("ledger.delTitle"), t("ledger.delBody").replace("${name}", cellText(row.cells[ref.columns.name])), async () => {
+            confirm(t("ledger.delTitle"), t("ledger.delBody").replace("${name}", (ref.columns.name && cellText(row.cells?.[ref.columns.name])) || t("ledger.detail")), async () => {
                 try {
                     const { removeLedgerRows, } = await import("@/core/siyuan");
                     await removeLedgerRows(ref!.avId!, [row.itemID], {
