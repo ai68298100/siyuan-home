@@ -38,15 +38,19 @@ export function selectCellContent(cell: AvCellLike | undefined | null): string |
 /** 提取单元格展示文本（无 UI 依赖纯函数） */
 export function cellContentText(cell: AvCellLike | undefined | null): string {
     if (!cell) return "";
-    if (cell.text?.content) return cell.text.content;
-    if (cell.block?.content) return cell.block.content;
+    if (cell.text?.content !== undefined && cell.text?.content !== null) return String(cell.text.content);
+    if (cell.block?.content !== undefined && cell.block?.content !== null) return String(cell.block.content);
     const sel = selectCellContent(cell);
     if (sel) return sel;
-    if (typeof cell.number?.content === "number") return String(cell.number.content);
-    if (typeof cell.date?.content === "number") {
-        const d = new Date(cell.date.content);
-        return isNaN(d.getTime()) ? "" : d.toISOString().slice(0, 10);
+    if (cell.number?.content !== undefined && cell.number?.content !== null) return String(cell.number.content);
+    if (cell.date?.content !== undefined && cell.date?.content !== null) {
+        const raw = cell.date.content;
+        const num = Number(raw);
+        const d = !isNaN(num) && num > 100000000 ? new Date(num) : new Date(String(raw));
+        if (!isNaN(d.getTime())) return d.toISOString().slice(0, 10);
+        return String(raw);
     }
+    if (cell.checkbox?.checked !== undefined) return cell.checkbox.checked ? "✓" : "";
     if (cell.url?.content) return cell.url.content;
     return "";
 }
