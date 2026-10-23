@@ -891,6 +891,21 @@ export default class LvHomePlugin extends Plugin {
         return getProvisioningReport(this.settings);
     }
 
+    /** 单模块独立自愈/建库（毫秒级执行，不阻塞其他模块） */
+    async repairModule(moduleId: string): Promise<any> {
+        const schema = this.schemaCatalog[moduleId];
+        if (!schema) return;
+        const resolveName = (key: string) => String(this.i18n[`field.${key}`] ?? key);
+        const res = await provisionModule(this.settings, moduleId, schema, this.i18nText("module." + moduleId), { resolveName });
+        try {
+            await saveSettings(this, this.settings);
+        } catch (e) {
+            console.warn("[LvHome] saveSettings in repairModule failed:", e);
+        }
+        await this.refreshHub(moduleId, true);
+        return res;
+    }
+
     private async provisionLedgers(): Promise<void> {
         const resolveName = (key: string) => String(this.i18n[`field.${key}`] ?? key);
         const enabled = new Set(this.settings.enabledModules);

@@ -30,6 +30,7 @@ export interface HomePluginLike extends Plugin {
     adoptHistoryLedgers?(): Promise<any>;
     showTab(): void;
     showTabDocs(docId?: string, blockId?: string): void;
+    repairModule?(moduleId: string): Promise<any>;
     openSetting(): void;
     setActiveLedger(id: string): void;
     listHandled(): HandledEntry[];

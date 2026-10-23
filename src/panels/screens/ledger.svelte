@@ -366,6 +366,7 @@
                         <span class="lv-caption">${t("ledger.bindDocTitle")}：</span>
                         <input class="b3-text-field" id="lv-bind-doc-input" placeholder="siyuan://blocks/20261021... 或 ((20261021...))" style="width:100%" />
                     </label>
+                    <div id="lv-bind-candidates" style="display:flex;flex-direction:column;gap:6px;max-height:180px;overflow-y:auto"></div>
                 </div>
                 <div class="b3-dialog__action">
                     <button class="b3-button b3-button--cancel">${t("cancel")}</button>
@@ -375,6 +376,34 @@
             width: "480px",
         });
         (dlg.element.querySelector(".b3-button--cancel") as HTMLButtonElement).onclick = () => dlg.destroy();
+        void (async () => {
+            const listEl = dlg.element.querySelector("#lv-bind-candidates") as HTMLElement | null;
+            if (!listEl) return;
+            try {
+                const { sql } = await import("@/core/siyuan");
+                const modName = t(`module.${active}`);
+                const rows = await sql<{ id: string; hpath: string }>(
+                    `SELECT id, hpath FROM blocks WHERE type='d' AND (hpath LIKE '%${active}%' OR hpath LIKE '%${modName}%') ORDER BY updated DESC LIMIT 5`
+                );
+                if (rows.length === 0 || !dlg.element.isConnected) return;
+                listEl.innerHTML = `<span class="lv-caption" style="color:var(--lv-tx-3);margin-top:4px">💡 推荐候选文档（点击直接填入）：</span>`;
+                for (const r of rows) {
+                    const btn = document.createElement("button");
+                    btn.type = "button";
+                    btn.className = "b3-button b3-button--outline";
+                    btn.style.cssText = "font-size:12px;padding:4px 8px;text-align:left;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%";
+                    btn.textContent = `📄 ${r.hpath}`;
+                    btn.onclick = () => {
+                        const inp = dlg.element.querySelector("#lv-bind-doc-input") as HTMLInputElement;
+                        if (inp) {
+                            inp.value = r.id;
+                            inp.focus();
+                        }
+                    };
+                    listEl.appendChild(btn);
+                }
+            } catch { /* soft query */ }
+        })();
         (dlg.element.querySelector("#lv-bind-doc-ok") as HTMLButtonElement).onclick = async function (this: HTMLButtonElement) {
             const inputVal = (dlg.element.querySelector("#lv-bind-doc-input") as HTMLInputElement).value.trim();
             if (!inputVal) return;
@@ -1209,22 +1238,17 @@
     async function rebuildLedger() {
         rebuilding = true;
         try {
-            await plugin.adoptHistoryLedgers?.();
-            const report = await plugin.ensureCoreLedgers();
-            try {
-                // Rebuilding/provisioning changes the set of readable ledgers;
-                // a cached scan can otherwise hide the new module for 30s.
-                await plugin.refreshHub(undefined, true);
-            } catch (e) {
-                showMessage(t("ledger.rebuildRefreshFailed").replace("${msg}", e instanceof Error ? e.message : String(e)), 6000, "error");
+            if (typeof plugin.repairModule === "function") {
+                await plugin.repairModule(active);
+            } else {
+                await plugin.adoptHistoryLedgers?.();
+                await plugin.ensureCoreLedgers();
+                try {
+                    await plugin.refreshHub(undefined, true);
+                } catch { /* soft */ }
             }
             await load(); // 立即重新拉取当前模块的数据
-            if (report.issues.length > 0) {
-                const modules = report.issues.map(({ moduleId }) => t(`module.${moduleId}`)).join(", ");
-                showMessage(t("ledger.rebuildPartial").replace("${modules}", modules), 7000, "error");
-            } else {
-                showMessage(t("ledger.rebuildDone"), 3000, "info");
-            }
+            showMessage(t("ledger.rebuildDone"), 3000, "info");
         } catch (e) {
             showMessage(t("ledger.rebuildFailed").replace("${msg}", e instanceof Error ? e.message : String(e)), 6000, "error");
         } finally {
