@@ -2,7 +2,7 @@
   "name": "siyuan-home",
   "author": "ai68298100",
   "url": "https://github.com/ai68298100/siyuan-home",
-  "version": "0.5.51",
+  "version": "0.5.52",
   "minAppVersion": "3.8.4",
   "settingsWindow": true,
   "kernels": [

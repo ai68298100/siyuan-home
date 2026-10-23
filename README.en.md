@@ -39,22 +39,23 @@ Certificates expire, medicine expires, insurance needs renewal, subscriptions au
 
 Image OCR uses the engine configured in SiYuan Settings → OCR. It runs only when requested and does not require automatic OCR to be enabled. AI OCR asks before each run because the image is sent to the selected AI service. Results are saved to SiYuan OCR text and included in search; re-running replaces the previous result. Encrypted notebook images and PDFs are not supported, and OCR text is never written into ledger fields automatically.
 
-## 🆕 What's new in v0.5.51
+## 🆕 What's new in v0.5.52
 
-This release polishes table cell rendering robustness and inline steppers: stringified number parsing, immediate low-stock rescan triggers, and strict invalid date `NaN` defenses:
+This release delivers deep polish across CSV batch imports, Spotlight ranking, and row log interactions:
 
-- **Improved (Inline Stepper Robustness & Rescan Trigger)**: Tolerates string-based numbers in `adjustRowQty` (e.g. `12`) to prevent unwanted zero resets; immediately triggers single-module rescan to synchronize low-stock reminder states;
-- **Improved (Strict Invalid Date NaN Defense)**: Validates dates with `isNaN(d.getTime())` in `cellText`, eliminating fragmented `NaN-NaN-NaN` display on corrupt inputs and cleanly falling back to `—`.
+- **Added (CSV Header Chinese Alias Auto-Alignment)**: Connected `guessMapping` to `IMPORTER_ALIASES`, auto-detecting headers like "Medicine Name", "Expiry Date", "Stock Qty", and "Purchase Price" for 100% zero-configuration mapping;
+- **Improved (Spotlight Multi-Dimensional Weighting)**: Empty search automatically elevates imminent items with valid due dates, and supports fuzzy module ID queries;
+- **Improved (Row Log Interaction Ergonomics)**: Defaults the date field to today in `addRowLogSection` and adds Enter key shortcuts for fluid continuous log entries.
 - **Validation**: 90 test suites, **791 unit tests passing**, TypeScript, Svelte, i18n (1950 keys), metadata, and package smoke all green.
-## 📦 Install (v0.5.51)
+## 📦 Install (v0.5.52)
 
 1. Download `package.zip` from [Releases](https://github.com/ai68298100/siyuan-home/releases/latest)
 2. SiYuan → Settings → Marketplace → Download → **Import** the zip
 3. Enable the plugin → complete the 2-step onboarding (household → module picks and provisioning)
 4. Press `Ctrl+Alt+H` anytime to open the hub
 
-> **Validation status:** core data paths have automated tests and isolated-kernel coverage. The v0.5.51 GitHub Release is available; Android WebView behavior remains host-specific validation. `icon.png` and `preview.png` were redesigned for v0.3.13 (brand-gradient tile + geometric mark; dark overview with sample data).
-> **Version note:** the tagged v0.5.51 package is the current GitHub release; local quality checks report 791 unit tests.
+> **Validation status:** core data paths have automated tests and isolated-kernel coverage. The v0.5.52 GitHub Release is available; Android WebView behavior remains host-specific validation. `icon.png` and `preview.png` were redesigned for v0.3.13 (brand-gradient tile + geometric mark; dark overview with sample data).
+> **Version note:** the tagged v0.5.52 package is the current GitHub release; local quality checks report 791 unit tests.
 >
 > Family sharing depends on SiYuan's collaboration, permissions, sync and conflict behavior. Test with non-sensitive data before sharing; this plugin does not provide a separate permission system.
 >
@@ -112,7 +113,8 @@ The v0.5.1 release is available on GitHub, with static isolated-kernel gates and
 
 | Phase | Content |
 |---|---|
-| ✅ v0.5.51 (current) | Stepper number parsing & rescan, invalid date NaN defense, table purity |
+| ✅ v0.5.52 (current) | CSV alias auto-alignment, Spotlight multi-dimension ranking, row log Enter shortcut |
+| v0.5.51 | Stepper number parsing & rescan, invalid date NaN defense, table purity |
 | v0.5.50 | Missing column perception & auto-repair, batch debounce protection, safe CSV export |
 | v0.5.49 | Per-module instant repair, smart candidate document sensing, full cell data tolerance |
 | v0.5.48 | Eliminate first-step provisioning failures, multi-level path self-healing, column alias compatibility |

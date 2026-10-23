@@ -3299,6 +3299,13 @@
                 inp.className = "b3-text-field";
                 inp.placeholder = f.placeholder;
                 inp.style.cssText = `width:${f.width}px;font-size:12px`;
+                if (f.type === "date") inp.value = localDateKey(new Date());
+                inp.onkeydown = (e: KeyboardEvent) => {
+                    if (e.key === "Enter" && !e.isComposing) {
+                        e.preventDefault();
+                        addBtn.click();
+                    }
+                };
                 inputs[f.key] = inp;
                 form.appendChild(inp);
             }
